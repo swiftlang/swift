@@ -805,8 +805,6 @@ namespace {
     virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
                                   Label label) = 0;
 
-    virtual bool hasNonStandardOutput() const = 0;
-
     /// Indicates whether the output format is meant to be parsable. Parsable
     /// output should use structure rather than stringification to convey
     /// detailed information, and generally provides more information than the
@@ -898,10 +896,6 @@ namespace {
         escaping_ostream escOS(OS);
         R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
       }, label, RangeColor);
-    }
-
-    bool hasNonStandardOutput() const override {
-      return &OS != &llvm::errs() && &OS != &llvm::dbgs();
     }
 
     bool isParsable() const override { return false; }
@@ -1014,8 +1008,6 @@ namespace {
       OS.attributeEnd();
     }
 
-    bool hasNonStandardOutput() const override { return true; }
-
     bool isParsable() const override { return true; }
   };
 
@@ -1045,10 +1037,6 @@ namespace {
         : Writer(writer), MemberLoading(memberLoading),
           GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
           GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) {}
-
-    bool hasNonStandardOutput() {
-      return Writer.hasNonStandardOutput();
-    }
 
     bool isTypeChecked() const {
       return MemberLoading == ASTDumpMemberLoading::TypeChecked;
@@ -3015,11 +3003,6 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
         << "autoclosure discriminator=";
     }
 
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (&os != &llvm::errs() && &os != &llvm::dbgs())
-      (void)ACE->getDiscriminator();
-
     PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
   }
@@ -4094,16 +4077,15 @@ public:
     printFoot();
   }
 
-  void printClosure(AbstractClosureExpr *E, char const *name,
-                                  Label label) {
+  void printClosure(AbstractClosureExpr *E, char const *name, Label label) {
     printCommon(E, name, label);
 
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (hasNonStandardOutput())
-      (void)E->getDiscriminator();
+    // If we're dumping the type-checked AST, compute the discriminator if
+    // needed. Otherwise, print the cached discriminator.
+    auto discriminator = isTypeChecked() ? E->getDiscriminator()
+                                         : E->getRawDiscriminator();
 
-    printField(E->getRawDiscriminator(), Label::always("discriminator"),
+    printField(discriminator, Label::always("discriminator"),
                DiscriminatorColor);
     printIsolation(E->getActorIsolation());
 

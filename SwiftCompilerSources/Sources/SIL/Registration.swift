@@ -118,6 +118,7 @@ public func registerSILClasses() {
   register(MoveOnlyWrapperToCopyableAddrInst.self)
   register(ObjectInst.self)
   register(VectorInst.self)
+  register(VectorBaseAddrInst.self)
   register(TuplePackExtractInst.self)
   register(TuplePackElementAddrInst.self)
   register(PackElementGetInst.self)

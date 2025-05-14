@@ -45,9 +45,9 @@ extension P {
     }
   }
 
-  // CHECK-LABEL: define{{.*}} swiftcc void @"$s19typed_throws_thunks1PP2g24bodyyyy7FailureQzYKXE_tAGYKFTj"(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias nocapture swifterror dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+  // CHECK-LABEL: define{{.*}} swiftcc void @"$s19typed_throws_thunks1PP2g24bodyyyy7FailureQzYKXE_tAGYKFTj"(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
 	// CHECK-NOT: ret
-  // CHECK: call swiftcc void {{.*}}(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias nocapture swifterror dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+  // CHECK: call swiftcc void {{.*}}(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
 
   public func g2(body: () throws(Failure) -> Void) throws(Failure) {
     do {
@@ -57,9 +57,9 @@ extension P {
     }
   }
 
-  // CHECK-LABEL: define{{.*}} swiftcc { i64, i64 } @"$s19typed_throws_thunks1PP2g34bodyyyyAA9FixedSizeVYKXE_tAGYKFTj"(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias nocapture swifterror dereferenceable(8) %3, ptr %4, ptr %5)
+  // CHECK-LABEL: define{{.*}} swiftcc { i64, i64 } @"$s19typed_throws_thunks1PP2g34bodyyyyAA9FixedSizeVYKXE_tAGYKFTj"(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5)
   // CHECK-NOT: ret
-  // CHECK:  call swiftcc { i64, i64 } {{.*}}(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias nocapture swifterror dereferenceable(8) %3, ptr %4, ptr %5)
+  // CHECK:  call swiftcc { i64, i64 } {{.*}}(ptr %0, ptr %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5)
 
 
   public func g3(body: () throws(FixedSize) -> Void) throws(FixedSize) {
@@ -69,7 +69,7 @@ extension P {
 protocol P2 {
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s19typed_throws_thunks2P2P1fyyAA1EOYKFTj"(
 // CHECK-SAME:      ptr noalias swiftself %0, 
-// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1, 
+// CHECK-SAME:      ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %1, 
 // CHECK-SAME:      ptr %2, ptr %3
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -81,7 +81,7 @@ protocol P2 {
     func f() throws(E)
 // CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1gyys4Int8VYKFTj"(
 // CHECk-SAME:      ptr noalias swiftself %0
-// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
+// CHECK-SAME:      ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %1
 // CHECK-SAME:      ptr %2
 // CHECK-SAME:      ptr %3
 // CHECK-SAME:  )
@@ -93,7 +93,7 @@ protocol P2 {
     func g() throws(Int8)
 // CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1hs4Int8VyAA1EOYKFTj"(
 // CHECK-SAME:      ptr noalias swiftself %0
-// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
+// CHECK-SAME:      ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %1
 // CHECK-SAME:      ptr %2 
 // CHECK-SAME:      ptr %3
 // CHECK-SAME:  )
@@ -105,7 +105,7 @@ protocol P2 {
     func h() throws(E) -> Int8
 // CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1is4Int8VyAFYKFTj"(
 // CHECK-SAME:      ptr noalias swiftself %0
-// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
+// CHECK-SAME:      ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %1
 // CHECK-SAME:      ptr %2
 // CHECK-SAME:      ptr %3
 // CHECK-SAME:  )

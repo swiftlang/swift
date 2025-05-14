@@ -197,10 +197,13 @@ EXPECTED_DEFAULTS = {
     'enable_ubsan': False,
     'export_compile_commands': False,
     'extra_cmake_options': [],
+    'extra_llvm_cmake_options': [],
     'extra_swift_args': [],
+    'extra_swift_cmake_options': [],
     'swift_debuginfo_non_lto_args': None,
     'force_optimized_typechecker': False,
     'foundation_build_variant': 'Debug',
+    'foundation_tests_build_variant': 'Debug',
     'host_cc': None,
     'host_cxx': None,
     'host_libtool': None,
@@ -783,6 +786,8 @@ EXPECTED_OPTIONS = [
                   choices=['false', 'not-merged', 'merged']),
     ChoicesOption('--android-arch',
                   choices=['armv7', 'aarch64', 'x86_64']),
+    ChoicesOption('--foundation-tests-build-type',
+                  dest='foundation_tests_build_variant', choices=['Debug', 'Release']),
 
     StrOption('--android-api-level'),
     StrOption('--build-args'),
@@ -803,6 +808,7 @@ EXPECTED_OPTIONS = [
     StrOption('--swift-darwin-module-archs'),
     StrOption('--swift-darwin-supported-archs'),
     SetTrueOption('--swift-freestanding-is-darwin'),
+    AppendOption('--extra-swift-cmake-options'),
 
     StrOption('--linux-archs'),
     StrOption('--linux-static-archs'),
@@ -853,6 +859,7 @@ EXPECTED_OPTIONS = [
     AppendOption('--llvm-ninja-targets'),
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
     AppendOption('--llvm-cmake-options'),
+    AppendOption('--extra-llvm-cmake-options'),
     EnableOption('--llvm-build-compiler-rt-with-use-runtimes'),
     AppendOption('--darwin-symroot-path-filters'),
 

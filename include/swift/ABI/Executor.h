@@ -77,10 +77,10 @@ class SerialExecutorRef {
     /// Executor that may need to participate in complex "same context" checks,
     /// by invoking `isSameExclusiveExecutionContext` when comparing execution contexts.
     ComplexEquality = 0b01,
-    /// Mark this executor as the one used by `Task.startSynchronously`,
+    /// Mark this executor as the one used by `Task.immediate`,
     /// It cannot participate in switching.
     // TODO: Perhaps make this a generic "cannot switch" rather than start synchronously specific.
-    StartSynchronously = 0b10,
+    Immediate = 0b10,
   };
 
   static_assert(static_cast<uintptr_t>(ExecutorKind::Ordinary) == 0);
@@ -107,12 +107,12 @@ public:
 
   static SerialExecutorRef forSynchronousStart() {
     auto wtable = reinterpret_cast<uintptr_t>(nullptr) |
-                  static_cast<uintptr_t>(ExecutorKind::StartSynchronously);
+                  static_cast<uintptr_t>(ExecutorKind::Immediate);
     return SerialExecutorRef(nullptr, wtable);
   }
   bool isForSynchronousStart() const {
     return getIdentity() == nullptr &&
-           getExecutorKind() == ExecutorKind::StartSynchronously;
+           getExecutorKind() == ExecutorKind::Immediate;
   }
 
   /// Given a pointer to a serial executor and its SerialExecutor

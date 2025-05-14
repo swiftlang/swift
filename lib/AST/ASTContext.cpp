@@ -2153,15 +2153,14 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
-void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+void ASTContext::setModuleAliases(
+    const llvm::StringMap<std::string> &aliasMap) {
   // This setter should be called only once after ASTContext has been initialized
   assert(ModuleAliasMap.empty());
-  
-  for (auto k: aliasMap.keys()) {
-    auto v = aliasMap.lookup(k);
-    if (!v.empty()) {
-      addModuleAlias(k, v);
-    }
+
+  for (auto &entry : aliasMap) {
+    if (!entry.getValue().empty())
+      addModuleAlias(entry.getKey(), entry.getValue());
   }
 }
 
@@ -2199,12 +2198,6 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
 
   // Otherwise return the value found (whether the key is an alias or real name)
   return value.first;
-}
-
-std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
-const {
-  assert(LangOpts.Target.isOSDarwin());
-  return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,

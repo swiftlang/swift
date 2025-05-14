@@ -140,7 +140,10 @@ extension MutatingContext {
     return _bridged.createBlockAfter(block.bridged).block
   }
 
-  func erase(instruction: Instruction) {
+  /// Removes and deletes `instruction`.
+  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
+  /// kind of instructions.
+  func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
     if !instruction.isInStaticInitializer {
       verifyIsTransforming(function: instruction.parentFunction)
     }
@@ -152,7 +155,7 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
 
-    _bridged.eraseInstruction(instruction.bridged)
+    _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
   func erase(instructionIncludingAllUsers inst: Instruction) {
@@ -164,7 +167,9 @@ extension MutatingContext {
         erase(instructionIncludingAllUsers: use.instruction)
       }
     }
-    erase(instruction: inst)
+    // We rely that after deleting the instruction its operands have no users.
+    // Therefore `salvageDebugInfo` must be turned off because we cannot insert debug_value instructions.
+    erase(instruction: inst, salvageDebugInfo: false)
   }
 
   func erase<S: Sequence>(instructions: S) where S.Element: Instruction {

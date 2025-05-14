@@ -320,6 +320,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
                            !protoDecl->isMarkerProtocol());
   representsAnyObject = false;
 
+  inverses = InvertibleProtocolSet();
+
   protocols.push_back(protoDecl);
   expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
@@ -353,7 +355,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  auto inverses = type->getInverses();
+  inverses = type->getInverses();
   expandDefaults(protocols, inverses, type->getASTContext());
 
   representsAnyObject = [&]() {
@@ -431,6 +433,16 @@ Type ExistentialLayout::getSuperclass() const {
   }
 
   return Type();
+}
+
+bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+  if (!getParameterizedProtocols().empty())
+    return true;
+
+  if (allowInverses && hasInverses())
+    return true;
+
+  return false;
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -829,15 +841,28 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
   return type->wrapInOptionalType()->getCanonicalType();
 }
 
-Type TypeBase::isArrayType() {
-  if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (isArray())
-      return boundStruct->getGenericArgs()[0];
+Type TypeBase::getArrayElementType() {
+  if (!isArray())
+    return Type();
 
-    if (isInlineArray())
-      return boundStruct->getGenericArgs()[1];
-  }
-  return Type();
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // Array<T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[0];
+}
+
+Type TypeBase::getInlineArrayElementType() {
+  if (!isInlineArray())
+    return Type();
+
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // InlineArray<n, T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[1];
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {

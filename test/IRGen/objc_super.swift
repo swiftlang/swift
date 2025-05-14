@@ -40,7 +40,7 @@ class Hoozit : Gizmo {
     // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
     // CHECK: store ptr [[T0]], ptr {{.*}}, align 8
     // CHECK: load ptr, ptr @"\01L_selector(frame)"
-    // CHECK: call void @objc_msgSendSuper2_stret(ptr noalias nocapture sret({{.*}}) {{.*}}, ptr {{.*}}, ptr {{.*}})
+    // CHECK: call void @objc_msgSendSuper2_stret(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} {{.*}}, ptr {{.*}}, ptr {{.*}})
     return NSInsetRect(super.frame(), 2.0, 2.0)
   }
   // CHECK: }

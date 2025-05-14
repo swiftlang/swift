@@ -17,7 +17,7 @@ import _Concurrency
 let max = 1000
 
 func bar(x: Int, cc: CheckedContinuation<Void, Never>) {
-  Task.startSynchronously {
+  Task.immediate {
     print("Task \(x) started")
     try! await Task.sleep(nanoseconds: 10000)
     if (x == max) {

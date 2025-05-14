@@ -38,8 +38,9 @@ func rdar29691909(o: AnyObject) -> Any? {
 
 func rdar29907555(_ value: Any!) -> String {
   return "\(value)" // expected-warning {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-1 {{use 'String(describing:)' to silence this warning}}
+  // expected-note@-1 {{use a default value parameter to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{use 'String(describing:)' to silence this warning}}
 }
 
 // https://github.com/apple/swift/issues/46300

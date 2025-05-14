@@ -3283,8 +3283,8 @@ suppressingFeatureCoroutineAccessors(PrintOptions &options,
 }
 
 static void
-suppressingFeatureABIAttribute(PrintOptions &options,
-                               llvm::function_ref<void()> action) {
+suppressingFeatureABIAttributeSE0479(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope1(options.PrintSyntheticSILGenName, true);
   ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::ABI);
   action();

@@ -734,12 +734,22 @@ void introduceUnsafeInheritExecutorReplacements(
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
 
+/// Function that attempts to handle all of the "bad" conformance isolation
+/// found somewhere, and returns true if it handled them. If not, returns
+/// false so that the conformances can be diagnose.
+using HandleConformanceIsolationFn =
+  llvm::function_ref<bool(ArrayRef<ActorIsolation>)>;
+
+/// Function used as a default HandleConformanceIsolationFn.
+bool doNotDiagnoseConformanceIsolation(ArrayRef<ActorIsolation>);
+
 /// Check for correct use of isolated conformances in the given reference.
 ///
 /// This checks that any isolated conformances that occur in the given
 /// declaration reference match the isolated of the context.
 bool checkIsolatedConformancesInContext(
-    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc);
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// Check for correct use of isolated conformances in the set given set of
 /// protocol conformances.
@@ -748,7 +758,8 @@ bool checkIsolatedConformancesInContext(
 /// declaration reference match the isolated of the context.
 bool checkIsolatedConformancesInContext(
     ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
-    const DeclContext *dc);
+    const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// Check for correct use of isolated conformances in the given substitution
 /// map.
@@ -756,14 +767,16 @@ bool checkIsolatedConformancesInContext(
 /// This checks that any isolated conformances that occur in the given
 /// substitution map match the isolated of the context.
 bool checkIsolatedConformancesInContext(
-    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc);
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// Check for correct use of isolated conformances in the given type.
 ///
 /// This checks that any isolated conformances that occur in the given
 /// type match the isolated of the context.
 bool checkIsolatedConformancesInContext(
-    Type type, SourceLoc loc, const DeclContext *dc);
+    Type type, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 } // end namespace swift
 

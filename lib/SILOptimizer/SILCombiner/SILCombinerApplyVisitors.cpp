@@ -1520,8 +1520,14 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   SILValue callee = AI->getCallee();
-  if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
-    callee = cee->getOperand();
+  for (;;) {
+    if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
+      callee = cee->getOperand();
+    } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
+      callee = mdi->getValue();
+    } else {
+      break;
+    }
   }
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);

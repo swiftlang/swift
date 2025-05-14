@@ -14,11 +14,14 @@ import Dispatch
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static let pause = 500_000_000 // 500ms
-  
+
   static func main() async {
     await testSleepDuration()
     await testSleepDoesNotBlock()
     await testSleepHuge()
+    if #available(SwiftStdlib 5.7, *) {
+      await testSleepNegative()
+    }
   }
 
   static func testSleepDuration() async {
@@ -34,7 +37,7 @@ import Dispatch
 
   static func testSleepDoesNotBlock() async {
     // FIXME: Should run on main executor
-    let task = detach {
+    let task = Task.detached {
       print("Run first")
     }
 
@@ -50,10 +53,10 @@ import Dispatch
   static func testSleepHuge() async {
     // Make sure nanoseconds values about Int64.max don't get interpreted as
     // negative and fail to sleep.
-    let task1 = detach {
+    let task1 = Task.detached {
       try await Task.sleep(nanoseconds: UInt64(Int64.max) + 1)
     }
-    let task2 = detach {
+    let task2 = Task.detached {
       try await Task.sleep(nanoseconds: UInt64.max)
     }
 
@@ -72,5 +75,29 @@ import Dispatch
       _ = try await task2.value
       fatalError("Sleep 2 completed early.")
     } catch {}
+  }
+
+  @available(SwiftStdlib 5.7, *)
+  static func testSleepNegative() async {
+    // Make sure that "negative" times don't cause us to sleep forever
+    let negativeDuration = Duration(secondsComponent: -60,
+                                    attosecondsComponent: 0)
+    let negativeTime = unsafe unsafeBitCast(negativeDuration,
+                                            to: ContinuousClock.Instant.self)
+
+    let task = Task.detached {
+      try await Task.sleep(until: negativeTime)
+    }
+
+    try! await Task.sleep(nanoseconds: UInt64(pause))
+
+    task.cancel()
+
+    // The sleep should complete; if they throw, this is a failure.
+    do {
+      _ = try await task.value
+    } catch {
+      fatalError("Sleep tried to wait for a negative time")
+    }
   }
 }

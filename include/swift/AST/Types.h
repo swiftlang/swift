@@ -987,9 +987,13 @@ public:
   /// type) from `DistributedActor`.
   bool isDistributedActor();
 
-  /// Determine if the type in question is an Array<T> and, if so, provide the
+  /// Determine if this type is an Array<T> and, if so, provide the element type
+  /// of the array.
+  Type getArrayElementType();
+
+  /// Determine if this type is an InlineArray<n, T> and, if so, provide the
   /// element type of the array.
-  Type isArrayType();
+  Type getInlineArrayElementType();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the

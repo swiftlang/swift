@@ -487,6 +487,10 @@ public struct Builder {
     return notifyNew(vectorInst.getAs(VectorInst.self))
   }
 
+  public func createVectorBaseAddr(vector: Value) -> VectorBaseAddrInst {
+    return notifyNew(bridged.createVectorBaseAddr(vector.bridged).getAs(VectorBaseAddrInst.self))
+  }
+
   public func createGlobalAddr(global: GlobalVariable, dependencyToken: Value?) -> GlobalAddrInst {
     return notifyNew(bridged.createGlobalAddr(global.bridged, dependencyToken.bridged).getAs(GlobalAddrInst.self))
   }

@@ -387,7 +387,7 @@ extension Instruction {
     case let bi as BuiltinInst:
       switch bi.id {
       case .ZeroInitializer:
-        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType : bi.type
+        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType(in: parentFunction) : bi.type
         return type.isBuiltinInteger || type.isBuiltinFloat
       case .PtrToInt:
         return bi.operands[0].value is StringLiteralInst

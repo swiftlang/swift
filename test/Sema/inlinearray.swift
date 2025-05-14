@@ -153,3 +153,11 @@ func testMismatches(_ x: [3 x Int], _ y: InlineArray<3, Int>) {
   let _: [3 x String] = y  // expected-error {{cannot assign value of type 'InlineArray<3, Int>' to type '[3 x String]'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 }
+
+func testPointerConversion() {
+  var inlineArray = InlineArray<1, Int>(repeating: 0)
+  acceptPointer(&inlineArray) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<InlineArray<1, Int>>' to expected argument type 'UnsafeMutablePointer<Int>'}}
+                              // expected-note@-1 {{arguments to generic parameter 'Pointee' ('InlineArray<1, Int>' and 'Int') are expected to be equal}}
+}
+
+func acceptPointer(_ pointer: UnsafeMutablePointer<Int>) {}

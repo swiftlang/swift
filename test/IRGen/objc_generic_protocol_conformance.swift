@@ -9,4 +9,4 @@ protocol P {
 extension Foo: P {}
 
 // SIL-LABEL: sil private [transparent] [thunk] [ossa] @$sSo3FooCyxG33objc_generic_protocol_conformance1PA2dEP3fooyyFTW {{.*}} @pseudogeneric
-// IR-LABEL: define internal swiftcc void @"$sSo3FooCyxG33objc_generic_protocol_conformance1PA2dEP3fooyyFTW"(ptr noalias nocapture swiftself dereferenceable({{4|8}}) %0, ptr{{( %Self)?}}, ptr{{( %SelfWitnessTable)?}})
+// IR-LABEL: define internal swiftcc void @"$sSo3FooCyxG33objc_generic_protocol_conformance1PA2dEP3fooyyFTW"(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{4|8}}) %0, ptr{{( %Self)?}}, ptr{{( %SelfWitnessTable)?}})

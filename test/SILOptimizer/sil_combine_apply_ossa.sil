@@ -1172,6 +1172,37 @@ bb0(%0 : $Int):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_of_closure :
+// CHECK-NOT:     partial_apply
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_of_closure'
+sil [ossa] @test_mark_dependence_of_closure : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @closure2 : $@convention(thin) (Int) -> ()
+  %4 = partial_apply %3(%0) : $@convention(thin) (Int) -> ()
+  %5 = convert_function %4 to $@callee_owned () -> ()
+  %6 = convert_escape_to_noescape %5 to $@noescape @callee_owned () -> ()
+  %7 = mark_dependence %6 on %5
+  apply %7() : $@noescape @callee_owned () -> ()
+  destroy_value %5
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_dead_closure_with_mark_dependence :
+// CHECK-NOT:     partial_apply
+// CHECK-LABEL: } // end sil function 'test_dead_closure_with_mark_dependence'
+sil [ossa] @test_dead_closure_with_mark_dependence : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @closure2 : $@convention(thin) (Int) -> ()
+  %4 = partial_apply %3(%0) : $@convention(thin) (Int) -> ()
+  %6 = convert_escape_to_noescape %4 to $@noescape @callee_owned () -> ()
+  %7 = mark_dependence %6 on %4
+  destroy_value %4
+  destroy_value %7
+  %r = tuple ()
+  return %r : $()
+}
+
 sil [ossa] @closure2 : $@convention(thin) (Int) -> ()
 
 sil [ossa] @yield1 : $@yield_once(Float) -> (@yields Float) {

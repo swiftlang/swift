@@ -175,7 +175,7 @@ private func lowerInlineArray(array: InlineArray, _ context: FunctionPassContext
 ///
 private func getInlineArrayInfo(of allocStack: AllocStackInst) -> InlineArray? {
   var arrayLoad: LoadInst? = nil
-  var elementStorage: UncheckedAddrCastInst? = nil
+  var elementStorage: VectorBaseAddrInst? = nil
 
   for use in allocStack.uses {
     switch use.instruction {
@@ -188,11 +188,11 @@ private func getInlineArrayInfo(of allocStack: AllocStackInst) -> InlineArray? {
       arrayLoad = load
     case is DeallocStackInst:
       break
-    case let addrCastToElement as UncheckedAddrCastInst:
+    case let baseAddr as VectorBaseAddrInst:
       if elementStorage != nil {
         return nil
       }
-      elementStorage = addrCastToElement
+      elementStorage = baseAddr
     default:
       return nil
     }

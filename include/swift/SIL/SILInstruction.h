@@ -6791,6 +6791,17 @@ public:
   }
 };
 
+class VectorBaseAddrInst
+    : public UnaryInstructionBase<SILInstructionKind::VectorBaseAddrInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  VectorBaseAddrInst(SILDebugLocation debugLoc, SILValue vector, SILType resultTy)
+      : UnaryInstructionBase(debugLoc, vector, resultTy) {}
+public:
+  SILValue getVector() const { return getOperand(); }
+};
+
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst final : public InstructionBaseWithTrailingOperands<
                             SILInstructionKind::TupleInst, TupleInst,

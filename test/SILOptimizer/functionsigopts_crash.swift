@@ -35,3 +35,21 @@ func testit(_ p: P) {
 public func callit(s: S) {
   testit(s)
 }
+
+// Check that FSO does not trigger a verifier error caused by a mutated @in argument which is 
+// converted to an @in_guaranteed argument (which must not be mutated).
+
+public protocol IP<Element> {
+  associatedtype Element
+
+  init<Iterator>(iterator: consuming Iterator) where Iterator: IteratorProtocol, Iterator.Element == Element
+}
+
+extension Array: IP {
+  public init<Iterator>(iterator: consuming Iterator) where Iterator: IteratorProtocol, Iterator.Element == Element {
+    self.init()
+    while let next = iterator.next() {
+      append(next)
+    }
+  }
+}

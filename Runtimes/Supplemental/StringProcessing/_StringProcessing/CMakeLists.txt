@@ -78,3 +78,12 @@ set_target_properties(swift_StringProcessing PROPERTIES
 target_link_libraries(swift_StringProcessing PRIVATE
     swift_RegexParser
     swiftCore)
+
+install(TARGETS swift_StringProcessing
+  ARCHIVE DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+emit_swift_interface(swift_StringProcessing)
+install_swift_interface(swift_StringProcessing)
+
+embed_manifest(swift_StringProcessing)

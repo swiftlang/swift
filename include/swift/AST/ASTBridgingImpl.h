@@ -436,6 +436,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasDynamicSelf() const {
+  return unbridged()->hasDynamicSelfType();
+}
+
 bool BridgedASTType::isArchetype() const {
   return unbridged()->is<swift::ArchetypeType>();
 }
@@ -538,8 +542,16 @@ bool BridgedASTType::isBuiltinVector() const {
   return unbridged()->is<swift::BuiltinVectorType>();
 }
 
+bool BridgedASTType::isBuiltinFixedArray() const {
+  return unbridged()->is<swift::BuiltinFixedArrayType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
+}
+
+BridgedASTType BridgedASTType::getBuiltinFixedArrayElementType() const {
+  return {unbridged()->castTo<swift::BuiltinFixedArrayType>()->getElementType().getPointer()};
 }
 
 bool BridgedASTType::isBuiltinFixedWidthInteger(SwiftInt width) const {

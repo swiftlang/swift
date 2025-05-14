@@ -2453,6 +2453,10 @@ BridgedInstruction BridgedBuilder::createVector(BridgedValueArray arguments) con
   return {unbridged().createVector(swift::ArtificialUnreachableLocation(), arguments.getValues(argValues))};
 }
 
+BridgedInstruction BridgedBuilder::createVectorBaseAddr(BridgedValue vector) const {
+  return {unbridged().createVectorBaseAddr(regularLoc(), vector.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global,
                                                     OptionalBridgedValue dependencyToken) const {
   return {unbridged().createGlobalAddr(regularLoc(), global.getGlobal(), dependencyToken.getSILValue())};

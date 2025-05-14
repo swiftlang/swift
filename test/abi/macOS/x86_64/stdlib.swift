@@ -1123,3 +1123,8 @@ Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7Ra
 
 // Duration.nanoseconds(_:)
 Added: _$ss8DurationV11nanosecondsyABSdFZ
+
+// var InlineArray._storage
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvM
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvs
+

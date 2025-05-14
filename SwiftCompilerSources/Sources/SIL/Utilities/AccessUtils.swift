@@ -431,7 +431,7 @@ public struct AccessPath : CustomStringConvertible, Hashable {
 
 private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
   switch value {
-  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst:
+  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst, is VectorBaseAddrInst:
     return true
   default:
     return false

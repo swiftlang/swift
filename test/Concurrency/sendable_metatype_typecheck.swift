@@ -147,3 +147,31 @@ final class TestStaticMembers<T> {
     let _: @Sendable () -> GenericS<Int> = GenericS.h // Ok
   }
 }
+
+// Downgrade use of static member references on non-Sendable base to a warning until next major mode to maintain source compatibility.
+do {
+  struct S<U> {
+    static func test(_: U, _: U) -> Bool { false }
+  }
+
+  func compute<T>(_: S<T>, _: @escaping @Sendable (T, T) -> Bool) {}
+
+  func test<T: Comparable>(s: S<T>) {
+    compute(s, >) // expected-warning {{converting non-sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+    compute(s, S.test) // expected-warning {{capture of non-sendable type 'T.Type' in an isolated closure}}
+  }
+}
+
+infix operator <=> : ComparisonPrecedence
+
+struct TestUnapplied<U> : Comparable {
+  static func <(_: TestUnapplied<U>, _: TestUnapplied<U>) -> Bool { false }
+}
+
+extension TestUnapplied {
+  static func <=>(_: Self, _: @escaping @Sendable (U, U) -> Bool) {}
+}
+
+func testUnappliedWithOpetator<T: Comparable>(v: TestUnapplied<T>) {
+  v<=>(>) // expected-error {{converting non-sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+}

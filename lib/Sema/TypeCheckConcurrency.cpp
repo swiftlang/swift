@@ -2823,6 +2823,29 @@ namespace {
       }
     }
 
+    /// Function object that refines isolation for each actor isolation it is
+    /// given, returning true if all of the provided isolations have been
+    /// accounted for, or false if the caller should handle them.
+    class RefineConformances {
+      ActorIsolationChecker &self;
+
+    public:
+      RefineConformances(ActorIsolationChecker &self) : self(self) { }
+
+      bool operator()(ArrayRef<ActorIsolation> isolations) const {
+        bool anyRefined = false;
+        bool anyUnrefined = false;
+        for (const auto &isolation : isolations) {
+          if (self.refineRequiredIsolation(isolation))
+            anyRefined = true;
+          else
+            anyUnrefined = true;
+        }
+
+        return anyRefined && !anyUnrefined;
+      }
+    };
+
     bool refineRequiredIsolation(ActorIsolation refinedIsolation) {
       if (requiredIsolationLoc.isInvalid())
         return false;
@@ -3332,13 +3355,13 @@ namespace {
       if (auto erasureExpr = dyn_cast<ErasureExpr>(expr)) {
         checkIsolatedConformancesInContext(
             erasureExpr->getConformances(), erasureExpr->getLoc(),
-            getDeclContext());
+            getDeclContext(), RefineConformances{*this});
       }
 
       if (auto *underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
         checkIsolatedConformancesInContext(
             underlyingToOpaque->substitutions, underlyingToOpaque->getLoc(),
-            getDeclContext());
+            getDeclContext(), RefineConformances{*this});
       }
 
       return Action::Continue(expr);
@@ -4447,7 +4470,8 @@ namespace {
         return false;
 
       // Make sure isolated conformances are formed in the right context.
-      checkIsolatedConformancesInContext(declRef, loc, getDeclContext());
+      checkIsolatedConformancesInContext(declRef, loc, getDeclContext(),
+                                         RefineConformances{*this});
 
       auto *const decl = declRef.getDecl();
 
@@ -7944,15 +7968,23 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   auto dc = rootNormal->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
+  auto proto = rootNormal->getProtocol();
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.
-  if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
+  if (getActorIsolation(proto).isActorIsolated())
+    return ActorIsolation::forNonisolated(false);
+
+  // SendableMetatype disables isolation inference.
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (sendableMetatypeProto && proto->inheritsFrom(sendableMetatypeProto))
     return ActorIsolation::forNonisolated(false);
 
   // @preconcurrency disables isolation inference.
   if (rootNormal->isPreconcurrency())
     return ActorIsolation::forNonisolated(false);
+
 
   // Isolation inference rules follow. If we aren't inferring isolated conformances,
   // we're done.
@@ -8007,11 +8039,14 @@ namespace {
   class MismatchedIsolatedConformances {
     llvm::TinyPtrVector<ProtocolConformance *> badIsolatedConformances;
     DeclContext *fromDC;
+    HandleConformanceIsolationFn handleBad;
     mutable std::optional<ActorIsolation> fromIsolation;
 
   public:
-    MismatchedIsolatedConformances(const DeclContext *fromDC)
-      : fromDC(const_cast<DeclContext *>(fromDC)) { }
+    MismatchedIsolatedConformances(const DeclContext *fromDC,
+                                   HandleConformanceIsolationFn handleBad)
+      : fromDC(const_cast<DeclContext *>(fromDC)),
+        handleBad(handleBad) { }
 
     ActorIsolation getContextIsolation() const {
       if (!fromIsolation)
@@ -8051,6 +8086,16 @@ namespace {
       if (badIsolatedConformances.empty())
         return false;
 
+      if (handleBad) {
+        // Capture all of the actor isolations from the conformances.
+        std::vector<ActorIsolation> badIsolations;
+        for (auto conformance : badIsolatedConformances)
+          badIsolations.push_back(conformance->getIsolation());
+
+        if (handleBad(badIsolations))
+          return false;
+      }
+
       ASTContext &ctx = fromDC->getASTContext();
       auto firstConformance = badIsolatedConformances.front();
       ctx.Diags.diagnose(
@@ -8066,32 +8111,40 @@ namespace {
 
 }
 
+bool swift::doNotDiagnoseConformanceIsolation(ArrayRef<ActorIsolation>) {
+  return false;
+}
+
 bool swift::checkIsolatedConformancesInContext(
-    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(declRef, mismatched);
   return mismatched.diagnose(loc);
 }
 
 bool swift::checkIsolatedConformancesInContext(
     ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
-    const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   for (auto conformance: conformances)
     forEachConformance(conformance, mismatched);
   return mismatched.diagnose(loc);
 }
 
 bool swift::checkIsolatedConformancesInContext(
-    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(subs, mismatched);
   return mismatched.diagnose(loc);
 }
 
 bool swift::checkIsolatedConformancesInContext(
-    Type type, SourceLoc loc, const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    Type type, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(type, mismatched);
   return mismatched.diagnose(loc);
 }

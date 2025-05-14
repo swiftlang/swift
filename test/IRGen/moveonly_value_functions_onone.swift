@@ -195,7 +195,7 @@ public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
 // CHECK:         [[INNER_DEINITING_RELEASABLE_NC_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]]
 // CHECK:         call swiftcc void @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVfD"(
 // CHECK-SAME:        ptr [[INNER_DEINITING_RELEASABLE_NC_METADATA]],
-//           :        ptr noalias nocapture swiftself dereferenceable(64) %deinit.arg)
+//           :        ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable(64) %deinit.arg)
 // CHECK:       }
 public func takeOuterNC_1<T>(_ o: consuming OuterNC_1<T>) {
   external_symbol()
@@ -288,7 +288,7 @@ public func takeGenericContext_1OuterNC_1<T : P>(_ e: consuming GenericContext_1
 public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<T>) {}
 
 // CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone26takeOuterSinglePayloadNC_2yyAA0fghI2_2OyxGnlF"(
-//           :      ptr noalias nocapture dereferenceable(64) %0, 
+//           :      ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(64) %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone22OuterSinglePayloadNC_2OyxGlWOh"(
@@ -305,7 +305,7 @@ public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<
 // CHECK:         [[METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK:         call swiftcc void @"$s30moveonly_value_functions_onone26InnerDeinitingReleasableNCVfD"(
 // CHECK-SAME:        ptr [[METADATA]],
-//           :        ptr noalias nocapture swiftself dereferenceable(64) %0)
+//           :        ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable(64) %0)
 // CHECK:       }
 public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<T>) {}
 
@@ -383,7 +383,7 @@ public func takeOuterMultiPayloadNC_1<T>(_ e: consuming OuterMultiPayloadNC_1<T>
 // CHECK:       }
 public func takeOuterMultiPayloadNC_2<T>(_ e: consuming OuterMultiPayloadNC_2<T>) {}
 // CHECK-LABEL: define{{.*}} @"$s30moveonly_value_functions_onone25takeOuterMultiPayloadNC_3yyAA0fghI2_3OyxGnlF"(
-//           :      ptr noalias nocapture dereferenceable(64) %0, 
+//           :      ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(64) %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         call{{.*}} @"$s30moveonly_value_functions_onone21OuterMultiPayloadNC_3OyxGlWOh"(

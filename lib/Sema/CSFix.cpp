@@ -219,7 +219,7 @@ TreatArrayLiteralAsDictionary *
 TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
                                        Type arrayTy,
                                        ConstraintLocator *locator) {
-  if (!arrayTy->isArrayType())
+  if (!arrayTy->isArray())
     return nullptr;
 
   // Determine the ArrayExpr from the locator.
@@ -282,9 +282,29 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
   // We can only handle the downgrade for conversions.
   switch (constraintKind) {
   case ConstraintKind::Conversion:
-  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Subtype:
     break;
+
+  case ConstraintKind::ArgumentConversion: {
+    if (!forSendable)
+      break;
+
+    // Passing a static member reference as an argument needs to be downgraded
+    // to a warning until future major mode to maintain source compatibility for
+    // code with non-Sendable metatypes.
+    if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(7)) {
+      auto *argLoc = cs.getConstraintLocator(locator);
+      if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
+        if (auto overload = cs.findSelectedOverloadFor(
+                argument->getSemanticsProvidingExpr())) {
+          auto *decl = overload->choice.getDecl();
+          if (decl && decl->isStatic())
+            return FixBehavior::DowngradeToWarning;
+        }
+      }
+    }
+    break;
+  }
 
   default:
     if (!cs.shouldAttemptFixes())
@@ -1814,7 +1834,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
     return nullptr;
 
-  auto elementType = argType->isArrayType();
+  auto elementType = argType->getArrayElementType();
   if (!elementType)
     return nullptr;
 
