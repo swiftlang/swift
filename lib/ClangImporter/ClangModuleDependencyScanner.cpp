@@ -147,8 +147,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(remapPath(clangModuleDep.ClangModuleMapFile));
 
-    // Handle VFSOverlay. If include tree is used, there is no need for overlay.
-    if (!ctx.ClangImporterOpts.UseClangIncludeTree) {
+    // Handle VFSOverlay. If caching is enabled, there is no need for overlay.
+    if (!ctx.CASOpts.EnableCaching) {
       for (auto &overlay : ctx.SearchPathOpts.VFSOverlayFiles) {
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(remapPath(overlay));
@@ -216,12 +216,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
 
     ctx.CASOpts.enumerateCASConfigurationFlags(
         [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
-
-    if (!RootID.empty()) {
-      swiftArgs.push_back("-no-clang-include-tree");
-      swiftArgs.push_back("-cas-fs");
-      swiftArgs.push_back(RootID);
-    }
 
     if (!IncludeTree.empty()) {
       swiftArgs.push_back("-clang-include-tree-root");
@@ -323,11 +317,6 @@ void ClangImporter::getBridgingHeaderOptions(
   if (auto Tree = deps.IncludeTreeID) {
     swiftArgs.push_back("-clang-include-tree-root");
     swiftArgs.push_back(*Tree);
-  }
-  if (auto CASFS = deps.CASFileSystemRootID) {
-    swiftArgs.push_back("-no-clang-include-tree");
-    swiftArgs.push_back("-cas-fs");
-    swiftArgs.push_back(*CASFS);
   }
 }
 

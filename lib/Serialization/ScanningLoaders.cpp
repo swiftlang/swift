@@ -231,16 +231,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
             isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
 
-        if (Ctx.CASOpts.EnableCaching) {
-          std::vector<std::string> clangDependencyFiles;
-          auto clangImporter =
-              static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-          clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
-          llvm::for_each(clangDependencyFiles, [&](std::string &file) {
-            Result->addAuxiliaryFile(file);
-          });
-        }
-
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
         Result->addModuleImports(*sourceFile, alreadyAddedModules,
