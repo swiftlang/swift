@@ -7688,7 +7688,9 @@ void SILWitnessTable::verify(const SILModule &M) const {
 
 /// Verify that a default witness table follows invariants.
 void SILDefaultWitnessTable::verify(const SILModule &mod) const {
-#ifndef NDEBUG
+  if (!verificationEnabled(mod))
+    return;
+
   for (const Entry &entry : getEntries()) {
     // FIXME: associated type witnesses.
     if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method)
@@ -7709,7 +7711,6 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
   }
-#endif
 }
 
 /// Verify that a global variable follows invariants.
