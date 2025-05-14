@@ -6607,19 +6607,19 @@ ERROR(objc_invalid_on_func_variadic,none,
 ERROR(objc_invalid_on_func_inout,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because inout "
       "parameters cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, unsigned))
+      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
 ERROR(objc_invalid_on_func_param_type,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "2 because the type of the "
       "parameter %1 cannot be represented in %" FOREIGN_LANG_SELECT "3",
-      (const AbstractFunctionDecl*, unsigned, unsigned, unsigned))
+      (const AbstractFunctionDecl*, unsigned, unsigned, ForeignLanguage))
 ERROR(objc_invalid_on_func_single_param_type,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because the type of the "
       "parameter cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, unsigned))
+      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
 ERROR(objc_invalid_on_func_result_type,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because its result type "
       "cannot be represented in %" FOREIGN_LANG_SELECT "2",
-      (const AbstractFunctionDecl*, unsigned, unsigned))
+      (const AbstractFunctionDecl*, unsigned, ForeignLanguage))
 ERROR(objc_invalid_on_foreign_class,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because Core Foundation "
       "types are not classes in Objective-C", (unsigned))
