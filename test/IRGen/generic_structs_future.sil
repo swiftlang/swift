@@ -232,10 +232,10 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 
 // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds ptr, ptr %T.ParentHasAssociatedType, i32 1
 // CHECK: [[T0:%.*]] = load ptr, ptr [[T0_GEP]]
-// CHECK: [[T4:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, ptr %T.HasAssociatedType, ptr %T, ptr @"$s22generic_structs_future17HasAssociatedTypeTL", ptr @"$s5Assoc22generic_structs_future17HasAssociatedTypePTl")
+// CHECK: [[T4:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, ptr %T.HasAssociatedType, ptr %T3, ptr @"$s22generic_structs_future17HasAssociatedTypeTL", ptr @"$s5Assoc22generic_structs_future17HasAssociatedTypePTl")
 
 // CHECK: %T.Assoc = extractvalue %swift.metadata_response [[T4]], 0
-// CHECK:   %T.Assoc.HasAssociatedType = call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %T.ParentHasAssociatedType, ptr %T, ptr %T.Assoc,
+// CHECK:   %T.Assoc.HasAssociatedType = call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %T.ParentHasAssociatedType, ptr %T3, ptr %T.Assoc,
 
 // CHECK:   [[T2:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, ptr %T.Assoc.HasAssociatedType, ptr %T.Assoc, ptr @"$s22generic_structs_future17HasAssociatedTypeTL", ptr @"$s5Assoc22generic_structs_future17HasAssociatedTypePTl")
 // CHECK:   %T.Assoc.Assoc = extractvalue %swift.metadata_response [[T2]], 0
