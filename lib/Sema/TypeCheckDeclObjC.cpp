@@ -305,13 +305,13 @@ static void diagnoseFunctionParamNotRepresentable(
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
                     AFD, getObjCDiagnosticAttrKind(Reason),
-                    (unsigned)language)
+                    language)
           .limitBehavior(behavior));
   } else {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_param_type,
                     AFD, ParamIndex + 1, getObjCDiagnosticAttrKind(Reason),
-                    (unsigned)language)
+                    language)
           .limitBehavior(behavior));
   }
   SourceRange SR;
@@ -358,7 +358,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                        AFD, getObjCDiagnosticAttrKind(Reason),
-                       (unsigned)language)
+                       language)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -800,7 +800,7 @@ bool swift::isRepresentableInLanguage(
       softenIfAccessNote(AFD, Reason.getAttr(),
        AFD->diagnose(diag::objc_invalid_on_func_result_type,
                      FD, getObjCDiagnosticAttrKind(Reason),
-                     (unsigned)language)
+                     language)
             .limitBehavior(behavior));
       diagnoseTypeNotRepresentableInObjC(FD, ResultType,
                                          FD->getResultTypeSourceRange(),
@@ -857,7 +857,7 @@ bool swift::isRepresentableInLanguage(
         softenIfAccessNote(AFD, Reason.getAttr(),
           AFD->diagnose(diag::objc_invalid_on_func_result_type,
                         FD, getObjCDiagnosticAttrKind(Reason),
-                        (unsigned)language)
+                        language)
               .limitBehavior(behavior));
         diagnoseTypeNotRepresentableInObjC(FD, type,
                                            FD->getResultTypeSourceRange(),
