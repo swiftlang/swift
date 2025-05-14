@@ -1063,7 +1063,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_startSynchronously(AsyncTask* job);
+void swift_task_immediate(AsyncTask* job, SerialExecutorRef targetExecutor);
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative

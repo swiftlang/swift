@@ -215,7 +215,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 
   GYB_SOURCES
     TaskGroup+addTask.swift.gyb
-    Task+startSynchronously.swift.gyb
+    Task+immediate.swift.gyb
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
