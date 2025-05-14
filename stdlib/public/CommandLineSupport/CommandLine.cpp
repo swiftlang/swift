@@ -135,7 +135,11 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
       }
     }
 
+#if defined(_WIN32)
+    argv[argc] = _strdup(arg);
+#else
     argv[argc] = strdup(arg);
+#endif
     argc += 1;
   });
 
