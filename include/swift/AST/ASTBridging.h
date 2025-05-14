@@ -215,9 +215,22 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
     BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
     BridgedSourceLoc cRParenLoc);
 
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:"
+           "lParenLoc:argumentLabelLocs:rParenLoc:)")
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cLabelLocs, BridgedSourceLoc cRParenLoc);
+
 SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:)")
 BridgedDeclNameLoc
 BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc);
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:)")
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
