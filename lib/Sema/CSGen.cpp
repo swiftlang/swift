@@ -3870,10 +3870,9 @@ namespace {
           componentTypeVars.push_back(memberTy);
           auto lookupName =
               kind == KeyPathExpr::Component::Kind::UnresolvedMember
-                  ? DeclNameRef(
-                        component.getUnresolvedDeclName()) // FIXME: type change
-                                                           // needed
-                  : component.getDeclRef().getDecl()->createNameRef();
+                  ? component.getUnresolvedDeclName()
+                  : component.getDeclRef().getDecl()->createNameRef(
+                                                          /*modSel=*/true);
 
           auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
@@ -5306,10 +5305,14 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
   ResolvedMemberResult Result;
   ConstraintSystem CS(&DC, std::nullopt);
 
+  // OK: By contract, `Name` should be derived from an existing Decl, not a
+  // name written by the user in source code. So when used as intended, we won't
+  // be dropping a module selector here.
+  DeclNameRef NameRef(Name);
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult =
-      CS.performMemberLookup(ConstraintKind::ValueMember, DeclNameRef(Name),
-                             BaseTy, FunctionRefInfo::singleBaseNameApply(),
+      CS.performMemberLookup(ConstraintKind::ValueMember, NameRef, BaseTy,
+                             FunctionRefInfo::singleBaseNameApply(),
                              CS.getConstraintLocator({}), false);
 
   // Keep track of all the unviable members.
