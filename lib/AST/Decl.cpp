@@ -11458,40 +11458,61 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
 }
 
 SourceLoc FuncDecl::getStartLoc() const {
-  auto startLoc = StaticLoc;
-  if (startLoc.isInvalid())
-    startLoc = FuncLoc;
-  if (startLoc.isInvalid())
-    startLoc = getNameLoc();
-  if (startLoc.isInvalid())
-    startLoc = getSignatureSourceRange().Start;
-  if (startLoc.isInvalid())
-    startLoc = getResultTypeSourceRange().Start;
-  if (startLoc.isInvalid())
-    startLoc = getGenericTrailingWhereClauseSourceRange().Start;
-  if (startLoc.isInvalid())
-    startLoc = getOriginalBodySourceRange().Start;
+  if (StaticLoc)
+    return StaticLoc;
 
-  return startLoc;
+  if (FuncLoc)
+    return FuncLoc;
+
+  auto nameLoc = getNameLoc();
+  if (nameLoc)
+    return nameLoc;
+
+  auto sigStart = getSignatureSourceRange().Start;
+  if (sigStart)
+    return sigStart;
+
+  auto resultTyStart = getResultTypeSourceRange().Start;
+  if (resultTyStart)
+    return resultTyStart;
+
+  auto genericWhereStart = getGenericTrailingWhereClauseSourceRange().Start;
+  if (genericWhereStart)
+    return genericWhereStart;
+
+  auto bodyStart = getOriginalBodySourceRange().Start;
+  if (bodyStart)
+    return bodyStart;
+
+  return SourceLoc();
+}
+
+SourceLoc FuncDecl::getEndLoc() const {
+  auto bodyEnd = getOriginalBodySourceRange().End;
+  if (bodyEnd)
+    return bodyEnd;
+
+  auto genericWhereEnd = getGenericTrailingWhereClauseSourceRange().End;
+  if (genericWhereEnd)
+    return genericWhereEnd;
+
+  auto resultTyEnd = getResultTypeSourceRange().End;
+  if (resultTyEnd)
+    return resultTyEnd;
+
+  auto sigEnd = getSignatureSourceRange().End;
+  if (sigEnd)
+    return sigEnd;
+
+  return getStartLoc();
 }
 
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
-
   if (startLoc.isInvalid())
     return SourceRange();
 
-  SourceLoc endLoc = getOriginalBodySourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getGenericTrailingWhereClauseSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getResultTypeSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getSignatureSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = startLoc;
-
-  return { startLoc, endLoc };
+  return { startLoc, getEndLoc() };
 }
 
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
