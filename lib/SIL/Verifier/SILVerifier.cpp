@@ -7686,6 +7686,30 @@ void SILWitnessTable::verify(const SILModule &mod) const {
     assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "witness table entry for " + baseName + " must be ABI-compatible",
+              *witnessFunction);
+    }
   }
 }
 
@@ -7713,6 +7737,31 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
     assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "default witness table entry for " + baseName +
+                  " must be ABI-compatible",
+              *witnessFunction);
+    }
   }
 }
 
