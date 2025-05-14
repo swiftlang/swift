@@ -169,13 +169,19 @@ static StringRef toString(ValueWitnessKind k) {
 
 class NodePrinter {
 private:
-  DemanglerPrinter Printer;
+  std::unique_ptr<DemanglerPrinter> PrinterStorage;
+  DemanglerPrinter &Printer;
   DemangleOptions Options;
   bool SpecializationPrefixPrinted = false;
   bool isValid = true;
 
 public:
-  NodePrinter(DemangleOptions options) : Options(options) {}
+  NodePrinter(DemangleOptions options, DemanglerPrinter *printer = nullptr)
+      : PrinterStorage(),
+        Printer(printer
+                    ? *printer
+                    : *(PrinterStorage = std::make_unique<DemanglerPrinter>())),
+        Options(options) {}
 
   std::string printRoot(NodePointer root) {
     isValid = true;
@@ -802,6 +808,7 @@ private:
       return;
     }
 
+    Printer.startParameters(depth);
     NodePointer Parameters = ParameterType->getFirstChild();
     assert(Parameters->getKind() == Node::Kind::Type);
     Parameters = Parameters->getFirstChild();
@@ -814,6 +821,7 @@ private:
       } else {
         Printer << "(_:)";
       }
+      Printer.endParameters(depth);
       return;
     }
 
@@ -853,6 +861,7 @@ private:
         },
         [&]() { Printer << (showTypes ? ", " : ""); });
     Printer << ')';
+    Printer.endParameters(depth);
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node,
@@ -3576,7 +3585,9 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
         Printer << '.';
     }
   }
-
+  if (Entity->shouldTrackNameRange()) {
+    Printer.startName();
+  }
   if (hasName || !OverwriteName.empty()) {
     if (!ExtraName.empty() && MultiWordName) {
       Printer << ExtraName;
@@ -3605,6 +3616,9 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     Printer << ExtraName;
     if (ExtraIndex >= 0)
       Printer << ExtraIndex;
+  }
+  if (Entity->shouldTrackNameRange()) {
+    Printer.endName();
   }
   if (TypePr != TypePrinting::NoType) {
     NodePointer type = getChildIf(Entity, Node::Kind::Type);
@@ -3836,11 +3850,12 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
 }
 
 std::string Demangle::nodeToString(NodePointer root,
-                                   const DemangleOptions &options) {
+                                   const DemangleOptions &options,
+                                   DemanglerPrinter *printer) {
   if (!root)
     return "";
 
-  return NodePrinter(options).printRoot(root);
+  return NodePrinter(options, printer).printRoot(root);
 }
 
 #endif

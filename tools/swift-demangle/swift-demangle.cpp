@@ -78,6 +78,10 @@ static llvm::cl::opt<bool>
 Classify("classify",
            llvm::cl::desc("Display symbol classification characters"));
 
+static llvm::cl::opt<bool>
+    Ranges("ranges",
+           llvm::cl::desc("Display symbol ranges in the demangled string"));
+
 /// Options that are primarily used for testing.
 /// \{
 static llvm::cl::opt<bool> DisplayLocalNameContexts(
@@ -250,7 +254,10 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       os << remangled;
       return;
     }
-    std::string string = swift::Demangle::nodeToString(pointer, options);
+
+    TrackingDemanglerPrinter printer;
+    std::string string =
+        swift::Demangle::nodeToString(pointer, options, &printer);
     if (!CompactMode)
       os << name << " ---> ";
 
@@ -275,6 +282,17 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         os << '{' << Classifications << "} ";
     }
     os << (string.empty() ? name : llvm::StringRef(string));
+
+    if (!string.empty() && Ranges &&
+        (printer.hasBaseName() || printer.hasParameters())) {
+      os << " | {(";
+      if (printer.hasBaseName())
+        os << printer.getNameStart() << "," << printer.getNameEnd();
+      os << ") - (";
+      if (printer.hasParameters())
+        os << printer.getParametersStart() << "," << printer.getParametersEnd();
+      os << ")}";
+    }
   }
   DCtx.clear();
 }

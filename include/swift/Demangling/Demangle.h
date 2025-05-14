@@ -19,6 +19,7 @@
 #ifndef SWIFT_DEMANGLING_DEMANGLE_H
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
+#include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Errors.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
@@ -234,6 +235,18 @@ private:
 public:
   Kind getKind() const { return NodeKind; }
 
+  bool shouldTrackNameRange() const {
+    switch (getKind()) {
+    case Kind::Function:
+    case Kind::Constructor:
+    case Kind::Allocator:
+    case Kind::ExplicitClosure:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   bool isSimilarTo(const Node *other) const {
     if (NodeKind != other->NodeKind
         || NodePayloadKind != other->NodePayloadKind)
@@ -417,6 +430,10 @@ bool isOldFunctionTypeMangling(llvm::StringRef mangledName);
 
 class Demangler;
 
+class DemanglerPrinter;
+
+class TrackingDemanglerPrinter;
+
 /// The demangler context.
 ///
 /// It owns the allocated nodes which are created during demangling.
@@ -472,9 +489,10 @@ public:
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
-  std::string demangleSymbolAsString(
-      llvm::StringRef MangledName,
-      const DemangleOptions &Options = DemangleOptions());
+  std::string
+  demangleSymbolAsString(llvm::StringRef MangledName,
+                         const DemangleOptions &Options = DemangleOptions(),
+                         DemanglerPrinter *printer = nullptr);
 
   /// Demangle the given type and return the readable name.
   ///
@@ -531,7 +549,8 @@ public:
 /// \returns The demangled string.
 std::string
 demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
-                       const DemangleOptions &options = DemangleOptions());
+                       const DemangleOptions &options = DemangleOptions(),
+                       DemanglerPrinter *printer = nullptr);
 
 /// Standalone utility function to demangle the given symbol as string.
 ///
@@ -541,11 +560,12 @@ demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
 /// \returns The demangled string.
 inline std::string
 demangleSymbolAsString(const std::string &mangledName,
-                       const DemangleOptions &options = DemangleOptions()) {
-  return demangleSymbolAsString(mangledName.data(), mangledName.size(),
-                                options);
+                       const DemangleOptions &options = DemangleOptions(),
+                       DemanglerPrinter *printer = nullptr) {
+  return demangleSymbolAsString(mangledName.data(), mangledName.size(), options,
+                                printer);
 }
-  
+
 /// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
@@ -554,9 +574,10 @@ demangleSymbolAsString(const std::string &mangledName,
 /// \returns The demangled string.
 inline std::string
 demangleSymbolAsString(llvm::StringRef MangledName,
-                       const DemangleOptions &Options = DemangleOptions()) {
-  return demangleSymbolAsString(MangledName.data(),
-                                MangledName.size(), Options);
+                       const DemangleOptions &Options = DemangleOptions(),
+                       DemanglerPrinter *printer = nullptr) {
+  return demangleSymbolAsString(MangledName.data(), MangledName.size(), Options,
+                                printer);
 }
 
 /// Standalone utility function to demangle the given type as string.
@@ -730,7 +751,8 @@ ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
 /// \returns A string representing the demangled name.
 ///
 std::string nodeToString(NodePointer Root,
-                         const DemangleOptions &Options = DemangleOptions());
+                         const DemangleOptions &Options = DemangleOptions(),
+                         DemanglerPrinter *printer = nullptr);
 
 /// Transforms a mangled key path accessor thunk helper
 /// into the identfier/subscript that would be used to invoke it in swift code.
@@ -777,13 +799,79 @@ public:
 
   llvm::StringRef getStringRef() const { return Stream; }
 
+  size_t getStreamLength() { return Stream.length(); }
+
   /// Shrinks the buffer.
   void resetSize(size_t toPos) {
     assert(toPos <= Stream.size());
     Stream.resize(toPos);
   }
+
+  /// Mark the start of the name of a function.
+  virtual void startName() {}
+
+  /// Mark the end of the name of a function.
+  virtual void endName() {}
+
+  /// Mark the start of the parameters of a function.
+  ///
+  /// \param depth Current depth of the parameters that are being printed.
+  virtual void startParameters(unsigned depth) {}
+
+  /// Mark the end of the parameters of a function.
+  ///
+  /// \param depth Current depth of the parameters that are being printed.
+  virtual void endParameters(unsigned depth) {}
+
+  virtual ~DemanglerPrinter() {}
+
 private:
   std::string Stream;
+};
+
+/// A class for printing to a std::string while tracking ranges.
+class TrackingDemanglerPrinter : public swift::Demangle::DemanglerPrinter {
+public:
+  size_t getNameStart() { return baseNameRange.first; }
+  size_t getNameEnd() { return baseNameRange.second; }
+  size_t getParametersStart() { return parametersRange.first; }
+  size_t getParametersEnd() { return parametersRange.second; }
+  bool hasBaseName() { return baseNameRange.first < baseNameRange.second; }
+  bool hasParameters() {
+    return parametersRange.first < parametersRange.second;
+  }
+
+  void startName() override {
+    if (!hasBaseName())
+      baseNameRange.first = getStreamLength();
+  }
+
+  void endName() override {
+    if (!hasBaseName())
+      baseNameRange.second = getStreamLength();
+  }
+
+  void startParameters(unsigned depth) override {
+    if (parametersDepth || !hasBaseName() || hasParameters()) {
+      return;
+    }
+    parametersRange.first = getStreamLength();
+    parametersDepth = depth;
+  }
+
+  void endParameters(unsigned depth) override {
+    if (!parametersDepth || *parametersDepth != depth || hasParameters()) {
+      return;
+    }
+    parametersRange.second = getStreamLength();
+  }
+
+private:
+  std::pair<size_t, size_t> baseNameRange;
+
+  std::pair<size_t, size_t> parametersRange;
+
+  std::optional<unsigned> parametersDepth;
 };
 
 /// Returns a the node kind \p k as string.
