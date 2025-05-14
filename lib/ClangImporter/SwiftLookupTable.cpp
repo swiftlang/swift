@@ -64,7 +64,6 @@ namespace {
 
   class BaseNameToEntitiesTableReaderInfo;
   class GlobalsAsMembersTableReaderInfo;
-  class AvailabilityDomainsTableReaderInfo;
 
   using SerializedBaseNameToEntitiesTable =
     llvm::OnDiskIterableChainedHashTable<BaseNameToEntitiesTableReaderInfo>;
@@ -74,9 +73,6 @@ namespace {
 
   using SerializedGlobalsAsMembersIndex =
     llvm::OnDiskIterableChainedHashTable<GlobalsAsMembersTableReaderInfo>;
-
-  using SerializedAvailabilityDomainsTable =
-      llvm::OnDiskIterableChainedHashTable<AvailabilityDomainsTableReaderInfo>;
 } // end anonymous namespace
 
 namespace swift {
@@ -118,8 +114,6 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
 
   std::unique_ptr<SerializedBaseNameToEntitiesTable> SerializedTable;
   ArrayRef<clang::serialization::DeclID> Categories;
-  // FIXME: [availability] Remove this when Clang supports domain lookup.
-  std::unique_ptr<SerializedAvailabilityDomainsTable> AvailabilityDomainsTable;
   std::unique_ptr<SerializedGlobalsAsMembersTable> GlobalsAsMembersTable;
   std::unique_ptr<SerializedGlobalsAsMembersIndex> GlobalsAsMembersIndex;
 
@@ -130,8 +124,6 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
                          std::unique_ptr<SerializedBaseNameToEntitiesTable>
                              serializedTable,
                          ArrayRef<clang::serialization::DeclID> categories,
-                         std::unique_ptr<SerializedAvailabilityDomainsTable>
-                             availabilityDomainsTable,
                          std::unique_ptr<SerializedGlobalsAsMembersTable>
                              globalsAsMembersTable,
                          std::unique_ptr<SerializedGlobalsAsMembersIndex>
@@ -139,7 +131,6 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
       : ModuleFileExtensionReader(extension), Reader(reader),
         ModuleFile(moduleFile), OnRemove(onRemove),
         SerializedTable(std::move(serializedTable)), Categories(categories),
-        AvailabilityDomainsTable(std::move(availabilityDomainsTable)),
         GlobalsAsMembersTable(std::move(globalsAsMembersTable)),
         GlobalsAsMembersIndex(std::move(globalsAsMembersIndex)) {}
 
@@ -194,12 +185,6 @@ public:
   bool lookupGlobalsAsMembers(
       SerializedSwiftName baseName,
       SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries);
-
-  SmallVector<StringRef, 4> getAvailabilityDomainNames();
-
-  /// Retreve the decl ID representing the availability domain with the given
-  /// name.
-  clang::serialization::DeclID lookupAvailabilityDomain(StringRef domainName);
 };
 } // namespace swift
 
@@ -363,11 +348,6 @@ void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
 
   // Add the category.
   Categories.push_back(category);
-}
-
-void SwiftLookupTable::addAvailabilityDomainDecl(StringRef name,
-                                                 clang::VarDecl *decl) {
-  AvailabilityDomains.insert({name, decl});
 }
 
 bool SwiftLookupTable::resolveUnresolvedEntries(
@@ -732,38 +712,6 @@ SwiftLookupTable::lookupGlobalsAsMembers(SerializedSwiftName baseName,
   return lookupGlobalsAsMembersImpl(baseName, *storedContext);
 }
 
-// FIXME: [availability] Remove this once Clang has a lookup table.
-clang::VarDecl *SwiftLookupTable::lookupAvailabilityDomainDecl(StringRef name) {
-  // If the name is empty, there is nothing to find.
-  if (name.empty())
-    return nullptr;
-
-  // See if we have an existing cached lookup result.
-  auto known = AvailabilityDomains.find(name);
-  if (known != AvailabilityDomains.end())
-    return known->second;
-
-  // If there's no reader, we've found all there is to find.
-  if (!Reader)
-    return nullptr;
-
-  // Look up this domain in the module file.
-  clang::VarDecl *result = nullptr;
-  auto declID = Reader->lookupAvailabilityDomain(name);
-  if (declID) {
-    auto localID = clang::LocalDeclID::get(Reader->getASTReader(),
-                                           Reader->getModuleFile(), declID);
-    result = cast_or_null<clang::VarDecl>(
-        Reader->getASTReader().GetLocalDecl(Reader->getModuleFile(), localID));
-  }
-
-  // Add the result to the table (whether we found a decl or not) so that we
-  // don't look again.
-  AvailabilityDomains.insert({name, result});
-
-  return result;
-}
-
 SmallVector<SwiftLookupTable::SingleEntry, 4>
 SwiftLookupTable::allGlobalsAsMembersInContext(EffectiveClangContext context) {
   if (!context) return { };
@@ -972,10 +920,6 @@ void SwiftLookupTable::deserializeAll() {
   for (auto context : Reader->getGlobalsAsMembersContexts()) {
     (void)allGlobalsAsMembersInContext(context);
   }
-
-  for (auto domainName : Reader->getAvailabilityDomainNames()) {
-    (void)lookupAvailabilityDomainDecl(domainName);
-  }
 }
 
 /// Print a stored context to the given output stream for debugging purposes.
@@ -1106,22 +1050,6 @@ void SwiftLookupTable::dump(raw_ostream &os) const {
       os << "\n";
     }
   }
-
-  if (!AvailabilityDomains.empty()) {
-    os << "Availability domains:\n";
-    SmallVector<StringRef, 4> domainNames;
-    for (const auto &entry : AvailabilityDomains) {
-      domainNames.push_back(entry.first);
-    }
-    llvm::array_pod_sort(domainNames.begin(), domainNames.end());
-
-    for (auto domainName : domainNames) {
-      os << "  " << domainName << ": ";
-
-      auto *domainDecl = AvailabilityDomains.find(domainName)->second;
-      os << (domainDecl ? domainDecl->getName() : "<nullptr>") << "\n";
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1151,10 +1079,6 @@ namespace {
     /// Record that contains the mapping from contexts to the list of
     /// globals that will be injected as members into those contexts.
     GLOBALS_AS_MEMBERS_INDEX_RECORD_ID,
-
-    // FIXME: [availability] Remove this when Clang supports domain lookup.
-    /// Record that contains the mapping from domain names to domain decls.
-    AVAILABILITY_DOMAINS_ID,
   };
 
   using BaseNameToEntitiesTableRecordLayout
@@ -1168,9 +1092,6 @@ namespace {
 
   using GlobalsAsMembersIndexRecordLayout
     = BCRecordLayout<GLOBALS_AS_MEMBERS_INDEX_RECORD_ID, BCVBR<16>, BCBlob>;
-
-  using AvailabilityDomainsTableRecordLayout =
-      BCRecordLayout<AVAILABILITY_DOMAINS_ID, BCVBR<16>, BCBlob>;
 
   constexpr size_t SizeOfEmittedStoredSingleEntry
     = sizeof(StoredSingleEntry::SerializationID)
@@ -1367,38 +1288,6 @@ namespace {
     }
   };
 
-  // FIXME: [availability] Remove this when Clang supports domain lookup.
-  /// Trait used to write the on-disk hash table for the identifier ->
-  /// availability domain table.
-  class AvailabilityDomainsTableWriterInfo {
-  public:
-    using key_type = StringRef;
-    using key_type_ref = key_type;
-    using data_type = clang::serialization::DeclID;
-    using data_type_ref = const data_type &;
-    using hash_value_type = uint32_t;
-    using offset_type = unsigned;
-
-    hash_value_type ComputeHash(key_type_ref key) { return llvm::djbHash(key); }
-
-    std::pair<unsigned, unsigned>
-    EmitKeyDataLength(raw_ostream &os, key_type_ref key, data_type_ref) {
-      uint32_t keyLength = key.size();
-      uint32_t dataLength = sizeof(data_type);
-
-      llvm::support::endian::Writer writer(os, llvm::endianness::little);
-      writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
-      return {keyLength, dataLength};
-    }
-
-    void EmitKey(raw_ostream &os, key_type_ref key, unsigned) { os << key; }
-
-    void EmitData(raw_ostream &os, key_type_ref, data_type_ref data, unsigned) {
-      llvm::support::endian::Writer writer(os, llvm::endianness::little);
-      writer.write<data_type>(data);
-    }
-  };
 } // end anonymous namespace
 
 void SwiftLookupTableWriter::writeExtensionContents(
@@ -1508,35 +1397,6 @@ void SwiftLookupTableWriter::writeExtensionContents(
     }
 
     GlobalsAsMembersIndexRecordLayout layout(stream);
-    layout.emit(ScratchRecord, tableOffset, hashTableBlob);
-  }
-
-  if (!table.AvailabilityDomains.empty()) {
-    // Sort the availability domain names.
-    SmallVector<StringRef, 4> domainNames;
-    for (const auto &entry : table.AvailabilityDomains)
-      domainNames.push_back(entry.first);
-    llvm::array_pod_sort(domainNames.begin(), domainNames.end());
-
-    llvm::SmallString<4096> hashTableBlob;
-    uint32_t tableOffset;
-    {
-      llvm::OnDiskChainedHashTableGenerator<AvailabilityDomainsTableWriterInfo>
-          generator;
-      AvailabilityDomainsTableWriterInfo info;
-
-      for (auto domainName : domainNames) {
-        auto domainDecl = table.AvailabilityDomains[domainName];
-        auto declID = Writer.getDeclID(domainDecl).getRawValue();
-        generator.insert(domainName, declID, info);
-      }
-
-      llvm::raw_svector_ostream blobStream(hashTableBlob);
-      // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
-      tableOffset = generator.Emit(blobStream, info);
-    }
-    AvailabilityDomainsTableRecordLayout layout(stream);
     layout.emit(ScratchRecord, tableOffset, hashTableBlob);
   }
 }
@@ -1690,46 +1550,6 @@ namespace {
     }
   };
 
-  // FIXME: [availability] Remove this when Clang supports domain lookup.
-  /// Used to deserialize the on-disk identifier -> availability domain table.
-  class AvailabilityDomainsTableReaderInfo {
-  public:
-    using internal_key_type = llvm::StringRef;
-    using external_key_type = internal_key_type;
-    using data_type = clang::serialization::DeclID;
-    using hash_value_type = uint32_t;
-    using offset_type = unsigned;
-
-    internal_key_type GetInternalKey(external_key_type key) { return key; }
-    external_key_type GetExternalKey(internal_key_type key) { return key; }
-
-    hash_value_type ComputeHash(internal_key_type key) {
-      return llvm::djbHash(key);
-    }
-
-    static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
-      return lhs == rhs;
-    }
-
-    static std::pair<unsigned, unsigned>
-    ReadKeyDataLength(const uint8_t *&data) {
-      unsigned keyLength =
-          endian::readNext<uint16_t, llvm::endianness::little>(data);
-      unsigned dataLength =
-          endian::readNext<uint16_t, llvm::endianness::little>(data);
-      return {keyLength, dataLength};
-    }
-
-    static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-      return llvm::StringRef(reinterpret_cast<const char *>(data), length);
-    }
-
-    static data_type ReadData(internal_key_type key, const uint8_t *data,
-                              unsigned length) {
-      return endian::readNext<data_type, llvm::endianness::little>(data);
-    }
-  };
-
 } // end anonymous namespace
 
 clang::NamedDecl *SwiftLookupTable::mapStoredDecl(StoredSingleEntry &entry) {
@@ -1839,7 +1659,6 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   std::unique_ptr<SerializedGlobalsAsMembersIndex> globalsAsMembersIndex;
   std::unique_ptr<SerializedGlobalsAsMembersTable> globalsAsMembersTable;
   ArrayRef<clang::serialization::DeclID> categories;
-  std::unique_ptr<SerializedAvailabilityDomainsTable> availabilityDomainsTable;
 
   while (next.Kind != llvm::BitstreamEntry::EndBlock) {
     if (next.Kind == llvm::BitstreamEntry::Error)
@@ -1932,20 +1751,6 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
       break;
     }
 
-    case AVAILABILITY_DOMAINS_ID: {
-      // Already saw the availability domains table.
-      if (availabilityDomainsTable)
-        return nullptr;
-
-      uint32_t tableOffset;
-      AvailabilityDomainsTableRecordLayout::readRecord(scratch, tableOffset);
-      auto base = reinterpret_cast<const uint8_t *>(blobData.data());
-
-      availabilityDomainsTable.reset(SerializedAvailabilityDomainsTable::Create(
-          base + tableOffset, base + sizeof(uint32_t), base));
-      break;
-    }
-
     default:
       // Unknown record, possibly for use by a future version of the
       // module format.
@@ -1969,7 +1774,6 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   return std::unique_ptr<SwiftLookupTableReader>(
            new SwiftLookupTableReader(extension, reader, moduleFile, onRemove,
                                       std::move(serializedTable), categories,
-                                      std::move(availabilityDomainsTable),
                                       std::move(globalsAsMembersTable),
                                       std::move(globalsAsMembersIndex)));
 
@@ -2043,30 +1847,6 @@ bool SwiftLookupTableReader::lookupGlobalsAsMembers(
   // Grab the results.
   entries = std::move(*known);
   return true;
-}
-
-SmallVector<StringRef, 4> SwiftLookupTableReader::getAvailabilityDomainNames() {
-  SmallVector<StringRef, 4> results;
-  if (!AvailabilityDomainsTable)
-    return {};
-
-  for (auto name : AvailabilityDomainsTable->keys()) {
-    results.push_back(name);
-  }
-  return results;
-}
-
-clang::serialization::DeclID
-SwiftLookupTableReader::lookupAvailabilityDomain(StringRef domainName) {
-  if (!AvailabilityDomainsTable)
-    return {};
-
-  // Look for an entry with this context name.
-  auto known = AvailabilityDomainsTable->find(domainName);
-  if (known == AvailabilityDomainsTable->end())
-    return {};
-
-  return *known;
 }
 
 clang::ModuleFileExtensionMetadata
@@ -2231,16 +2011,6 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       if (isa<clang::CXXMethodDecl>(usingShadowDecl->getTargetDecl()))
         addEntryToLookupTable(table, usingShadowDecl, nameImporter);
     }
-  }
-
-  // If this decl represents an availability domain, add it to the lookup table
-  // as one.
-  // FIXME: [availability] Remove this once Clang has a lookup table.
-  if (auto varDecl = dyn_cast<clang::VarDecl>(named)) {
-    auto mutableVar = const_cast<clang::VarDecl *>(varDecl);
-    auto domainInfo = clangContext.getFeatureAvailInfo(mutableVar);
-    if (!domainInfo.first.empty())
-      table.addAvailabilityDomainDecl(domainInfo.first, mutableVar);
   }
 }
 

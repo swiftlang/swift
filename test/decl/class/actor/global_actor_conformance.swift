@@ -32,6 +32,7 @@ protocol P2 {
 // expected-warning@+1{{conformance of 'C1' to protocol 'P1' crosses into global actor 'GlobalActor'-isolated code and can cause data races}}
 class C1 : P1, P2 {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-2{{isolate this conformance to the global actor 'GlobalActor' with '@GlobalActor'}}
 
   typealias Assoc = String
 
@@ -57,6 +58,7 @@ protocol NonIsolatedRequirement {
 extension OnMain: NonIsolatedRequirement {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
   // expected-note@+1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   func requirement() {}
 }

@@ -35,6 +35,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -572,6 +573,11 @@ void verifyKeyPathComponent(SILModule &M,
 /// open_existential_addr. We should expand it as needed.
 struct ImmutableAddressUseVerifier {
   SmallVector<Operand *, 32> worklist;
+  bool ignoreDestroys;
+  bool defaultIsMutating;
+
+  ImmutableAddressUseVerifier(bool ignoreDestroys = false, bool defaultIsMutating = false)
+    : ignoreDestroys(ignoreDestroys), defaultIsMutating(defaultIsMutating) {}
 
   bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
     switch (conv) {
@@ -704,10 +710,9 @@ struct ImmutableAddressUseVerifier {
           }
         }
 
-        // Otherwise this is a builtin that we are not expecting to see, so bail
-        // and assert.
-        llvm::errs() << "Unhandled, unexpected builtin instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
+        // Otherwise this is a builtin that we are not expecting to see.
+        if (defaultIsMutating)
+          return true;
         break;
       }
       case SILInstructionKind::MarkDependenceInst:
@@ -775,7 +780,9 @@ struct ImmutableAddressUseVerifier {
         else
           break;
       case SILInstructionKind::DestroyAddrInst:
-        return true;
+        if (!ignoreDestroys)
+          return true;
+        break;
       case SILInstructionKind::UpcastInst:
       case SILInstructionKind::UncheckedAddrCastInst: {
         if (isAddrCastToNonConsuming(cast<SingleValueInstruction>(inst))) {
@@ -821,6 +828,7 @@ struct ImmutableAddressUseVerifier {
         LLVM_FALLTHROUGH;
       case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
       case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+      case SILInstructionKind::VectorBaseAddrInst:
       case SILInstructionKind::StructElementAddrInst:
       case SILInstructionKind::TupleElementAddrInst:
       case SILInstructionKind::IndexAddrInst:
@@ -841,9 +849,7 @@ struct ImmutableAddressUseVerifier {
           }
           break;
         }
-        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
-        break;
+        return true;
       }
       case SILInstructionKind::TuplePackElementAddrInst: {
         if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
@@ -865,8 +871,8 @@ struct ImmutableAddressUseVerifier {
         return false;
       }
       default:
-        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
+        if (defaultIsMutating)
+          return true;
         break;
       }
     }
@@ -7385,6 +7391,11 @@ public:
 #undef require
 #undef requireObjectType
 
+bool swift::isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys,
+                                      bool defaultIsMutating) {
+  return ImmutableAddressUseVerifier(ignoreDestroys, defaultIsMutating).isMutatingOrConsuming(arg);
+}
+
 //===----------------------------------------------------------------------===//
 //                     Out of Line Verifier Run Functions
 //===----------------------------------------------------------------------===//
@@ -7787,14 +7798,20 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<ProtocolConformance*> wtableConformances;
+  llvm::DenseSet<llvm::PointerIntPair<ProtocolConformance *, 1, bool>> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
-    if (!wtableConformances.insert(conformance).second) {
+    if (!wtableConformances.insert({conformance, wt.isSpecialized()}).second) {
       llvm::errs() << "Witness table redefined: ";
       conformance->printName(llvm::errs());
       assert(false && "triggering standard assertion failure routine");
+    }
+    if (wt.isSpecialized()) {
+      ASSERT(specializedWitnessTableMap.find(conformance) != specializedWitnessTableMap.end());
+    } else {
+      auto *rootConf= cast<RootProtocolConformance>(conformance);
+      ASSERT(WitnessTableMap.find(rootConf) != WitnessTableMap.end());
     }
     wt.verify(*this);
   }

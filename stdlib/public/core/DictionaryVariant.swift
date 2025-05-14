@@ -324,7 +324,7 @@ extension Dictionary._Variant {
         cocoa, capacity: cocoa.count + 1)
       let result = native.mutatingFind(key, isUnique: true)
       self = .init(native: native)
-      return unsafe result
+      return result
     }
 #endif
     let isUnique = isUniquelyReferenced()
@@ -390,7 +390,7 @@ extension Dictionary._Variant {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
     let native = ensureUniqueNative()
-    let bucket = unsafe native.validatedBucket(for: index)
+    let bucket = native.validatedBucket(for: index)
     return unsafe asNative.uncheckedRemove(at: bucket, isUnique: true)
   }
 

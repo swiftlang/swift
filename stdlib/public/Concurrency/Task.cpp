@@ -30,6 +30,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskOptions.h"
+#include "swift/Basic/Casting.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
@@ -381,6 +382,11 @@ static SerialExecutorRef executorForEnqueuedJob(Job *job) {
     return swift_task_getMainExecutor();
   }
 
+  if (auto identity = reinterpret_cast<HeapObject *>(jobQueue)) {
+    return SerialExecutorRef::forOrdinary(
+      identity, _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+  }
+
   return SerialExecutorRef::generic();
 #endif
 }
@@ -439,6 +445,8 @@ const void *const swift::_swift_concurrency_debug_jobMetadata =
     static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
+
+const size_t swift::_swift_concurrency_debug_asyncTaskSize = sizeof(AsyncTask);
 
 const HeapMetadata *swift::jobHeapMetadataPtr =
     static_cast<HeapMetadata *>(&jobHeapMetadata);
@@ -1073,19 +1081,19 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // The final funclet shouldn't release the task or the task function.
   } else if (asyncLet) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTask);
+        function_cast<TaskContinuationFunction *>(&completeTask);
 
   // If we have a non-null closure context and the task function is not
   // consumed by calling it, use a final funclet that releases both the
   // task and the closure context.
   } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskWithClosure);
+        function_cast<TaskContinuationFunction *>(&completeTaskWithClosure);
 
   // Otherwise, just release the task.
   } else {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskAndRelease);
+        function_cast<TaskContinuationFunction *>(&completeTaskAndRelease);
   }
 #pragma clang diagnostic pop
 
@@ -1797,8 +1805,7 @@ static void swift_task_removeCancellationHandlerImpl(
   auto task = swift_task_getCurrent();
   assert(task->_private()._status().load(std::memory_order_relaxed).getInnermostRecord() == record &&
     "We expect that the popped record will be exactly first as well as that it is of the expected type");
-  if (auto poppedRecord =
-      popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
+  if (popStatusRecordOfType<CancellationNotificationStatusRecord>(task)) {
     swift_task_dealloc(record);
   }
 }
@@ -1810,8 +1817,9 @@ swift_task_addPriorityEscalationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
+  auto unsigned_handler = swift_auth_code(handler, 11839);
   auto *record = ::new (allocation)
-      EscalationNotificationStatusRecord(handler, context);
+      EscalationNotificationStatusRecord(unsigned_handler, context);
 
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;

@@ -1708,7 +1708,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftCrossImportDir:
       case file_types::TY_SwiftOverlayFile:
       case file_types::TY_JSONDependencies:
-      case file_types::TY_JSONFeatures:
+      case file_types::TY_JSONArguments:
       case file_types::TY_SwiftABIDescriptor:
       case file_types::TY_SwiftAPIDescriptor:
       case file_types::TY_ConstValues:
@@ -2046,6 +2046,28 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
       llvm::errs() << errors;
       return sys::TaskFinishedResponse::ContinueExecution;
     });
+    return false;
+  }
+
+  if (Args.hasArg(options::OPT_print_supported_features)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-supported-features");
+
+    std::string executable = getSwiftProgramPath();
+
+    // FIXME(https://github.com/apple/swift/issues/54554): This bypasses
+    // mechanisms like -v and -###.
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode, StringRef output,
+                     StringRef errors, sys::TaskProcessInformation ProcInfo,
+                     void *unused) -> sys::TaskFinishedResponse {
+                    llvm::outs() << output;
+                    llvm::errs() << errors;
+                    return sys::TaskFinishedResponse::ContinueExecution;
+                  });
     return false;
   }
 

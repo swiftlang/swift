@@ -452,7 +452,7 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     // version. We do this before limiting the behavior, because
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
-      if (majorVersion > 6) {
+      if (majorVersion >= version::Version::getFutureMajorLanguageVersion()) {
         wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
         wrapIn(diag::error_in_swift_lang_mode, majorVersion);
@@ -470,6 +470,11 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
   }
 
   return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftVersion() {
+  using namespace version;
+  return warnUntilSwiftVersion(Version::getFutureMajorLanguageVersion());
 }
 
 InFlightDiagnostic &
@@ -874,18 +879,22 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
     }
 
-    // If it's an accessor, describe that and then switch to discussing its
-    // storage.
-    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-      Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " for ";
-      D = accessor->getStorage();
-    }
-
-    // If it's an extension, describe that and then switch to discussing its
-    // nominal type.
-    if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-      Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " of ";
-      D = ext->getSelfNominalTypeDecl();
+    if (includeName) {
+      if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+        // If it's an accessor, describe that and then switch to discussing its
+        // storage declaration.
+        Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " for ";
+        D = accessor->getStorage();
+      } else if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+        // If it's an extension with a valid bound type declaration, describe
+        // the extension itself then switch to discussing the bound
+        // declaration.
+        if (auto *nominal = ext->getSelfNominalTypeDecl()) {
+          Out << Decl::getDescriptiveKindName(D->getDescriptiveKind())
+              << " of ";
+          D = nominal;
+        }
+      }
     }
 
     // Figure out the name we want to print.

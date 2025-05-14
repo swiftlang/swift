@@ -59,6 +59,10 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
+  if (CallerIsolatedLoc.isValid()) {
+    ty = new (p.Context) CallerIsolatedTypeRepr(ty, CallerIsolatedLoc);
+  }
+
   if (lifetimeEntry) {
     ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntry);
   }
@@ -163,9 +167,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (isParameterSpecifier() &&
-      !(!Context.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-        Tok.isContextualKeyword("isolated"))) {
+  if (isParameterSpecifier()) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
@@ -1730,12 +1732,52 @@ bool Parser::canParseTypeSimpleOrComposition() {
   return true;
 }
 
+bool Parser::canParseNonisolatedAsTypeModifier() {
+  assert(Tok.isContextualKeyword("nonisolated"));
+
+  BacktrackingScope scope(*this);
+
+  // Consume 'nonisolated'
+  consumeToken();
+
+  // Something like:
+  //
+  // nonisolated
+  //  (42)
+  if (Tok.isAtStartOfLine())
+    return false;
+
+  // Always requires `(nonsending)`, together
+  // we don't want eagerly interpret something
+  // like `nonisolated(0)` as a modifier.
+
+  if (!consumeIf(tok::l_paren))
+    return false;
+
+  if (!Tok.isContextualKeyword("nonsending"))
+    return false;
+
+  consumeToken();
+
+  return consumeIf(tok::r_paren);
+}
+
 bool Parser::canParseTypeScalar() {
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
 
   if (Tok.isContextualKeyword("sending"))
     consumeToken();
+
+  if (Tok.isContextualKeyword("nonisolated")) {
+    if (!canParseNonisolatedAsTypeModifier())
+      return false;
+
+    // consume 'nonisolated'
+    consumeToken();
+    // skip '(nonsending)'
+    skipSingle();
+  }
 
   if (!canParseTypeSimpleOrComposition())
     return false;

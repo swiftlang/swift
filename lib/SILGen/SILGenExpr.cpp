@@ -489,11 +489,11 @@ namespace {
                                        SGFContext C);
 
     /// Helper method for handling function conversion expr to
-    /// @execution(caller). Returns an empty RValue on failure.
+    /// nonisolated(nonsending). Returns an empty RValue on failure.
     RValue emitFunctionCvtToExecutionCaller(FunctionConversionExpr *E,
                                             SGFContext C);
     /// Helper method for handling function conversion expr to a global actor
-    /// from an @execution(caller) function.
+    /// from an nonisolated(nonsending) function.
     RValue
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
@@ -1576,9 +1576,7 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()))
-                        .subst(subs);
+  auto nativeType = Type(SGF.getASTContext().TheSelfType).subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
   auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
@@ -1968,17 +1966,17 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   //
   // Swift 6:
   //
-  // (fn_cvt_expr type="@execution(caller) () async -> ()"
-  //   (fn_cvt_expr type="@execution(caller) @Sendable () async -> ()"
+  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
+  //   (fn_cvt_expr type="nonisolated(nonsending) @Sendable () async -> ()"
   //      (declref_expr type="() async -> ()"
   //
   // Swift 5:
   //
-  // (fn_cvt_expr type="@execution(caller) () async -> ()"
+  // (fn_cvt_expr type="nonisolated(nonsending) () async -> ()"
   //   (declref_expr type="() async -> ()"
   //
   // The @Sendable in Swift 6 mode is due to us not representing
-  // @execution(caller) or @Sendable in the constraint evaluator.
+  // nonisolated(nonsending) or @Sendable in the constraint evaluator.
   //
   // The reason why we need to evaluate this especially is that otherwise we
   // generate multiple
@@ -2038,7 +2036,7 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   // We are pattern matching a conversion sequence like the following:
   //
   // (fn_cvt_expr implicit type="@GlobalActor @Sendable () async -> ()
-  //    (fn_cvt_expr implicit type="@execution(caller) @Sendable () async -> ()"
+  //    (fn_cvt_expr implicit type="nonisolated(nonsending) @Sendable () async -> ()"
   //       (declref_expr type="() async -> ()"
   //
   // Where the declref referred to by the declref_expr has execution(caller)
@@ -2047,9 +2045,9 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   // fix it up later.
   //
   // What we want to emit first a direct reference to the caller as an
-  // @execution(caller) function, then we convert it to @execution(caller)
-  // @Sendable. Finally, we thunk @execution(caller) to @GlobalActor. The
-  // thunking is important so that we can ensure that @execution(caller) runs on
+  // nonisolated(nonsending) function, then we convert it to nonisolated(nonsending)
+  // @Sendable. Finally, we thunk nonisolated(nonsending) to @GlobalActor. The
+  // thunking is important so that we can ensure that nonisolated(nonsending) runs on
   // that specific @GlobalActor.
 
   CanAnyFunctionType destType =
@@ -2201,13 +2199,13 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     }
   }
 
-  // Check if we are converting a function to an @execution(caller) from a
-  // declref that is also @execution(caller). In such a case, this was a case
+  // Check if we are converting a function to an nonisolated(nonsending) from a
+  // declref that is also nonisolated(nonsending). In such a case, this was a case
   // that was put in by Sema. We do not need a thunk, but just need to recognize
   // this case and elide the conversion. The reason why we need to do this is
-  // that otherwise, we put in extra thunks that convert @execution(caller) to
-  // @execution(concurrent) back to @execution(caller). This is done b/c we do
-  // not represent @execution(caller) in interface types, so the actual decl ref
+  // that otherwise, we put in extra thunks that convert nonisolated(nonsending) to
+  // @concurrent back to nonisolated(nonsending). This is done b/c we do
+  // not represent nonisolated(nonsending) in interface types, so the actual decl ref
   // will be viewed as @async () -> ().
   if (destType->getIsolation().isNonIsolatedCaller()) {
     if (RValue rv = emitFunctionCvtToExecutionCaller(e, C))
@@ -3815,6 +3813,7 @@ static SILFunction *getOrCreateKeyPathSetter(
   auto semantics = AccessSemantics::Ordinary;
   auto strategy = property->getAccessStrategy(semantics, AccessKind::Write,
                                               SGM.M.getSwiftModule(), expansion,
+                                              std::nullopt,
                                               /*useOldABI=*/false);
 
   LValueOptions lvOptions;
@@ -4152,9 +4151,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto formalCanTy = formalTy->getCanonicalType();
       
       // Get the Equatable conformance from the Hashable conformance.
-      auto equatable = hashable.getAssociatedConformance(
-          GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
-          equatableProtocol);
+      auto equatable = hashable.getAssociatedConformance(C.TheSelfType, equatableProtocol);
 
       assert(equatable.isAbstract() == hashable.isAbstract());
       if (equatable.isConcrete())
@@ -4330,10 +4327,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         hashValueVar->getDeclContext()->getGenericSignatureOfContext();
       assert(hashGenericSig);
       SubstitutionMap hashableSubsMap = SubstitutionMap::get(
-          hashGenericSig,
-          [&](SubstitutableType *type) -> Type { return formalTy; },
-          [&](CanType dependentType, Type replacementType, ProtocolDecl *proto)
-              -> ProtocolConformanceRef { return hashable; });
+          hashGenericSig, formalTy, hashable);
 
       // Read the storage.
       ManagedValue base = ManagedValue::forBorrowedAddressRValue(indexAddr);
@@ -4633,7 +4627,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     auto strategy = storage->getAccessStrategy(
         AccessSemantics::Ordinary,
         storage->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
-        M.getSwiftModule(), expansion,
+        M.getSwiftModule(), expansion, std::nullopt,
         /*useOldABI=*/false);
 
     AbstractStorageDecl *externalDecl = nullptr;
@@ -4998,7 +4992,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
                                      SGFContext C) {
   ArgumentScope scope(SGF, E);
 
-  auto iaTy = E->getType()->castTo<BoundGenericType>();
+  auto iaTy = E->getType()->castTo<BoundGenericStructType>();
   auto loweredIAType = SGF.getLoweredType(iaTy);
 
   // If this is an empty InlineArray literal and it's loadable, then create an
@@ -5013,9 +5007,19 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
   auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
 
+
+  auto *arrayDecl = cast<StructDecl>(iaTy->getDecl());
+  VarDecl *storageProperty = nullptr;
+  for (VarDecl *property : arrayDecl->getStoredProperties()) {
+    if ((property->getTypeInContext()->is<BuiltinFixedArrayType>())) {
+      storageProperty = property;
+      break;
+    }
+  }
+
   SILValue alloc = SGF.emitTemporaryAllocation(E, loweredIAType);
-  SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
-                                            eltTL.getLoweredType().getAddressType());
+  SILValue storage = SGF.B.createStructElementAddr(E, alloc, storageProperty);
+  SILValue addr = SGF.B.createVectorBaseAddr(E, storage);
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
@@ -6679,7 +6683,7 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   // Array conversion does not always go down the ArrayConverter
   // path. Recognize the Array source type here both for ArrayToPointer and
   // InoutToPointer cases and diagnose on the element type.
-  Type eltTy = sourceTy->isArrayType();
+  Type eltTy = sourceTy->getArrayElementType();
   if (!eltTy)
     eltTy = sourceTy;
 
@@ -7178,6 +7182,14 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
 
     if (subType.isLoadable(SGF.F)) {
+      // Trivial types don't undergo any lifetime analysis, so simply load
+      // the value.
+      if (subType.isTrivial(SGF.F)
+          && !address.getType().isMoveOnlyWrapped()) {
+        return RValue(SGF, {SGF.B.createLoadCopy(E, address)},
+                      subType.getASTType());
+      }
+
       // Use a formal access load borrow so this closes in the writeback scope
       // above.
       ManagedValue value = SGF.B.createFormalAccessLoadBorrow(E, address);

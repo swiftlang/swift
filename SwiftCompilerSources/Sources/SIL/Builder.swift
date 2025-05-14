@@ -215,6 +215,13 @@ public struct Builder {
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
   }
 
+  public func createUncheckedOwnershipConversion(
+    operand: Value, resultOwnership: Ownership
+  ) -> UncheckedOwnershipConversionInst {
+    let uoc = bridged.createUncheckedOwnershipConversion(operand.bridged, resultOwnership._bridged)
+    return notifyNew(uoc.getAs(UncheckedOwnershipConversionInst.self))
+  }
+
   public func createLoad(fromAddress: Value, ownership: LoadInst.LoadOwnership) -> LoadInst {
     let load = bridged.createLoad(fromAddress.bridged, ownership.rawValue)
     return notifyNew(load.getAs(LoadInst.self))
@@ -480,6 +487,10 @@ public struct Builder {
     return notifyNew(vectorInst.getAs(VectorInst.self))
   }
 
+  public func createVectorBaseAddr(vector: Value) -> VectorBaseAddrInst {
+    return notifyNew(bridged.createVectorBaseAddr(vector.bridged).getAs(VectorBaseAddrInst.self))
+  }
+
   public func createGlobalAddr(global: GlobalVariable, dependencyToken: Value?) -> GlobalAddrInst {
     return notifyNew(bridged.createGlobalAddr(global.bridged, dependencyToken.bridged).getAs(GlobalAddrInst.self))
   }
@@ -573,6 +584,12 @@ public struct Builder {
   public func createEndCOWMutation(instance: Value, keepUnique: Bool) -> EndCOWMutationInst {
     let endMutation = bridged.createEndCOWMutation(instance.bridged, keepUnique)
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
+  }
+
+  @discardableResult
+  public func createEndCOWMutationAddr(address: Value) -> EndCOWMutationAddrInst {
+    let endMutation = bridged.createEndCOWMutationAddr(address.bridged)
+    return notifyNew(endMutation.getAs(EndCOWMutationAddrInst.self))
   }
 
   public func createMarkDependence(value: Value, base: Value, kind: MarkDependenceKind) -> MarkDependenceInst {

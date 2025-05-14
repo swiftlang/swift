@@ -1414,8 +1414,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
-  // `@execution(...)` attribute is only valid on asynchronous function types.
-  if (expr->getAttrs().hasAttribute<ExecutionAttr>()) {
+  // `@concurrent` attribute is only valid on asynchronous function types.
+  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
     async = true;
   }
 
@@ -1692,7 +1692,7 @@ struct TypeSimplifier {
             auto elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
 
             if (proto == arrayProto && assocType == elementAssocTy) {
-              return lookupBaseType->isArrayType();
+              return lookupBaseType->getInlineArrayElementType();
             }
           }
 
@@ -4407,11 +4407,9 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
       // Check what access strategy is used for a read-write access. It must be
       // direct-to-storage in order for the conversion to be non-ephemeral.
-      auto access = asd->getAccessStrategy(
+      return asd->isAccessedViaPhysicalStorage(
           AccessSemantics::Ordinary, AccessKind::ReadWrite,
-          DC->getParentModule(), DC->getResilienceExpansion(),
-          /*useOldABI=*/false);
-      return access.getKind() == AccessStrategy::Storage;
+          DC->getParentModule(), DC->getResilienceExpansion());
     };
 
     SourceRange range;
@@ -5175,7 +5173,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       case ActorIsolation::Erased:
         llvm_unreachable("storage cannot have opaque isolation");
 
-      // A reference to an actor isolated state makes key path non-Sendable.
+      // A reference to an actor-isolated state makes key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:
         isSendable = false;

@@ -371,6 +371,44 @@ bool GenericSignatureImpl::requiresProtocol(Type type,
   return getRequirementMachine()->requiresProtocol(type, proto);
 }
 
+std::optional<std::pair<Type, ProtocolDecl *>>
+GenericSignatureImpl::prohibitsIsolatedConformance(Type type) const {
+  type = getReducedType(type);
+
+  if (!type->isTypeParameter())
+    return std::nullopt;
+
+  // An isolated conformance cannot be used in a context where the type
+  // parameter can escape the isolation domain in which the conformance
+  // was formed. To establish this, we look for Sendable or SendableMetatype
+  // requirements on the type parameter itself.
+  ASTContext &ctx = type->getASTContext();
+  auto sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+
+  // Check for a conformance requirement to SendableMetatype, which is
+  // implied by Sendable.
+  if (sendableMetatypeProto && requiresProtocol(type, sendableMetatypeProto)) {
+    // Check for a conformance requirement to Sendable and return that if
+    // it exists, because it's more recognizable and specific.
+    if (sendableProto && requiresProtocol(type, sendableProto))
+      return std::make_pair(type, sendableProto);
+
+    return std::make_pair(type, sendableMetatypeProto);
+  }
+
+  // If this is a nested type, also check whether the parent type conforms to
+  // SendableMetatype, because one can derive this type from the parent type.
+  // FIXME: This is not a complete check, because there are other ways in which
+  // one might be able to derive this type. This needs to determine whether
+  // there is any path from a SendableMetatype-conforming type to this type.
+  if (auto depMemTy = type->getAs<DependentMemberType>())
+    return prohibitsIsolatedConformance(depMemTy->getBase());
+
+  return std::nullopt;
+}
+
 /// Determine whether the given dependent type is equal to a concrete type.
 bool GenericSignatureImpl::isConcreteType(Type type) const {
   assert(type->isTypeParameter() && "Expected a type parameter");
@@ -793,8 +831,7 @@ int swift::compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   return 0;
 }
 
-/// Canonical ordering for type parameters.
-int swift::compareDependentTypes(Type type1, Type type2) {
+static int compareDependentTypesRec(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
 
@@ -815,7 +852,7 @@ int swift::compareDependentTypes(Type type1, Type type2) {
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
   if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
+        compareDependentTypesRec(depMemTy1->getBase(), depMemTy2->getBase()))
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
@@ -829,6 +866,17 @@ int swift::compareDependentTypes(Type type1, Type type2) {
     return result;
 
   return 0;
+}
+
+/// Canonical ordering for type parameters.
+int swift::compareDependentTypes(Type type1, Type type2) {
+  auto *root1 = type1->getRootGenericParam();
+  auto *root2 = type2->getRootGenericParam();
+  if (root1->getWeight() != root2->getWeight()) {
+    return root2->getWeight() ? -1 : +1;
+  }
+
+  return compareDependentTypesRec(type1, type2);
 }
 
 #pragma mark Generic signature verification

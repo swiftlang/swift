@@ -98,12 +98,12 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   @objc
   internal func nextObject() -> AnyObject? {
-    if unsafe nextBucket == endBucket {
+    if nextBucket == endBucket {
       return nil
     }
-    let bucket = unsafe nextBucket
+    let bucket = nextBucket
     unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
-    return unsafe self.bridgedKey(at: bucket)
+    return self.bridgedKey(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -119,7 +119,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
       unsafe theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
-    if unsafe nextBucket == endBucket {
+    if nextBucket == endBucket {
       unsafe state.pointee = theState
       return 0
     }
@@ -315,8 +315,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   ) {
     _precondition(count >= 0, "Invalid count")
     guard count > 0 else { return }
-    let bridgedKeys = unsafe bridgeKeys()
-    let bridgedValues = unsafe bridgeValues()
+    let bridgedKeys = bridgeKeys()
+    let bridgedValues = bridgeValues()
     var i = 0 // Current position in the output buffers
 
     defer { _fixLifetime(self) }
@@ -355,8 +355,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       Unmanaged<AnyObject>,
       UnsafeMutablePointer<UInt8>
     ) -> Void) {
-    let bridgedKeys = unsafe bridgeKeys()
-    let bridgedValues = unsafe bridgeValues()
+    let bridgedKeys = bridgeKeys()
+    let bridgedValues = bridgeValues()
 
     defer { _fixLifetime(self) }
 
@@ -409,9 +409,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     var stored = 0
 
     // Only need to bridge once, so we can hoist it out of the loop.
-    let bridgedKeys = unsafe bridgeKeys()
+    let bridgedKeys = bridgeKeys()
     for i in 0..<count {
-      if unsafe bucket == endBucket { break }
+      if bucket == endBucket { break }
 
       unsafe unmanagedObjects[i] = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
       stored += 1
@@ -700,7 +700,7 @@ extension __CocoaDictionary: Sequence {
     // This stored property should be stored at offset zero.  There's code below
     // relying on this.
     internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
-      unsafe _makeSwiftNSFastEnumerationState()
+      _makeSwiftNSFastEnumerationState()
 
     // This stored property should be stored right after
     // `_fastEnumerationState`.  There's code below relying on this.

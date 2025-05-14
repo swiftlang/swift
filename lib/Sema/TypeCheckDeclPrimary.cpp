@@ -618,15 +618,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
 /// Returns \c true if \p current and \p other are in the same source file
 /// \em and \c current appears before \p other in that file.
 static bool isBeforeInSameFile(Decl *current, Decl *other) {
-  if (current->getDeclContext()->getParentSourceFile() !=
-                  other->getDeclContext()->getParentSourceFile())
+  if (current->getDeclContext()->getOutermostParentSourceFile() !=
+                  other->getDeclContext()->getOutermostParentSourceFile())
     return false;
 
-  if (!current->getLoc().isValid())
+  if (current->getLoc().isInvalid() || other->getLoc().isInvalid())
     return false;
 
   return current->getASTContext().SourceMgr
-                        .isBeforeInBuffer(current->getLoc(), other->getLoc());
+                        .isBefore(current->getLoc(), other->getLoc());
 }
 
 template <typename T>
@@ -728,6 +728,20 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
                                          flags);
       otherDefinitions.append(found.begin(), found.end());
+
+      // Look into the generics of the type. Value generic parameters can appear
+      // as static members of the type.
+      if (auto genericDC = static_cast<Decl *>(nominal)->getAsGenericContext()) {
+        auto gpList = genericDC->getGenericParams();
+
+        if (gpList && !current->getBaseName().isSpecial()) {
+          auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
+
+          if (gp && gp->isValue()) {
+            otherDefinitions.push_back(gp);
+          }
+        }
+      }
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
@@ -1081,8 +1095,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                     return req->getName() == VD->getName();
                   });
             }
-            declToDiagnose->diagnose(diag::invalid_redecl_implicit,
-                                     current->getDescriptiveKind(),
+            declToDiagnose->diagnose(diag::invalid_redecl_implicit, current,
                                      isProtocolRequirement, other);
 
             // Emit a specialized note if the one of the declarations is
@@ -1136,6 +1149,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       break;
     }
   }
+
   return std::make_tuple<>();
 }
 
@@ -2002,9 +2016,8 @@ static StringRef prettyPrintAttrs(const ValueDecl *VD,
 }
 
 static void diagnoseChangesByAccessNote(
-    ValueDecl *VD,
-    ArrayRef<const DeclAttribute *> attrs,
-    Diag<StringRef, StringRef, DescriptiveDeclKind> diagID,
+    ValueDecl *VD, ArrayRef<const DeclAttribute *> attrs,
+    Diag<StringRef, StringRef, const ValueDecl *> diagID,
     Diag<StringRef> fixItID,
     llvm::function_ref<void(InFlightDiagnostic, StringRef)> addFixIts) {
   if (!VD->getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess() ||
@@ -2018,7 +2031,7 @@ static void diagnoseChangesByAccessNote(
   SourceLoc fixItLoc;
 
   auto reason = VD->getModuleContext()->getAccessNotes().Reason;
-  auto diag = VD->diagnose(diagID, reason, attrText, VD->getDescriptiveKind());
+  auto diag = VD->diagnose(diagID, reason, attrText, VD);
   for (auto attr : attrs) {
     diag.highlight(attr->getRangeWithAt());
     if (fixItLoc.isInvalid())
@@ -2072,8 +2085,8 @@ swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
   auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
   return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
                                D->getModuleContext()->getAccessNotes().Reason,
-                               ctx.AllocateCopy(attrText), D->getDescriptiveKind())
-                        .limitBehavior(behavior));
+                               ctx.AllocateCopy(attrText), VD)
+                       .limitBehavior(behavior));
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
@@ -2114,8 +2127,8 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
       if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
         return;
 
-      VD->diagnose(diag::attr_objc_name_changed_by_access_note,
-                   notes.Reason, VD->getDescriptiveKind(), newName);
+      VD->diagnose(diag::attr_objc_name_changed_by_access_note, notes.Reason,
+                   VD, newName);
 
       auto fixIt =
           VD->diagnose(diag::fixit_attr_objc_name_changed_by_access_note);
@@ -2126,8 +2139,7 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
       auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
 
       VD->diagnose(diag::attr_objc_name_conflicts_with_access_note,
-                   notes.Reason, VD->getDescriptiveKind(),
-                   attr->getName().value(), newName)
+                   notes.Reason, VD, attr->getName().value(), newName)
           .highlight(attr->getRangeWithAt())
           .limitBehavior(behavior);
     }
@@ -3236,8 +3248,6 @@ public:
     diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
 
-    TypeChecker::checkPatternBindingCaptures(ED);
-
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
@@ -3306,8 +3316,6 @@ public:
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
     }
-
-    TypeChecker::checkPatternBindingCaptures(SD);
 
     checkInheritanceClause(SD);
     diagnoseMissingExplicitSendable(SD);
@@ -3489,8 +3497,6 @@ public:
 
     for (Decl *Member : CD->getABIMembers())
       visit(Member);
-
-    TypeChecker::checkPatternBindingCaptures(CD);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3790,24 +3796,10 @@ public:
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
-    // FIXME: This needs to be moved to its own request if we want to
-    // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      std::optional<ForeignAsyncConvention> asyncConvention;
-      std::optional<ForeignErrorConvention> errorConvention;
-      ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
-      if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
-        if (FD->hasAsync()) {
-          FD->setForeignAsyncConvention(*asyncConvention);
-          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::attr_decl_async,
-                             CDeclAttr, FD);
-        } else if (FD->hasThrows()) {
-          FD->setForeignErrorConvention(*errorConvention);
-          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
-        }
-      } else {
-        reason.setAttrInvalid();
-      }
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclAttributeRequest{FD, CDeclAttr},
+                        {});
     }
 
     TypeChecker::checkObjCImplementation(FD);
@@ -4073,8 +4065,6 @@ public:
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
-
-    TypeChecker::checkPatternBindingCaptures(ED);
 
     TypeChecker::checkConformancesInContext(ED);
 

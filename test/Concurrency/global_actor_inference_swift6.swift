@@ -207,6 +207,7 @@ protocol InferenceConflictWithSuperclass: MainActorSuperclass, InferSomeGlobalAc
 class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
   //expected-note@-1 {{turn data races into runtime errors with '@preconcurrency'}}
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
 
   func f() {}
 
@@ -223,5 +224,5 @@ class InheritConformance: ConformInExtension {
 }
 
 func testInheritedMainActorConformance() {
-  InheritConformance().f() // okay; this is not main actor isolated
+  InheritConformance().f() // okay; this is not MainActor isolated
 }

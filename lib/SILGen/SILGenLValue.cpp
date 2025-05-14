@@ -245,8 +245,9 @@ static LValueTypeData getPhysicalStorageTypeData(TypeExpansionContext context,
 }
 
 static bool shouldUseUnsafeEnforcement(VarDecl *var) {
-  if (var->isDebuggerVar())
+  if (var->isDebuggerVar()) {
     return true;
+  }
 
   return false;
 }
@@ -277,6 +278,22 @@ SILGenFunction::getDynamicEnforcement(VarDecl *var) {
   } else if (hasExclusivityAttr(var, ExclusivityAttr::Checked)) {
     return SILAccessEnforcement::Dynamic;
   }
+
+  // Access markers are especially load-bearing for the move-only checker,
+  // so we also emit `begin_access` markers for cases where storage
+  // is move-only.
+  // TODO: It seems useful to do this for all unchecked declarations, since
+  // access scopes are useful semantic information.
+  if (var->getTypeInContext()->isNoncopyable()) {
+    return SILAccessEnforcement::Unsafe;
+  }
+  if (auto param = dyn_cast<ParamDecl>(var)) {
+    if (param->getSpecifier() == ParamSpecifier::Borrowing
+        || param->getSpecifier() == ParamSpecifier::Consuming) {
+      return SILAccessEnforcement::Unsafe;
+    }
+  }
+  
   return std::nullopt;
 }
 
@@ -2518,9 +2535,9 @@ namespace {
 
       // Perform the begin_apply.
       SmallVector<ManagedValue, 1> yields;
-      auto cleanup =
-        SGF.emitBeginApply(loc, projectFnRef, subs, { base, keyPathValue },
-                           substFnType, ApplyOptions(), yields);
+      auto cleanup = SGF.emitBeginApply(loc, projectFnRef, /*canUnwind=*/true,
+                                        subs, {base, keyPathValue}, substFnType,
+                                        ApplyOptions(), yields);
 
       // Push an operation to do the end_apply.
       pushEndApplyWriteback(SGF, loc, cleanup, getTypeData());
@@ -3098,10 +3115,12 @@ public:
 
     assert(!e->getType()->is<LValueType>());
 
+    auto pair = std::make_pair<>(e->getSourceRange(), SGF.FunctionDC);
+
     auto accessSemantics = e->getAccessSemantics();
     AccessStrategy strategy = var->getAccessStrategy(
         accessSemantics, getFormalAccessKind(accessKind),
-        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(), pair,
         /*useOldABI=*/false);
 
     auto baseFormalType = getBaseFormalType(e->getBase());
@@ -3379,7 +3398,7 @@ static LValue emitLValueForNonMemberVarDecl(
   auto access = getFormalAccessKind(accessKind);
   auto strategy = var->getAccessStrategy(
       semantics, access, SGF.SGM.M.getSwiftModule(),
-      SGF.F.getResilienceExpansion(), /*useOldABI=*/false);
+      SGF.F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -4015,6 +4034,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   AccessStrategy strategy = var->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
       /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
@@ -4036,6 +4056,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       strategy = var->getAccessStrategy(
           accessSemantics, getFormalAccessKind(accessKind),
           SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
           /*useOldABI=*/false);
     }
   }
@@ -4237,6 +4258,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto strategy = decl->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
       /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
@@ -4257,6 +4279,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       strategy = decl->getAccessStrategy(
           accessSemantics, getFormalAccessKind(accessKind),
           SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
           /*useOldABI=*/false);
     }
   }
@@ -4727,7 +4750,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy = ivar->getAccessStrategy(
       semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), /*useOldABI=*/false);
+      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -5443,7 +5466,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     bool isBaseGuaranteed) {
   AccessStrategy strategy = storage->getAccessStrategy(
       semantics, AccessKind::Read, SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), /*useOldABI=*/false);
+      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {

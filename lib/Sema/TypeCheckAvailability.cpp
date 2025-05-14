@@ -276,16 +276,18 @@ static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
   return false;
 }
 
-// Utility function to help determine if noasync diagnostics are still
-// appropriate even if a `DeclContext` returns `false` from `isAsyncContext()`.
-static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
-  if (auto *D = DC->getAsDecl())
-    if (auto *FD = dyn_cast<FuncDecl>(D))
+/// Retrieve the innermost DeclContext that should be consulted for noasync
+/// checking.
+static const DeclContext *
+getInnermostDeclContextForNoAsync(const DeclContext *DC) {
+  if (auto *D = DC->getAsDecl()) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (FD->isDeferBody())
         // If this is a defer body, we should delegate to its parent.
-        return shouldTreatDeclContextAsAsyncForDiagnostics(DC->getParent());
-
-  return DC->isAsyncContext();
+        return getInnermostDeclContextForNoAsync(DC->getParent());
+    }
+  }
+  return DC;
 }
 
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
@@ -655,9 +657,9 @@ static void fixAvailabilityForDecl(
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
-  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
-  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
-    KindForDiagnostic = D->getDescriptiveKind();
+  const auto *DeclForDiagnostic = ConcDecl;
+  if (isa<PatternBindingDecl>(DeclForDiagnostic)) {
+    DeclForDiagnostic = D;
   }
 
   SourceLoc InsertLoc =
@@ -668,7 +670,7 @@ static void fixAvailabilityForDecl(
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
 
-  D->diagnose(diag::availability_add_attribute, KindForDiagnostic)
+  D->diagnose(diag::availability_add_attribute, DeclForDiagnostic)
       .fixItInsert(InsertLoc, diag::insert_available_attr,
                    Domain.getNameForAttributePrinting(),
                    RequiredAvailability.getVersionString(), OriginalIndent);
@@ -2697,6 +2699,7 @@ diagnoseDeclUnsafe(ConcreteDeclRef declRef, SourceRange R,
 
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   enumerateUnsafeUses(declRef, diagLoc, call != nullptr,
+                      /*skipTypeCheck=*/false,
                       [&](UnsafeUse unsafeUse) {
     unsafeUses->push_back(unsafeUse);
     return false;
@@ -2758,7 +2761,8 @@ static bool
 diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &Where) {
   // If we are not in an (effective) async context, don't check it
-  if (!shouldTreatDeclContextAsAsyncForDiagnostics(Where.getDeclContext()))
+  auto *noAsyncDC = getInnermostDeclContextForNoAsync(Where.getDeclContext());
+  if (!noAsyncDC->isAsyncContext())
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
@@ -2774,14 +2778,27 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     }
   }
 
+  // In Swift 6 we previously didn't coerce macro arguments to parameter types,
+  // so closure arguments may be treated as async in cases where they weren't in
+  // Swift 6. As such we need to warn if the use is within a closure macro
+  // argument until the next language mode.
+  auto shouldWarnUntilFutureVersion = [&]() {
+    auto *CE = dyn_cast<ClosureExpr>(noAsyncDC);
+    return CE && CE->isMacroArgument();
+  };
+
   // @available(noasync) spelling
   if (auto attr = D->getNoAsyncAttr()) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->getMessage());
-    diag.warnUntilSwiftVersion(6);
-    diag.limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
-                                         D->preconcurrency());
+    if (D->preconcurrency()) {
+      diag.limitBehavior(DiagnosticBehavior::Warning);
+    } else if (shouldWarnUntilFutureVersion()) {
+      diag.warnUntilFutureSwiftVersion();
+    } else {
+      diag.warnUntilSwiftVersion(6);
+    }
 
     if (!attr->getRename().empty()) {
       fixItAvailableAttrRename(diag, R, D, attr->getRename(), call);
@@ -2797,10 +2814,16 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   // @_unavailableFromAsync spelling
   const UnavailableFromAsyncAttr *attr =
       D->getAttrs().getAttribute<UnavailableFromAsyncAttr>();
-  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-  ctx.Diags
-      .diagnose(diagLoc, diag::async_unavailable_decl, D, attr->Message)
-      .warnUntilSwiftVersion(6);
+  {
+    SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+    auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
+                                   attr->Message);
+    if (shouldWarnUntilFutureVersion()) {
+      diag.warnUntilFutureSwiftVersion();
+    } else {
+      diag.warnUntilSwiftVersion(6);
+    }
+  }
   D->diagnose(diag::decl_declared_here, D);
   return true;
 }
@@ -3511,6 +3534,11 @@ void swift::checkExplicitAvailability(Decl *decl) {
       !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
   if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+    // Skip extensions that extend non-public types.
+    auto extended = extension->getExtendedNominal();
+    if (!extended || !extended->getFormalAccessScope().isPublic())
+      return;
+
     // Skip extensions when none of their members need availability.
     auto members = extension->getMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),

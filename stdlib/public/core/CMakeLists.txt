@@ -57,7 +57,6 @@ split_embedded_sources(
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
-  EMBEDDED SwiftSettings.swift
   EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguouslyStored.swift
@@ -214,6 +213,13 @@ split_embedded_sources(
   EMBEDDED UnsafeRawPointer.swift
   EMBEDDED UTFEncoding.swift
   EMBEDDED UTF8.swift
+  EMBEDDED UTF8EncodingError.swift
+  EMBEDDED UTF8Span.swift
+  EMBEDDED UTF8SpanBits.swift
+  EMBEDDED UTF8SpanComparisons.swift
+  EMBEDDED UTF8SpanFundamentals.swift
+  EMBEDDED UTF8SpanInternalHelpers.swift
+  EMBEDDED UTF8SpanIterators.swift
   EMBEDDED UTF16.swift
   EMBEDDED UTF32.swift
   EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
@@ -252,7 +258,7 @@ split_embedded_sources(
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
 
     NORMAL AtomicInt.swift.gyb
-    NORMAL FloatingPointParsing.swift.gyb
+  EMBEDDED FloatingPointParsing.swift.gyb
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED LegacyInt128.swift.gyb

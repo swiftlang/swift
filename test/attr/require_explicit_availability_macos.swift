@@ -144,6 +144,8 @@ private class PrivateClass { }
 
 extension PrivateClass { }
 
+extension PrivateClass : P { }
+
 @available(macOS 10.1, *)
 public protocol PublicProtocol { }
 
@@ -161,6 +163,8 @@ public struct spiStruct {
 extension spiStruct {
   public func spiExtensionMethod() {}
 }
+
+extension spiStruct : P { }
 
 public var publicVar = S() // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
 
@@ -248,7 +252,7 @@ extension SomeClass { // expected-warning {{public declarations should have an a
 public struct StructWithImplicitMembers { }
 
 extension StructWithImplicitMembers: Hashable { }
-// expected-note @-1 {{add @available attribute to enclosing extension}}
+// expected-note @-1 {{add '@available' attribute to enclosing extension}}
 // expected-warning @-2 {{public declarations should have an availability attribute with an introduction version}}
 // expected-error @-3 {{'StructWithImplicitMembers' is only available in macOS 10.15 or newer}}
 

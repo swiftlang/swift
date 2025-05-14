@@ -206,6 +206,10 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PrintTargetInfo = true;
   }
 
+  if (Args.hasArg(OPT_print_supported_features)) {
+    Opts.PrintSupportedFeatures = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
@@ -678,8 +682,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::CompileModuleFromInterface;
   if (Opt.matches(OPT_typecheck_module_from_interface))
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
-  if (Opt.matches(OPT_emit_supported_features))
-    return FrontendOptions::ActionType::PrintFeature;
+  if (Opt.matches(OPT_emit_supported_arguments))
+    return FrontendOptions::ActionType::PrintArguments;
   llvm_unreachable("Unhandled mode option");
 }
 
@@ -980,13 +984,12 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
 
       // First, add the real name as a key to prevent it from being
       // used as an alias
-      if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {
+      if (!options.ModuleAliasMap.insert({rhs, ""}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, rhs);
         return false;
       }
       // Next, add the alias as a key and the real name as a value to the map
-      auto underlyingName = options.ModuleAliasMap.find(rhs)->first();
-      if (!options.ModuleAliasMap.insert({lhs, underlyingName}).second) {
+      if (!options.ModuleAliasMap.insert({lhs, rhs.str()}).second) {
         diags.diagnose(SourceLoc(), diag::error_module_alias_duplicate, lhs);
         return false;
       }

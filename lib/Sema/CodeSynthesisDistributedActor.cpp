@@ -110,8 +110,7 @@ static VarDecl *addImplicitDistributedActorIDProperty(
       nominal);
 
   // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
   // mark as @_compilerInitialized, since we synthesize the initializing
   // assignment during SILGen.
   propDecl->getAttrs().add(
@@ -161,8 +160,7 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
       nominal);
 
   // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   auto idProperty = nominal->getDistributedActorIDProperty();
   // If the id was not yet synthesized, we need to ensure that eventually
@@ -739,8 +737,7 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->getAttrs().add(
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  thunk->getAttrs().add(NonisolatedAttr::createImplicit(C));
 
   return thunk;
 }
@@ -1080,11 +1077,8 @@ GetDistributedActorAsActorConformanceRequest::evaluate(
   if (!ext)
     return nullptr;
 
-  auto genericParam = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0,
-                                                    ctx);
-
   auto distributedActorAsActorConformance = ctx.getNormalConformance(
-      Type(genericParam), actorProto, SourceLoc(), ext,
+      Type(ctx.TheSelfType), actorProto, SourceLoc(), ext,
       ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
   // NOTE: Normally we "register" a conformance, but here we don't
   // because we cannot (currently) register them in a protocol,

@@ -163,9 +163,9 @@ public:
 
     this->stringInitIntrinsic = callee;
 
-    MetatypeInst *stringMetatypeInst =
-        dyn_cast<MetatypeInst>(inst->getOperand(4)->getDefiningInstruction());
-    this->stringMetatype = stringMetatypeInst->getType();
+    auto stringMetatype = inst->getOperand(4)->getType();
+    assert(stringMetatype.isMetatype());
+    this->stringMetatype = stringMetatype;
   }
 
   bool isInitialized() { return stringInitIntrinsic != nullptr; }

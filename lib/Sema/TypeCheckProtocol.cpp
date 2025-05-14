@@ -912,8 +912,7 @@ RequirementMatch swift::matchWitness(
 
     case ThrownErrorSubtyping::Subtype:
       // If there were no type parameters, we're done.
-      if (!reqThrownError->hasTypeVariable() &&
-          !reqThrownError->hasTypeParameter())
+      if (!reqThrownError->hasTypeParameter())
         break;
 
       LLVM_FALLTHROUGH;
@@ -1035,11 +1034,7 @@ findMissingGenericRequirementForSolutionFix(
           return conformance->getType();
 
         ASSERT(gp->getDepth() > 0);
-        gp = GenericTypeParamType::get(gp->getParamKind(),
-                                       gp->getDepth() - 1,
-                                       gp->getIndex(),
-                                       gp->getValueType(),
-                                       ctx);
+        gp = gp->withDepth(gp->getDepth() - 1);
       }
 
       if (!sig)
@@ -2567,13 +2562,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  // Complain if the global-actor-isolated conformances are not enabled.
-  if (conformance->isIsolated() &&
-      !Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
-    Context.Diags.diagnose(
-        ComplainLoc, diag::isolated_conformance_experimental_feature);
-  }
-  
   bool allowImpliedConditionalConformance = false;
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
@@ -3672,12 +3660,11 @@ static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
   // move it to another extension where the required level is possible;
   // otherwise, we simply mark decl as the required level.
   if (shouldMoveToAnotherExtension) {
-    diags.diagnose(decl, diag::witness_move_to_another_extension,
-                   decl->getDescriptiveKind(), requiredAccess);
+    diags.diagnose(decl, diag::witness_move_to_another_extension, decl,
+                   requiredAccess);
   } else {
-    auto fixItDiag = diags.diagnose(decl, diag::witness_fix_access,
-                                    decl->getDescriptiveKind(),
-                                    requiredAccess);
+    auto fixItDiag =
+        diags.diagnose(decl, diag::witness_fix_access, decl, requiredAccess);
     fixItAccess(fixItDiag, decl, requiredAccess, isForSetter,
                 shouldUseDefaultAccess);
   }
@@ -3705,8 +3692,12 @@ static Type getTupleConformanceTypeWitness(DeclContext *dc,
 
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
-                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
-  if (isa<ConstructorDecl>(Requirement)) {
+                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS,
+                     bool withExplicitObjCAttr) {
+  // We sometimes use this for @implementation extensions too.
+  bool forProtocol = isa<ProtocolDecl>(Requirement->getDeclContext());
+
+  if (isa<ConstructorDecl>(Requirement) && forProtocol) {
     if (auto CD = Adopter->getSelfClassDecl()) {
       if (!CD->isSemanticallyFinal() && isa<ExtensionDecl>(Adopter)) {
         // In this case, user should mark class as 'final' or define
@@ -3732,15 +3723,35 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
 
+  PrintOptions Options = PrintOptions::printForDiagnostics(
+      AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
+  Options.PrintDocumentationComments = false;
+  Options.PrintAccess = false;
+  Options.SkipAttributes = true;
+  Options.FunctionDefinitions = true;
+  Options.PrintAccessorBodiesInProtocols = true;
+  Options.PrintExplicitAccessorParameters = false;
+  Options.FullyQualifiedTypesIfAmbiguous = true;
+
+  if (withExplicitObjCAttr) {
+    if (auto runtimeName = Requirement->getObjCRuntimeName()) {
+      llvm::SmallString<32> scratch;
+      Printer.printAttrName("@objc");
+      Printer << "(" << runtimeName->getString(scratch) << ")";
+      Printer.printNewline();
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ObjC);
+    }
+  }
+
   AccessLevel Access =
     std::min(
       /* Access of the context */
       Adopter->getSelfNominalTypeDecl()->getFormalAccess(),
       /* Access of the protocol */
-      Requirement->getDeclContext()->getSelfProtocolDecl()->
-        getFormalAccess());
-  if (Access == AccessLevel::Public)
-    Printer << "public ";
+      Requirement->getDeclContext()->getSelfNominalTypeDecl()
+                      ->getFormalAccess());
+  if (Access > AccessLevel::Internal)
+    Printer.printKeyword(getAccessLevelSpelling(Access), Options, " ");
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
     Printer << "typealias " << MissingTypeWitness->getName() << " = ";
@@ -3754,7 +3765,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
     Printer << "\n";
   } else {
-    if (isa<ConstructorDecl>(Requirement)) {
+    if (isa<ConstructorDecl>(Requirement) && forProtocol) {
       if (auto CD = Adopter->getSelfClassDecl()) {
         if (!CD->isFinal()) {
           Printer << "required ";
@@ -3763,15 +3774,6 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
         }
       }
     }
-
-    PrintOptions Options = PrintOptions::printForDiagnostics(
-        AccessLevel::Private, Ctx.TypeCheckerOpts.PrintFullConvention);
-    Options.PrintDocumentationComments = false;
-    Options.PrintAccess = false;
-    Options.SkipAttributes = true;
-    Options.FunctionDefinitions = true;
-    Options.PrintAccessorBodiesInProtocols = true;
-    Options.FullyQualifiedTypesIfAmbiguous = true;
 
     bool AdopterIsClass = Adopter->getSelfClassDecl() != nullptr;
     // Skip 'mutating' only inside classes: mutating methods usually
@@ -3798,9 +3800,12 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
-    if (isa<NominalTypeDecl>(Adopter)) {
-      // Create a variable declaration instead of a computed property in
-      // nominal types...
+
+    // Can the conforming declaration declare a stored property?
+    auto ImplementedAdopter = Adopter->getImplementedObjCContext();
+    if (isa<NominalTypeDecl>(ImplementedAdopter) &&
+          (!isa<EnumDecl>(ImplementedAdopter) || Requirement->isStatic())) {
+      // Create a variable declaration instead of a computed property...
       Options.PrintPropertyAccessors = false;
 
       // ...but a non-mutating setter requirement will force us into a
@@ -3811,6 +3816,11 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
           if (const auto Set = VD->getOpaqueAccessor(AccessorKind::Set))
             if (Set->getAttrs().hasAttribute<NonMutatingAttr>())
               Options.PrintPropertyAccessors = true;
+
+      // If we're not printing the accessors, make them affect the introducer
+      // instead.
+      Options.InferPropertyIntroducerFromAccessors =
+          !Options.PrintPropertyAccessors;
     }
     Requirement->print(Printer, Options);
     Printer << "\n";
@@ -4334,9 +4344,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
         });
     }
     if (best.Kind == MatchKind::RequiresNonSendable) {
@@ -4485,9 +4494,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
       });
       break;
     }
@@ -4517,9 +4525,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc, diag::witness_unavailable, witness,
                          conformance->getProtocol(), EncodedMessage.Message);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-          diags.diagnose(requirement, diag::kind_declname_declared_here,
-                         DescriptiveDeclKind::Requirement,
-                         requirement->getName());
+          diags.diagnose(requirement, diag::requirement_declared_here,
+                         requirement);
         });
       break;
 
@@ -4536,9 +4543,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            witness, conformance->getProtocol()->getName(),
                            EncodedMessage.Message);
             emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-            diags.diagnose(requirement, diag::kind_declname_declared_here,
-                           DescriptiveDeclKind::Requirement,
-                           requirement->getName());
+            diags.diagnose(requirement, diag::requirement_declared_here,
+                           requirement);
           });
         break;
     }
@@ -4945,6 +4951,9 @@ static void diagnoseConformanceIsolationErrors(
       hasIsolatedConformances = true;
     }
 
+    // Take the least-restrictive behavior.
+    behavior = behavior.merge(assocConformanceError.behavior);
+
     anyNonDistributedIssues = true;
   }
 
@@ -4973,8 +4982,7 @@ static void diagnoseConformanceIsolationErrors(
     }
 
     // Suggest isolating the conformance, if possible.
-    if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-        potentialIsolation && potentialIsolation->isGlobalActor() &&
+    if (potentialIsolation && potentialIsolation->isGlobalActor() &&
         !conformance->isIsolated()) {
       bool isMainActor = false;
       Type globalActorIsolation = potentialIsolation->getGlobalActor();
@@ -5172,7 +5180,8 @@ static bool diagnoseTypeWitnessAvailability(
     return false;
 
   // In Swift 6 and earlier type witness availability diagnostics are warnings.
-  const unsigned warnBeforeVersion = 7;
+  using namespace version;
+  const unsigned warnBeforeVersion = Version::getFutureMajorLanguageVersion();
   bool shouldError =
       ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
 
@@ -5193,9 +5202,8 @@ static bool diagnoseTypeWitnessAvailability(
               .warnUntilSwiftVersion(warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
-          ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                             DescriptiveDeclKind::Requirement,
-                             assocType->getName());
+          ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
+                             assocType);
         });
   }
 
@@ -5402,9 +5410,19 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
             // If the isolation doesn't match, record an error.
             if (!outerIsolation.isGlobalActor() ||
                 outerIsolation != innerIsolation) {
+              DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified;
+              // If we're working with requirements imported from Clang, or with
+              // global actor isolation in general, use the default diagnostic
+              // behavior based on the conformance context.
+              if (proto->hasClangNode() ||
+                  outerIsolation.isGlobalActor() ||
+                  innerIsolation.isGlobalActor())
+                behavior = SendableCheckContext(dc).defaultDiagnosticBehavior();
+
               ctx.getGlobalCache().conformanceIsolationErrors[conformance]
                 .push_back(
-                  AssociatedConformanceIsolationError{isolatedConformance});
+                  AssociatedConformanceIsolationError{
+                    isolatedConformance, behavior});
               return true;
             }
 
@@ -5532,8 +5550,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5552,8 +5570,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             if (!witness->canInferObjCFromRequirement(requirement)) {
               fixDeclarationObjCName(
@@ -5572,8 +5590,8 @@ void ConformanceChecker::resolveValueWitnesses() {
               // to attach the fix-it to the note that shows where the
               // witness is defined.
               fixItDiag.value().flush();
-              fixItDiag.emplace(witness->diagnose(
-                  diag::make_decl_objc, witness->getDescriptiveKind()));
+              fixItDiag.emplace(
+                  witness->diagnose(diag::make_decl_objc, witness));
             }
             fixItDiag->fixItInsert(witness->getAttributeInsertionLoc(false),
                                    "@objc ");
@@ -5587,9 +5605,7 @@ void ConformanceChecker::resolveValueWitnesses() {
                              "@nonobjc ");
           }
 
-          requirement->diagnose(diag::kind_declname_declared_here,
-                                DescriptiveDeclKind::Requirement,
-                                requirement->getName());
+          requirement->diagnose(diag::requirement_declared_here, requirement);
 
           Conformance->setInvalid();
           return;
@@ -6275,8 +6291,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
         .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
   }
 
-  req->diagnose(diag::kind_declname_declared_here,
-                DescriptiveDeclKind::Requirement, req->getName());
+  req->diagnose(diag::requirement_declared_here, req);
 }
 
 /// Whether the given protocol is "NSCoding".

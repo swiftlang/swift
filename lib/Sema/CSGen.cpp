@@ -1085,7 +1085,12 @@ namespace {
           baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
 
-        if (auto elementTy = baseObjTy->isArrayType()) {
+        auto elementTy = baseObjTy->getArrayElementType();
+
+        if (!elementTy)
+          elementTy = baseObjTy->getInlineArrayElementType();
+
+        if (elementTy) {
 
           if (auto arraySliceTy = 
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
@@ -1723,9 +1728,6 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
-      auto paramType = CS.DC->mapTypeIntoContext(ty);
-      E->setParamType(paramType);
       return E->getParamDecl()->getValueType();
     }
 
@@ -2154,18 +2156,28 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && contextualType->isArrayType()) {
+      if (contextualType &&
+          (contextualType->getArrayElementType() ||
+           contextualType->getInlineArrayElementType())) {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         // FIXME: This is the wrong place to be opening the opaque type.
         contextualType = CS.openOpaqueType(
             contextualType, contextualPurpose, locator, /*ownerDecl=*/nullptr);
-        Type arrayElementType = contextualType->isArrayType();
+
+        Type eltType;
+
+        if (contextualType->isArray())
+          eltType = contextualType->getArrayElementType();
+
+        if (contextualType->isInlineArray())
+          eltType = contextualType->getInlineArrayElementType();
+
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
-        joinElementTypes(arrayElementType);
+        joinElementTypes(eltType);
         return contextualType;
       }
 
@@ -2584,14 +2596,8 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
-        if (auto *execution =
-                closure->getAttrs().getAttribute<ExecutionAttr>()) {
-          switch (execution->getBehavior()) {
-          case ExecutionKind::Caller:
-            return FunctionTypeIsolation::forNonIsolatedCaller();
-          case ExecutionKind::Concurrent:
-            return FunctionTypeIsolation::forNonIsolated();
-          }
+        if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+          return FunctionTypeIsolation::forNonIsolated();
         }
 
         return FunctionTypeIsolation::forNonIsolated();
@@ -4591,8 +4597,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // non-`Sendable` state across the isolation boundary. `next()` should
   // inherit the isolation of the caller, but for now, use the opt out.
   if (isAsync) {
-    auto *nonisolated = new (ctx)
-        NonisolatedAttr(/*unsafe=*/true, /*implicit=*/true);
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
     makeIteratorVar->getAttrs().add(nonisolated);
   }
 
@@ -4602,8 +4608,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
 
-    auto *makeIteratorRef = UnresolvedDotExpr::createImplicit(
-        ctx, sequenceExpr, makeIterator->getName());
+    auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
+        sequenceExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     Expr *makeIteratorCall =
@@ -4666,11 +4673,13 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
-    auto *nextRef = UnresolvedDotExpr::createImplicit(
-        ctx,
+    auto *makeIteratorVarRef =
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                              /*Implicit=*/true),
-        nextId, labels);
+                              /*Implicit=*/true);
+    auto *nextRef = new (ctx)
+        UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
+                          DeclNameRef(DeclName(ctx, nextId, labels)),
+                          DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     ArgumentList *nextArgs;

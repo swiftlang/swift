@@ -1000,8 +1000,7 @@ namespace {
 
       // Emit the dispatch thunk.
       auto shouldEmitDispatchThunk =
-          (Resilient || IGM.getOptions().WitnessMethodElimination) &&
-          !func.isDistributed();
+          (Resilient || IGM.getOptions().WitnessMethodElimination);
       if (shouldEmitDispatchThunk) {
         IGM.emitDispatchThunk(func);
       }
@@ -1082,14 +1081,8 @@ namespace {
             // Define the method descriptor.
             SILDeclRef func(entry.getFunction());
 
-            /// Distributed thunks don't need resilience.
-            if (func.isDistributedThunk()) {
-              continue;
-            }
-
             auto *descriptor =
-              B.getAddrOfCurrentPosition(
-                IGM.ProtocolRequirementStructTy);
+                B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
             IGM.defineMethodDescriptor(func, Proto, descriptor,
                                        IGM.ProtocolRequirementStructTy);
           }
@@ -4625,7 +4618,7 @@ namespace {
         } else if (accessor && requiresFeatureCoroutineAccessors(
                                    accessor->getAccessorKind())) {
           ptr = llvm::ConstantExpr::getBitCast(
-              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer(),
+              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer(),
               IGM.FunctionPtrTy);
         } else {
           ptr = llvm::ConstantExpr::getBitCast(IGM.getDeletedMethodErrorFn(),
@@ -7859,8 +7852,10 @@ irgen::emitExtendedExistentialTypeShape(IRGenModule &IGM,
 
     // You can have a superclass with a generic parameter pack in a composition,
     // like `C<each T> & P<Int>`
-    assert(genHeader->GenericPackArguments.empty() &&
+    if (genSig) {
+      assert(genHeader->GenericPackArguments.empty() &&
            "Generic parameter packs not supported here yet");
+    }
 
     return b.finishAndCreateFuture();
   }, [&](llvm::GlobalVariable *var) {

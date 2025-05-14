@@ -2352,12 +2352,7 @@ public:
   }
   
   bool isCopyable() const {
-    if (!hasGeneralizationSignature()) {
-      return true;
-    }
-    auto *reqts = getGenSigRequirements();
-    for (unsigned i = 0, e = getNumGenSigRequirements(); i < e; ++i) {
-      auto &reqt = reqts[i];
+    for (auto &reqt : getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
         continue;
       }
@@ -2982,14 +2977,6 @@ public:
       return llvm::StringRef();
 
     return Demangle::makeSymbolicMangledNameStringRef(this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->type);
-  }
-
-  /// True if this is a conformance to 'SerialExecutor' which has a non-default
-  /// (i.e. not the stdlib's default implementation) witness. This means that
-  /// the developer has implemented this method explicitly and we should prefer
-  /// calling it.
-  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
-    return Flags.hasNonDefaultSerialExecutorIsIsolatingCurrentContext();
   }
 
   /// Retrieve the protocol conformance of the global actor type to the

@@ -68,17 +68,17 @@ func acceptP(_: some P) { }
 
 func testConformance(i: Int) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  acceptP(i) // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  acceptP(i) // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsOpaqueP() -> some P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsExistentialP() -> any P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 // FIXME: Should work even if the IteratorProtocol conformance is safe
@@ -142,7 +142,7 @@ func casting(value: Any, i: Int) {
   _ = unsafe value as! UnsafeType
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  _ = i as any P // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  _ = i as any P // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func metatypes() {
@@ -200,6 +200,8 @@ func unsafeFun() {
   _ = color
 
   if unsafe { }
+
+  _ = unsafe ? 1 : 0
 }
 
 func moreUnsafeFunc(unsafe: [Int]) {
@@ -216,6 +218,13 @@ func yetMoreUnsafeFunc(unsafe: () -> Void) {
 
   _ = unsafe ()
   // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+}
+
+func yetMoreMoreUnsafeFunc(unsafe: Int?) {
+  _ = unsafe!
+  if let unsafe {
+    _ = unsafe + 1
+  }
 }
 
 // @safe suppresses unsafe-type-related diagnostics on an entity
@@ -270,4 +279,41 @@ struct UnsafeWrapTest {
 }
 
 @safe @unsafe
-struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both '@safe' and '@unsafe'}}
+
+@unsafe
+struct UnsafeContainingUnspecified {
+  typealias A = Int
+
+  func getA() -> A { 0 }
+
+  @safe
+  struct Y {
+    var value: Int
+  }
+
+  func f() {
+    _ = Y(value: 5)
+  }
+}
+
+
+@unsafe func f(x: UnsafeContainingUnspecified) {
+  let a = unsafe x.getA()
+  _ = a
+}
+
+extension Slice {
+  // Make sure we aren't diagnosing the 'defer' as unsafe.
+  public func withContiguousMutableStorageIfAvailable<R, Element>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
+    try unsafe base.withContiguousStorageIfAvailable { buffer in
+      let start = unsafe base.baseAddress?.advanced(by: startIndex)
+      var slice = unsafe UnsafeMutableBufferPointer(start: start, count: count)
+      defer {
+      }
+      return try unsafe body(&slice)
+    }
+  }
+}

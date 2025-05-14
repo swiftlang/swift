@@ -307,24 +307,24 @@ func useAfterTransferLetSquelchedIndirectAddressOnly<T : ProvidesStaticValue>(_ 
 
   await transferToMainIndirect(ns)
   // expected-tns-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-tns-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'T' into main actor-isolated context may introduce data races}}
-  print(ns) // expected-tns-note {{access can happen concurrently}}
+  print(ns)
 
   await transferToMainIndirect(ns2)
   print(ns2)
 
   await transferToMainIndirect(ns3)
   // expected-tns-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-tns-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-tns-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'T' into main actor-isolated context may introduce data races}}
-  print(ns3) // expected-tns-note {{access can happen concurrently}}
+  print(ns3)
 
   await transferToMainIndirect(ns4)
   // expected-tns-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-tns-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-tns-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-complete-warning @-3 {{passing argument of non-sendable type 'T' into main actor-isolated context may introduce data races}}
-  print(ns4) // expected-tns-note {{access can happen concurrently}}
+  print(ns4)
 }
 
 ////////////////////////
@@ -676,7 +676,7 @@ struct NonIsolatedUnsafeFieldNonSendableStruct {
   let letObject = NonSendableKlass()
   var varObject = NonSendableKlass()
 
-  // This is unsafe since self is not main actor isolated, so our values are
+  // This is unsafe since self is not MainActor isolated, so our values are
   // task isolated.
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
@@ -693,7 +693,7 @@ struct NonIsolatedUnsafeFieldNonSendableStruct {
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
-  // This is safe since self will become main actor isolated as a result of
+  // This is safe since self will become MainActor isolated as a result of
   // test2 running.
   @MainActor func test2() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
@@ -709,7 +709,7 @@ final class FinalNonIsolatedUnsafeFieldKlass {
   let letObject = NonSendableKlass()
   var varObject = NonSendableKlass()
 
-  // This is unsafe since self is not main actor isolated, so our values are
+  // This is unsafe since self is not MainActor isolated, so our values are
   // task isolated.
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
@@ -726,7 +726,7 @@ final class FinalNonIsolatedUnsafeFieldKlass {
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
-  // This is safe since self will become main actor isolated as a result of
+  // This is safe since self will become MainActor isolated as a result of
   // test2 running.
   @MainActor func test2() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
@@ -742,7 +742,7 @@ class NonIsolatedUnsafeFieldKlass {
   let letObject = NonSendableKlass()
   var varObject = NonSendableKlass()
 
-  // This is unsafe since self is not main actor isolated, so our values are
+  // This is unsafe since self is not MainActor isolated, so our values are
   // task isolated.
   func test() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
@@ -759,7 +759,7 @@ class NonIsolatedUnsafeFieldKlass {
     // expected-complete-warning @-3 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
-  // This is safe since self will become main actor isolated as a result of
+  // This is safe since self will become MainActor isolated as a result of
   // test2 running.
   @MainActor func test2() async {
     await transferToMainDirect(nonIsolatedUnsafeLetObject)
@@ -775,7 +775,7 @@ class NonIsolatedUnsafeFieldGenericKlass<T> { // expected-complete-note 4{{}}
   let letAddressOnly: T? = nil
   var varAddressOnly: T? = nil
 
-  // This is unsafe since self is not main actor isolated, so our values are
+  // This is unsafe since self is not MainActor isolated, so our values are
   // task isolated.
   func test() async {
     await transferToMainIndirect(nonIsolatedUnsafeLetAddressOnly)
@@ -796,7 +796,7 @@ class NonIsolatedUnsafeFieldGenericKlass<T> { // expected-complete-note 4{{}}
     // expected-tns-note @-2 {{sending task-isolated value of non-Sendable type 'T?' to main actor-isolated global function 'transferToMainIndirect' risks causing races in between task-isolated and main actor-isolated uses}}
   }
 
-  // This is safe since self will become main actor isolated as a result of
+  // This is safe since self will become MainActor isolated as a result of
   // test2 running.
   @MainActor func test2() async {
     await transferToMainIndirect(nonIsolatedUnsafeLetAddressOnly)

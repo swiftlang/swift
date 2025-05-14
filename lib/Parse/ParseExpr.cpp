@@ -421,12 +421,14 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   if (Tok.isContextualKeyword("unsafe") &&
       !(peekToken().isAtStartOfLine() ||
-        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
-                          tok::equal, tok::colon, tok::comma, tok::eof) ||
+        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::equal,
+                          tok::colon, tok::comma, tok::eof) ||
         (isExprBasic && peekToken().is(tok::l_brace)) ||
         peekToken().is(tok::period) ||
         (peekToken().isAny(tok::l_paren, tok::l_square) &&
-         peekToken().getRange().getStart() == Tok.getRange().getEnd()))) {
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()) ||
+        peekToken().isBinaryOperatorLike() ||
+        peekToken().isPostfixOperatorLike())) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -542,8 +544,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse '@' sign, 'inout' or 'nonisolated' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      Tok.isContextualKeyword("nonisolated")) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);
@@ -1907,11 +1910,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   default:
   UnknownCharacter:
     checkForInputIncomplete();
-    // Enable trailing comma in string literal interpolation
-    // Note that 'Tok.is(tok::r_paren)' is not used because the text is ")\"\n" but the kind is actualy 'eof'
-    if (Tok.is(tok::eof) && Tok.getText() == ")") {
-      return nullptr;
-    }
     // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);
     return nullptr;
@@ -1972,7 +1970,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(TokenLoc),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =

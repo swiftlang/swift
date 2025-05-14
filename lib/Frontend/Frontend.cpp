@@ -456,7 +456,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getCASOptions();
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
     return true;
   }
@@ -466,6 +466,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+                         "creating base cache key",
                          toString(BaseKey.takeError()));
     return true;
   }
@@ -629,14 +630,14 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {
-    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTrees.empty() ||
+    if (!CASOpts.CASFSRootIDs.empty() || !CASOpts.ClangIncludeTree.empty() ||
         !CASOpts.ClangIncludeTreeFileList.empty()) {
       // Set up CASFS as BaseFS.
       auto FS = createCASFileSystem(*CAS, CASOpts.CASFSRootIDs,
-                                    CASOpts.ClangIncludeTrees,
+                                    CASOpts.ClangIncludeTree,
                                     CASOpts.ClangIncludeTreeFileList);
       if (!FS) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_cas,
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
                              toString(FS.takeError()));
         return true;
       }
@@ -755,6 +756,47 @@ void CompilerInstance::setUpDiagnosticOptions() {
 //    in the presence of overlays and mixed-source frameworks, we want to prefer
 //    the overlay or framework module over the underlying Clang module.
 bool CompilerInstance::setUpModuleLoaders() {
+  auto ModuleCachePathFromInvocation = getInvocation().getClangModuleCachePath();
+  auto &FEOpts = Invocation.getFrontendOptions();
+  auto MLM = Invocation.getSearchPathOptions().ModuleLoadMode;
+  auto IgnoreSourceInfoFile = Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+
+  // Dependency scanning sub-invocations only require the loaders necessary
+  // for locating textual and binary Swift modules.
+  if (Invocation.getFrontendOptions().DependencyScanningSubInvocation) {
+    Context->addModuleInterfaceChecker(
+        std::make_unique<ModuleInterfaceCheckerImpl>(
+            *Context, ModuleCachePathFromInvocation, FEOpts.PrebuiltModuleCachePath,
+            FEOpts.BackupModuleInterfaceDir, LoaderOpts,
+            RequireOSSAModules_t(Invocation.getSILOptions())));
+
+    if (MLM != ModuleLoadingMode::OnlySerialized) {
+      // We only need ModuleInterfaceLoader for implicit modules.
+      auto PIML = ModuleInterfaceLoader::create(
+          *Context, *static_cast<ModuleInterfaceCheckerImpl*>(Context
+            ->getModuleInterfaceChecker()), getDependencyTracker(), MLM,
+          FEOpts.PreferInterfaceForModules, IgnoreSourceInfoFile);
+      Context->addModuleLoader(std::move(PIML), false, false, true);
+    }
+    std::unique_ptr<ImplicitSerializedModuleLoader> ISML =
+    ImplicitSerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
+                                   IgnoreSourceInfoFile);
+    this->DefaultSerializedLoader = ISML.get();
+    Context->addModuleLoader(std::move(ISML));
+
+    // When caching is enabled, we rely on ClangImporter for
+    // 'addClangInvovcationDependencies'
+    if (Invocation.getCASOptions().EnableCaching) {
+      std::unique_ptr<ClangImporter> clangImporter =
+        ClangImporter::create(*Context, Invocation.getPCHHash(),
+                              getDependencyTracker());
+      Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+    }
+
+    return false;
+  }
+
   if (hasSourceImport()) {
     bool enableLibraryEvolution =
       Invocation.getFrontendOptions().EnableLibraryEvolution;
@@ -762,9 +804,7 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                   enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
-  auto MLM = Invocation.getSearchPathOptions().ModuleLoadMode;
-  auto IgnoreSourceInfoFile =
-    Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
+
   if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
     auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
         *Context, getDependencyTracker(), MLM, IgnoreSourceInfoFile);
@@ -807,13 +847,10 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   // Configure ModuleInterfaceChecker for the ASTContext.
-  auto CacheFromInvocation = getInvocation().getClangModuleCachePath();
   auto const &Clang = clangImporter->getClangInstance();
-  std::string ModuleCachePath = CacheFromInvocation.empty()
+  std::string ModuleCachePath = ModuleCachePathFromInvocation.empty()
                                     ? getModuleCachePathFromClang(Clang)
-                                    : CacheFromInvocation.str();
-  auto &FEOpts = Invocation.getFrontendOptions();
-  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+                                    : ModuleCachePathFromInvocation.str();
   Context->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
@@ -878,6 +915,7 @@ bool CompilerInstance::setUpPluginLoader() {
   /// FIXME: If Invocation has 'PluginRegistry', we can set it. But should we?
   auto loader = std::make_unique<PluginLoader>(
       *Context, getDependencyTracker(),
+      Invocation.getFrontendOptions().CacheReplayPrefixMap,
       Invocation.getFrontendOptions().DisableSandbox);
   Context->setPluginLoader(std::move(loader));
   return false;
@@ -1409,7 +1447,8 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::get(name, mainModule, kind, ctx);
+    auto *domain =
+        CustomAvailabilityDomain::get(name, kind, mainModule, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };

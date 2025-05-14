@@ -217,6 +217,10 @@ public:
     }
   }
 
+  /// In the debugger return the index for the stored actorInstance pointer
+  /// union index. Asserts if not an actor instance.
+  SWIFT_DEBUG_HELPER(unsigned getActorInstanceUnionIndex() const);
+
   NominalTypeDecl *getActor() const;
 
   VarDecl *getActorInstance() const;

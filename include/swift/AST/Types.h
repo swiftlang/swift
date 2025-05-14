@@ -318,6 +318,11 @@ public:
     Bits &= ~HasDependentMember;
   }
 
+  /// Remove the IsUnsafe property from this set.
+  void removeIsUnsafe() {
+    Bits &= ~IsUnsafe;
+  }
+  
   /// Test for a particular property in this set.
   bool operator&(Property prop) const {
     return Bits & prop;
@@ -982,9 +987,13 @@ public:
   /// type) from `DistributedActor`.
   bool isDistributedActor();
 
-  /// Determine if the type in question is an Array<T> and, if so, provide the
+  /// Determine if this type is an Array<T> and, if so, provide the element type
+  /// of the array.
+  Type getArrayElementType();
+
+  /// Determine if this type is an InlineArray<n, T> and, if so, provide the
   /// element type of the array.
-  Type isArrayType();
+  Type getInlineArrayElementType();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
@@ -1048,6 +1057,9 @@ public:
   /** Check if this type is equal to Swift.NAME. */ \
   bool is##NAME();
   #include "swift/AST/KnownStdlibTypes.def"
+
+  /// Check if this type is from the Builtin module.
+  bool isBuiltinType();
 
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
@@ -5027,9 +5039,15 @@ Type substOpaqueTypesWithUnderlyingTypes(Type type,
 
 CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
                                             TypeExpansionContext context);
+
 ProtocolConformanceRef
 substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref,
                                     TypeExpansionContext context);
+
+SubstitutionMap
+substOpaqueTypesWithUnderlyingTypes(SubstitutionMap subs,
+                                    TypeExpansionContext context);
+
 namespace Lowering {
   class TypeConverter;
 }
@@ -5452,6 +5470,10 @@ public:
     return getParameters().back();
   }
 
+  unsigned getSelfParameterIndex() const {
+    return NumParameters - 1;
+  }
+
   /// Return SILParameterInfo for the isolated parameter in this SILFunctionType
   /// if one exists. Returns None otherwise.
   std::optional<SILParameterInfo> maybeGetIsolatedParameter() const {
@@ -5648,6 +5670,24 @@ public:
   std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
     return getLifetimeDependenceFor(getNumParameters());
   }
+
+  /// Return true of the specified parameter is addressable based on its type
+  /// lowering in 'caller's context. This includes @_addressableForDependencies
+  /// parameter types.
+  ///
+  /// Defined in SILType.cpp.
+  bool isAddressable(unsigned paramIdx, SILFunction *caller);
+
+  /// Return true of the specified parameter is addressable based on its type
+  /// lowering. This includes @_addressableForDependencies parameter types.
+  ///
+  /// 'genericEnv' may be null.
+  ///
+  /// Defined in SILType.cpp.
+  bool isAddressable(unsigned paramIdx, SILModule &module,
+                     GenericEnvironment *genericEnv,
+                     Lowering::TypeConverter &typeConverter,
+                     TypeExpansionContext expansion);
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
@@ -7036,8 +7076,8 @@ public:
   Type operator()(SubstitutableType *maybeOpaqueType) const;
 
   /// LookupConformanceFn
-  ProtocolConformanceRef operator()(CanType maybeOpaqueType,
-                                    Type replacementType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type maybeOpaqueType,
                                     ProtocolDecl *protocol) const;
 
   OpaqueSubstitutionKind
@@ -7053,6 +7093,32 @@ private:
   }
 
   bool isWholeModule() const { return inContextAndIsWholeModule.getInt(); }
+};
+
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map existential
+/// archetypes in the given generic environment to known concrete types from
+/// the given substitution map.
+class ReplaceExistentialArchetypesWithConcreteTypes {
+private:
+  GenericEnvironment *env;
+  SubstitutionMap subs;
+
+  Type getInterfaceType(ExistentialArchetypeType *type) const;
+
+public:
+  ReplaceExistentialArchetypesWithConcreteTypes(GenericEnvironment *env,
+                                                SubstitutionMap subs)
+      : env(env), subs(subs) {}
+
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *type) const;
+
+  /// LookupConformanceFn
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type origType,
+                                    ProtocolDecl *protocol) const;
+
 };
 
 /// An archetype that's only valid in a portion of a local context.
@@ -7227,9 +7293,10 @@ class GenericTypeParamType : public SubstitutableType,
     Identifier Name;
   };
 
-  unsigned Depth : 15;
   unsigned IsDecl : 1;
-  unsigned Index : 16;
+  unsigned Depth : 15;
+  unsigned Weight : 1;
+  unsigned Index : 15;
 
   /// The kind of generic type parameter this is.
   GenericTypeParamKind ParamKind;
@@ -7254,14 +7321,20 @@ public:
                                    Type valueType, const ASTContext &ctx);
 
   /// Retrieve a canonical generic type parameter with the given kind, depth,
-  /// index, and optional value type.
+  /// index, weight, and optional value type.
   static GenericTypeParamType *get(GenericTypeParamKind paramKind,
-                                   unsigned depth, unsigned index,
+                                   unsigned depth, unsigned index, unsigned weight,
                                    Type valueType, const ASTContext &ctx);
 
-  /// Retrieve a canonical generic type parameter at the given depth and index.
+  /// Retrieve a canonical generic type parameter at the given depth and index,
+  /// with weight 0.
   static GenericTypeParamType *getType(unsigned depth, unsigned index,
                                        const ASTContext &ctx);
+
+  /// Retrieve a canonical generic type parameter at the given depth and index
+  /// for an opaque result type, so with weight 1.
+  static GenericTypeParamType *getOpaqueResultType(unsigned depth, unsigned index,
+                                                   const ASTContext &ctx);
 
   /// Retrieve a canonical generic parameter pack at the given depth and index.
   static GenericTypeParamType *getPack(unsigned depth, unsigned index,
@@ -7318,6 +7391,14 @@ public:
     return Index;
   }
 
+  /// The weight of this generic parameter in the type parameter order.
+  ///
+  /// Opaque result types have weight 1, while all other generic parameters
+  /// have weight 0.
+  unsigned getWeight() const {
+    return Weight;
+  }
+
   /// Returns \c true if this type parameter is declared as a pack.
   ///
   /// \code
@@ -7339,20 +7420,24 @@ public:
 
   Type getValueType() const;
 
+  GenericTypeParamType *withDepth(unsigned depth) const;
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     // Note: We explicitly don't use 'getName()' because for canonical forms
     // which don't store an identifier we'll go create a tau based form. We
     // really want to just plumb down the null Identifier because that's what's
     // inside the cache.
-    Profile(ID, getParamKind(), getDepth(), getIndex(), getValueType(),
-            Name);
+    Profile(ID, getParamKind(), getDepth(), getIndex(), getWeight(),
+            getValueType(), Name);
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericTypeParamKind paramKind, unsigned depth,
-                      unsigned index, Type valueType, Identifier name) {
+                      unsigned index, unsigned weight, Type valueType,
+                      Identifier name) {
     ID.AddInteger((uint8_t)paramKind);
     ID.AddInteger(depth);
     ID.AddInteger(index);
+    ID.AddInteger(weight);
     ID.AddPointer(valueType.getPointer());
     ID.AddPointer(name.get());
   }
@@ -7375,7 +7460,7 @@ private:
                                 const ASTContext &ctx);
 
   explicit GenericTypeParamType(GenericTypeParamKind paramKind, unsigned depth,
-                                unsigned index, Type valueType,
+                                unsigned index, unsigned weight, Type valueType,
                                 RecursiveTypeProperties props,
                                 const ASTContext &ctx);
 };
@@ -7384,6 +7469,11 @@ static CanGenericTypeParamType getType(unsigned depth, unsigned index,
                                        const ASTContext &C) {
   return CanGenericTypeParamType(
       GenericTypeParamType::getType(depth, index, C));
+}
+static CanGenericTypeParamType getOpaqueResultType(unsigned depth, unsigned index,
+                                                   const ASTContext &C) {
+  return CanGenericTypeParamType(
+      GenericTypeParamType::getOpaqueResultType(depth, index, C));
 }
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
@@ -8114,6 +8204,10 @@ inline Type TypeBase::getNominalParent() {
 
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
+}
+
+inline bool TypeBase::isBuiltinType() {
+  return isa<BuiltinType>(getCanonicalType());
 }
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {

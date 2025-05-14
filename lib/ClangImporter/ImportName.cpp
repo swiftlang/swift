@@ -1967,6 +1967,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe: {
+      // If the operator has a parameter that is an rvalue reference, it would
+      // cause name lookup collision with an overload that has lvalue reference
+      // parameter, if it exists.
+      for (auto paramDecl : functionDecl->parameters()) {
+        if (paramDecl->getType()->isRValueReferenceType())
+          return ImportedName();
+      }
+
       auto operatorName =
           isa<clang::CXXMethodDecl>(functionDecl)
               ? getOperatorName(swiftCtx, op)
@@ -2266,11 +2274,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   if (auto classTemplateSpecDecl =
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
-    /// Symbolic specializations get imported as the symbolic class template
-    /// type.
-    if (importSymbolicCXXDecls)
-      return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
-                            version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
                                                        swiftCtx, this, version);

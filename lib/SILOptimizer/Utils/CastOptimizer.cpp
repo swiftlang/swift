@@ -1481,6 +1481,9 @@ static bool optimizeStaticallyKnownProtocolConformance(
     if (Conformance.isInvalid())
       return false;
 
+    if (!matchesActorIsolation(Conformance, Inst->getFunction()))
+      return false;
+
     auto layout = TargetType->getExistentialLayout();
     if (layout.getProtocols().size() != 1)
       return false;

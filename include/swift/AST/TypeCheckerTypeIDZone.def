@@ -550,6 +550,9 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckCDeclAttributeRequest,
+              evaluator::SideEffect(FuncDecl *, CDeclAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasInitAccessorRequest,
               bool(AbstractStorageDecl *), Cached,
               NoLocationInfo)
@@ -608,6 +611,9 @@ SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
 SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
               CaptureInfo(ParamDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PatternBindingCaptureInfoRequest,
+              CaptureInfo(PatternBindingDecl *, unsigned),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CustomDerivativesRequest,
               CustomDerivativesResult(SourceFile *),
               Cached, NoLocationInfo)
@@ -623,6 +629,3 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               std::optional<SemanticAvailabilitySpec>
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
-
-SWIFT_REQUEST(TypeChecker, SourceFileLangOptionsRequest,
-              SourceFileLangOptions (SourceFile *), Cached, NoLocationInfo)

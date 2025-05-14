@@ -1557,7 +1557,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   }
 }
 
-// Make sure we handle the merge of the actor isolated and disconnected state
+// Make sure we handle the merge of the actor-isolated and disconnected state
 // appropriately.
 //
 // TODO: Since we are accessing the var field, we miss an
@@ -1745,8 +1745,8 @@ func sendableGlobalActorIsolated() {
   print(x) // expected-tns-note {{access can happen concurrently}}
 }
 
-// We do not get an error here since we are transferring x both times to a main
-// actor isolated thing function. We used to emit an error when using region
+// We do not get an error here since we are transferring x both times to a
+// MainActor-isolated thing function. We used to emit an error when using region
 // isolation since we would trip on the store_borrow we used to materialize the
 // value.
 func testIndirectParameterSameIsolationNoError() async {
@@ -1836,7 +1836,7 @@ func testThatGlobalActorTakesPrecedenceOverActorIsolationOnMethods() async {
   let a = MyActor()
   let ns = NonSendableKlass()
 
-  // 'ns' should be main actor isolated since useKlassMainActor is @MainActor
+  // 'ns' should be MainActor isolated since useKlassMainActor is @MainActor
   // isolated. Previously we would let MyActor take precedence here...
   a.useKlassMainActor(ns)
 
@@ -1966,5 +1966,91 @@ extension NonIsolatedFinalKlass {
   func testGetIsolationInfoOfField() async {
     await transferToMain(ns) // expected-tns-warning {{sending 'self.ns' risks causing data races}}
     // expected-tns-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  }
+}
+
+func mutableLocalCaptureDataRace() async {
+  var x = 0
+  x = 0
+  _ = x
+
+  Task.detached { x = 1 } // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
+}
+
+func mutableLocalCaptureDataRace2() async {
+  var x = 0
+  x = 0
+
+  Task.detached { x = 1 } // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+
+  print(x) // expected-tns-note {{access can happen concurrently}}
+}
+
+func localCaptureDataRace3() async {
+  let x = 0
+
+  Task.detached { print(x) }
+
+  print(x)
+}
+
+nonisolated func localCaptureDataRace4() {
+  var x = 0
+  _ = x
+
+  Task.detached { @MainActor in x = 1 } // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+
+  x = 2 // expected-tns-note {{access can happen concurrently}}
+}
+
+// We shouldn't error here since every time around, we are using the same
+// isolation.
+func testIsolatedParamInference() {
+  class S : @unchecked Sendable {}
+
+  final class B {
+    var s = S()
+    var b: Bool = false
+
+    func foo(isolation: isolated Actor = #isolation) async {
+      while !b {
+        await withTaskGroup(of: Int.self) { group in
+          _ = isolation
+          self.s = S()
+        }
+      }
+    }
+  }
+}
+
+// We shouldn't error here since test2 is isolated to B since we are capturing
+// self and funcParam is also exposed to B's isolated since it is a parameter to
+// one of B's methods.
+func sendIsolatedValueToItsOwnIsolationDomain() {
+  class A {
+    func useValue() {}
+  }
+
+  func helper(_ x: @escaping () -> A) {}
+
+  actor B {
+    let field = A()
+
+    private func test(funcParam: A?) async {
+      helper {
+        if let funcParam {
+          return funcParam
+        } else {
+          return self.field
+        }
+      }
+
+      funcParam?.useValue()
+    }
   }
 }

@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ABIAttribute -parse-as-library -Rabi-inference
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
-// REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: objc_interop
 
 import Foundation
@@ -21,7 +20,7 @@ struct FutureType {}
 
 @abi(func available5(_: FutureType)) // expected-error {{'FutureType' is only available in }}
 func available5(_: FutureType) {} // expected-error {{'FutureType' is only available in }}
-// expected-note@-1 2{{add @available attribute to enclosing global function}} (fix-it not tested because it varies by target)
+// expected-note@-1 2{{add '@available' attribute to enclosing global function}} (fix-it not tested because it varies by target)
 
 @abi(func available6(_: FutureType))
 @available(macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99, *) func available6(_: FutureType) {}

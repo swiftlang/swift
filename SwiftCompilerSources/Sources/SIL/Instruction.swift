@@ -149,7 +149,8 @@ public class Instruction : CustomStringConvertible, Hashable {
   /// their operand.
   public final var isIncidentalUse: Bool {
     switch self {
-    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst:
+    case is DebugValueInst, is FixLifetimeInst, is EndLifetimeInst,
+         is IgnoredUseInst:
       return true
     default:
       return isEndOfScopeMarker
@@ -317,8 +318,8 @@ final public class AssignOrInitInst : Instruction, StoringInstruction {}
 public protocol SourceDestAddrInstruction : Instruction {
   var sourceOperand: Operand { get }
   var destinationOperand: Operand { get }
-  var isTakeOfSrc: Bool { get }
-  var isInitializationOfDest: Bool { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
 }
 
 extension SourceDestAddrInstruction {
@@ -329,10 +330,10 @@ extension SourceDestAddrInstruction {
 }
 
 final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool {
+  public var isTakeOfSource: Bool {
     bridged.CopyAddrInst_isTakeOfSrc()
   }
-  public var isInitializationOfDest: Bool {
+  public var isInitializationOfDestination: Bool {
     bridged.CopyAddrInst_isInitializationOfDest()
   }
 }
@@ -341,10 +342,10 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
 
-  public var isTakeOfSrc: Bool {
+  public var isTakeOfSource: Bool {
     bridged.ExplicitCopyAddrInst_isTakeOfSrc()
   }
-  public var isInitializationOfDest: Bool {
+  public var isInitializationOfDestination: Bool {
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
 }
@@ -449,17 +450,17 @@ public enum VariableScopeInstruction {
     scopeBegin.uses.lazy.filter { $0.endsLifetime || $0.instruction is ExtendLifetimeInst }
   }
 
-  // TODO: with SIL verification, we might be able to make varDecl non-Optional.
-  public var varDecl: VarDecl? {
-    if let debugVarDecl = instruction.debugVarDecl {
-      return debugVarDecl
-    }
+  // TODO: assert that VarDecl is valid whenever isFromVarDecl returns tyue.
+  public func findVarDecl() -> VarDecl? {
     // SILGen may produce double var_decl instructions for the same variable:
     //   %box = alloc_box [var_decl] "x"
     //   begin_borrow %box [var_decl]
     //
-    // Assume that, if the begin_borrow or move_value does not have its own debug_value, then it must actually be
-    // associated with its operand's var_decl.
+    // Therefore, first check if begin_borrow or move_value has any debug_value users.
+    if let debugVarDecl = instruction.findVarDeclFromDebugUsers() {
+      return debugVarDecl
+    }
+    // Otherwise, assume that the var_decl is associated with its operand's var_decl.
     return instruction.operands[0].value.definingInstruction?.findVarDecl()
   }
 }
@@ -471,17 +472,33 @@ extension Instruction {
       return varDeclInst.varDecl
     }
     if let varScopeInst = VariableScopeInstruction(self) {
-      return varScopeInst.varDecl
+      return varScopeInst.findVarDecl()
     }
-    return debugVarDecl
+    return findVarDeclFromDebugUsers()
   }
 
-  var debugVarDecl: VarDecl? {
+  func findVarDeclFromDebugUsers() -> VarDecl? {
     for result in results {
-      for use in result.uses {
-        if let debugVal = use.instruction as? DebugValueInst {
-          return debugVal.varDecl
-        }
+      if let varDecl = result.findVarDeclFromDebugUsers() {
+        return varDecl
+      }
+    }
+    return nil
+  }
+}
+
+extension Value {
+  public func findVarDecl() -> VarDecl? {
+    if let arg = self as? Argument {
+      return arg.findVarDecl()
+    }
+    return findVarDeclFromDebugUsers()
+  }
+
+  func findVarDeclFromDebugUsers() -> VarDecl? {
+    for use in uses {
+      if let debugVal = use.instruction as? DebugValueInst {
+        return debugVal.varDecl
       }
     }
     return nil
@@ -525,8 +542,8 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
     CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
   }
 
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 
   public var isolatedConformances: CastingIsolatedConformances {
@@ -706,8 +723,8 @@ class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {
 
 final public
 class UncheckedRefCastAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
 }
 
 final public class UncheckedAddrCastInst : SingleValueInstruction, UnaryInstruction {
@@ -812,7 +829,9 @@ final public
 class DeinitExistentialValueInst : Instruction {}
 
 final public
-class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var isImmutable: Bool { bridged.OpenExistentialAddr_isImmutable() }
+}
 
 final public
 class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
@@ -1071,7 +1090,7 @@ class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {
 final public class ThickToObjCMetatypeInst : SingleValueInstruction {}
 final public class ObjCToThickMetatypeInst : SingleValueInstruction {}
 
-final public class CopyBlockInst : SingleValueInstruction {}
+final public class CopyBlockInst : SingleValueInstruction, UnaryInstruction {}
 final public class CopyBlockWithoutEscapingInst : SingleValueInstruction {}
 
 final public
@@ -1168,7 +1187,7 @@ final public class BridgeObjectToRefInst : SingleValueInstruction, UnaryInstruct
 
 final public class BridgeObjectToWordInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class BorrowedFromInst : SingleValueInstruction, BorrowIntroducingInstruction {
+final public class BorrowedFromInst : SingleValueInstruction, BeginBorrowInstruction {
   public var borrowedValue: Value { operands[0].value }
   public var borrowedPhi: Phi { Phi(borrowedValue)! }
   public var enclosingOperands: OperandArray {
@@ -1178,6 +1197,8 @@ final public class BorrowedFromInst : SingleValueInstruction, BorrowIntroducingI
   public var enclosingValues: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
     enclosingOperands.values
   }
+
+  public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {
@@ -1221,6 +1242,10 @@ final public class StrongCopyWeakValueInst : SingleValueInstruction, UnaryInstru
 final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {
   public var instance: Value { operand.value }
   public var doKeepUnique: Bool { bridged.EndCOWMutationInst_doKeepUnique() }
+}
+
+final public class EndCOWMutationAddrInst : Instruction, UnaryInstruction {
+  public var address: Value { operand.value }
 }
 
 final public
@@ -1295,8 +1320,8 @@ final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, U
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
 final public class MarkUnresolvedMoveAddrInst : Instruction, SourceDestAddrInstruction {
-  public var isTakeOfSrc: Bool { true }
-  public var isInitializationOfDest: Bool { true }
+  public var isTakeOfSource: Bool { true }
+  public var isInitializationOfDestination: Bool { true }
 }
 
 final public class CopyableToMoveOnlyWrapperValueInst: SingleValueInstruction, UnaryInstruction {}
@@ -1323,6 +1348,10 @@ final public class ObjectInst : SingleValueInstruction {
 }
 
 final public class VectorInst : SingleValueInstruction {
+}
+
+final public class VectorBaseAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var vector: Value { operand.value }
 }
 
 final public class DifferentiableFunctionInst: SingleValueInstruction {}
@@ -1414,10 +1443,8 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 /// An instruction whose side effects extend across a scope including other instructions. These are always paired with a
 /// scope ending instruction such as `begin_access` (ending with `end_access`) and `begin_borrow` (ending with
 /// `end_borrow`).
-public protocol ScopedInstruction {
-  var instruction: Instruction { get }
-
-  var endOperands: LazyFilterSequence<UseList> { get }
+public protocol ScopedInstruction: Instruction {
+  var scopeEndingOperands: LazyFilterSequence<UseList> { get }
 
   var endInstructions: EndInstructions { get }
 }
@@ -1426,43 +1453,32 @@ extension Instruction {
   /// Return the sequence of use points of any instruction.
   public var endInstructions: EndInstructions {
     if let scopedInst = self as? ScopedInstruction {
-      return .scoped(scopedInst.endOperands.users)
+      return .scoped(scopedInst.scopeEndingOperands.users)
     }
     return .single(self)
   }
 }
 
-/// Instructions beginning a borrow-scope which must be ended by `end_borrow`.
-public protocol BorrowIntroducingInstruction : SingleValueInstruction, ScopedInstruction {
-}
-
-extension BorrowIntroducingInstruction {
-  public var instruction: Instruction { get { self } }
+/// Single-value instructions beginning a borrow-scope which end with an `end_borrow` or a branch to a re-borrow phi.
+/// See also `BeginBorrowValue` which represents all kind of `Value`s which begin a borrow scope.
+public protocol BeginBorrowInstruction : SingleValueInstruction, ScopedInstruction {
 }
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {
   public var borrow: Value { operand.value }
 }
 
-extension BorrowIntroducingInstruction {
-  public var endOperands: LazyFilterSequence<UseList> {
-    return uses.lazy.filter { $0.instruction is EndBorrowInst }
-  }
-}
-
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BorrowIntroducingInstruction {
+final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, BeginBorrowInstruction {
   public var borrowedValue: Value { operand.value }
 
   public override var isLexical: Bool { bridged.BeginBorrow_isLexical() }
   public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
   public var isFromVarDecl: Bool { bridged.BeginBorrow_isFromVarDecl() }
 
-  public var endOperands: LazyFilterSequence<UseList> {
-    return uses.endingLifetime
-  }
+  public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
-final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BorrowIntroducingInstruction {
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BeginBorrowInstruction {
 
   // True if the invariants on `load_borrow` have not been checked and should not be strictly enforced.
   //
@@ -1470,10 +1486,12 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Bor
   // code using noncopyable types that consumes or mutates a memory location while that location is borrowed,
   // but the move-only checker must diagnose those problems before canonical SIL is formed.
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
+
+  public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
-final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BorrowIntroducingInstruction {
-  var allocStack: AllocStackInst {
+final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction, BeginBorrowInstruction {
+  public var allocStack: AllocStackInst {
     var dest = destination
     if let mark = dest as? MarkUnresolvedNonCopyableValueInst {
       dest = mark.operand.value
@@ -1481,7 +1499,13 @@ final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction,
     return dest as! AllocStackInst
   }
 
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
+    return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
+  }
+
   public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+    // A `store_borrow` is an address value.
+    // Only `end_borrow`s (with this address operand) can end such a borrow scope.
     uses.users(ofType: EndBorrowInst.self)
   }
 }
@@ -1506,7 +1530,7 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public typealias EndAccessInstructions = LazyMapSequence<LazyFilterSequence<UseList>, EndAccessInst>
 
   public var endAccessInstructions: EndAccessInstructions {
-    endOperands.map { $0.instruction as! EndAccessInst }
+    scopeEndingOperands.map { $0.instruction as! EndAccessInst }
   }
 }
 
@@ -1517,9 +1541,7 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 }
 
 extension BeginAccessInst : ScopedInstruction {
-  public var instruction: Instruction { get { self } }
-
-  public var endOperands: LazyFilterSequence<UseList> {
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
     return uses.lazy.filter { $0.instruction is EndAccessInst }
   }
 }
@@ -1532,14 +1554,15 @@ final public class EndUnpairedAccessInst : Instruction {}
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
+  public var isCalleeAllocated: Bool { bridged.BeginApplyInst_isCalleeAllocated() }
 
   public var singleDirectResult: Value? { nil }
   public var singleDirectErrorResult: Value? { nil }
 
-  public var token: Value { getResult(index: resultCount - 1) }
+  public var token: Value { getResult(index: resultCount - (isCalleeAllocated ? 2 : 1)) }
 
   public var yieldedValues: Results {
-    Results(inst: self, numResults: resultCount - 1)
+    Results(inst: self, numResults: resultCount - (isCalleeAllocated ? 2 : 1))
   }
 }
 
@@ -1554,9 +1577,7 @@ final public class AbortApplyInst : Instruction, UnaryInstruction {
 }
 
 extension BeginApplyInst : ScopedInstruction {
-  public var instruction: Instruction { get { self } }
-
-  public var endOperands: LazyFilterSequence<UseList> {
+  public var scopeEndingOperands: LazyFilterSequence<UseList> {
     return token.uses.lazy.filter { $0.isScopeEndingUse }
   }
 }
@@ -1681,6 +1702,9 @@ final public class ThrowAddrInst : TermInst {
 }
 
 final public class YieldInst : TermInst {
+  public func convention(of operand: Operand) -> ArgumentConvention {
+    return bridged.YieldInst_getConvention(operand.bridged).convention
+  }
 }
 
 final public class UnwindInst : TermInst {

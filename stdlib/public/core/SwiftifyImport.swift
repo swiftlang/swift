@@ -54,12 +54,54 @@ public enum _SwiftifyInfo {
 /// It will replace some std::span arguments with Swift's Span type when sufficient information is
 /// available.
 ///
-/// Currently not supported: return pointers, nested pointers, pointee "count" parameters, endedBy.
+/// Currently not supported: nested pointers, pointee "count" parameters, endedBy.
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
-public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
+public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
+                             spanAvailability: String? = nil,
+                             typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+public func _swiftifyOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(copy source)
+public func _swiftifyOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}

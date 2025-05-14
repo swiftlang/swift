@@ -2500,6 +2500,9 @@ public:
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
+  void visitVectorBaseAddrInst(VectorBaseAddrInst *vbai) {
+    *this << getIDAndType(vbai->getVector());
+  }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     *this << (EI->isImmutable() ? "[immutable] " : "")
           << getIDAndType(EI->getOperand()) << ", #";
@@ -2761,6 +2764,9 @@ public:
   void visitEndCOWMutationInst(EndCOWMutationInst *ECMI) {
     if (ECMI->doKeepUnique())
       *this << "[keep_unique] ";
+    *this << getIDAndType(ECMI->getOperand());
+  }
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *ECMI) {
     *this << getIDAndType(ECMI->getOperand());
   }
   void visitEndInitLetRefInst(EndInitLetRefInst *I) {
@@ -4350,7 +4356,7 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
       conformance.getConcrete()->printName(out, options);
     else {
       out << "dependent ";
-      assocProtoWitness.SubstType->print(out, options);
+      assocProtoWitness.Witness.getType()->print(out, options);
     }
     break;
   }
@@ -4373,6 +4379,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   printSerializedKind(OS, getSerializedKind());
 
+  if (isSpecialized())
+    OS << "[specialized] ";
+
   getConformance()->printName(OS, Options);
   Options.GenericSig =
     getConformance()->getDeclContext()->getGenericSignatureOfContext()
@@ -4392,18 +4401,21 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto conditionalConformance : getConditionalConformances()) {
     // conditional_conformance (TypeName: Protocol):
     // <conformance>
-    if (conditionalConformance.Conformance.isInvalid())
+    if (conditionalConformance.isInvalid()) {
+      OS << "  conditional_conformance invalid";
       continue;
+    }
 
     OS << "  conditional_conformance (";
-    conditionalConformance.Requirement.print(OS, Options);
-    OS << ": " << conditionalConformance.Conformance.getProtocol()->getName()
+    conditionalConformance.getType().print(OS, Options);
+    OS << ": " << conditionalConformance.getProtocol()->getName()
        << "): ";
-    if (conditionalConformance.Conformance.isConcrete())
-      conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
+    if (conditionalConformance.isConcrete())
+      conditionalConformance.getConcrete()->printName(OS, Options);
     else {
+      ASSERT(conditionalConformance.isAbstract() && "Handle pack conformance here");
       OS << "dependent ";
-      conditionalConformance.Requirement->print(OS, Options);
+      conditionalConformance.getType()->print(OS, Options);
     }
 
     OS << '\n';

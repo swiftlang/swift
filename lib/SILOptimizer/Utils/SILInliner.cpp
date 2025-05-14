@@ -500,6 +500,9 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
           if (!enableLexicalLifetimes)
             continue;
 
+          if (!Original.isDeinitBarrier())
+            continue;
+
           // Exclusive mutating accesses don't entail a lexical scope.
           if (paramInfo.getConvention() == ParameterConvention::Indirect_Inout)
             continue;
@@ -1023,6 +1026,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
     return InlineCost::Free;
 
   // Turning the task reference into a continuation should be basically free.
@@ -1092,6 +1096,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DynamicMethodBranchInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::IndexAddrInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::TailAddrInst:
   case SILInstructionKind::IndexRawPointerInst:
   case SILInstructionKind::InitEnumDataAddrInst:

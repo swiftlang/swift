@@ -23,11 +23,13 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
@@ -330,10 +332,6 @@ BridgedType BridgedType::getObjectType() const {
   return unbridged().getObjectType();
 }
 
-BridgedDiagnosticArgument BridgedType::asDiagnosticArgument() const {
-  return swift::DiagnosticArgument(unbridged().getASTType());
-}
-
 bool BridgedType::isTrivial(BridgedFunction f) const {
   return unbridged().isTrivial(f.getFunction());
 }
@@ -348,6 +346,10 @@ bool BridgedType::isLoadable(BridgedFunction f) const {
 
 bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
+}
+
+bool BridgedType::isBox() const {
+  return unbridged().is<swift::SILBoxType>();
 }
 
 bool BridgedType::containsNoEscapeFunction() const {
@@ -380,6 +382,16 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
+}
+
+SwiftInt BridgedType::getNumBoxFields() const {
+  return unbridged().castTo<swift::SILBoxType>()->getLayout()->getFields().size();
+}
+
+BridgedType BridgedType::getBoxFieldType(SwiftInt idx, BridgedFunction f) const {
+  auto *fn = f.getFunction();
+  return swift::getSILBoxFieldType(fn->getTypeExpansionContext(), unbridged().castTo<swift::SILBoxType>(),
+                                   fn->getModule().Types, idx);
 }
 
 SwiftInt BridgedType::getNumNominalFields() const {
@@ -576,6 +588,11 @@ bool BridgedArgument::FunctionArgument_isLexical() const {
   return llvm::cast<swift::SILFunctionArgument>(getArgument())->getLifetime().isLexical();
 }
 
+bool BridgedArgument::FunctionArgument_isClosureCapture() const {
+  return llvm::cast<swift::SILFunctionArgument>(
+    getArgument())->isClosureCapture();
+}
+
 OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
   return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
 }
@@ -625,6 +642,9 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
 }
+OptionalBridgedDeclObj BridgedLocation::getDecl() const {
+  return {getLoc().getLocation().getAsASTNode<swift::Decl>()};
+}
 BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedDeclObj decl) {
   return swift::SILDebugLocation(decl.unbridged(), nullptr);
 }
@@ -646,6 +666,18 @@ BridgedStringRef BridgedFunction::getName() const {
 
 BridgedLocation BridgedFunction::getLocation() const {
   return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())}; 
+}
+
+bool BridgedFunction::isAccessor() const {
+  if (auto *valDecl = getFunction()->getDeclRef().getDecl()) {
+    return llvm::isa<swift::AccessorDecl>(valDecl);
+  }
+  return false;
+}
+
+BridgedStringRef BridgedFunction::getAccessorName() const {
+  auto *accessorDecl  = llvm::cast<swift::AccessorDecl>(getFunction()->getDeclRef().getDecl());
+  return accessorKindName(accessorDecl->getAccessorKind());
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
@@ -821,6 +853,14 @@ void BridgedFunction::setLinkage(BridgedLinkage linkage) const {
 
 void BridgedFunction::setIsSerialized(bool isSerialized) const {
   getFunction()->setSerializedKind(isSerialized ? swift::IsSerialized : swift::IsNotSerialized);
+}
+
+bool BridgedFunction::conformanceMatchesActorIsolation(BridgedConformance conformance) const {
+  return swift::matchesActorIsolation(conformance.unbridged(), getFunction());
+}
+
+bool BridgedFunction::isSpecialization() const {
+  return getFunction()->isSpecialization();
 }
 
 bool BridgedFunction::isResilientNominalDecl(BridgedDeclObj decl) const {
@@ -1104,6 +1144,13 @@ BridgedCanType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType(
   return getAs<swift::InitExistentialRefInst>()->getFormalConcreteType();
 }
 
+bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
+  switch (getAs<swift::OpenExistentialAddrInst>()->getAccessKind()) {
+    case swift::OpenedExistentialAccess::Immutable: return true;
+    case swift::OpenedExistentialAccess::Mutable: return false;
+  }
+}
+
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
   return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
 }
@@ -1333,8 +1380,16 @@ SwiftInt BridgedInstruction::BeginApplyInst_numArguments() const {
   return getAs<swift::BeginApplyInst>()->getNumArguments();
 }
 
+bool BridgedInstruction::BeginApplyInst_isCalleeAllocated() const {
+  return getAs<swift::BeginApplyInst>()->isCalleeAllocated();
+}
+
 SwiftInt BridgedInstruction::TryApplyInst_numArguments() const {
   return getAs<swift::TryApplyInst>()->getNumArguments();
+}
+
+BridgedArgumentConvention BridgedInstruction::YieldInst_getConvention(BridgedOperand forOperand) const {
+  return castToArgumentConvention(getAs<swift::YieldInst>()->getArgumentConventionForOperand(*forOperand.op));
 }
 
 BridgedBasicBlock BridgedInstruction::BranchInst_getTargetBlock() const {
@@ -1400,6 +1455,15 @@ bool BridgedInstruction::CopyAddrInst_isTakeOfSrc() const {
 
 bool BridgedInstruction::CopyAddrInst_isInitializationOfDest() const {
   return getAs<swift::CopyAddrInst>()->isInitializationOfDest();
+}
+
+void BridgedInstruction::CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const {
+  return getAs<swift::CopyAddrInst>()->setIsTakeOfSrc(isTakeOfSrc ? swift::IsTake : swift::IsNotTake);
+}
+
+void BridgedInstruction::CopyAddrInst_setIsInitializationOfDest(bool isInitializationOfDest) const {
+  return getAs<swift::CopyAddrInst>()->setIsInitializationOfDest(
+      isInitializationOfDest ? swift::IsInitialization : swift::IsNotInitialization);
 }
 
 bool BridgedInstruction::ExplicitCopyAddrInst_isTakeOfSrc() const {
@@ -1913,10 +1977,6 @@ BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceRequirement() c
   return unbridged().getAssociatedConformanceWitness().Requirement;
 }
 
-BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceSubstType() const {
-  return {unbridged().getAssociatedConformanceWitness().SubstType};
-}
-
 BridgedConformance BridgedWitnessTableEntry::getAssociatedConformanceWitness() const {
   return {unbridged().getAssociatedConformanceWitness().Witness};
 }
@@ -1948,11 +2008,9 @@ BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedType(BridgedD
 }
 
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedConformance(BridgedCanType requirement,
-                                                                               BridgedCanType substType,
                                                                                BridgedConformance witness) {
   return bridge(swift::SILWitnessTable::Entry(
     swift::SILWitnessTable::AssociatedConformanceWitness{requirement.unbridged(),
-                                                         substType.unbridged(),
                                                          witness.unbridged()}));
 }
 
@@ -1973,6 +2031,10 @@ BridgedWitnessTableEntry BridgedWitnessTable::getEntry(SwiftInt index) const {
 
 bool BridgedWitnessTable::isDeclaration() const {
   return table->isDeclaration();
+}
+
+bool BridgedWitnessTable::isSpecialized() const {
+  return table->isSpecialized();
 }
 
 SwiftInt BridgedDefaultWitnessTable::getNumEntries() const {
@@ -2161,6 +2223,13 @@ BridgedInstruction BridgedBuilder::createUnconditionalCheckedCastAddr(
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
   return {unbridged().createLoad(regularLoc(), op.getSILValue(),
                                  (swift::LoadOwnershipQualifier)ownership)};
+}
+
+
+BridgedInstruction BridgedBuilder::createUncheckedOwnershipConversion(BridgedValue op,
+                                                                      BridgedValue::Ownership ownership) const {
+  return {unbridged().createUncheckedOwnershipConversion(regularLoc(), op.getSILValue(),
+                                                         BridgedValue::unbridge(ownership))};
 }
 
 BridgedInstruction BridgedBuilder::createLoadBorrow(BridgedValue op) const {
@@ -2384,6 +2453,10 @@ BridgedInstruction BridgedBuilder::createVector(BridgedValueArray arguments) con
   return {unbridged().createVector(swift::ArtificialUnreachableLocation(), arguments.getValues(argValues))};
 }
 
+BridgedInstruction BridgedBuilder::createVectorBaseAddr(BridgedValue vector) const {
+  return {unbridged().createVectorBaseAddr(regularLoc(), vector.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global,
                                                     OptionalBridgedValue dependencyToken) const {
   return {unbridged().createGlobalAddr(regularLoc(), global.getGlobal(), dependencyToken.getSILValue())};
@@ -2472,6 +2545,12 @@ BridgedInstruction BridgedBuilder::createMetatype(BridgedCanType instanceType,
 BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, bool keepUnique) const {
   return {unbridged().createEndCOWMutation(regularLoc(), instance.getSILValue(),
                                            keepUnique)};
+}
+
+BridgedInstruction
+BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
+  return {unbridged().createEndCOWMutationAddr(regularLoc(),
+                                               instance.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {

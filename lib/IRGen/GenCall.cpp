@@ -262,10 +262,14 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(
     llvm::Function *projectFn = cast<llvm::Function>(
         (cast<llvm::Constant>(args[2])->stripPointerCasts()));
     auto *fnTy = projectFn->getFunctionType();
-
-    llvm::Value *context =
+    llvm::Value *callerContext = nullptr;
+    if (projectFn == getOrCreateResumePrjFn()) {
+      callerContext = popAsyncContext(calleeContext);
+    } else {
+      callerContext =
         Builder.CreateCallWithoutDbgLoc(fnTy, projectFn, {calleeContext});
-    storeCurrentAsyncContext(context);
+    }
+    storeCurrentAsyncContext(callerContext);
   }
 
   return id;
@@ -305,13 +309,14 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
 static void addIndirectValueParameterAttributes(IRGenModule &IGM,
                                                 llvm::AttributeList &attrs,
                                                 const TypeInfo &ti,
-                                                unsigned argIndex) {
+                                                unsigned argIndex,
+                                                bool addressable) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   // Value parameter pointers can't alias or be captured.
   b.addAttribute(llvm::Attribute::NoAlias);
   // Bitwise takable value types are guaranteed not to capture
   // a pointer into itself.
-  if (ti.isBitwiseTakable(ResilienceExpansion::Maximal))
+  if (!addressable && ti.isBitwiseTakable(ResilienceExpansion::Maximal))
     b.addAttribute(llvm::Attribute::NoCapture);
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
@@ -340,7 +345,7 @@ static void addPackParameterAttributes(IRGenModule &IGM,
 static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
                                         llvm::AttributeList &attrs,
                                         const TypeInfo &ti, unsigned argIndex,
-                                        bool aliasable) {
+                                        bool aliasable, bool addressable) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   // Thanks to exclusivity checking, it is not possible to alias inouts except
   // those that are inout_aliasable.
@@ -351,7 +356,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
   }
   // Bitwise takable value types are guaranteed not to capture
   // a pointer into itself.
-  if (ti.isBitwiseTakable(ResilienceExpansion::Maximal))
+  if (!addressable && ti.isBitwiseTakable(ResilienceExpansion::Maximal))
     b.addAttribute(llvm::Attribute::NoCapture);
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
@@ -600,8 +605,10 @@ namespace {
     Signature getSignature();
 
   private:
-    const TypeInfo &expand(SILParameterInfo param);
+    const TypeInfo &expand(unsigned paramIdx);
     llvm::Type *addIndirectResult(SILType resultType, bool useInReg = false);
+
+    bool isAddressableParam(unsigned paramIdx);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -1781,7 +1788,8 @@ static ArrayRef<llvm::Type *> expandScalarOrStructTypeToArray(llvm::Type *&ty) {
   return expandedTys;
 }
 
-const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
+const TypeInfo &SignatureExpansion::expand(unsigned paramIdx) {
+  auto param = FnType->getParameters()[paramIdx];
   auto paramSILType = getSILFuncConventions().getSILType(
       param, IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(paramSILType);
@@ -1789,7 +1797,8 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
-    addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
+    addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size(),
+                                        isAddressableParam(paramIdx));
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
     return ti;
@@ -1797,8 +1806,9 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     addInoutParameterAttributes(
-        IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
-        conv == ParameterConvention::Indirect_InoutAliasable);
+      IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
+      conv == ParameterConvention::Indirect_InoutAliasable,
+      isAddressableParam(paramIdx));
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
     return ti;
@@ -1822,7 +1832,8 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
       auto &nativeSchema = ti.nativeParameterValueSchema(IGM);
       if (nativeSchema.requiresIndirect()) {
         addIndirectValueParameterAttributes(IGM, Attrs, ti,
-                                            ParamIRTypes.size());
+                                            ParamIRTypes.size(),
+                                            /*addressable*/ false);
         ParamIRTypes.push_back(ti.getStorageType()->getPointerTo());
         return ti;
       }
@@ -1840,6 +1851,13 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
     llvm_unreachable("bad abstract CC");
   }
   llvm_unreachable("bad parameter convention");
+}
+
+bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
+  return FnType->isAddressable(paramIdx, IGM.IRGen.SIL,
+                               IGM.getGenericEnvironment(),
+                               IGM.getSILTypes(),
+                               IGM.getMaximalTypeExpansionContext());
 }
 
 /// Does the given function type have a self parameter that should be
@@ -1887,7 +1905,6 @@ static void addParamInfo(SignatureExpansionABIDetails *details,
 }
 
 void SignatureExpansion::expandKeyPathAccessorParameters() {
-  auto params = FnType->getParameters();
   unsigned numArgsToExpand;
   SmallVector<llvm::Type *, 4> tailParams;
 
@@ -1933,7 +1950,7 @@ void SignatureExpansion::expandKeyPathAccessorParameters() {
     llvm_unreachable("non keypath accessor convention");
   }
   for (unsigned i = 0; i < numArgsToExpand; i++) {
-    expand(params[i]);
+    expand(i);
   }
   for (auto tailParam : tailParams) {
     ParamIRTypes.push_back(tailParam);
@@ -1987,9 +2004,9 @@ void SignatureExpansion::expandParameters(
     params = params.drop_back();
   }
 
-  for (auto param : params) {
-    const TypeInfo &ti = expand(param);
-    addParamInfo(recordedABIDetails, ti, param.getConvention());
+  for (auto pair : enumerate(params)) {
+    const TypeInfo &ti = expand(pair.index());
+    addParamInfo(recordedABIDetails, ti, pair.value().getConvention());
   }
   if (recordedABIDetails && FnType->hasSelfParam() && !hasSelfContext)
     recordedABIDetails->parameters.back().isSelf = true;
@@ -2015,7 +2032,7 @@ void SignatureExpansion::expandParameters(
 
     if (claimSelf())
       IGM.addSwiftSelfAttributes(Attrs, curLength);
-    expand(FnType->getSelfParameter());
+    expand(FnType->getSelfParameterIndex());
     if (recordedABIDetails)
       recordedABIDetails->hasTrailingSelfParam = true;
     assert(ParamIRTypes.size() == curLength + 1 &&
@@ -2260,8 +2277,8 @@ void SignatureExpansion::expandAsyncEntryType() {
     params = params.drop_back();
   }
 
-  for (auto param : params) {
-    expand(param);
+  for (unsigned i : range(params.size())) {
+    expand(i);
   }
 
   // Next, the generic signature.
@@ -2279,7 +2296,7 @@ void SignatureExpansion::expandAsyncEntryType() {
   if (hasSelfContext) {
     auto curLength = ParamIRTypes.size();
     (void)curLength;
-    expand(FnType->getSelfParameter());
+    expand(FnType->getSelfParameterIndex());
     assert(ParamIRTypes.size() == curLength + 1 &&
            "adding 'self' added unexpected number of parameters");
     if (claimSelf())
@@ -5006,6 +5023,8 @@ static void emitRetconCoroutineEntry(
   for (auto *arg : finalArguments) {
     arguments.push_back(arg);
   }
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, arguments);
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
@@ -5095,7 +5114,7 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
 void irgen::emitYieldOnceCoroutineEntry(
     IRGenFunction &IGF, CanSILFunctionType fnType,
     NativeCCEntryPointArgumentEmission &emission) {
-  // Use malloc and free as our allocator.
+  // Use free as our deallocator.
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
   auto *buffer = emission.getCoroutineBuffer();
   llvm::SmallVector<llvm::Value *, 2> finalArgs;
@@ -5103,15 +5122,19 @@ void irgen::emitYieldOnceCoroutineEntry(
   if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
-    allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocFn());
+    // Use swift_coroFrameAllocStub to emit our allocator.
+    allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
   } else {
+    // Use malloc as our allocator.
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
   }
+
   emitRetconCoroutineEntry(IGF, fnType, buffer,
                            llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM), {},
                            allocFn, deallocFn, finalArgs);
+
 }
 
 void irgen::emitYieldManyCoroutineEntry(

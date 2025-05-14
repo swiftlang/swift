@@ -38,8 +38,23 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
 
 - When applicable, phrase diagnostics as rules rather than reporting that the compiler failed to do something. Example:
 
-  - Normal: "cannot call 'super.init' outside of an initializer"
-  - Better: "'super.init' cannot be called outside of an initializer"
+  - Normal: `cannot call 'super.init' outside of an initializer`
+  - Better: `'super.init' cannot be called outside of an initializer`
+
+- Use `'` to quote attributes, symbol names, and any other text that is
+  referred to as code or a token.
+  Some idiomatic Swift tokens, such as `protocol`, by themselves are or appear
+  in Swift terms of art.
+  Terms of art are written in plain text and must not be quoted.
+  If you are not certain whether a Swift token has an associated term of art,
+  consult the [book].
+  For example:
+  - `'mutating' is only valid on methods`, but
+    `cannot call mutating method on immutable value`.
+  - `'@autoclosure' only applies to function types`.
+  - `subscript access can throw but is not marked with 'try'`.
+  - `expected '{' after 'defer'`.
+  - `type 'S' does not conform to protocol 'Sequence'`.
 
 - When referring to attributes by name, use *either* `attribute 'foo'` or 
   `'@foo'`, rather than `attribute '@foo'`.
@@ -53,6 +68,8 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
   - "...here" (for a purely locational note)
 
 - If possible, it is best to include the name of the type or function that has the error, e.g. "non-actor type 'Nope' cannot ..." is better than "non-actor type cannot ...". It helps developers relate the error message to the specific type the error is about, even if the error would highlight the appropriate line / function in other ways. 
+
+[book]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language
 
 ### Locations and Highlights ###
 
@@ -99,6 +116,14 @@ Diagnostic group documentation should:
 - Include references to relevant chapters of _The Swift Programming Language_.
 - Be written in Markdown, but avoid excessive markup which negatively impacts the terminal UX.
 
+The diagnostic group documentation supports generating a DocC bundle for hosting. You can currently find the compiler diagnostics documentation at https://docs.swift.org/compiler/documentation/diagnostics/
+
+To generate this documentation locally, run the following command from the root of the repository:
+```
+docc preview --allow-arbitrary-catalog-directories userdocs/diagnostics
+```
+
+
 ### Quick-Start Guide for Contributing New Diagnostic Groups ###
 
 Adding new diagnostic groups is a great way to get familiar with the process of contributing to Swift, while also making a big impact!
@@ -110,7 +135,7 @@ To add a new diagnostics group:
     - An entry in a `Diagnostics*.def` file describing the diagnostic. If there are any closely related diagnostics the note should also be attached to, they can usually be found nearby.
     - Each point in the compiler source where the diagnostic is emitted. This can be helpful in determining the exact circumstances which cause it to be emitted.
 4. Add a new Markdown file in the `userdocs/diagnostics/` directory in the swift repository containing the documentation. When writing a note, keep the writing guidelines from the section above in mind. The existing notes in the directory are another useful guide.
-5. Create a new entry in `DiagnosticGroups.def` that provides the name for your new diagnostic group along with the name of the file you added in step (4).
+5. Create a new entry in `DiagnosticGroups.def` that provides the name for your new diagnostic group along with the name of the file you added in step (4), without an extension.
 6. Find each diagnostic you want to make part of this group in the various `Diagnostics*.def` files. For each diagnostic, replace the `ERROR` or `WARNING` with `GROUPED_ERROR` or `GROUPED_WARNING`, respectively, and put the diagnostic group name after the string literal for the diagnostic message.
 7. If possible, rebuild the compiler and try recompiling your test program. Your new diagnostic group should appear as `[#<group name>]` at the end of the diagnostic, with a link to the diagnostic file.
 8. That's it! The new diagnostic group is now ready to be submitted as a pull request on GitHub.

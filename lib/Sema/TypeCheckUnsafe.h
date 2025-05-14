@@ -34,6 +34,7 @@ void diagnoseUnsafeUse(const UnsafeUse &use);
 bool enumerateUnsafeUses(ConcreteDeclRef declRef,
                          SourceLoc loc,
                          bool isCall,
+                         bool skipTypeCheck,
                          llvm::function_ref<bool(UnsafeUse)> fn);
 
 /// Enumerate all of the unsafe uses that occur within this array of protocol

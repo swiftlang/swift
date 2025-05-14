@@ -89,6 +89,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
   /// The access base is some SIL pattern which does not fit into any other case.
   /// This should be a very rare situation.
+  ///
+  /// TODO: unidentified should preserve its base address value, but AccessBase must be Hashable.
   case unidentified
 
   public init(baseAddress: Value) {
@@ -218,6 +220,21 @@ public enum AccessBase : CustomStringConvertible, Hashable {
         return true
       case .argument, .yield, .pointer, .index, .unidentified:
         return false
+    }
+  }
+
+  public var storageIsLexical: Bool {
+    switch self {
+    case .argument(let arg):
+      return arg.isLexical
+    case .stack(let allocStack):
+      return allocStack.isLexical
+    case .global:
+      return true
+    case .box, .class, .tail:
+      return reference!.referenceRoot.isLexical
+    case .yield, .pointer, .index, .storeBorrow, .unidentified:
+      return false
     }
   }
 
@@ -414,7 +431,7 @@ public struct AccessPath : CustomStringConvertible, Hashable {
 
 private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
   switch value {
-  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst:
+  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst, is VectorBaseAddrInst:
     return true
   default:
     return false
@@ -554,10 +571,6 @@ public struct AccessBaseAndScopes {
   public init(base: AccessBase, scopes: SingleInlineArray<EnclosingAccessScope>) {
     self.base = base
     self.scopes = scopes
-  }
-
-  public var outerAddress: Value? {
-    base.address ?? scopes.last?.address
   }
 
   public var enclosingAccess: EnclosingAccessScope {

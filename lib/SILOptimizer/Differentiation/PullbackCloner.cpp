@@ -2095,6 +2095,23 @@ PullbackCloner::PullbackCloner(VJPCloner &vjpCloner)
 
 PullbackCloner::~PullbackCloner() { delete &impl; }
 
+static SILValue getArrayValue(ApplyInst *ai) {
+  SILValue arrayValue;
+  for (auto use : ai->getUses()) {
+    auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
+    if (!dti)
+      continue;
+    DEBUG_ASSERT(!arrayValue && "Array value already found");
+    // The first `destructure_tuple` result is the `Array` value.
+    arrayValue = dti->getResult(0);
+#ifndef DEBUG_ASSERT_enabled
+    break;
+#endif
+  }
+  ASSERT(arrayValue);
+  return arrayValue;
+}
+
 //--------------------------------------------------------------------------//
 // Entry point
 //--------------------------------------------------------------------------//
@@ -2439,6 +2456,134 @@ bool PullbackCloner::Implementation::run() {
   // Visit original blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
+    LLVM_DEBUG(getADDebugStream()
+               << "Begin search for adjoints of loop-local active values\n");
+    llvm::DenseMap<const SILLoop *, llvm::DenseSet<SILValue>>
+        loopLocalActiveValues;
+    for (auto *bb : originalBlocks) {
+      const SILLoop *loop = vjpCloner.getLoopInfo()->getLoopFor(bb);
+      if (loop == nullptr)
+        continue;
+      SILBasicBlock *loopHeader = loop->getHeader();
+      SILBasicBlock *pbLoopHeader = getPullbackBlock(loopHeader);
+      LLVM_DEBUG(getADDebugStream()
+                 << "Original bb" << bb->getDebugID()
+                 << " belongs to a loop, original header bb"
+                 << loopHeader->getDebugID() << ", pullback header bb"
+                 << pbLoopHeader->getDebugID() << '\n');
+      builder.setInsertionPoint(pbLoopHeader);
+      auto bbActiveValuesIt = activeValues.find(bb);
+      if (bbActiveValuesIt == activeValues.end())
+        continue;
+      const auto &bbActiveValues = bbActiveValuesIt->second;
+      for (SILValue bbActiveValue : bbActiveValues) {
+        if (vjpCloner.getLoopInfo()->getLoopFor(
+                bbActiveValue->getParentBlock()) != loop) {
+          LLVM_DEBUG(
+              getADDebugStream()
+              << "The following active value is NOT loop-local, skipping: "
+              << bbActiveValue);
+          continue;
+        }
+
+        auto [_, wasInserted] =
+            loopLocalActiveValues[loop].insert(bbActiveValue);
+        LLVM_DEBUG(getADDebugStream()
+                   << "The following active value is loop-local, ");
+        if (!wasInserted) {
+          LLVM_DEBUG(llvm::dbgs() << "but it was already processed, skipping: "
+                                  << bbActiveValue);
+          continue;
+        }
+
+        if (getTangentValueCategory(bbActiveValue) ==
+            SILValueCategory::Object) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "zeroing its adjoint value in loop header: "
+                     << bbActiveValue);
+          setAdjointValue(bb, bbActiveValue,
+                          makeZeroAdjointValue(getRemappedTangentType(
+                              bbActiveValue->getType())));
+          continue;
+        }
+
+        ASSERT(getTangentValueCategory(bbActiveValue) ==
+               SILValueCategory::Address);
+
+        // getAdjointProjection might call materializeAdjointDirect which
+        // writes to debug output, emit \n.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "checking if it's adjoint is a projection\n");
+
+        if (!getAdjointProjection(bb, bbActiveValue)) {
+          LLVM_DEBUG(getADDebugStream()
+                     << "Adjoint for the following value is NOT a projection, "
+                        "zeroing its adjoint buffer in loop header: "
+                     << bbActiveValue);
+
+          // All adjoint buffers are allocated in the pullback entry and
+          // deallocated in the pullback exit. So, use IsNotInitialization to
+          // emit destroy_addr before zeroing the buffer.
+          ASSERT(bufferMap.contains({bb, bbActiveValue}));
+          builder.emitZeroIntoBuffer(pbLoc, getAdjointBuffer(bb, bbActiveValue),
+                                     IsNotInitialization);
+
+          continue;
+        }
+
+        LLVM_DEBUG(getADDebugStream()
+                   << "Adjoint for the following value is a projection, ");
+
+        // If Projection::isAddressProjection(v) is true for a value v, it
+        // is not added to active values list (see recordValueIfActive).
+        //
+        // Ensure that only the following value types conforming to
+        // getAdjointProjection but not conforming to
+        // Projection::isAddressProjection can go here.
+        //
+        // Instructions conforming to Projection::isAddressProjection and
+        // thus never corresponding to an active value do not need any
+        // handling, because only active values can have adjoints from
+        // previous iterations propagated via BB arguments.
+        do {
+          // Consider '%X = begin_access [modify] [static] %Y'.
+          // 1. If %Y is loop-local, it's adjoint buffer will
+          //    be zeroed, and we'll have zero adjoint projection to it.
+          // 2. Otherwise, we do not need to zero the projection buffer.
+          // Thus, we can just skip.
+          if (dyn_cast<BeginAccessInst>(bbActiveValue)) {
+            LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
+            break;
+          }
+
+          // Consider the following sequence:
+          //   %1 = function_ref @allocUninitArray
+          //   %2 = apply %1<Float>(%0)
+          //   (%3, %4) = destructure_tuple %2
+          //   %5 = mark_dependence %4 on %3
+          //   %6 = pointer_to_address %6 to [strict] $*Float
+          // Since %6 is active, %3 (which is an array) must also be active.
+          // Thus, adjoint for %3 will be zeroed if needed. Ensure that expected
+          // invariants hold and then skip.
+          if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
+                  bbActiveValue)) {
+            ASSERT(isa<PointerToAddressInst>(bbActiveValue));
+            SILValue arrayValue = getArrayValue(ai);
+            ASSERT(llvm::find(bbActiveValues, arrayValue) !=
+                   bbActiveValues.end());
+            ASSERT(vjpCloner.getLoopInfo()->getLoopFor(
+                       arrayValue->getParentBlock()) == loop);
+            LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
+            break;
+          }
+
+          ASSERT(false);
+        } while (false);
+      }
+    }
+    LLVM_DEBUG(getADDebugStream()
+               << "End search for adjoints of loop-local active values\n");
+
     for (auto *bb : originalBlocks) {
       visitSILBasicBlock(bb);
       if (errorOccurred)
@@ -3339,19 +3484,9 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
       eltIndex = ili->getValue().getLimitedValue();
     }
     // Get the array adjoint value.
-    SILValue arrayAdjoint;
-    assert(ai && "Expected `array.uninitialized_intrinsic` application");
-    for (auto use : ai->getUses()) {
-      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-      if (!dti)
-        continue;
-      assert(!arrayAdjoint && "Array adjoint already found");
-      // The first `destructure_tuple` result is the `Array` value.
-      auto arrayValue = dti->getResult(0);
-      arrayAdjoint = materializeAdjointDirect(
-          getAdjointValue(origBB, arrayValue), definingInst->getLoc());
-    }
-    assert(arrayAdjoint && "Array does not have adjoint value");
+    SILValue arrayValue = getArrayValue(ai);
+    SILValue arrayAdjoint = materializeAdjointDirect(
+        getAdjointValue(origBB, arrayValue), definingInst->getLoc());
     // Apply `Array.TangentVector.subscript` to get array element adjoint value.
     auto *eltAdjBuffer =
         getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, ai->getLoc());

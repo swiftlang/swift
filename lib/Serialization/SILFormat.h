@@ -229,6 +229,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
+    BCFixed<1>,          // Is this a specialized witness table.
     BCFixed<2>,          // SerializedKind.
     ProtocolConformanceIDField   // conformance
     // Witness table entries will be serialized after.
@@ -249,7 +250,6 @@ namespace sil_block {
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
     TypeIDField, // ID of requirement subject type
-    TypeIDField, // ID of substituted subject type
     ProtocolConformanceIDField
   >;
 
@@ -261,7 +261,6 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField, // ID of associated type
     ProtocolConformanceIDField // ID of conformance
   >;
 

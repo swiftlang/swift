@@ -379,10 +379,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(globalRemapping));
   }
 
-  if (inputArgs.hasArg(options::OPT_executor_factory)) {
-    inputArgs.AddLastArg(arguments, options::OPT_executor_factory);
-  }
-
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
@@ -758,8 +754,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-imported-modules";
   case file_types::TY_JSONDependencies:
     return "-scan-dependencies";
-  case file_types::TY_JSONFeatures:
-    return "-emit-supported-features";
+  case file_types::TY_JSONArguments:
+    return "-emit-supported-arguments";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -1045,7 +1041,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
-    case file_types::TY_JSONFeatures:
+    case file_types::TY_JSONArguments:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

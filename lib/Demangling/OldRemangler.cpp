@@ -555,6 +555,13 @@ Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError
+Remangler::mangleDependentProtocolConformanceOpaque(Node *node,
+                                                    unsigned depth) {
+  // Dependent conformances aren't in the old mangling
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleProtocolConformance(Node *node, unsigned depth) {
   // type, protocol name, context
   DEMANGLER_ASSERT(node->getNumChildren() == 3, node);

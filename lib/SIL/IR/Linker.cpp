@@ -299,7 +299,8 @@ void SILLinkerVisitor::visitProtocolConformance(
 
       SILLinkage linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
       WT = SILWitnessTable::create(Mod, linkage,
-                                   const_cast<RootProtocolConformance *>(rootC));
+                                   const_cast<RootProtocolConformance *>(rootC),
+                                   /*specialized=*/ false);
     }
     // If the module is at or past the Lowered stage, then we can't do any
     // further deserialization, since pre-IRGen SIL lowering changes the types

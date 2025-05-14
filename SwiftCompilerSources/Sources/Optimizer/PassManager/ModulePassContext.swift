@@ -144,14 +144,14 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   @discardableResult
-  func createWitnessTable(entries: [WitnessTable.Entry],
+  func createSpecializedWitnessTable(entries: [WitnessTable.Entry],
                           conformance: Conformance,
                           linkage: Linkage,
                           serialized: Bool) -> WitnessTable
   {
     let bridgedEntries = entries.map { $0.bridged }
     let bridgedWitnessTable = bridgedEntries.withBridgedArrayRef {
-      _bridged.createWitnessTable(linkage.bridged, serialized, conformance.bridged, $0)
+      _bridged.createSpecializedWitnessTable(linkage.bridged, serialized, conformance.bridged, $0)
     }
     return WitnessTable(bridged: bridgedWitnessTable)
   }

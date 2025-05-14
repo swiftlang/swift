@@ -1345,23 +1345,18 @@ public:
     llvm_unreachable("unhandled ownership");
   }
 
-  // Determines owned/unowned ResultConvention of the returned value based on
-  // returns_retained/returns_unretained attribute.
+  // Determines the ownership ResultConvention (owned/unowned) of the return
+  // value using the SWIFT_RETURNS_(UN)RETAINED annotation on the C++ API; if
+  // not explicitly annotated, falls back to the
+  // SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT annotation on the C++
+  // SWIFT_SHARED_REFERENCE type.
   std::optional<ResultConvention>
   getCxxRefConventionWithAttrs(const TypeLowering &tl,
                                const clang::Decl *decl) const {
-    if (tl.getLoweredType().isForeignReferenceType() && decl->hasAttrs()) {
-      for (const auto *attr : decl->getAttrs()) {
-        if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-          if (swiftAttr->getAttribute() == "returns_unretained") {
-            return ResultConvention::Unowned;
-          } else if (swiftAttr->getAttribute() == "returns_retained") {
-            return ResultConvention::Owned;
-          }
-        }
-      }
-    }
-    return std::nullopt;
+    if (!tl.getLoweredType().isForeignReferenceType())
+      return std::nullopt;
+
+    return importer::getCxxRefConventionWithAttrs(decl);
   }
 };
 
@@ -1520,10 +1515,8 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
       return false;
 
     if (clangTy->getPointeeType()->getAs<clang::RecordType>()) {
-      // CF type as foreign class
-      if (substTy->getClassOrBoundGenericClass() &&
-          substTy->getClassOrBoundGenericClass()->getForeignClassKind() ==
-            ClassDecl::ForeignKind::CFType) {
+      // Foreign reference types
+      if (substTy->getClassOrBoundGenericClass()) {
         return false;
       }
     }
@@ -1541,6 +1534,9 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
   // express immutable borrowed params, so we have to have this hack.
   // Eventually, we should just express these correctly: rdar://89647503
   if (importer::isCxxConstReferenceType(clangTy))
+    return true;
+
+  if (clangTy->isRValueReferenceType())
     return true;
 
   return false;
@@ -1702,9 +1698,13 @@ private:
     }
 
     // If we are an async function that is unspecified or nonisolated, insert an
-    // isolated parameter if AsyncCallerExecution is enabled.
+    // isolated parameter if NonisolatedNonsendingByDefault is enabled.
+    //
+    // NOTE: The parameter is not inserted for async functions imported
+    // from ObjC because they are handled in a special way that doesn't
+    // require it.
     if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
-        extInfoBuilder.isAsync()) {
+        extInfoBuilder.isAsync() && !Foreign.async) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
           ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
@@ -2478,8 +2478,10 @@ static CanSILFunctionType getSILFunctionType(
   
   if (auto accessor = getAsCoroutineAccessor(constant)) {
     auto origAccessor = cast<AccessorDecl>(origConstant->getDecl());
+    auto &ctx = origAccessor->getASTContext();
     coroutineKind =
-        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())
+        (requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+         ctx.SILOpts.CoroutineAccessorsUseYieldOnce2)
             ? SILCoroutineKind::YieldOnce2
             : SILCoroutineKind::YieldOnce;
 
@@ -2617,19 +2619,26 @@ static CanSILFunctionType getSILFunctionType(
   {
     std::optional<ActorIsolation> actorIsolation;
     if (constant) {
+      // TODO: It should to be possible to `getActorIsolation` if
+      // reference is to a decl instead of trying to get isolation
+      // from the reference kind, the attributes, or the context.
+
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
         actorIsolation = ActorIsolation::forNonisolated(false);
-      } else if (auto *decl = constant->getAbstractFunctionDecl();
-                 decl && decl->getExecutionBehavior().has_value()) {
-        switch (*decl->getExecutionBehavior()) {
-        case ExecutionKind::Concurrent:
+      } else if (auto *decl = constant->getAbstractFunctionDecl()) {
+        if (auto *nonisolatedAttr =
+                decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+          if (nonisolatedAttr->isNonSending())
+            actorIsolation = ActorIsolation::forCallerIsolationInheriting();
+        } else if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
           actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
-          break;
-        case ExecutionKind::Caller:
-          actorIsolation = ActorIsolation::forCallerIsolationInheriting();
-          break;
         }
-      } else {
+      } else if (auto *closure = constant->getAbstractClosureExpr()) {
+        if (auto isolation = closure->getActorIsolation())
+          actorIsolation = isolation;
+      }
+
+      if (!actorIsolation) {
         actorIsolation =
             getActorIsolationOfContext(constant->getInnermostDeclContext());
       }

@@ -41,9 +41,9 @@ func testInAsync(x: X, plainClosure: () -> Void) async { // expected-note 2{{par
   let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
 
-  unsafelySendableClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a @Sendable closure}}
+  unsafelySendableClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
   unsafelyMainActorClosure(plainClosure)
-  unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a @Sendable closure}}
+  unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
 }
 
 func testElsewhere(x: X) {
@@ -148,10 +148,10 @@ struct S3: Q, Sendable {
 // Historical attribute names do nothing (but are permitted)
 // ---------------------------------------------------------------------------
 func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of '@preconcurrency'}}
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of '@preconcurrency'}}
 
 // ---------------------------------------------------------------------------
 // Random bugs
@@ -234,6 +234,7 @@ extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-note@-1{{add '@preconcurrency' to the 'NotIsolated' conformance to suppress isolation-related diagnostics}}{{36-36=@preconcurrency }}
   // expected-complete-tns-note@-2{{turn data races into runtime errors with '@preconcurrency'}}{{36-36=@preconcurrency }}
   // expected-complete-tns-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-complete-tns-note@-4{{isolate this conformance to the main actor with '@MainActor'}}
   func requirement() {}
   // expected-complete-tns-note@-1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   // expected-complete-tns-note@-2 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
