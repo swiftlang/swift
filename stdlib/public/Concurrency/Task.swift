@@ -644,14 +644,14 @@ extension Task where Failure == Never {
 #endif
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public init(
-    name: String?,
+  public init( // Task.init where Failure == Never (SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    name: String? = nil,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
@@ -660,9 +660,9 @@ extension Task where Failure == Never {
 #elseif $Embedded
   @discardableResult
   @_alwaysEmitIntoClient
-  @available(SwiftStdlib 6.2, *)
-  public init(
-    name: String?,
+  @available(SwiftStdlib 5.1, *)
+  public init( // Task.init where Failure == Never (Embedded)
+    name: String? = nil, // ignored
     // TaskExecutor is unavailable in embedded
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async -> Success
@@ -678,7 +678,6 @@ extension Task where Failure == Never {
       isDiscardingTask: false,
       isSynchronousStart: false)
 
-    // Create the asynchronous task.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
@@ -689,10 +688,10 @@ extension Task where Failure == Never {
   ///
   /// Use this function when creating asynchronous work
   /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
+  /// Like `Task.detached(name:priority:operation:)`,
   /// this function creates a separate, top-level task.
-  /// Unlike `Task.detached(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
+  /// Unlike `Task.detached(name:priority:operation:)`,
+  /// the task created by `Task.init(name:priority:operation:)`
   /// inherits the priority and actor context of the caller,
   /// so the operation is treated more like an asynchronous extension
   /// to the synchronous operation.
@@ -704,26 +703,29 @@ extension Task where Failure == Never {
   /// it only makes it impossible for you to explicitly cancel the task.
   ///
   /// - Parameters:
-  ///   - name: The high-level human-readable name given for this task
+  ///   - name: Human readable name of the task. Some runtime versions may not support naming tasks, and this parameter will be ignored.
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
   @discardableResult
+  @available(SwiftStdlib 5.1, *)
   @_alwaysEmitIntoClient
-  @available(SwiftStdlib 6.2, *)
-  public init(
-    name: String?,
+  public init( // Task.init where Failure == Never
+    name: String? = nil,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
-    // Create the asynchronous task.
     let builtinSerialExecutor =
       unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -737,15 +739,15 @@ extension Task where Failure == Never {
             initialSerialExecutor: builtinSerialExecutor,
             taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
-      }
-    }
-    #endif
+        }
+    } // let name
+    #endif // $BuiltinCreateAsyncTaskName
+
     if task == nil {
-      // either no task name was set, or names are unsupported
       task = Builtin.createTask(
-      flags: flags,
-      initialSerialExecutor: builtinSerialExecutor,
-      operation: operation).0
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
     }
 
     self._task = task!
@@ -759,22 +761,22 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public init(
+  public init( // Task.init where Failure == Error (SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
 #else
-  /// Runs the given throwing operation asynchronously
+  /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
   ///
   /// Use this function when creating asynchronous work
   /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
+  /// Like `Task.detached(name:priority:operation:)`,
   /// this function creates a separate, top-level task.
-  /// Unlike `detach(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
+  /// Unlike `Task.detached(name:priority:operation:)`,
+  /// the task created by `Task.init(name:priority:operation:)`
   /// inherits the priority and actor context of the caller,
   /// so the operation is treated more like an asynchronous extension
   /// to the synchronous operation.
@@ -786,251 +788,28 @@ extension Task where Failure == Error {
   /// it only makes it impossible for you to explicitly cancel the task.
   ///
   /// - Parameters:
+  ///   - name: Human readable name of the task. Some runtime versions may not support naming tasks, and this parameter will be ignored.
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
-  public init(
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
+  @available(SwiftStdlib 5.1, *)
+  public init( // Task.init where Failure == Error
+      name: String? = nil,
+      priority: TaskPriority? = nil,
+      @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
-    // Set up the task flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
-
-    // Create the asynchronous task future.
-    let builtinSerialExecutor =
-      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    let (task, _) = Builtin.createTask(flags: flags,
-                                       initialSerialExecutor: builtinSerialExecutor,
-                                       operation: operation)
-
-    self._task = task
-  }
-#endif
-}
-
-
-@available(SwiftStdlib 6.2, *)
-extension Task where Failure == Error {
-  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public init(
-    name: String?,
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
-) {
-  fatalError("Unavailable in task-to-thread concurrency model.")
-}
-  #elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  @available(SwiftStdlib 6.2, *)
-  public init(
-    name: String?,
-    // TaskExecutor is unavailable in embedded
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async throws -> Success
-) {
-  // Set up the job flags for a new task.
-  let flags = taskCreateFlags(
-    priority: priority, isChildTask: false, copyTaskLocals: true,
-    inheritContext: true, enqueueJob: true,
-    addPendingGroupTaskUnconditionally: false,
-    isDiscardingTask: false, isSynchronousStart: false)
-
-  // Create the asynchronous task.
-  let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-self._task = task
-}
-  #else
-  /// Runs the given nonthrowing operation asynchronously
-  /// as part of a new top-level task on behalf of the current actor.
-  ///
-  /// Use this function when creating asynchronous work
-  /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
-  /// this function creates a separate, top-level task.
-  /// Unlike `Task.detached(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
-  /// inherits the priority and actor context of the caller,
-  /// so the operation is treated more like an asynchronous extension
-  /// to the synchronous operation.
-  ///
-  /// You need to keep a reference to the task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - name: The high-level human-readable name given for this task
-  ///   - priority: The priority of the task.
-  ///     Pass `nil` to use the priority from `Task.currentPriority`.
-  ///   - operation: The operation to perform.
-  @discardableResult
-  @_alwaysEmitIntoClient
-  @available(SwiftStdlib 6.2, *)
-  public init(
-    name: String?,
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
-) {
-  // Set up the job flags for a new task.
-  let flags = taskCreateFlags(
-    priority: priority, isChildTask: false, copyTaskLocals: true,
-    inheritContext: true, enqueueJob: true,
-    addPendingGroupTaskUnconditionally: false,
-    isDiscardingTask: false, isSynchronousStart: false)
-
-  // Create the asynchronous task.
-  let builtinSerialExecutor =
-    unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-  var task: Builtin.NativeObject?
-  #if $BuiltinCreateAsyncTaskName
-  if let name {
-    task =
-      unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
-        Builtin.createTask(
-          flags: flags,
-          initialSerialExecutor: builtinSerialExecutor,
-          taskName: nameBytes.baseAddress!._rawValue,
-          operation: operation).0
-      }
-  }
-  #endif
-  if task == nil {
-    // either no task name was set, or names are unsupported
-    task = Builtin.createTask(
-      flags: flags,
-      initialSerialExecutor: builtinSerialExecutor,
-      operation: operation).0
-  }
-
-  self._task = task!
-  }
-  #endif
-}
-
-// ==== Detached Tasks ---------------------------------------------------------
-
-@available(SwiftStdlib 5.1, *)
-extension Task where Failure == Never {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public static func detached(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> Success
-  ) -> Task<Success, Failure> {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#else
-  /// Runs the given nonthrowing operation asynchronously
-  /// as part of a new top-level task.
-  ///
-  /// Don't use a detached task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
-  ///
-  /// You need to keep a reference to the detached task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the task.
-  ///   - operation: The operation to perform.
-  ///
-  /// - Returns: A reference to the task.
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> Success
-  ) -> Task<Success, Failure> {
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
-
-    // Create the asynchronous task future.
-    let builtinSerialExecutor =
-      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    let (task, _) = Builtin.createTask(flags: flags,
-                                       initialSerialExecutor:
-                                         builtinSerialExecutor,
-                                       operation: operation)
-
-    return Task(task)
-  }
-#endif
-}
-
-@available(SwiftStdlib 6.2, *)
-extension Task where Failure == Never {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public static func detached(
-    name: String?,
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> Success
-  ) -> Task<Success, Failure> {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#else
-  /// Runs the given nonthrowing operation asynchronously
-  /// as part of a new top-level task.
-  ///
-  /// Don't use a detached task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
-  ///
-  /// You need to keep a reference to the detached task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - name: Human readable name of the task.
-  ///   - priority: The priority of the task.
-  ///   - operation: The operation to perform.
-  ///
-  /// - Returns: A reference to the task.
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    name: String?,
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> Success
-  ) -> Task<Success, Failure> {
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
@@ -1049,6 +828,93 @@ extension Task where Failure == Never {
         }
     }
     #endif
+
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
+    }
+
+    self._task = task!
+  }
+#endif
+}
+
+// ==== Detached Tasks ---------------------------------------------------------
+
+@available(SwiftStdlib 5.1, *)
+extension Task where Failure == Never {
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public static func detached( // Task.detached where Failure == Never (SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    operation: sending @escaping @isolated(any) () async -> Success
+  ) -> Task<Success, Failure> {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+#else
+  /// Runs the given nonthrowing operation asynchronously
+  /// as part of a new top-level task.
+  ///
+  /// Don't use a detached task if it's possible
+  /// to model the operation using structured concurrency features like child tasks.
+  /// Child tasks inherit the parent task's priority and task-local storage,
+  /// and canceling a parent task automatically cancels all of its child tasks.
+  /// You need to handle these considerations manually with a detached task.
+  ///
+  /// You need to keep a reference to the detached task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - name: Human readable name of the task. On runtimes which to not support naming tasks, this parameter will be ignored.
+  ///   - priority: The priority of the task.
+  ///   - operation: The operation to perform.
+  ///
+  /// - Returns: A reference to the task.
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public static func detached( // Task.detached where Failure == Never
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    operation: sending @escaping @isolated(any) () async -> Success
+  ) -> Task<Success, Failure> {
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+
+    // Create the asynchronous task.
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+
     if task == nil {
       // either no task name was set, or names are unsupported
       task = Builtin.createTask(
@@ -1068,7 +934,8 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public static func detached(
+  public static func detached( // Task.detached where Failure == Error (SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    name: String? = nil,
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
@@ -1093,86 +960,28 @@ extension Task where Failure == Error {
   /// it only makes it impossible for you to explicitly cancel the task.
   ///
   /// - Parameters:
+  ///   - name: Human readable name of the task. On runtimes which to not support naming tasks, this parameter will be ignored.
   ///   - priority: The priority of the task.
   ///   - operation: The operation to perform.
   ///
   /// - Returns: A reference to the task.
   @discardableResult
   @_alwaysEmitIntoClient
-  public static func detached(
+  public static func detached( // Task.detached where Failure == Error
+    name: String? = nil,
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
-
-    // Create the asynchronous task future.
-    let builtinSerialExecutor =
-      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    let (task, _) = Builtin.createTask(flags: flags,
-                                       initialSerialExecutor:
-                                         builtinSerialExecutor,
-                                       operation: operation)
-
-    return Task(task)
-  }
-#endif
-}
-
-@available(SwiftStdlib 6.2, *)
-extension Task where Failure == Error {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
-  public static func detached(
-    name: String?,
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> Success
-  ) -> Task<Success, Failure> {
-    fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#else
-  /// Runs the given throwing operation asynchronously
-  /// as part of a new top-level task.
-  ///
-  /// If the operation throws an error, this method propagates that error.
-  ///
-  /// Don't use a detached task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
-  ///
-  /// You need to keep a reference to the detached task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the task.
-  ///   - operation: The operation to perform.
-  ///
-  /// - Returns: A reference to the task.
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    name: String?,
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> Success
-  ) -> Task<Success, Failure> {
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
@@ -1190,13 +999,13 @@ extension Task where Failure == Error {
             operation: operation).0
         }
     }
-    #endif
+    #endif // $BuiltinCreateAsyncTaskName
+
     if task == nil {
-      // either no task name was set, or names are unsupported
       task = Builtin.createTask(
-      flags: flags,
-      initialSerialExecutor: builtinSerialExecutor,
-      operation: operation).0
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
     }
 
     return Task(task!)
@@ -1289,7 +1098,7 @@ extension Task where Success == Never, Failure == Never {
 /// To query the current task without saving a reference to it,
 /// use properties like `currentPriority`.
 /// If you need to store a reference to a task,
-/// create an unstructured task using `Task.detached(priority:operation:)` instead.
+/// create an unstructured task using `Task.detached(name:priority:operation:)` instead.
 ///
 /// - Parameters:
 ///   - body: A closure that takes an `UnsafeCurrentTask` parameter.

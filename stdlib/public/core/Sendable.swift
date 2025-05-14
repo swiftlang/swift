@@ -111,7 +111,7 @@
 /// In a context that expects a sendable closure,
 /// a closure that satisfies the requirements
 /// implicitly conforms to `Sendable` ---
-/// for example, in a call to `Task.detached(priority:operation:)`.
+/// for example, in a call to `Task.detached(name:priority:operation:)`.
 ///
 /// You can explicitly mark a closure as sendable
 /// by writing `@Sendable` as part of a type annotation,

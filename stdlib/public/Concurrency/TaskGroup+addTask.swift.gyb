@@ -191,10 +191,9 @@ extension ${TYPE} {
   ///
   /// - Parameters:
   % if HAS_TASK_NAME:
-  ///   - name: Human readable name of this task.
+  ///   - name: Human readable name of this task. Some runtime versions may not support naming tasks, and this parameter will be ignored.
   % end
   % if HAS_TASK_EXECUTOR:
-  ///   - taskExecutor:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///      Explicitly passing `nil` as the executor preference is equivalent to
   ///      calling the `${METHOD_NAME}` method without a preference, and effectively
