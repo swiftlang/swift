@@ -247,6 +247,13 @@ lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode link
 /// struct-with-deinit drops the deinit.
 bool shouldExpand(SILModule &module, SILType ty);
 
+/// Returns true if `arg` is mutated.
+/// if `ignoreDestroys` is true, `destroy_addr` instructions are ignored.
+/// `defaultIsMutating` specifies the state of instructions which are not explicitly handled.
+/// For historical reasons this utility is implemented in SILVerifier.cpp.
+bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = false,
+                               bool defaultIsMutating = false);
+
 } // end namespace swift
 
 #endif

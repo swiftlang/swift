@@ -421,12 +421,12 @@ struct PAEM : P4EM {
 // CHECK:   apply [[F]]([[V]])
 
 // CHECK-64-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
-// CHECK-64:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
-// CHECK-64:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
-// CHECK-64:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
-// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-
+// CHECK-64:         [[V:%.*]] = integer_literal $Builtin.Int64, 5
+// CHECK-64-DAG:     [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
+// CHECK-64-DAG:     [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK-64:         apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:         apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:       } // end sil function '$s1A2PAV4testyyF'
 @inline(never)
 func testIt<T>(cl: (Int64) throws -> T) {
  do {
