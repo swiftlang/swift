@@ -392,6 +392,12 @@ enum class BridgedMemoryBehavior {
 struct BridgedLocation {
   uint64_t storage[3];
 
+  struct FilenameAndLocation {
+    BridgedStringRef path;
+    SwiftInt line;
+    SwiftInt column;
+  };
+
   BRIDGED_INLINE BridgedLocation(const swift::SILDebugLocation &loc);
   BRIDGED_INLINE const swift::SILDebugLocation &getLoc() const;
 
@@ -402,6 +408,8 @@ struct BridgedLocation {
   BRIDGED_INLINE bool isInlined() const;
   BRIDGED_INLINE bool isEqualTo(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
+  BRIDGED_INLINE bool isFilenameAndLocation() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE FilenameAndLocation getFilenameAndLocation() const;
   BRIDGED_INLINE bool hasSameSourceLocation(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   static BRIDGED_INLINE BridgedLocation fromNominalTypeDecl(BridgedDeclObj decl);
