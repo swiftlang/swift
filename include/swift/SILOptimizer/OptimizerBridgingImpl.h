@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -253,8 +254,8 @@ BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunctio
   return {bridgedFunction.getFunction()->createBasicBlock()};
 }
 
-void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
-  invocation->eraseInstruction(inst.unbridged());
+void BridgedPassContext::eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const {
+  invocation->eraseInstruction(inst.unbridged(), salvageDebugInfo);
 }
 
 void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {

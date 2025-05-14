@@ -38,18 +38,51 @@ let tempRValueElimination = FunctionPass(name: "temp-rvalue-elimination") {
   (function: Function, context: FunctionPassContext) in
 
   for inst in function.instructions {
-    if let copyAddr = inst as? CopyAddrInst {
-      tryEliminate(copy: copyAddr, context)
+    switch inst {
+    case let copy as CopyAddrInst:
+      if copy.source == copy.destination {
+        // Remove identity copies which may have been created by an earlier iteration, where another `copy_addr`
+        // copied the `alloc_stack` back to the source location.
+        context.erase(instruction: copy)
+      } else {
+        tryEliminate(copy: copy, context)
+      }
+    case let store as StoreInst:
+      // Also handle `load`-`store` pairs which are basically the same thing as a `copy_addr`.
+      if let load = store.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == store.parentBlock {
+        tryEliminate(copy: store, context)
+      }
+    default:
+      break
     }
   }
 }
 
-private func tryEliminate(copy: CopyAddrInst, _ context: FunctionPassContext) {
-  // Remove identity copies which may have been created by an earlier iteration, where another `copy_addr`
-  // copied the `alloc_stack` back to the source location.
-  if copy.source == copy.destination {
-    context.erase(instruction: copy)
-  }
+private protocol CopyLikeInstruction: Instruction {
+  var sourceAddress: Value { get }
+  var destinationAddress: Value { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
+  var loadingInstruction: Instruction { get }
+}
+
+extension CopyAddrInst: CopyLikeInstruction {
+  var sourceAddress: Value { source }
+  var destinationAddress: Value { destination }
+  var loadingInstruction: Instruction { self }
+}
+
+// A `store` which has a `load` as source operand. This is basically the same as a `copy_addr`.
+extension StoreInst: CopyLikeInstruction {
+  var sourceAddress: Value { load.address }
+  var destinationAddress: Value { destination }
+  var isTakeOfSource: Bool { load.loadOwnership == .take }
+  var isInitializationOfDestination: Bool { storeOwnership != .assign }
+  var loadingInstruction: Instruction { load }
+  private var load: LoadInst { source as! LoadInst }
+}
+
+private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
 
   guard let (allocStack, lastUseOfAllocStack) = getRemovableAllocStackDestination(of: copy, context) else {
     return
@@ -61,7 +94,7 @@ private func tryEliminate(copy: CopyAddrInst, _ context: FunctionPassContext) {
 
   if needToInsertDestroy(copy: copy, lastUseOfAllocStack: lastUseOfAllocStack) {
     Builder.insert(after: lastUseOfAllocStack, context) { builder in
-      builder.createDestroyAddr(address: copy.source)
+      builder.createDestroyAddr(address: copy.sourceAddress)
     }
   }
 
@@ -76,7 +109,7 @@ private func tryEliminate(copy: CopyAddrInst, _ context: FunctionPassContext) {
         assert(cai == lastUseOfAllocStack && cai.source == allocStack)
         cai.set(isTakeOfSource: false, context)
       }
-      use.set(to: copy.source, context)
+      use.set(to: copy.sourceAddress, context)
     case let load as LoadInst:
       if load.loadOwnership == .take, !copy.isTakeOfSource {
         // If the original copy is not taking its source, a `load` from the `allocStack` must
@@ -84,17 +117,17 @@ private func tryEliminate(copy: CopyAddrInst, _ context: FunctionPassContext) {
         assert(load == lastUseOfAllocStack)
         load.set(ownership: .copy, context)
       }
-      use.set(to: copy.source, context);
+      use.set(to: copy.sourceAddress, context);
 
     default:
       // Note that no operations that may be handled by this default clause can destroy the `allocStack`.
       // This includes operations that load the value from memory and release it or cast the address
       // before destroying it.
-      use.set(to: copy.source, context);
+      use.set(to: copy.sourceAddress, context);
     }
   }
   context.erase(instruction: allocStack)
-  context.erase(instruction: copy)
+  context.erase(instructionIncludingAllUsers: copy.loadingInstruction)
 }
 
 /// Checks if the `copy` is copying into an `alloc_stack` which is removable:
@@ -105,17 +138,17 @@ private func tryEliminate(copy: CopyAddrInst, _ context: FunctionPassContext) {
 ///   %lastUseOfAllocStack = load %allocStack
 /// ```
 private func getRemovableAllocStackDestination(
-  of copy: CopyAddrInst, _ context: FunctionPassContext
+  of copy: CopyLikeInstruction, _ context: FunctionPassContext
 ) -> (allocStack: AllocStackInst, lastUseOfAllocStack: Instruction)? {
   guard copy.isInitializationOfDestination,
-        let allocStack = copy.destination as? AllocStackInst
+        let allocStack = copy.destinationAddress as? AllocStackInst
   else {
     return nil
   }
 
   // If the `allocStack` is lexical we can eliminate it if the source of the copy is lexical and
   // it is live for longer than the `allocStack`.
-  if allocStack.isLexical && !copy.source.accessBase.storageIsLexical {
+  if allocStack.isLexical && !copy.sourceAddress.accessBase.storageIsLexical {
     return nil
   }
 
@@ -149,7 +182,7 @@ private func getRemovableAllocStackDestination(
   if copy.isTakeOfSource,
      lastUseOfAllocStack != copy,
      !(lastUseOfAllocStack is DestroyAddrInst),
-     lastUseOfAllocStack.mayWrite(toAddress: copy.source, context.aliasAnalysis)
+     lastUseOfAllocStack.mayWrite(toAddress: copy.sourceAddress, context.aliasAnalysis)
   {
     return nil
   }
@@ -168,7 +201,7 @@ private func getRemovableAllocStackDestination(
 
 /// We need to insert a final destroy if the original `copy` is taking the source but the
 /// `lastUseOfAllocStack` is not taking the `alloc_stack`.
-private func needToInsertDestroy(copy: CopyAddrInst, lastUseOfAllocStack: Instruction) -> Bool {
+private func needToInsertDestroy(copy: CopyLikeInstruction, lastUseOfAllocStack: Instruction) -> Bool {
   if !copy.isTakeOfSource {
     return false
   }
@@ -177,13 +210,13 @@ private func needToInsertDestroy(copy: CopyAddrInst, lastUseOfAllocStack: Instru
     return true
   case let cai as CopyAddrInst:
     if cai.isTakeOfSource {
-      assert(cai.source == copy.destination, "copy_addr must be not take a projected address")
+      assert(cai.source == copy.destinationAddress, "copy_addr must be not take a projected address")
       return false
     }
     return true
   case let li as LoadInst:
     if li.loadOwnership == .take {
-      assert(li.address == copy.destination, "load must be not take a projected address")
+      assert(li.address == copy.destinationAddress, "load must be not take a projected address")
       return false
     }
     return true
@@ -247,7 +280,9 @@ private extension AllocStackInst {
 /// ```
 /// We must not replace %temp with %a after the `end_access`. Instead we try to move the `end_access`
 /// after the last use.
-private func extendAccessScopes(beyond lastUse: Instruction, copy: CopyAddrInst, _ context: FunctionPassContext) -> Bool {
+private func extendAccessScopes(beyond lastUse: Instruction, copy: CopyLikeInstruction,
+                                _ context: FunctionPassContext) -> Bool
+{
   var endAccessToMove: EndAccessInst? = nil
 
   for inst in InstructionList(first: copy.next) {
@@ -257,7 +292,7 @@ private func extendAccessScopes(beyond lastUse: Instruction, copy: CopyAddrInst,
       if endAccessToMove != nil {
         return false
       }
-      if context.aliasAnalysis.mayAlias(copy.source, endAccess.beginAccess.address),
+      if context.aliasAnalysis.mayAlias(copy.sourceAddress, endAccess.beginAccess.address),
          // There cannot be any aliasing modifying accesses within the liverange of the `alloc_stack`,
          // because we would have cought this in `getLastUseWhileSourceIsNotModified`.
          // But there are cases where `aliasAnalysis.mayAlias` is less precise than `Instruction.mayWrite`.
@@ -301,7 +336,7 @@ private func extendAccessScopes(beyond lastUse: Instruction, copy: CopyAddrInst,
 ///
 /// Unfortunately, we cannot simply use the destroy points as the lifetime end, because they can be in a
 /// different basic block. Instead we look for the last non-destroy, non-dealloc use.
-private func getLastUseWhileSourceIsNotModified(of copy: CopyAddrInst,
+private func getLastUseWhileSourceIsNotModified(of copy: CopyLikeInstruction,
                                                 uses: InstructionSetWithCount,
                                                 _ context: FunctionPassContext) -> Instruction?
 {
@@ -313,7 +348,7 @@ private func getLastUseWhileSourceIsNotModified(of copy: CopyAddrInst,
 
   // We already checked that the useful lifetime of the `alloc_stack` ends in the same block as the `copy`.
   // Therefore we can limit our search to the instructions of this block.
-  for inst in InstructionList(first: copy.next) {
+  for inst in InstructionList(first: copy.loadingInstruction.next) {
     if uses.contains(inst) {
       numUsesFound += 1
     }
@@ -327,7 +362,7 @@ private func getLastUseWhileSourceIsNotModified(of copy: CopyAddrInst,
       // could occur _before_ the read of the `alloc_stack`.
       switch inst {
       case is FullApplySite, is YieldInst:
-        if inst.mayWrite(toAddress: copy.source, aliasAnalysis) {
+        if inst.mayWrite(toAddress: copy.sourceAddress, aliasAnalysis) {
           return nil
         }
         return inst
@@ -336,7 +371,7 @@ private func getLastUseWhileSourceIsNotModified(of copy: CopyAddrInst,
       }
     }
 
-    if inst.mayWrite(toAddress: copy.source, aliasAnalysis) {
+    if inst.mayWrite(toAddress: copy.sourceAddress, aliasAnalysis) {
       return nil
     }
   }
@@ -348,9 +383,9 @@ private func getLastUseWhileSourceIsNotModified(of copy: CopyAddrInst,
 /// Collects all uses of the `alloc_stack`.
 private struct UseCollector : AddressDefUseWalker {
   private(set) var uses: InstructionSetWithCount
-  private let copy: CopyAddrInst
+  private let copy: CopyLikeInstruction
 
-  init(copy: CopyAddrInst, _ context: FunctionPassContext) {
+  init(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
     self.uses = InstructionSetWithCount(context)
     self.copy = copy
   }
@@ -467,7 +502,7 @@ private struct UseCollector : AddressDefUseWalker {
       if load.loadOwnership == .take,
           // Only accept `load [take]` if it takes the whole `alloc_stack`. A `load [take]` from
           // a projection would destroy only a part of the `alloc_stack` and we don't handle this.
-          load.address != copy.destination
+          load.address != copy.destinationAddress
       {
         return .abortWalk
       }
@@ -494,7 +529,7 @@ private struct UseCollector : AddressDefUseWalker {
         return .abortWalk
       }
       // As with `load [take]`, only accept `copy_addr [take]` if it takes the whole `alloc_stack`.
-      if copyFromStack.isTakeOfSource && copyFromStack.source != copy.destination {
+      if copyFromStack.isTakeOfSource && copyFromStack.source != copy.destinationAddress {
         return .abortWalk
       }
       uses.insert(copyFromStack)

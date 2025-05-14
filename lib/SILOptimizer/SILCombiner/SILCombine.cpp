@@ -694,11 +694,13 @@ SILTransform *swift::createSILCombine() {
 //                          SwiftFunctionPassContext
 //===----------------------------------------------------------------------===//
 
-void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
+void SwiftPassInvocation::eraseInstruction(SILInstruction *inst, bool salvageDebugInfo) {
   if (silCombiner) {
-    silCombiner->eraseInstFromFunction(*inst);
+    silCombiner->eraseInstFromFunction(*inst, /*addOperandsToWorklist=*/ true, salvageDebugInfo);
   } else {
-    swift::salvageDebugInfo(inst);
+    if (salvageDebugInfo) {
+      swift::salvageDebugInfo(inst);
+    }
     if (inst->isStaticInitializerInst()) {
       inst->getParent()->erase(inst, *getPassManager()->getModule());
     } else {
