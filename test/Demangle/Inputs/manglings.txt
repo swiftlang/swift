@@ -85,26 +85,26 @@ _TF3fooap3barSi ---> foo.bar.nativePinningMutableAddressor : Swift.Int
 _TF3foolp3barSi ---> foo.bar.nativePinningAddressor : Swift.Int
 _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 _TF3foos3barSi ---> foo.bar.setter : Swift.Int
-_TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> () | {(8,11) - (11,25)}
-_TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T:_TFC3foo3bar3basfT3zimCS_3zim_T_,C} @objc foo.bar.bas(zim: foo.zim) -> () | {(14,17) - (17,31)}
-_TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double | {(25,28) - (28,56)}
-_T03foo3barC3basyAA3zimCAE_tFTo ---> {T:_T03foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> () | {(14,17) - (17,31)}
-_T0SC3fooS2d_SdtFTO ---> {T:_T0SC3fooS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double | {(25,28) - (28,56)}
-_$s3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$s3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> () | {(14,17) - (17,31)}
-_$sSC3fooyS2d_SdtFTO ---> {T:_$sSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double | {(25,28) - (28,56)}
-_$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> () | {(14,17) - (17,31)}
-_$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double | {(25,28) - (28,56)}
-_$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> () | {(14,17) - (17,31)}
-_$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double | {(25,28) - (28,56)}
+_TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
+_TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T:_TFC3foo3bar3basfT3zimCS_3zim_T_,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+_TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
+_T03foo3barC3basyAA3zimCAE_tFTo ---> {T:_T03foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+_T0SC3fooS2d_SdtFTO ---> {T:_T0SC3fooS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
+_$s3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$s3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+_$sSC3fooyS2d_SdtFTO ---> {T:_$sSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
+_$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+_$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
+_$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
+_$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _$sTA.123 ---> {T:} partial apply forwarder with unmangled suffix ".123"
-$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} partial apply forwarder for closure #1 () -> () in main.foo(Swift.Int) -> () with unmangled suffix ".1" | {(28,38) - (39,41)}
-$s4main8MyStructV3fooyyFAA1XV_Tg5.foo ---> generic specialization <main.X> of main.MyStruct.foo() -> () with unmangled suffix ".foo" | {(49,52) - (52,54)}
-_TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> () | {(16,19) - (19,33)}
-_TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> () | {(8,11) - (11,25)}
-_TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim | {(4,11) - (11,29)}
-_TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> foo.^ postfix(foo.bar, foo.bas) -> foo.zim | {(4,13) - (13,31)}
-_TFC3foo3barCfT_S0_ ---> foo.bar.__allocating_init() -> foo.bar | {(8,25) - (25,27)}
-_TFC3foo3barcfT_S0_ ---> foo.bar.init() -> foo.bar | {(8,12) - (12,14)}
+$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} partial apply forwarder for closure #1 () -> () in main.foo(Swift.Int) -> () with unmangled suffix ".1"
+$s4main8MyStructV3fooyyFAA1XV_Tg5.foo ---> generic specialization <main.X> of main.MyStruct.foo() -> () with unmangled suffix ".foo"
+_TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
+_TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
+_TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
+_TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> foo.^ postfix(foo.bar, foo.bas) -> foo.zim
+_TFC3foo3barCfT_S0_ ---> foo.bar.__allocating_init() -> foo.bar
+_TFC3foo3barcfT_S0_ ---> foo.bar.init() -> foo.bar
 _TFC3foo3barD ---> foo.bar.__deallocating_deinit
 _TFC3foo3barZ ---> foo.bar.__isolated_deallocating_deinit
 _TFC3foo3bard ---> foo.bar.deinit
@@ -138,10 +138,10 @@ _TWIC3foo3barS_8barrableS_ ---> {C} instantiation function for generic protocol 
 _TWtC3foo3barS_8barrableS_4fred ---> {C} associated type metadata accessor for fred in foo.bar : foo.barrable in foo
 _TWTC3foo3barS_8barrableS_4fredS_6thomas ---> {C} associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
 _TFSCg5greenVSC5Color ---> __C_Synthesized.green.getter : __C_Synthesized.Color
-_TIF1t1fFT1iSi1sSS_T_A_ ---> default argument 0 of t.f(i: Swift.Int, s: Swift.String) -> () | {(24,25) - (25,56)}
-_TIF1t1fFT1iSi1sSS_T_A0_ ---> default argument 1 of t.f(i: Swift.Int, s: Swift.String) -> () | {(24,25) - (25,56)}
-_TFSqcfT_GSqx_ ---> Swift.Optional.init() -> A? | {(15,19) - (19,21)}
-_TF21class_bound_protocols32class_bound_protocol_compositionFT1xPS_10ClassBoundS_13NotClassBound__PS0_S1__ ---> class_bound_protocols.class_bound_protocol_composition(x: class_bound_protocols.ClassBound & class_bound_protocols.NotClassBound) -> class_bound_protocols.ClassBound & class_bound_protocols.NotClassBound | {(22,54) - (54,129)}
+_TIF1t1fFT1iSi1sSS_T_A_ ---> default argument 0 of t.f(i: Swift.Int, s: Swift.String) -> ()
+_TIF1t1fFT1iSi1sSS_T_A0_ ---> default argument 1 of t.f(i: Swift.Int, s: Swift.String) -> ()
+_TFSqcfT_GSqx_ ---> Swift.Optional.init() -> A?
+_TF21class_bound_protocols32class_bound_protocol_compositionFT1xPS_10ClassBoundS_13NotClassBound__PS0_S1__ ---> class_bound_protocols.class_bound_protocol_composition(x: class_bound_protocols.ClassBound & class_bound_protocols.NotClassBound) -> class_bound_protocols.ClassBound & class_bound_protocols.NotClassBound
 _TtZZ ---> _TtZZ
 _TtB ---> _TtB
 _TtBSi ---> _TtBSi
@@ -171,7 +171,7 @@ _TWvd ---> _TWvd
 _TWvi ---> _TWvi
 _TWvx ---> _TWvx
 _TtVCC4main3Foo4Ding3Str ---> main.Foo.Ding.Str
-_TFVCC6nested6AClass12AnotherClass7AStruct9aFunctionfT1aSi_S2_ ---> nested.AClass.AnotherClass.AStruct.aFunction(a: Swift.Int) -> nested.AClass.AnotherClass.AStruct | {(35,44) - (44,58)}
+_TFVCC6nested6AClass12AnotherClass7AStruct9aFunctionfT1aSi_S2_ ---> nested.AClass.AnotherClass.AStruct.aFunction(a: Swift.Int) -> nested.AClass.AnotherClass.AStruct
 _TtXwC10attributes10SwiftClass ---> weak attributes.SwiftClass
 _TtXoC10attributes10SwiftClass ---> unowned attributes.SwiftClass
 _TtERR ---> <ERROR TYPE>
@@ -183,20 +183,20 @@ _Ttas3Int ---> Swift.Int
 _TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@in Swift.UnicodeScalar) -> (@out Swift.Bool) to @callee_owned (@unowned Swift.UnicodeScalar) -> (@unowned Swift.Bool)
 _TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@in Swift.Int) -> (@out Swift.Int?) to @callee_owned (@unowned Swift.Int) -> (@unowned Swift.Int?)
 _TTRGrXFo_iV18switch_abstraction1A_ix_XFo_dS0__ix_ ---> reabstraction thunk helper <A> from @callee_owned (@unowned switch_abstraction.A) -> (@out A) to @callee_owned (@in switch_abstraction.A) -> (@out A)
-_TFCF5types1gFT1bSb_T_L0_10Collection3zimfT_T_ ---> zim() -> () in Collection #2 in types.g(b: Swift.Bool) -> () | {(0,3) - (3,5)}
-_TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> closure #1 () -> Swift.Int in capture_promotion.test_capture_promotion() -> () -> Swift.Int with unmangled suffix "_promote0" | {(0,10) - (11,13)}
-_TFIVs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> _arguments : [Swift.String] in variable initialization expression of Swift._Process with unmangled suffix "U_FT_GSaSS_" | {(0,10) - ()}
-_TFIvVs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> closure #1 () -> [Swift.String] in variable initialization expression of Swift._Process._arguments : [Swift.String] | {(0,10) - (11,13)}
+_TFCF5types1gFT1bSb_T_L0_10Collection3zimfT_T_ ---> zim() -> () in Collection #2 in types.g(b: Swift.Bool) -> ()
+_TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> closure #1 () -> Swift.Int in capture_promotion.test_capture_promotion() -> () -> Swift.Int with unmangled suffix "_promote0"
+_TFIVs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> _arguments : [Swift.String] in variable initialization expression of Swift._Process with unmangled suffix "U_FT_GSaSS_"
+_TFIvVs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> closure #1 () -> [Swift.String] in variable initialization expression of Swift._Process._arguments : [Swift.String]
 _TFCSo1AE ---> __C.A.__ivar_destroyer
 _TFCSo1Ae ---> __C.A.__ivar_initializer
-_TTWC13call_protocol1CS_1PS_FS1_3foofT_Si ---> protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol | {(37,40) - (40,42)}
-_T013call_protocol1CCAA1PA2aDP3fooSiyFTW ---> {T:} protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol | {(37,40) - (40,42)}
-_TFC12dynamic_self1X1ffT_DS0_ ---> dynamic_self.X.f() -> Self | {(15,16) - (16,18)}
-_TTSg5Si___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int> of Swift.Optional.init() -> A? | {(53,57) - (57,59)}
-_TTSgq5Si___TFSqcfT_GSqx_ ---> generic specialization <serialized, Swift.Int> of Swift.Optional.init() -> A? | {(65,69) - (69,71)}
-_TTSg5SiSis3Foos_Sf___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init() -> A? | {(102,106) - (106,108)}
-_TTSg5Si_Sf___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int, Swift.Float> of Swift.Optional.init() -> A? | {(66,70) - (70,72)}
-_TTSg5Si_Sf___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int, Swift.Float> of Swift.Optional.init() -> A? | {(66,70) - (70,72)}
+_TTWC13call_protocol1CS_1PS_FS1_3foofT_Si ---> protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
+_T013call_protocol1CCAA1PA2aDP3fooSiyFTW ---> {T:} protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
+_TFC12dynamic_self1X1ffT_DS0_ ---> dynamic_self.X.f() -> Self
+_TTSg5Si___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int> of Swift.Optional.init() -> A?
+_TTSgq5Si___TFSqcfT_GSqx_ ---> generic specialization <serialized, Swift.Int> of Swift.Optional.init() -> A?
+_TTSg5SiSis3Foos_Sf___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int with Swift.Int : Swift.Foo in Swift, Swift.Float> of Swift.Optional.init() -> A?
+_TTSg5Si_Sf___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int, Swift.Float> of Swift.Optional.init() -> A?
+_TTSg5Si_Sf___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int, Swift.Float> of Swift.Optional.init() -> A?
 _TTSgS ---> _TTSgS
 _TTSg5S ---> _TTSg5S
 _TTSgSi ---> _TTSgSi
@@ -205,109 +205,109 @@ _TTSgSi_ ---> _TTSgSi_
 _TTSgSi__ ---> _TTSgSi__
 _TTSgSiS_ ---> _TTSgSiS_
 _TTSgSi__xyz ---> _TTSgSi__xyz
-_TTSr5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <Swift.Int> of test.generic<A>(A) -> A | {(61,68) - (71,74)}
-_TTSrq5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <serialized, Swift.Int> of test.generic<A>(A) -> A | {(73,80) - (83,86)}
+_TTSr5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <Swift.Int> of test.generic<A>(A) -> A
+_TTSrq5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <serialized, Swift.Int> of test.generic<A>(A) -> A
 _TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_ ---> {T:_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_} partial apply forwarder for reabstraction thunk helper from @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool)
 _TPAo__TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___ ---> {T:_TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error)
 _T0S2SSbIxxxd_S2SSbIxiid_TRTA ---> {T:_T0S2SSbIxxxd_S2SSbIxiid_TR} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
 _T0SPyxGAAs5Error_pIxydzo_A2AsAB_pIxirzo_lTRTa ---> {T:_T0SPyxGAAs5Error_pIxydzo_A2AsAB_pIxirzo_lTR} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
 _TiC4Meow5MyCls9subscriptFT1iSi_Sf ---> Meow.MyCls.subscript(i: Swift.Int) -> Swift.Float
-_TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> mangling.ليهمابتكلموشعربي؟() -> () | {(9,43) - (43,45)}
-_TF8manglingX24ihqwcrbEcvIaIdqgAFGpqjyeFT_T_ ---> mangling.他们为什么不说中文() -> () | {(9,36) - (36,38)}
-_TF8manglingX27ihqwctvzcJBfGFJdrssDxIboAybFT_T_ ---> mangling.他們爲什麽不說中文() -> () | {(9,36) - (36,38)}
-_TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> mangling.Pročprostěnemluvíčesky() -> () | {(9,35) - (35,37)}
-_TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» infix(Swift.Int, Swift.Int) -> Swift.Int | {(9,20) - (20,42)}
-_TF8manglingoi2qqFTSiSi_T_ ---> mangling.?? infix(Swift.Int, Swift.Int) -> () | {(9,17) - (17,39)}
-_TFE11ext_structAV11def_structA1A4testfT_T_ ---> (extension in ext_structA):def_structA.A.test() -> () | {(41,45) - (45,47)}
-_TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC)() -> devirt_access.(PrivateClass in _DISC) | {(14,40) - (40,42)}
-_TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main)() -> () | {(5,18) - (18,20)}
-_TF4mainP5_main3abcFT_aS_P5_DISC3xyz ---> main.(abc in _main)() -> main.(xyz in _DISC) | {(5,19) - (19,21)}
+_TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> mangling.ليهمابتكلموشعربي؟() -> ()
+_TF8manglingX24ihqwcrbEcvIaIdqgAFGpqjyeFT_T_ ---> mangling.他们为什么不说中文() -> ()
+_TF8manglingX27ihqwctvzcJBfGFJdrssDxIboAybFT_T_ ---> mangling.他們爲什麽不說中文() -> ()
+_TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> mangling.Pročprostěnemluvíčesky() -> ()
+_TF8manglingXoi7p_qcaDcFTSiSi_Si ---> mangling.«+» infix(Swift.Int, Swift.Int) -> Swift.Int
+_TF8manglingoi2qqFTSiSi_T_ ---> mangling.?? infix(Swift.Int, Swift.Int) -> ()
+_TFE11ext_structAV11def_structA1A4testfT_T_ ---> (extension in ext_structA):def_structA.A.test() -> ()
+_TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC)() -> devirt_access.(PrivateClass in _DISC)
+_TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main)() -> ()
+_TF4mainP5_main3abcFT_aS_P5_DISC3xyz ---> main.(abc in _main)() -> main.(xyz in _DISC)
 _TtPMP_ ---> Any.Type
-_TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType(Any.Type) -> Swift.Bool | {(20,49) - (49,59)}
+_TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType(Any.Type) -> Swift.Bool
 _TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> Swift._NSSwiftArray.staticElementType.getter : Any.Type
 _TFCs17_DictionaryMirrorg9valueTypePMP_ ---> Swift._DictionaryMirror.valueType.getter : Any.Type
-_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> () | {(183,195) - (195,225)}
-_TTSfq1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <serialized, Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> () | {(195,207) - (207,237)}
-_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of generic specialization <Swift.Int> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> () | {(221,233) - (233,263)}
-_TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> generic specialization <Swift.Int> of function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> () | {(221,233) - (233,263)}
+_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
+_TTSfq1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <serialized, Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
+_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of generic specialization <Swift.Int> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
+_TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> generic specialization <Swift.Int> of function signature specialization <Arg[0] = [Closure Propagated : closure #1 (Swift.Int, Swift.Int) -> () in specgen.caller(Swift.Int) -> (), Argument Types : [Swift.Int]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper(Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@in Swift.Int) -> (@unowned ()) to @callee_owned (@unowned Swift.Int) -> (@unowned ())
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper(Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@in Swift.Int) -> (@unowned_inner_pointer ()) to @callee_owned (@unowned Swift.Int) -> (@unowned_inner_pointer ())
-_TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Constant Propagated Integer : 0], Arg[1] = [Constant Propagated Float : 0], Arg[2] = [Constant Propagated String : u8'u123'], Arg[3] = [Constant Propagated Global : globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8], Arg[4] = [Constant Propagated Function : _TFtest_capture_propagation2_closure]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> () | {(357,369) - (369,399)}
-_TTSf0gs___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Owned To Guaranteed and Exploded> of Swift._LegacyStringCore._invariantCheck() -> () | {(105,120) - (120,122)}
-_TTSf2g___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Owned To Guaranteed> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(164,168) - (168,189)}
-_TTSf2dg___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Owned To Guaranteed> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(173,177) - (177,198)}
-_TTSf2dgs___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Owned To Guaranteed and Exploded> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(186,190) - (190,211)}
-_TTSf3d_i_d_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from Box, Arg[2] = Dead, Arg[3] = Value Promoted from Box, Arg[4] = Dead, Arg[5] = Value Promoted from Box> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(209,213) - (213,234)}
-_TTSf3d_i_n_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from Box, Arg[3] = Value Promoted from Box, Arg[4] = Dead, Arg[5] = Value Promoted from Box> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(194,198) - (198,219)}
+_TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Constant Propagated Integer : 0], Arg[1] = [Constant Propagated Float : 0], Arg[2] = [Constant Propagated String : u8'u123'], Arg[3] = [Constant Propagated Global : globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8], Arg[4] = [Constant Propagated Function : _TFtest_capture_propagation2_closure]> of specgen.take_closure((Swift.Int, Swift.Int) -> ()) -> ()
+_TTSf0gs___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Owned To Guaranteed and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
+_TTSf2g___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Owned To Guaranteed> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2dg___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Owned To Guaranteed> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2dgs___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Owned To Guaranteed and Exploded> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf3d_i_d_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from Box, Arg[2] = Dead, Arg[3] = Value Promoted from Box, Arg[4] = Dead, Arg[5] = Value Promoted from Box> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf3d_i_n_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from Box, Arg[3] = Value Promoted from Box, Arg[4] = Dead, Arg[5] = Value Promoted from Box> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
 _TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> implicit closure #1 : @autoclosure () -> Swift.Bool in variable initialization expression of static mangling.HasVarInit.state : Swift.Bool
-_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTqd__x_T_ ---> foo #1 (A1, A) -> () in interface_type_mangling.GenericTypeContext.closureInGenericContext<A>(A1) -> () | {(0,6) - (7,14)}
-_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_x ---> foo #1 () -> A in interface_type_mangling.GenericTypeContext.closureInGenericPropertyContext.getter : A | {(0,6) - (7,9)}
-_TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_23closureInGenericContextuRxS1_rfqd__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericContext<A where A: interface_type_mangling.GenericWitnessTest>(A1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling | {(64,87) - (142,146)}
+_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTqd__x_T_ ---> foo #1 (A1, A) -> () in interface_type_mangling.GenericTypeContext.closureInGenericContext<A>(A1) -> ()
+_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_x ---> foo #1 () -> A in interface_type_mangling.GenericTypeContext.closureInGenericPropertyContext.getter : A
+_TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_23closureInGenericContextuRxS1_rfqd__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericContext<A where A: interface_type_mangling.GenericWitnessTest>(A1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
 _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_g31closureInGenericPropertyContextwx3Tee ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-_TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu0_RxS1_rfTqd__1yqd_0__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth<A, B where A: interface_type_mangling.GenericWitnessTest>(A1, y: B1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling | {(64,80) - (138,149)}
-_TFC3red11BaseClassEHcfzT1aSi_S0_ ---> red.BaseClassEH.init(a: Swift.Int) throws -> red.BaseClassEH | {(16,20) - (20,34)}
+_TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu0_RxS1_rfTqd__1yqd_0__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth<A, B where A: interface_type_mangling.GenericWitnessTest>(A1, y: B1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
+_TFC3red11BaseClassEHcfzT1aSi_S0_ ---> red.BaseClassEH.init(a: Swift.Int) throws -> red.BaseClassEH
 _TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
 _TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
 _TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned () -> (@unowned (), @error @owned Swift.Error) to @callee_owned (@in ()) -> (@out (), @error @owned Swift.Error)
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps5Error_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.Error
 _TMps10Comparable ---> protocol descriptor for Swift.Comparable
-_TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> test.(C in _83378C430F65473055F1BD53F3ADCDB7).doFoo() -> () | {(46,51) - (51,53)}
-_TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9leftoversx14transformationFxqd___GS1_x_qd___ ---> nested_generics.Lunch.Dinner.init(firstCourse: A, secondCourse: A1?, leftovers: A, transformation: (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1> | {(29,33) - (33,109)}
-_TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_ ---> init(material: A) -> Relish #1 in nested_generics.HotDogs.applyRelish() -> ()<A> in Relish #1 in nested_generics.HotDogs.applyRelish() -> () | {(0,4) - (4,17)}
-_TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> init(material: A) -> Cheese #1 in (extension in nested_generics):Swift.String.foo() -> ()<A> in Cheese #1 in (extension in nested_generics):Swift.String.foo() -> () | {(0,4) - (4,17)}
+_TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> test.(C in _83378C430F65473055F1BD53F3ADCDB7).doFoo() -> ()
+_TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9leftoversx14transformationFxqd___GS1_x_qd___ ---> nested_generics.Lunch.Dinner.init(firstCourse: A, secondCourse: A1?, leftovers: A, transformation: (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
+_TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_ ---> init(material: A) -> Relish #1 in nested_generics.HotDogs.applyRelish() -> ()<A> in Relish #1 in nested_generics.HotDogs.applyRelish() -> ()
+_TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> init(material: A) -> Cheese #1 in (extension in nested_generics):Swift.String.foo() -> ()<A> in Cheese #1 in (extension in nested_generics):Swift.String.foo() -> ()
 _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue ---> _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue
-_T0s17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD05Indexs01_A9IndexablePQzAM15shiftingToStart_tFAJs01_J4BasePQzAQcfU_ ---> closure #1 (A.Swift._IndexableBase.Index) -> A.Swift._IndexableBase.Index in (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.MutableCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.RandomAccessCollection>.rotateRandomAccess(shiftingToStart: A.Swift._MutableIndexable.Index) -> A.Swift._MutableIndexable.Index | {(0,10) - (11,41)}
-_$Ss17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD015shiftingToStart5Indexs01_A9IndexablePQzAN_tFAKs01_M4BasePQzAQcfU_ ---> closure #1 (A.Swift._IndexableBase.Index) -> A.Swift._IndexableBase.Index in (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.MutableCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.RandomAccessCollection>.rotateRandomAccess(shiftingToStart: A.Swift._MutableIndexable.Index) -> A.Swift._MutableIndexable.Index | {(0,10) - (11,41)}
+_T0s17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD05Indexs01_A9IndexablePQzAM15shiftingToStart_tFAJs01_J4BasePQzAQcfU_ ---> closure #1 (A.Swift._IndexableBase.Index) -> A.Swift._IndexableBase.Index in (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.MutableCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.RandomAccessCollection>.rotateRandomAccess(shiftingToStart: A.Swift._MutableIndexable.Index) -> A.Swift._MutableIndexable.Index
+_$Ss17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD015shiftingToStart5Indexs01_A9IndexablePQzAN_tFAKs01_M4BasePQzAQcfU_ ---> closure #1 (A.Swift._IndexableBase.Index) -> A.Swift._IndexableBase.Index in (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.MutableCollection, A.Swift.BidirectionalCollection.SubSequence: Swift.RandomAccessCollection>.rotateRandomAccess(shiftingToStart: A.Swift._MutableIndexable.Index) -> A.Swift._MutableIndexable.Index
 _T03foo4_123ABTf3psbpsb_n ---> function signature specialization <Arg[0] = [Constant Propagated String : u8'123'], Arg[1] = [Constant Propagated String : u8'123']> of foo
-_T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner(inout Swift.Int32, (Swift.Int32) -> ()) -> () | {(151,156) - (156,196)}
-_$S4main5inneryys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner(inout Swift.Int32, (Swift.Int32) -> ()) -> () | {(151,156) - (156,196)}
-_T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> () | {(132,138) - (138,158)}
-_$S3foo6testityyyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> () | {(132,138) - (138,158)}
+_T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner(inout Swift.Int32, (Swift.Int32) -> ()) -> ()
+_$S4main5inneryys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner(inout Swift.Int32, (Swift.Int32) -> ()) -> ()
+_T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> ()
+_$S3foo6testityyyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> ()
 _SocketJoinOrLeaveMulticast ---> _SocketJoinOrLeaveMulticast
-_T0s10DictionaryV3t17E6Index2V1loiSbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool | {(50,57) - (57,127)}
-_T08mangling14varargsVsArrayySi3arrd_SS1ntF ---> mangling.varargsVsArray(arr: Swift.Int..., n: Swift.String) -> () | {(9,23) - (23,59)}
-_T08mangling14varargsVsArrayySaySiG3arr_SS1ntF ---> mangling.varargsVsArray(arr: [Swift.Int], n: Swift.String) -> () | {(9,23) - (23,58)}
-_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray(arr: [Swift.Int]..., n: Swift.String) -> () | {(9,23) - (23,61)}
-_T08mangling14varargsVsArrayySi3arrd_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> () | {(9,23) - (23,42)}
-_T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray(arr: [Swift.Int]...) -> () | {(9,23) - (23,44)}
-_$Ss10DictionaryV3t17E6Index2V1loiySbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool | {(50,57) - (57,127)}
-_$S8mangling14varargsVsArray3arr1nySid_SStF ---> mangling.varargsVsArray(arr: Swift.Int..., n: Swift.String) -> () | {(9,23) - (23,59)}
-_$S8mangling14varargsVsArray3arr1nySaySiG_SStF ---> mangling.varargsVsArray(arr: [Swift.Int], n: Swift.String) -> () | {(9,23) - (23,58)}
-_$S8mangling14varargsVsArray3arr1nySaySiGd_SStF ---> mangling.varargsVsArray(arr: [Swift.Int]..., n: Swift.String) -> () | {(9,23) - (23,61)}
-_$S8mangling14varargsVsArray3arrySid_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> () | {(9,23) - (23,42)}
-_$S8mangling14varargsVsArray3arrySaySiGd_tF ---> mangling.varargsVsArray(arr: [Swift.Int]...) -> () | {(9,23) - (23,44)}
+_T0s10DictionaryV3t17E6Index2V1loiSbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool
+_T08mangling14varargsVsArrayySi3arrd_SS1ntF ---> mangling.varargsVsArray(arr: Swift.Int..., n: Swift.String) -> ()
+_T08mangling14varargsVsArrayySaySiG3arr_SS1ntF ---> mangling.varargsVsArray(arr: [Swift.Int], n: Swift.String) -> ()
+_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray(arr: [Swift.Int]..., n: Swift.String) -> ()
+_T08mangling14varargsVsArrayySi3arrd_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> ()
+_T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray(arr: [Swift.Int]...) -> ()
+_$Ss10DictionaryV3t17E6Index2V1loiySbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool
+_$S8mangling14varargsVsArray3arr1nySid_SStF ---> mangling.varargsVsArray(arr: Swift.Int..., n: Swift.String) -> ()
+_$S8mangling14varargsVsArray3arr1nySaySiG_SStF ---> mangling.varargsVsArray(arr: [Swift.Int], n: Swift.String) -> ()
+_$S8mangling14varargsVsArray3arr1nySaySiGd_SStF ---> mangling.varargsVsArray(arr: [Swift.Int]..., n: Swift.String) -> ()
+_$S8mangling14varargsVsArray3arrySid_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> ()
+_$S8mangling14varargsVsArray3arrySaySiGd_tF ---> mangling.varargsVsArray(arr: [Swift.Int]...) -> ()
 _T0s13_UnicodeViewsVss22RandomAccessCollectionRzs0A8EncodingR_11SubSequence_5IndexQZAFRtzsAcERpzAE_AEQZAIRSs15UnsignedInteger8Iterator_7ElementRPzAE_AlMQZANRS13EncodedScalar_AlMQY_AORSr0_lE13CharacterViewVyxq__G ---> (extension in Swift):Swift._UnicodeViews<A, B><A, B where A: Swift.RandomAccessCollection, B: Swift.UnicodeEncoding, A.Index == A.SubSequence.Index, A.SubSequence: Swift.RandomAccessCollection, A.SubSequence == A.SubSequence.SubSequence, A.Iterator.Element: Swift.UnsignedInteger, A.Iterator.Element == A.SubSequence.Iterator.Element, A.SubSequence.Iterator.Element == B.EncodedScalar.Iterator.Element>.CharacterView
-_T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __C.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation) -> Swift.Bool | {(98,106) - (106,264)}
-_$S10Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiySbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __C.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation) -> Swift.Bool | {(98,106) - (106,264)}
-_T04main1_yyF ---> main._() -> () | {(5,6) - (6,8)}
-_T04test6testitSiyt_tF ---> test.testit(()) -> Swift.Int | {(5,11) - (11,15)}
-_$S4test6testitySiyt_tF ---> test.testit(()) -> Swift.Int | {(5,11) - (11,15)}
+_T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __C.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation) -> Swift.Bool
+_$S10Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiySbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __C.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__C.UnitAngle>.Orientation) -> Swift.Bool
+_T04main1_yyF ---> main._() -> ()
+_T04test6testitSiyt_tF ---> test.testit(()) -> Swift.Int
+_$S4test6testitySiyt_tF ---> test.testit(()) -> Swift.Int
 _T08_ElementQzSbs5Error_pIxxdzo_ABSbsAC_pIxidzo_s26RangeReplaceableCollectionRzABRLClTR ---> {T:} reabstraction thunk helper <A where A: Swift.RangeReplaceableCollection, A._Element: AnyObject> from @callee_owned (@owned A._Element) -> (@unowned Swift.Bool, @error @owned Swift.Error) to @callee_owned (@in A._Element) -> (@unowned Swift.Bool, @error @owned Swift.Error)
 _T0Ix_IyB_Tr ---> {T:} reabstraction thunk from @callee_owned () -> () to @callee_unowned @convention(block) () -> ()
 _T0Rml ---> _T0Rml
 _T0Tk ---> _T0Tk
 _T0A8 ---> _T0A8
 _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n ---> _T0s30ReversedRandomAccessCollectionVyxGTfq3nnpf_nTfq1cn_nTfq4x_n
-_T03abc6testitySiFTm ---> merged abc.testit(Swift.Int) -> () | {(11,17) - (17,28)}
-_T04main4TestCACSi1x_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test | {(10,26) - (26,40)}
-_$S3abc6testityySiFTm ---> merged abc.testit(Swift.Int) -> () | {(11,17) - (17,28)}
-_$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test | {(10,26) - (26,40)}
+_T03abc6testitySiFTm ---> merged abc.testit(Swift.Int) -> ()
+_T04main4TestCACSi1x_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
+_$S3abc6testityySiFTm ---> merged abc.testit(Swift.Int) -> ()
+_$S4main4TestC1xACSi_tc6_PRIV_Llfc ---> main.Test.(in _PRIV_).init(x: Swift.Int) -> main.Test
 _T0SqWOy.17 ---> outlined copy of Swift.Optional with unmangled suffix ".17"
 _T0SqWOC ---> outlined init with copy of Swift.Optional
 _T0SqWOD ---> outlined assign with take of Swift.Optional
 _T0SqWOF ---> outlined assign with copy of Swift.Optional
 _T0SqWOH ---> outlined destroy of Swift.Optional
-_T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int] | {(28,34) - (34,36)}
-_T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int] | {(36,42) - (42,44)}
-_T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int] | {(28,34) - (34,36)}
+_T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
+_T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
+_T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
 _T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc __C.UITextField.text.getter : Swift.String?
 _T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __C.UITextField.text.getter : Swift.String?
-$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_ ---> outlined bridged method (mbgnn) of @objc __C.Gizmo.doSomething([Swift.String]?) -> Any? | {(51,62) - (62,79)}
+$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembgnn_ ---> outlined bridged method (mbgnn) of @objc __C.Gizmo.doSomething([Swift.String]?) -> Any?
 _T04test1SVyxGAA1RA2A1ZRzAA1Y2ZZRpzl1A_AhaGPWT ---> {C} associated type witness table accessor for A.ZZ : test.Y in <A where A: test.Z, A.ZZ: test.Y> test.S<A> : test.R in test
-_T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfC ---> {T:_T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfc} Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69).init() -> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69) | {(70,74) - (74,76)}
+_T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfC ---> {T:_T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfc} Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69).init() -> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69)
 _T0D ---> _T0D
-_T0s18EnumeratedIteratorVyxGs8Sequencess0B8ProtocolRzlsADP5splitSay03SubC0QzGSi9maxSplits_Sb25omittingEmptySubsequencesSb7ElementQzKc14whereSeparatortKFTW ---> {T:} protocol witness for Swift.Sequence.split(maxSplits: Swift.Int, omittingEmptySubsequences: Swift.Bool, whereSeparator: (A.Element) throws -> Swift.Bool) throws -> [A.SubSequence] in conformance <A where A: Swift.IteratorProtocol> Swift.EnumeratedIterator<A> : Swift.Sequence in Swift | {(36,41) - (41,152)}
+_T0s18EnumeratedIteratorVyxGs8Sequencess0B8ProtocolRzlsADP5splitSay03SubC0QzGSi9maxSplits_Sb25omittingEmptySubsequencesSb7ElementQzKc14whereSeparatortKFTW ---> {T:} protocol witness for Swift.Sequence.split(maxSplits: Swift.Int, omittingEmptySubsequences: Swift.Bool, whereSeparator: (A.Element) throws -> Swift.Bool) throws -> [A.SubSequence] in conformance <A where A: Swift.IteratorProtocol> Swift.EnumeratedIterator<A> : Swift.Sequence in Swift
 _T0s3SetVyxGs10CollectiotySivm ---> _T0s3SetVyxGs10CollectiotySivm
 _S$s3SetVyxGs10CollectiotySivm ---> _S$s3SetVyxGs10CollectiotySivm
 _T0s18ReversedCollectionVyxGs04LazyB8ProtocolfC ---> _T0s18ReversedCollectionVyxGs04LazyB8ProtocolfC
@@ -322,17 +322,17 @@ $S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc ---> protocol 
 $ss6SimpleHr ---> protocol descriptor runtime record for Swift.Simple
 $ss5OtherVs6SimplesHc ---> protocol conformance descriptor runtime record for Swift.Other : Swift.Simple in Swift
 $ss5OtherVHn ---> nominal type descriptor runtime record for Swift.Other
-$s18opaque_return_type3fooQryFQOHo ---> opaque type descriptor runtime record for <<opaque return type of opaque_return_type.foo() -> some>> | {(85,88) - (88,90)}
+$s18opaque_return_type3fooQryFQOHo ---> opaque type descriptor runtime record for <<opaque return type of opaque_return_type.foo() -> some>>
 $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
-$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAyHCg_AiJ1QAAyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> () | {(21,26) - (26,93)}
-$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHPyHCg_AiJ1QHPyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> () | {(21,26) - (26,93)}
-$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHpyHCg_AiJ1QHpyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> () | {(21,26) - (26,93)}
+$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAyHCg_AiJ1QAAyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHPyHCg_AiJ1QHPyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHpyHCg_AiJ1QHpyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
 _T0LiteralAByxGxd_tcfC ---> _T0LiteralAByxGxd_tcfC
 _T0XZ ---> _T0XZ
-_TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Guaranteed To Owned and Exploded> of Swift._LegacyStringCore._invariantCheck() -> () | {(105,120) - (120,122)}
-_TTSf2o___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(164,168) - (168,189)}
-_TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(173,177) - (177,198)}
-_TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned and Exploded> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore | {(186,190) - (190,211)}
+_TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Guaranteed To Owned and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
+_TTSf2o___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned and Exploded> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
 _TTSf ---> _TTSf
 _TtW0_j ---> _TtW0_j
 _TtW_4m3a3v ---> _TtW_4m3a3v
@@ -343,36 +343,36 @@ _$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
 _$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
 _$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
 _T0lxxxmmmTk ---> _T0lxxxmmmTk
-_TtCF4test11doNotCrash1FT_QuL_8MyClass1 ---> MyClass1 #1 in test.doNotCrash1() -> some | {(20,31) - (31,33)}
+_TtCF4test11doNotCrash1FT_QuL_8MyClass1 ---> MyClass1 #1 in test.doNotCrash1() -> some
 $s3Bar3FooVAA5DrinkVyxGs5Error_pSeRzSERzlyShy4AbcdAHO6MemberVGALSeHPAKSeAAyHC_HCg_ALSEHPAKSEAAyHC_HCg0_Iseggozo_SgWOe ---> outlined consume of (@escaping @callee_guaranteed @substituted <A where A: Swift.Decodable, A: Swift.Encodable> (@guaranteed Bar.Foo) -> (@owned Bar.Drink<A>, @error @owned Swift.Error) for <Swift.Set<Abcd.Abcd.Member>>)?
-$s4Test5ProtoP8IteratorV10collectionAEy_qd__Gqd___tcfc ---> Test.Proto.Iterator.init(collection: A1) -> Test.Proto.Iterator<A1> | {(20,24) - (24,40)}
-$s4test3fooV4blahyAA1SV1fQryFQOy_Qo_AHF ---> test.foo.blah(<<opaque return type of test.S.f() -> some>>.0) -> <<opaque return type of test.S.f() -> some>>.0 | {(9,13) - (13,61)}
-$S3nix8MystructV1xACyxGx_tcfc7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.init(x: A) -> nix.Mystruct<A> | {(30,34) - (34,40)}
+$s4Test5ProtoP8IteratorV10collectionAEy_qd__Gqd___tcfc ---> Test.Proto.Iterator.init(collection: A1) -> Test.Proto.Iterator<A1>
+$s4test3fooV4blahyAA1SV1fQryFQOy_Qo_AHF ---> test.foo.blah(<<opaque return type of test.S.f() -> some>>.0) -> <<opaque return type of test.S.f() -> some>>.0
+$S3nix8MystructV1xACyxGx_tcfc7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.init(x: A) -> nix.Mystruct<A>
 $S3nix7MyclassCfd7MyaliasL_ayx__GD ---> Myalias #1 in nix.Myclass<A>.deinit
 $S3nix8MystructVyS2icig7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.subscript.getter : (Swift.Int) -> Swift.Int
 $S3nix8MystructV1x1uACyxGx_qd__tclufc7MyaliasL_ayx_qd___GD ---> Myalias #1 in nix.Mystruct<A>.<A1>(x: A, u: A1) -> nix.Mystruct<A>
-$S3nix8MystructV6testit1xyx_tF7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.testit(x: A) -> () | {(30,36) - (36,42)}
-$S3nix8MystructV6testit1x1u1vyx_qd__qd_0_tr0_lF7MyaliasL_ayx_qd__qd_0__GD ---> Myalias #1 in nix.Mystruct<A>.testit<A1, B1>(x: A, u: A1, v: B1) -> () | {(30,36) - (44,64)}
+$S3nix8MystructV6testit1xyx_tF7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.testit(x: A) -> ()
+$S3nix8MystructV6testit1x1u1vyx_qd__qd_0_tr0_lF7MyaliasL_ayx_qd__qd_0__GD ---> Myalias #1 in nix.Mystruct<A>.testit<A1, B1>(x: A, u: A1, v: B1) -> ()
 $S4blah8PatatinoaySiGD ---> blah.Patatino<Swift.Int>
 $SSiSHsWP ---> protocol witness table for Swift.Int : Swift.Hashable in Swift
 $S7TestMod5OuterV3Fooayx_SiGD ---> TestMod.Outer<A>.Foo<Swift.Int>
 $Ss17_VariantSetBufferO05CocoaC0ayx_GD ---> Swift._VariantSetBuffer<A>.CocoaBuffer
 $S2t21QP22ProtocolTypeAliasThingayAA4BlahV5SomeQa_GSgD ---> t2.Blah.SomeQ as t2.Q.ProtocolTypeAliasThing?
-$s1A1gyyxlFx_qd__t_Ti5 ---> inlined generic function <(A, A1)> of A.g<A>(A) -> () | {(40,41) - (44,47)}
+$s1A1gyyxlFx_qd__t_Ti5 ---> inlined generic function <(A, A1)> of A.g<A>(A) -> ()
 $S1T19protocol_resilience17ResilientProtocolPTl ---> associated type descriptor for protocol_resilience.ResilientProtocol.T
 $S18resilient_protocol21ResilientBaseProtocolTL ---> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol
 $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocType2: t.Q
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
-$s4Test6testityyxlFAA8MystructV_TB5 ---> generic specialization <Test.Mystruct> of Test.testit<A>(A) -> () | {(47,53) - (56,59)}
-$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A | {(128,132) - (165,169)}
-$s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> () | {(55,62) - (68,74)}
+$s4Test6testityyxlFAA8MystructV_TB5 ---> generic specialization <Test.Mystruct> of Test.testit<A>(A) -> ()
+$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A
+$s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
-$s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str | {(9,26) - (26,28)}
+$s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
 $s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
-$s3red4testyAA3ResOyxSayq_GAEs5ErrorAAq_sAFHD1__HCg_GADyxq_GsAFR_r0_lF ---> red.test<A, B where B: Swift.Error>(red.Res<A, B>) -> red.Res<A, [B]> | {(4,8) - (35,50)}
-$s3red4testyAA7OurTypeOy4them05TheirD0Vy5AssocQzGAjE0F8ProtocolAAxAA0c7DerivedH0HD1_AA0c4BaseH0HI1_AieKHA2__HCg_GxmAaLRzlF ---> red.test<A where A: red.OurDerivedProtocol>(A.Type) -> red.OurType<them.TheirType<A.Assoc>> | {(4,8) - (43,51)}
+$s3red4testyAA3ResOyxSayq_GAEs5ErrorAAq_sAFHD1__HCg_GADyxq_GsAFR_r0_lF ---> red.test<A, B where B: Swift.Error>(red.Res<A, B>) -> red.Res<A, [B]>
+$s3red4testyAA7OurTypeOy4them05TheirD0Vy5AssocQzGAjE0F8ProtocolAAxAA0c7DerivedH0HD1_AA0c4BaseH0HI1_AieKHA2__HCg_GxmAaLRzlF ---> red.test<A where A: red.OurDerivedProtocol>(A.Type) -> red.OurType<them.TheirType<A.Assoc>>
 $s17property_wrappers10WithTuplesV9fractionsSd_S2dtvpfP ---> property wrapper backing initializer of property_wrappers.WithTuples.fractions : (Swift.Double, Swift.Double, Swift.Double)
-$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTOTA ---> {T:$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTO} partial apply forwarder for @nonobjc __C.OS_dispatch_queue.sync(execute: () -> ()) -> () | {(59,63) - (63,82)}
+$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTOTA ---> {T:$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTO} partial apply forwarder for @nonobjc __C.OS_dispatch_queue.sync(execute: () -> ()) -> ()
 $s4main1gyySiXCvp ---> main.g : @convention(c) (Swift.Int) -> ()
 $s4main1gyySiXBvp ---> main.g : @convention(block) (Swift.Int) -> ()
 $sxq_Ifgnr_D ---> @differentiable(_forward) @callee_guaranteed (@in_guaranteed A) -> (@out B)
@@ -384,56 +384,56 @@ $sS5fIertyyywddw_D ---> @escaping @differentiable(reverse) @convention(thin) (@u
 $syQo ---> $syQo
 $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee ---> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
 $sx1td_t ---> (t: A...)
-$s7example1fyyYaF ---> example.f() async -> () | {(8,9) - (9,11)}
-$s7example1fyyYaKF ---> example.f() async throws -> () | {(8,9) - (9,11)}
-$s4main20receiveInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF ---> main.receiveInstantiation(inout __C.__CxxTemplateInst12MagicWrapperIiE) -> () | {(5,25) - (25,71)}
-$s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF ---> main.returnInstantiation() -> __C.__CxxTemplateInst12MagicWrapperIiE | {(5,24) - (24,26)}
-$s4main6testityyYaFTu ---> async function pointer to main.testit() async -> () | {(31,37) - (37,39)}
-$s13test_mangling3fooyS2f_S2ftFTJfUSSpSr ---> forward-mode derivative of test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {1, 2} and results {0} | {(41,44) - (44,83)}
-$s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFAdERzAdER_AafGRpzAafHRQr0_lTJrSpSr ---> reverse-mode derivative of test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P> | {(41,45) - (126,132)}
-$s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFAdERzAdER_AafGRpzAafHRQr0_lTJVrSpSr ---> vtable thunk for reverse-mode derivative of test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P> | {(58,62) - (143,149)}
-$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lTJpUSSpSr ---> pullback of test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable> | {(26,29) - (76,95)}
-$s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFTSAdERzAdER_AafGRpzAafHRQr0_lTJrSpSr ---> reverse-mode derivative of protocol self-conformance witness for test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P> | {(79,83) - (164,170)}
-$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lTJpUSSpSrTj ---> dispatch thunk of pullback of test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable> | {(44,47) - (94,113)}
-$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lTJpUSSpSrTq ---> method descriptor for pullback of test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable> | {(48,51) - (98,117)}
+$s7example1fyyYaF ---> example.f() async -> ()
+$s7example1fyyYaKF ---> example.f() async throws -> ()
+$s4main20receiveInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF ---> main.receiveInstantiation(inout __C.__CxxTemplateInst12MagicWrapperIiE) -> ()
+$s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF ---> main.returnInstantiation() -> __C.__CxxTemplateInst12MagicWrapperIiE
+$s4main6testityyYaFTu ---> async function pointer to main.testit() async -> ()
+$s13test_mangling3fooyS2f_S2ftFTJfUSSpSr ---> forward-mode derivative of test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {1, 2} and results {0}
+$s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFAdERzAdER_AafGRpzAafHRQr0_lTJrSpSr ---> reverse-mode derivative of test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P>
+$s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFAdERzAdER_AafGRpzAafHRQr0_lTJVrSpSr ---> vtable thunk for reverse-mode derivative of test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P>
+$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lTJpUSSpSr ---> pullback of test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
+$s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFTSAdERzAdER_AafGRpzAafHRQr0_lTJrSpSr ---> reverse-mode derivative of protocol self-conformance witness for test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P>
+$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lTJpUSSpSrTj ---> dispatch thunk of pullback of test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
+$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lTJpUSSpSrTq ---> method descriptor for pullback of test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
 $s13TangentVector16_Differentiation14DifferentiablePQzAaDQy_SdAFIegnnnr_TJSdSSSpSrSUSP ---> autodiff subset parameters thunk for differential from @escaping @callee_guaranteed (@in_guaranteed A._Differentiation.Differentiable.TangentVector, @in_guaranteed B._Differentiation.Differentiable.TangentVector, @in_guaranteed Swift.Double) -> (@out B._Differentiation.Differentiable.TangentVector) with respect to parameters {0, 1, 2} and results {0} to parameters {0, 2}
 $s13TangentVector16_Differentiation14DifferentiablePQy_AaDQzAESdIegnrrr_TJSpSSSpSrSUSP ---> autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@in_guaranteed B._Differentiation.Differentiable.TangentVector) -> (@out A._Differentiation.Differentiable.TangentVector, @out B._Differentiation.Differentiable.TangentVector, @out Swift.Double) with respect to parameters {0, 1, 2} and results {0} to parameters {0, 2}
-$s39differentiation_subset_parameters_thunk19inoutIndirectCalleryq_x_q_q0_t16_Differentiation14DifferentiableRzAcDR_AcDR0_r1_lFxq_Sdq_xq_Sdr0_ly13TangentVectorAcDPQy_AeFQzIsegnrr_Iegnnnro_TJSrSSSpSrSUSP ---> autodiff subset parameters thunk for reverse-mode derivative from differentiation_subset_parameters_thunk.inoutIndirectCaller<A, B, C where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, C: _Differentiation.Differentiable>(A, B, C) -> B with respect to parameters {0, 1, 2} and results {0} to parameters {0, 2} of type @escaping @callee_guaranteed (@in_guaranteed A, @in_guaranteed B, @in_guaranteed Swift.Double) -> (@out B, @owned @escaping @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> (@out B, @out Swift.Double) for <B._Differentiation.Differentiable.TangentVectorA._Differentiation.Differentiable.TangentVector>) | {(106,125) - (247,256)}
+$s39differentiation_subset_parameters_thunk19inoutIndirectCalleryq_x_q_q0_t16_Differentiation14DifferentiableRzAcDR_AcDR0_r1_lFxq_Sdq_xq_Sdr0_ly13TangentVectorAcDPQy_AeFQzIsegnrr_Iegnnnro_TJSrSSSpSrSUSP ---> autodiff subset parameters thunk for reverse-mode derivative from differentiation_subset_parameters_thunk.inoutIndirectCaller<A, B, C where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, C: _Differentiation.Differentiable>(A, B, C) -> B with respect to parameters {0, 1, 2} and results {0} to parameters {0, 2} of type @escaping @callee_guaranteed (@in_guaranteed A, @in_guaranteed B, @in_guaranteed Swift.Double) -> (@out B, @owned @escaping @callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> (@out B, @out Swift.Double) for <B._Differentiation.Differentiable.TangentVectorA._Differentiation.Differentiable.TangentVector>)
 $sS2f8mangling3FooV13TangentVectorVIegydd_SfAESfIegydd_TJOp ---> autodiff self-reordering reabstraction thunk for pullback from @escaping @callee_guaranteed (@unowned Swift.Float) -> (@unowned Swift.Float, @unowned mangling.Foo.TangentVector) to @escaping @callee_guaranteed (@unowned Swift.Float) -> (@unowned mangling.Foo.TangentVector, @unowned Swift.Float)
-$s13test_mangling3fooyS2f_S2ftFWJrSpSr ---> reverse-mode differentiability witness for test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {0} and results {0} | {(57,60) - (60,99)}
-$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lWJrUSSpSr ---> reverse-mode differentiability witness for test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable> | {(57,60) - (107,126)}
-$s5async1hyyS2iYbXEF ---> async.h(@Sendable (Swift.Int) -> Swift.Int) -> () | {(6,7) - (7,43)}
-$s5Actor02MyA0C17testAsyncFunctionyyYaKFTY0_ ---> (1) suspend resume partial function for Actor.MyActor.testAsyncFunction() async throws -> () | {(54,71) - (71,73)}
-$s5Actor02MyA0C17testAsyncFunctionyyYaKFTQ1_ ---> (2) await resume partial function for Actor.MyActor.testAsyncFunction() async throws -> () | {(52,69) - (69,71)}
-$s4diff1hyyS2iYjfXEF ---> diff.h(@differentiable(_forward) (Swift.Int) -> Swift.Int) -> () | {(5,6) - (6,58)}
-$s4diff1hyyS2iYjrXEF ---> diff.h(@differentiable(reverse) (Swift.Int) -> Swift.Int) -> () | {(5,6) - (6,57)}
-$s4diff1hyyS2iYjdXEF ---> diff.h(@differentiable (Swift.Int) -> Swift.Int) -> () | {(5,6) - (6,48)}
-$s4diff1hyyS2iYjlXEF ---> diff.h(@differentiable(_linear) (Swift.Int) -> Swift.Int) -> () | {(5,6) - (6,57)}
-$s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, inout @noDerivative Swift.Float) -> Swift.Float) -> () | {(5,8) - (8,96)}
-$s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> () | {(5,8) - (8,98)}
-$s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> () | {(5,8) - (8,90)}
-$s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> () | {(5,8) - (8,106)}
+$s13test_mangling3fooyS2f_S2ftFWJrSpSr ---> reverse-mode differentiability witness for test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {0} and results {0}
+$s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lWJrUSSpSr ---> reverse-mode differentiability witness for test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
+$s5async1hyyS2iYbXEF ---> async.h(@Sendable (Swift.Int) -> Swift.Int) -> ()
+$s5Actor02MyA0C17testAsyncFunctionyyYaKFTY0_ ---> (1) suspend resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()
+$s5Actor02MyA0C17testAsyncFunctionyyYaKFTQ1_ ---> (2) await resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()
+$s4diff1hyyS2iYjfXEF ---> diff.h(@differentiable(_forward) (Swift.Int) -> Swift.Int) -> ()
+$s4diff1hyyS2iYjrXEF ---> diff.h(@differentiable(reverse) (Swift.Int) -> Swift.Int) -> ()
+$s4diff1hyyS2iYjdXEF ---> diff.h(@differentiable (Swift.Int) -> Swift.Int) -> ()
+$s4diff1hyyS2iYjlXEF ---> diff.h(@differentiable(_linear) (Swift.Int) -> Swift.Int) -> ()
+$s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, inout @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()
 $SSSTf4pd44444_pf ---> function signature specialization <Arg[0] = [Constant Propagated Float : 44444], Return = > of Swift.String
 $sScA ---> Swift.Actor
 $sScGySiG ---> Swift.TaskGroup<Swift.Int>
-$s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>((@Swift.MainActor () -> A)?) -> (() -> A)? | {(5,15) - (18,47)}
+$s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>((@Swift.MainActor () -> A)?) -> (() -> A)?
 $sSvSgA3ASbIetCyyd_SgSbIetCyyyd_SgD ---> (@escaping @convention(thin) @convention(c) (@unowned Swift.UnsafeMutableRawPointer?, @unowned Swift.UnsafeMutableRawPointer?, @unowned (@escaping @convention(thin) @convention(c) (@unowned Swift.UnsafeMutableRawPointer?, @unowned Swift.UnsafeMutableRawPointer?) -> (@unowned Swift.Bool))?) -> (@unowned Swift.Bool))?
-$s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>((@Swift.MainActor () -> A)?) -> (() -> A)? | {(5,15) - (18,47)}
-$s1t10globalFuncyyAA7MyActorCYiF ---> t.globalFunc(isolated t.MyActor) -> () | {(2,12) - (12,32)}
+$s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>((@Swift.MainActor () -> A)?) -> (() -> A)?
+$s1t10globalFuncyyAA7MyActorCYiF ---> t.globalFunc(isolated t.MyActor) -> ()
 $sSIxip6foobarP ---> foobar in Swift.DefaultIndices.subscript : A
 $s13__lldb_expr_110$10016c2d8yXZ1B10$10016c2e0LLC ---> __lldb_expr_1.(unknown context at $10016c2d8).(B in $10016c2e0)
 $s__TJO ---> $s__TJO
-$s6Foobar7Vector2VAASdRszlE10simdMatrix5scale6rotate9translateSo0C10_double3x3aACySdG_SdAJtFZ0D4TypeL_aySd__GD ---> MatrixType #1 in static (extension in Foobar):Foobar.Vector2<Swift.Double><A where A == Swift.Double>.simdMatrix(scale: Foobar.Vector2<Swift.Double>, rotate: Swift.Double, translate: Foobar.Vector2<Swift.Double>) -> __C.simd_double3x3 | {(102,112) - (112,212)}
-$s17distributed_thunk2DAC1fyyFTE ---> distributed thunk distributed_thunk.DA.f() -> () | {(39,40) - (40,42)}
-$s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int | {(44,51) - (51,62)}
-$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String | {(118,125) - (125,136)}
-$s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> () | {(2,5) - (5,29)}
-$s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> () | {(258,259) - (259,261)}
-$s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> () | {(48,64) - (64,66)}
-$s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> () | {(51,67) - (67,69)}
-$s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> () | {(5,8) - (11,36)}
-$s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> () | {(5,8) - (8,79)}
-$s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> () | {(9,13) - (13,21)}
+$s6Foobar7Vector2VAASdRszlE10simdMatrix5scale6rotate9translateSo0C10_double3x3aACySdG_SdAJtFZ0D4TypeL_aySd__GD ---> MatrixType #1 in static (extension in Foobar):Foobar.Vector2<Swift.Double><A where A == Swift.Double>.simdMatrix(scale: Foobar.Vector2<Swift.Double>, rotate: Swift.Double, translate: Foobar.Vector2<Swift.Double>) -> __C.simd_double3x3
+$s17distributed_thunk2DAC1fyyFTE ---> distributed thunk distributed_thunk.DA.f() -> ()
+$s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed_test.X.compute(Swift.Int) -> Swift.Int
+$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
+$s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
+$s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
+$s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
+$s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
+$s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
+$s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
+$s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()
 $sxxxIxzCXxxxesy ---> $sxxxIxzCXxxxesy
 $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x ---> $Sxxx_x_xxIxzCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC$x
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTATQ0_ ---> {T:$sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTR} (1) await resume partial function for partial apply forwarder for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
@@ -441,27 +441,27 @@ $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTQ0_ ---> {T:} (1) awai
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTY0_ ---> {T:} (1) suspend resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTY_ ---> {T:} (0) suspend resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
 $sxIeghHr_xs5Error_pIegHrzo_s8SendableRzs5NeverORs_r0_lTRTQ12_ ---> {T:} (13) await resume partial function for reabstraction thunk helper <A, B where A: Swift.Sendable, B == Swift.Never> from @escaping @callee_guaranteed @Sendable @async () -> (@out A) to @escaping @callee_guaranteed @async () -> (@out A, @error @owned Swift.Error)
-$s7Library3fooyyFTwS ---> #_hasSymbol query for Library.foo() -> () | {(30,33) - (33,35)}
+$s7Library3fooyyFTwS ---> #_hasSymbol query for Library.foo() -> ()
 $s7Library5KlassCTwS ---> #_hasSymbol query for Library.Klass
 $s14swift_ide_test14myColorLiteral3red5green4blue5alphaAA0E0VSf_S3ftcfm ---> swift_ide_test.myColorLiteral(red: Swift.Float, green: Swift.Float, blue: Swift.Float, alpha: Swift.Float) -> swift_ide_test.Color
 $s14swift_ide_test10myFilenamexfm ---> swift_ide_test.myFilename : A
-$s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro expansion #3 of stringify in MacroUser.testStringify(a: Swift.Int, b: Swift.Int) -> () | {(58,71) - (71,99)}
-$s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> () | {(111,141) - (141,143)}
-@__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_ ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> () | {(50,63) - (63,91)}
+$s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro expansion #3 of stringify in MacroUser.testStringify(a: Swift.Int, b: Swift.Int) -> ()
+$s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> ()
+@__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_ ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_ ---> peer macro @addCompletionHandler expansion #1 of f in macro_expand_peers.S
 @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_ ---> freestanding macro expansion #2 of NotCovered(in _4361AD9339943F52AE6186DD51E04E91) in MacroUser.MemberNotCovered
 $sxSo8_NSRangeVRlzCRl_Cr0_llySo12ModelRequestCyxq_GIsPetWAlYl_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(witness_method) @yield_once <A, B where A: AnyObject, B: AnyObject> @substituted <A> (@inout A) -> (@yields @inout __C._NSRange) for <__C.ModelRequest<A, B>>
 $SyyySGSS_IIxxxxx____xsIyFSySIxx_@xIxx____xxI ---> $SyyySGSS_IIxxxxx____xsIyFSySIxx_@xIxx____xxI
-$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF ---> typed_throws.rethrowConcrete() throws(typed_throws.MyError) -> () | {(13,28) - (28,30)}
-$s3red3use2fnySiyYAXE_tF ---> red.use(fn: @isolated(any) () -> Swift.Int) -> () | {(4,7) - (7,43)}
-$s4testAAyAA5KlassC_ACtACnYTF ---> test.test(__owned test.Klass) -> sending (test.Klass, test.Klass) | {(5,9) - (9,29)}
-$s5test24testyyAA5KlassCnYuF ---> test2.test(sending __owned test2.Klass) -> () | {(6,10) - (10,39)}
+$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF ---> typed_throws.rethrowConcrete() throws(typed_throws.MyError) -> ()
+$s3red3use2fnySiyYAXE_tF ---> red.use(fn: @isolated(any) () -> Swift.Int) -> ()
+$s4testAAyAA5KlassC_ACtACnYTF ---> test.test(__owned test.Klass) -> sending (test.Klass, test.Klass)
+$s5test24testyyAA5KlassCnYuF ---> test2.test(sending __owned test2.Klass) -> ()
 $s7ElementSTQzqd__s5Error_pIgnrzo_ABqd__sAC_pIegnrzr_SlRzr__lTR ---> {T:} reabstraction thunk helper <A><A1 where A: Swift.Collection> from @callee_guaranteed (@in_guaranteed A.Swift.Sequence.Element) -> (@out A1, @error @owned Swift.Error) to @escaping @callee_guaranteed (@in_guaranteed A.Swift.Sequence.Element) -> (@out A1, @error @out Swift.Error)
 $sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative sending Swift.Float) -> (@unowned Swift.Float)
 $sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned sending Swift.Float) -> (@unowned Swift.Float)
-$s4testA2A5KlassCyYTF ---> test.test() -> sending test.Klass | {(5,9) - (9,11)}
+$s4testA2A5KlassCyYTF ---> test.test() -> sending test.Klass
 $s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> sending main.Klass
-$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() async -> sending null.NonSendableKlass | {(5,24) - (24,26)}
+$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() async -> sending null.NonSendableKlass
 $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> sending (@out null.NonSendableKlass, @error @owned Swift.Error)
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
@@ -474,16 +474,16 @@ $s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
 $s2hi1SVIetMIy_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
 $s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
 $s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
-$s3red7MyActorC3runyxxyYaKACYcYTXEYaKlFZ ---> static red.MyActor.run<A>(@red.MyActor () async throws -> sending A) async throws -> A | {(19,22) - (25,68)}
-$s3red7MyActorC3runyxxyYaKYAYTXEYaKlFZ ---> static red.MyActor.run<A>(@isolated(any) () async throws -> sending A) async throws -> A | {(19,22) - (25,70)}
+$s3red7MyActorC3runyxxyYaKACYcYTXEYaKlFZ ---> static red.MyActor.run<A>(@red.MyActor () async throws -> sending A) async throws -> A
+$s3red7MyActorC3runyxxyYaKYAYTXEYaKlFZ ---> static red.MyActor.run<A>(@isolated(any) () async throws -> sending A) async throws -> A
 $s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@in_guaranteed sending ToolKit.TypedValue) -> sending (@out ToolKit.TypedValue, @error @owned Swift.Error) to @escaping @callee_guaranteed @async (@in sending ToolKit.TypedValue) -> (@out ToolKit.TypedValue, @error @out Swift.Error)
 $s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)
-$s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(nonisolated(nonsending) () async throws -> A) async throws -> A | {(19,22) - (25,71)}
+$s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(nonisolated(nonsending) () async throws -> A) async throws -> A
 $s5thing1PP1sAA1SVvxTwc ---> coro function pointer to thing.P.s.modify2 : thing.S
-_$s15raw_identifiers0020foospace_liaADEDGcjayyF ---> raw_identifiers.`foo space`() -> () | {(16,28) - (28,30)}
-_$s15raw_identifiers0018_3times_pgaIGJCFbhayyF ---> raw_identifiers.`3 times`() -> () | {(16,26) - (26,28)}
-_$s15raw_identifiers0019test_yeaIIBCEapkagayyF ---> raw_identifiers.`test +`() -> () | {(16,25) - (25,27)}
-_$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo`() -> () | {(16,28) - (28,30)}
-_$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> () | {(34,39) - (39,41)}
+_$s15raw_identifiers0020foospace_liaADEDGcjayyF ---> raw_identifiers.`foo space`() -> ()
+_$s15raw_identifiers0018_3times_pgaIGJCFbhayyF ---> raw_identifiers.`3 times`() -> ()
+_$s15raw_identifiers0019test_yeaIIBCEapkagayyF ---> raw_identifiers.`test +`() -> ()
+_$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo`() -> ()
+_$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()
 $s7Library1BC1iSivxTwd ---> default override of Library.B.i.modify2 : Swift.Int
 $s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.modify2 : Swift.Int

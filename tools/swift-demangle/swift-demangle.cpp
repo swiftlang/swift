@@ -142,6 +142,62 @@ static void stripSpecialization(NodePointer Node) {
   }
 }
 
+class TrackingNodePrinter : public NodePrinter {
+public:
+  std::pair<size_t, size_t> BasenameRange;
+  std::pair<size_t, size_t> ParametersRange;
+  bool hasBasename() { return BasenameRange.first < BasenameRange.second; }
+  bool hasParameters() {
+    return ParametersRange.first < ParametersRange.second;
+  }
+
+private:
+  std::optional<unsigned> parametersDepth;
+
+  void startName() {
+    if (!hasBasename())
+      BasenameRange.first = getStreamLength();
+  }
+
+  void endName() {
+    if (!hasBasename())
+      BasenameRange.second = getStreamLength();
+  }
+
+  void startParameters(unsigned depth) {
+    if (parametersDepth || !hasBasename() || hasParameters()) {
+      return;
+    }
+    ParametersRange.first = getStreamLength();
+    parametersDepth = depth;
+  }
+
+  void endParameters(unsigned depth) {
+    if (!parametersDepth || *parametersDepth != depth || hasParameters()) {
+      return;
+    }
+    ParametersRange.second = getStreamLength();
+  }
+
+  void printFunctionName(bool hasName, llvm::StringRef &OverwriteName,
+                         llvm::StringRef &ExtraName, bool MultiWordName,
+                         int &ExtraIndex, swift::Demangle::NodePointer Entity,
+                         unsigned int depth) override {
+    startName();
+    NodePrinter::printFunctionName(hasName, OverwriteName, ExtraName,
+                                   MultiWordName, ExtraIndex, Entity, depth);
+    endName();
+  }
+
+  void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
+                               unsigned depth, bool showTypes) override {
+    startParameters(depth);
+    NodePrinter::printFunctionParameters(LabelList, ParameterType, depth,
+                                         showTypes);
+    endParameters(depth);
+  }
+};
+
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      swift::Demangle::Context &DCtx,
                      const swift::Demangle::DemangleOptions &options) {
@@ -255,9 +311,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       return;
     }
 
-    TrackingDemanglerPrinter printer;
-    std::string string =
-        swift::Demangle::nodeToString(pointer, options, &printer);
+    std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
       os << name << " ---> ";
 
@@ -282,17 +336,6 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         os << '{' << Classifications << "} ";
     }
     os << (string.empty() ? name : llvm::StringRef(string));
-
-    if (!string.empty() && Ranges &&
-        (printer.hasBaseName() || printer.hasParameters())) {
-      os << " | {(";
-      if (printer.hasBaseName())
-        os << printer.getNameStart() << "," << printer.getNameEnd();
-      os << ") - (";
-      if (printer.hasParameters())
-        os << printer.getParametersStart() << "," << printer.getParametersEnd();
-      os << ")}";
-    }
   }
   DCtx.clear();
 }
