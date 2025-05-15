@@ -206,6 +206,13 @@ struct _ObjectiveCBridgeableWitnessTable : WitnessTable {
 extern "C" const ProtocolDescriptor
 PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
 
+#if SWIFT_OBJC_INTEROP
+#define BRIDGING_CONFORMANCE_SYM \
+  MANGLE_SYM(s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
+
+extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
+#endif
+
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
