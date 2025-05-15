@@ -675,7 +675,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
     // build command to main module to ensure frontend gets the same result.
     // This needs to happen after visiting all the top-level decls from all
     // SourceFiles.
-    auto buildArgs = mainDependencies.getCommandline();
+    std::vector<std::string> buildArgs = mainDependencies.getCommandline();
     mainModule->getASTContext().forEachCanImportVersionCheck(
         [&](StringRef moduleName, const llvm::VersionTuple &Version,
             const llvm::VersionTuple &UnderlyingVersion) {
@@ -1542,25 +1542,33 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     recordResult(clangDep);
 
   // C++ Interop requires additional handling
-  if (ScanCompilerInvocation.getLangOptions().EnableCXXInterop) {
-    for (const auto &clangDepName : allClangDependencies) {
-      // If this Clang module is a part of the C++ stdlib, and we haven't loaded
-      // the overlay for it so far, it is a split libc++ module (e.g.
-      // std_vector). Load the CxxStdlib overlay explicitly.
-      const auto &clangDepInfo =
-          cache.findDependency(clangDepName, ModuleDependencyKind::Clang)
-              .value()
-              ->getAsClangModule();
-      if (importer::isCxxStdModule(clangDepName, clangDepInfo->IsSystem) &&
-          !swiftOverlayDependencies.contains(
-              {clangDepName, ModuleDependencyKind::SwiftInterface}) &&
-          !swiftOverlayDependencies.contains(
-              {clangDepName, ModuleDependencyKind::SwiftBinary})) {
-        ScanningThreadPool.async(
-            scanForSwiftDependency,
-            getModuleImportIdentifier(ScanASTContext.Id_CxxStdlib.str()));
-        ScanningThreadPool.wait();
-        recordResult(ScanASTContext.Id_CxxStdlib.str().str());
+  if (ScanCompilerInvocation.getLangOptions().EnableCXXInterop &&
+      moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
+    const auto &moduleInfo = cache.findKnownDependency(moduleID);
+    const auto commandLine = moduleInfo.getCommandline();
+
+    // If the textual interface was built without C++ interop, do not query
+    // the C++ Standard Library Swift overlay for its compilation.
+    if (llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") ==
+        commandLine.end()) {
+      for (const auto &clangDepName : allClangDependencies) {
+        // If this Clang module is a part of the C++ stdlib, and we haven't
+        // loaded the overlay for it so far, it is a split libc++ module (e.g.
+        // std_vector). Load the CxxStdlib overlay explicitly.
+        const auto &clangDepInfo =
+            cache.findDependency(clangDepName, ModuleDependencyKind::Clang)
+                .value()
+                ->getAsClangModule();
+        if (importer::isCxxStdModule(clangDepName, clangDepInfo->IsSystem) &&
+            !swiftOverlayDependencies.contains(
+                {clangDepName, ModuleDependencyKind::SwiftInterface}) &&
+            !swiftOverlayDependencies.contains(
+                {clangDepName, ModuleDependencyKind::SwiftBinary})) {
+          scanForSwiftDependency(
+              getModuleImportIdentifier(ScanASTContext.Id_CxxStdlib.str()));
+          recordResult(ScanASTContext.Id_CxxStdlib.str().str());
+          break;
+        }
       }
     }
   }
@@ -1615,7 +1623,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
   // Update the command-line on the main module to
   // disable implicit cross-import overlay search.
   auto mainDep = cache.findKnownDependency(actualMainID);
-  auto cmdCopy = mainDep.getCommandline();
+  std::vector<std::string> cmdCopy = mainDep.getCommandline();
   cmdCopy.push_back("-disable-cross-import-overlay-search");
   for (auto &entry : overlayFiles) {
     mainDep.addAuxiliaryFile(entry.second);
