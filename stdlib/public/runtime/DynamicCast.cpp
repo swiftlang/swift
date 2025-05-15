@@ -206,28 +206,46 @@ struct _ObjectiveCBridgeableWitnessTable : WitnessTable {
 extern "C" const ProtocolDescriptor
 PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
 
+/// Nominal type descriptor for Swift.String.
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
+
 struct ObjCBridgeWitnessCacheEntry {
   const Metadata *metadata;
   const _ObjectiveCBridgeableWitnessTable *witness;
 };
 
-static std::atomic<ObjCBridgeWitnessCacheEntry> _objcBridgeWitnessCache = {};
+// String is so important that we cache it permanently, so we don't want to
+// pollute this temporary cache with the String entry
+static const _ObjectiveCBridgeableWitnessTable *
+findBridgeWitnessNoCache(const Metadata *T) {
+  auto w = swift_conformsToProtocolCommon(
+         T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
+  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+}
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
+  // Special case: Memoize the bridge witness for Swift.String.
+  // Swift.String is the most heavily used bridge because of the prevalence of
+  // string-keyed dictionaries in Obj-C.  It's worth burning a few words of static
+  // storage to avoid repeatedly looking up this conformance.
+  if (T->getKind() == MetadataKind::Struct) {
+    auto structDescription = cast<StructMetadata>(T)->Description;
+    if (structDescription == &NOMINAL_TYPE_DESCR_SYM(SS)) {
+      static auto *Swift_String_ObjectiveCBridgeable = findBridgeWitnessNoCache(T);
+      return Swift_String_ObjectiveCBridgeable;
+    }
+  }
+  
+  static std::atomic<ObjCBridgeWitnessCacheEntry> _objcBridgeWitnessCache = {};
   auto cached = _objcBridgeWitnessCache.load(SWIFT_MEMORY_ORDER_CONSUME);
   if (cached.metadata == T) {
     return cached.witness;
   }
-  auto w = swift_conformsToProtocolCommon(
-      T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
-  auto result = reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
-  cached = {
-    .metadata = T,
-    .witness = result
-  };
+  cached.witness = findBridgeWitnessNoCache(T);
+  cached.metadata = T;
   _objcBridgeWitnessCache.store(cached, std::memory_order_release);
-  return result;
+  return cached.witness;
 }
 
 /// Retrieve the bridged Objective-C type for the given type that
@@ -751,7 +769,7 @@ struct ObjCBridgeMemo {
 #if !NDEBUG
                    memo->destType = setupData->destType;
 #endif
-                   memo->destBridgeWitness = findBridgeWitness(setupData->destType);
+                   memo->destBridgeWitness = findBridgeWitnessNoCache(setupData->destType);
                    if (memo->destBridgeWitness == nullptr) {
                      memo->targetBridgedType = nullptr;
                      memo->targetBridgedObjCClass = nullptr;
