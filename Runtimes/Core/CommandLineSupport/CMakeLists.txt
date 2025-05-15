@@ -5,6 +5,8 @@ if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
     "${PROJECT_BINARY_DIR}/include")
   target_compile_definitions(swiftCommandLineSupport PUBLIC
     -DSWIFT_STDLIB_HAS_COMMANDLINE)
+  target_compile_definitions(swiftCommandLineSupport PRIVATE
+    $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>)
 
   target_link_libraries(swiftCommandLineSupport PRIVATE
     swiftShims)

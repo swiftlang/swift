@@ -1094,12 +1094,6 @@ namespace swift {
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
 
-    /// Enable ClangIncludeTree for explicit module builds scanning.
-    bool UseClangIncludeTree = false;
-
-    /// Using ClangIncludeTreeRoot for compilation.
-    bool HasClangIncludeTreeRoot = false;
-
     /// Whether the dependency scanner should construct all swift-frontend
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
