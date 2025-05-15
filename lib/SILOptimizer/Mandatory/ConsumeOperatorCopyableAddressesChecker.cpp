@@ -1341,8 +1341,10 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
   }
 
   if (auto fas = FullApplySite::isa(op->getUser())) {
-    // Bail on apply uses of fields.
-    if (stripAccessMarkers(op->get()) != useState.address) {
+    auto convention = fas.getCaptureConvention(*op);
+    // Bail on non-inout apply uses of fields.
+    if (convention != SILArgumentConvention::Indirect_Inout &&
+        stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(
           llvm::dbgs()
           << "!!! Error! Found consuming closure use not on base address: "
@@ -1353,8 +1355,7 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
     // Then see if we have an inout_aliasable full apply site use. In that case,
     // we are going to try and extend move checking into the partial apply
     // using cloning to eliminate destroys or reinits.
-    if (fas.getCaptureConvention(*op) ==
-        SILArgumentConvention::Indirect_InoutAliasable) {
+    if (convention == SILArgumentConvention::Indirect_InoutAliasable) {
       // If we don't find the function, we can't handle this, so bail.
       auto *func = fas.getCalleeFunction();
       if (!func || !func->isDefer())
