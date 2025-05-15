@@ -208,9 +208,19 @@ PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
+  auto cached = _objcBridgeWitnessCache.load(SWIFT_MEMORY_ORDER_CONSUME);
+  if (cached.metadata == T) {
+    return cached.witness;
+  }
   auto w = swift_conformsToProtocolCommon(
       T, &PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable));
-  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+  auto result = reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+  cached = {
+    .metadata = T,
+    .witness = result
+  };
+  _objcBridgeWitnessCache.store(cached, std::memory_order_release);
+  return result;
 }
 
 /// Retrieve the bridged Objective-C type for the given type that
