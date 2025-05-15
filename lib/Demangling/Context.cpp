@@ -57,11 +57,11 @@ NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
 
 std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
                                             const DemangleOptions &Options,
-                                            std::unique_ptr<DemanglerPrinter> printer) {
+                                            DemanglerPrinter *printer) {
   NodePointer root = demangleSymbolAsNode(MangledName);
   if (!root) return MangledName.str();
 
-  std::string demangling = nodeToString(root, Options, std::move(printer));
+  std::string demangling = nodeToString(root, Options, printer);
   if (demangling.empty())
     return MangledName.str();
   return demangling;
@@ -271,10 +271,10 @@ std::string Context::getModuleName(llvm::StringRef mangledName) {
 std::string demangleSymbolAsString(const char *MangledName,
                                    size_t MangledNameLength,
                                    const DemangleOptions &Options,
-                                   std::unique_ptr<DemanglerPrinter> printer) {
+                                   DemanglerPrinter *printer) {
   Context Ctx;
   return Ctx.demangleSymbolAsString(StringRef(MangledName, MangledNameLength),
-                                    Options, std::move(printer));
+                                    Options, printer);
 }
 
 std::string demangleTypeAsString(const char *MangledName,
