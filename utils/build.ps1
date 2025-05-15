@@ -100,8 +100,8 @@ in batch file format instead of executing them.
 .PARAMETER HostArchName
 The architecture where the toolchain will execute.
 
-.PARAMETER Variant
-The toolchain variant to build. Defaults to `Asserts`.
+.PARAMETER IncludeNoAsserts
+If set, the no-assert toolchain variant is also build and included in the output.
 
 .PARAMETER FoundationTestConfiguration
 Whether to run swift-foundation and swift-corelibs-foundation tests in a debug or release configuration.
@@ -148,8 +148,7 @@ param
   [string] $Stage = "",
   [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
-  [ValidateSet("Asserts", "NoAsserts")]
-  [string] $Variant = "Asserts",
+  [switch] $IncludeNoAsserts = $false,
   [switch] $Clean,
   [switch] $DebugInfo,
   [ValidatePattern('^\d+(\.\d+)*$')]
@@ -623,8 +622,10 @@ function Get-InstallDir([Hashtable] $Platform) {
 
 # For dev productivity, install the host toolchain directly using CMake.
 # This allows iterating on the toolchain using ninja builds.
-$HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+$Variant"
-$BuildPlatform.ToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+$Variant"
+$HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+$PinnedToolchainVariant"
+$HostPlatform.NoAssertsToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+NoAsserts"
+$BuildPlatform.ToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+$PinnedToolchainVariant"
+$BuildPlatform.NoAssertsToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+NoAsserts"
 
 # Build functions
 function Invoke-BuildStep {
@@ -1694,7 +1695,7 @@ function Build-CMark([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin (Get-CMarkBinaryCache $Platform) `
-    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr" `
+    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr" `
     -Platform $Platform `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
@@ -1737,7 +1738,7 @@ function Build-BuildTools([Hashtable] $Platform) {
       SWIFT_INCLUDE_APINOTES = "NO";
       SWIFT_INCLUDE_DOCS = "NO";
       SWIFT_INCLUDE_TESTS = "NO";
-      "cmark-gfm_DIR" = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib\cmake";
+      "cmark-gfm_DIR" = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr\lib\cmake";
     }
 }
 
@@ -1773,7 +1774,7 @@ function Load-LitTestOverrides($Filename) {
   }
 }
 
-function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
+function Get-CompilersDefines([Hashtable] $Platformm, [string] $Variant, [switch] $Test) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
   $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
@@ -1848,7 +1849,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
   }
 }
 
-function Build-Compilers([Hashtable] $Platform) {
+function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
   New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\llvm `
@@ -1859,7 +1860,7 @@ function Build-Compilers([Hashtable] $Platform) {
     -UsePinnedCompilers Swift `
     -BuildTargets @("install-distribution") `
     -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
-    -Defines (Get-CompilersDefines $Platform)
+    -Defines (Get-CompilersDefines $Platform $Variant)
 
   $Settings = @{
     FallbackLibrarySearchPaths = @("usr/bin")
@@ -1869,10 +1870,10 @@ function Build-Compilers([Hashtable] $Platform) {
   Write-PList -Settings $Settings -Path "$($Platform.ToolchainInstallRoot)\ToolchainInfo.plist"
 }
 
-function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLVM, [switch] $TestSwift) {
   Invoke-IsolatingEnvVars {
     $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
-    $TestingDefines = Get-CompilersDefines $Platform -Test
+    $TestingDefines = Get-CompilersDefines $Platform $Variant -Test
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
@@ -1984,19 +1985,26 @@ function Build-mimalloc() {
     "ld.lld.exe",
     "ld64.lld.exe"
   )
-  foreach ($Tool in $Tools) {
-    $Binary = [IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $Tool)
+  $Binaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $_)}
+  if ($IncludeNoAsserts) {
+    $NoAssertBinaries = $Tools `
+      | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)} `
+      | Where-Object { Test-Path $_ -PathType Leaf }
+    $Binaries = $Binaries + $NoAssertBinaries
+  }
+  foreach ($Binary in $Binaries) {
+    $Name = [IO.Path]::GetFileName($Binary)
     # Binary-patch in place
     Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
     # Log the import table
-    $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Tool.txt"
-    $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Tool-error.txt"
+    $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
+    $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
     Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
     # Verify patching
     $Found = Select-String -Path $LogFile -Pattern "mimalloc"
     if (-not $Found) {
       Get-Content $ErrorFile
-      throw "Failed to patch mimalloc for $Tool"
+      throw "Failed to patch mimalloc for $Name"
     }
   }
 }
@@ -3232,8 +3240,8 @@ function Test-PackageManager() {
     -Src $SrcDir `
     -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
     -Platform $HostPlatform `
-    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\include" `
-    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant\usr\lib"
+    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr\include" `
+    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr\lib"
 }
 
 function Build-Installer([Hashtable] $Platform) {
@@ -3245,6 +3253,7 @@ function Build-Installer([Hashtable] $Platform) {
     BundleFlavor = "offline";
     ImageRoot = "$(Get-InstallDir $Platform)\";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
+    INCLUDE_NOASSERTS = $IncludeNoAsserts
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -3314,7 +3323,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-BuildTools $BuildPlatform
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-XML2 $BuildPlatform
-    Invoke-BuildStep Build-Compilers $BuildPlatform
+    Invoke-BuildStep Build-Compilers $BuildPlatform -Variant $PinnedToolchainVariant
   }
   if ($IncludeDS2) {
     Invoke-BuildStep Build-RegsGen2 $BuildPlatform
@@ -3322,7 +3331,10 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform
-  Invoke-BuildStep Build-Compilers $HostPlatform
+  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
+  if ($IncludeNoAsserts) {
+    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts"
+  }
 
   Invoke-BuildStep Build-SDK $BuildPlatform -IncludeMacros
 
@@ -3419,7 +3431,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform $Tests
+    Invoke-BuildStep Test-Compilers $HostPlatform $PinnedToolchainVariant $Tests 
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
