@@ -8389,9 +8389,10 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   if (attr->Rename.empty())
     return nullptr;
 
+  auto &ctx = attached->getASTContext();
   auto attachedContext = attached->getDeclContext();
   auto parsedName = parseDeclName(attr->Rename);
-  auto nameRef = parsedName.formDeclNameRef(attached->getASTContext());
+  auto nameRef = parsedName.formDeclNameRef(ctx);
 
   // Handle types separately
   if (isa<NominalTypeDecl>(attached)) {
@@ -8400,7 +8401,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
-                                     nameRef.withoutArgumentLabels(),
+                                     nameRef.withoutArgumentLabels(ctx),
                                      attr->getLocation(), NL_OnlyTypes,
                                      lookupResults);
     if (lookupResults.size() == 1)
