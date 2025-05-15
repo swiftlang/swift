@@ -829,7 +829,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     // Parse the next name.
     DeclNameLoc nameLoc;
     DeclNameRef name = parseDeclNameRef(nameLoc,
-        diag::expr_keypath_expected_property_or_type, flags);
+        diag::expr_keypath_expected_property_or_type, flags,
+        /*allowModSel=*/false);
     if (!name) {
       status.setIsParseError();
       break;
@@ -1329,7 +1330,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       auto Name = parseDeclNameRef(
           NameLoc, D,
           DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames |
-              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf,
+          /*allowModSel=*/true);
       if (!Name) {
         SourceRange ErrorRange = Result.get()->getSourceRange();
         ErrorRange.widen(TokLoc);
@@ -1803,7 +1805,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
                             DeclNameFlag::AllowKeywords |
                                 DeclNameFlag::AllowCompoundNames |
-                                DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+                                DeclNameFlag::AllowLowercaseAndUppercaseSelf,
+                            /*allowModSel=*/true);
     if (!Name)
       return makeParserErrorResult(new (Context) ErrorExpr(DotLoc));
 
@@ -2266,7 +2269,34 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
 
 DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                      DiagRef diag,
-                                     DeclNameOptions flags) {
+                                     DeclNameOptions flags,
+                                     bool allowModSel) {
+  // Consume the module name, if present.
+  SourceLoc moduleSelectorLoc;
+  Identifier moduleSelector;
+  if (Context.LangOpts.hasFeature(Feature::ModuleSelector) &&
+      peekToken().is(tok::colon_colon)) {
+    if (Tok.is(tok::identifier)) { // FIXME: tok::dollarident?
+      moduleSelectorLoc = consumeIdentifier(moduleSelector,
+                                            /*diagnoseDollarPrefix=*/true);
+    }
+    else {
+      diagnose(Tok, diag::expected_identifier_in_module_selector);
+      moduleSelector = Identifier();
+      moduleSelectorLoc = consumeToken();
+    }
+
+    // Diagnose if we don't allow a module selector here.
+    if (!allowModSel) {
+      diagnose(Tok, diag::module_selector_not_allowed_here)
+          .fixItRemove({moduleSelectorLoc, Tok.getLoc()});
+      moduleSelector = Identifier();
+      moduleSelectorLoc = SourceLoc();
+    }
+
+    consumeToken(tok::colon_colon);
+  }
+
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
@@ -2317,15 +2347,15 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                          rparenLoc);
 
   if (argumentLabelLocs.empty() || !hadArgList)
-    loc = DeclNameLoc(baseNameLoc);
+    loc = DeclNameLoc(Context, moduleSelectorLoc, baseNameLoc);
   else
-    loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
-                      rparenLoc);
+    loc = DeclNameLoc(Context, moduleSelectorLoc, baseNameLoc,
+                      lparenLoc, argumentLabelLocs, rparenLoc);
 
   if (!hadArgList)
-    return DeclNameRef(baseName);
+    return DeclNameRef(Context, moduleSelector, baseName);
 
-  return DeclNameRef({ Context, baseName, argumentLabels });
+  return DeclNameRef(Context, moduleSelector, baseName, argumentLabels);
 }
 
 ParserStatus Parser::parseFreestandingMacroExpansion(
@@ -2344,7 +2374,9 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
   bool hasWhitespaceBeforeName = poundEndLoc != Tok.getLoc();
 
-  macroNameRef = parseDeclNameRef(macroNameLoc, diag, DeclNameFlag::AllowKeywords);
+  macroNameRef = parseDeclNameRef(macroNameLoc, diag,
+                                  DeclNameFlag::AllowKeywords,
+                                  /*allowModSel=*/false);
   if (!macroNameRef)
     return makeParserError();
 
@@ -2401,7 +2433,8 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
   }
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr, declNameFlags);
+  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr, declNameFlags,
+                                      /*allowModSel=*/true);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -3067,7 +3100,8 @@ Expr *Parser::parseExprAnonClosureArg() {
   DeclNameLoc nameLoc;
   DeclNameRef nameRef =
       parseDeclNameRef(nameLoc, diag::impossible_parse,
-                       DeclNameFlag::AllowAnonymousParamNames);
+                       DeclNameFlag::AllowAnonymousParamNames,
+                       /*allowModSel=*/false);
 
   StringRef Name = nameRef.getBaseIdentifier().str();
   SourceLoc Loc = nameLoc.getBaseNameLoc();
@@ -3236,10 +3270,13 @@ ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, Sou
   Expr *SubExpr = nullptr;
   if (isUnappliedOperator()) {
     DeclNameLoc Loc;
+    // FIXME: We would like to allow module selectors on binary operators, but
+    // the condition above won't let us reach this code.
     auto OperName =
         parseDeclNameRef(Loc, diag::expected_operator_ref,
                          DeclNameFlag::AllowOperators |
-                             DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+                             DeclNameFlag::AllowLowercaseAndUppercaseSelf,
+                         /*allowModSel=*/true);
     if (!OperName) {
       return makeParserError();
     }

@@ -853,7 +853,8 @@ ParserResult<DeclRefTypeRepr> Parser::parseTypeIdentifier(TypeRepr *Base) {
   DeclNameLoc Loc;
   DeclNameRef Name =
       parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type,
-                       DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+                       DeclNameFlag::AllowLowercaseAndUppercaseSelf,
+                      /*allowModSel=*/true);
   if (!Name)
     return makeParserError();
 

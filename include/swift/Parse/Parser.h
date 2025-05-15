@@ -1854,7 +1854,8 @@ public:
   ///     unqualified-decl-base-name
   ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
   DeclNameRef parseDeclNameRef(DeclNameLoc &loc, DiagRef diag,
-                               DeclNameOptions flags);
+                               DeclNameOptions flags,
+                               bool allowModSel);
 
   /// Parse macro expansion.
   ///
