@@ -337,6 +337,9 @@ bool BridgedASTContext_langOptsAttachCommentsToDecls(
 SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
 BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
 
+SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetObjectFileFormat(self:_:)")
+bool BridgedASTContext_langOptsIsActiveTargetObjectFileFormat(BridgedASTContext cContext, BridgedStringRef cName);
+
 SWIFT_NAME("BridgedASTContext.langOptsGetLanguageVersion(self:_:)")
 SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
                                                       SwiftInt* _Nullable * _Nonnull cComponents);
