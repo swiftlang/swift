@@ -25,7 +25,7 @@ internal func _exit(result: CInt)
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("_swift_task_isMainExecutorSwift")
 internal func _isMainExecutor<E>(_ executor: E) -> Bool where E: SerialExecutor {
-  return executor.isMainExecutor
+  return executor._isMainExecutor
 }
 #endif
 
@@ -92,7 +92,7 @@ internal func _jobGetExecutorPrivateData(
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_getMainExecutor")
 internal func _getMainExecutor() -> any SerialExecutor {
-  return MainActor.executor
+  return MainActor._executor
 }
 #else
 // For task-to-thread model, this is implemented in C++
