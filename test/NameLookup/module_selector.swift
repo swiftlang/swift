@@ -66,13 +66,20 @@ extension A: @retroactive Swift::Equatable {
 // Test resolution of main:: using `B`
 
 extension main::B {}
+// FIXME improve: expected-error@-1 {{cannot find type 'main::B' in scope}}
 
 extension B: @retroactive main::Equatable {
+  // FIXME improve: expected-error@-1 {{cannot find type 'main::Equatable' in scope}}
 
   @_implements(main::Equatable, ==(_:_:))
+  // FIXME improve: expected-error@-1 {{cannot find type 'main::Equatable' in scope}}
 
   public static func equals(_: main::B, _: main::B) -> main::Bool {
+  // FIXME improve: expected-error@-1 {{cannot find type 'main::B' in scope}}
+  // FIXME improve: expected-error@-2 {{cannot find type 'main::B' in scope}}
+  // FIXME improve: expected-error@-3 {{cannot find type 'main::Bool' in scope}}
     main::fatalError()
+    // FIXME improve: expected-error@-1 {{cannot find 'main::fatalError' in scope}}
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -83,7 +90,9 @@ extension B: @retroactive main::Equatable {
 
   mutating func myNegate() {
     let fn: (main::Int, main::Int) -> main::Int =
+    // FIXME improve: expected-error@-1 3{{cannot find type 'main::Int' in scope}}
       (main::+)
+      // FIXME improve: expected-error@-1 {{cannot find operator 'main::+' in scope}}
 
     let magnitude: Int.main::Magnitude = main::magnitude
     // FIXME improve: expected-error@-1 {{'main::Magnitude' is not a member type of struct 'Swift.Int'}}
@@ -91,12 +100,15 @@ extension B: @retroactive main::Equatable {
     _ = (fn, magnitude)
 
     if main::Bool.main::random() {
+      // FIXME improve: expected-error@-1 {{cannot find 'main::Bool' in scope}}
 
       main::negate()
       // FIXME improve: expected-error@-1 {{cannot find 'main::negate' in scope}}
     }
     else {
       self = main::B(value: .main::min)
+      // FIXME improve: expected-error@-1 {{cannot find 'main::B' in scope}}
+      // expected-error@-2 {{cannot infer contextual base in reference to member 'main::min'}}
 
       self = B.main::init(value: .min)
     }
@@ -104,6 +116,7 @@ extension B: @retroactive main::Equatable {
     self.main::myNegate()
 
     main::fatalError()
+    // FIXME improve: expected-error@-1 {{cannot find 'main::fatalError' in scope}}
 
     _ = \main::A.magnitude
     _ = \A.main::magnitude
@@ -117,11 +130,16 @@ extension B: @retroactive main::Equatable {
 extension ModuleSelectorTestingKit::C {}
 
 extension C: @retroactive ModuleSelectorTestingKit::Equatable {
+// FIXME improve: expected-error@-1 {{cannot find type 'ModuleSelectorTestingKit::Equatable' in scope}}
 
   @_implements(ModuleSelectorTestingKit::Equatable, ==(_:_:))
+  // FIXME improve: expected-error@-1 {{cannot find type 'ModuleSelectorTestingKit::Equatable' in scope}}
 
   public static func equals(_: ModuleSelectorTestingKit::C, _: ModuleSelectorTestingKit::C) -> ModuleSelectorTestingKit::Bool {
+  // FIXME improve: expected-error@-1 {{cannot find type 'ModuleSelectorTestingKit::Bool' in scope}}
+
     ModuleSelectorTestingKit::fatalError()
+    // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::fatalError' in scope}}
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -131,14 +149,18 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
 
   mutating func myNegate() {
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
+    // FIXME improve: expected-error@-1 3{{cannot find type 'ModuleSelectorTestingKit::Int' in scope}}
       (ModuleSelectorTestingKit::+)
+      // FIXME improve: expected-error@-1 {{cannot find operator 'ModuleSelectorTestingKit::+' in scope}}
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // FIXME improve: expected-error@-1 {{'ModuleSelectorTestingKit::Magnitude' is not a member type of struct 'Swift.Int'}}
+    // FIXME improve: expected-error@-2 {{cannot find 'ModuleSelectorTestingKit::magnitude' in scope}}
 
     _ = (fn, magnitude)
 
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
+    // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::Bool' in scope}}
 
       ModuleSelectorTestingKit::negate()
       // expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::negate' in scope}}
@@ -152,6 +174,7 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     self.ModuleSelectorTestingKit::myNegate()
 
     ModuleSelectorTestingKit::fatalError()
+    // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::fatalError' in scope}}
 
     _ = \ModuleSelectorTestingKit::A.magnitude
     _ = \A.ModuleSelectorTestingKit::magnitude
@@ -163,12 +186,16 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
 // Test resolution of Swift:: using `D`
 
 extension Swift::D {}
+// FIXME improve: expected-error@-1 {{cannot find type 'Swift::D' in scope}}
 
 extension D: @retroactive Swift::Equatable {
+// Caused by Swift::D failing to typecheck in `equals(_:_:)`: expected-error@-1 *{{extension outside of file declaring struct 'D' prevents automatic synthesis of '==' for protocol 'Equatable'}} expected-note@-1 *{{add stubs for conformance}}
 
   @_implements(Swift::Equatable, ==(_:_:))
   public static func equals(_: Swift::D, _: Swift::D) -> Swift::Bool {
-    Swift::fatalError()
+  // expected-error@-1 {{cannot find type 'Swift::D' in scope}}
+  // expected-error@-2 {{cannot find type 'Swift::D' in scope}}
+    Swift::fatalError() // no-error -- not typechecking function bodies
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -183,7 +210,7 @@ extension D: @retroactive Swift::Equatable {
       (Swift::+)
 
     let magnitude: Int.Swift::Magnitude = Swift::magnitude
-    // expected-error@-1 {{cannot convert value of type 'Never' to specified type 'Int.Magnitude' (aka 'UInt')}}
+    // expected-error@-1 {{cannot find 'Swift::magnitude' in scope}}
 
     _ = (fn, magnitude)
 
@@ -194,6 +221,8 @@ extension D: @retroactive Swift::Equatable {
     }
     else {
       self = Swift::D(value: .Swift::min)
+      // FIXME improve: expected-error@-1 {{cannot find 'Swift::D' in scope}}
+      // expected-error@-2 {{cannot infer contextual base in reference to member 'Swift::min'}}
 
       self = D.Swift::init(value: .min)
     }
@@ -210,7 +239,6 @@ extension D: @retroactive Swift::Equatable {
 }
 
 let mog: Never = fatalError()
-// expected-note@-1 {{did you mean 'mog'?}}
 
 func localVarsCantBeAccessedByModuleSelector() {
   let mag: Int.Swift::Magnitude = main::mag
@@ -223,29 +251,36 @@ struct AvailableUser {
   @available(macOS 10.15, *) var use1: String { "foo" }
 
   @main::available() var use2
+  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
 
   @ModuleSelectorTestingKit::available() var use4
   // no-error
 
   @Swift::available() var use5
+  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
 }
 
 func builderUser2(@main::MyBuilder fn: () -> Void) {}
+// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
 
 func builderUser3(@ModuleSelectorTestingKit::MyBuilder fn: () -> Void) {}
+// no-error
 
 func builderUser4(@Swift::MyBuilder fn: () -> Void) {}
+// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
 
 // Error cases
 
 func decl1(
   p1: main::A,
+  // FIXME: expected-error@-1 {{cannot find type 'main::A' in scope}}
   label p2: inout A,
   label p3: @escaping () -> A
 ) {
   switch Optional(main::p2) {
   case Optional.some(let decl1i):
-    // expected-warning@-1 {{immutable value 'decl1i' was never used; consider replacing with '_' or removing it}}
     break
   case .none:
     break
@@ -253,7 +288,6 @@ func decl1(
 
   switch Optional(main::p2) {
   case let Optional.some(decl1j):
-    // expected-warning@-1 {{immutable value 'decl1j' was never used; consider replacing with '_' or removing it}}
     break
   case .none:
     break
@@ -261,7 +295,6 @@ func decl1(
 
   switch Optional(main::p2) {
  case let decl1k?:
-    // expected-warning@-1 {{immutable value 'decl1k' was never used; consider replacing with '_' or removing it}}
     break
   case .none:
     break
@@ -269,9 +302,11 @@ func decl1(
 }
 
 typealias decl5 = main::Bool
+// FIXME improve: expected-error@-1 {{cannot find type 'main::Bool' in scope}}
 
 func badModuleNames() {
   NonexistentModule::print()
+  // expected-error@-1 {{cannot find 'NonexistentModule::print' in scope}}
 
   _ = "foo".NonexistentModule::count
 
