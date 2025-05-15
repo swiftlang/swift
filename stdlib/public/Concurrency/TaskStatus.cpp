@@ -654,8 +654,13 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
   auto taskNameLen = strlen(_taskName);
   char* taskNameCopy = reinterpret_cast<char*>(
       _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
+#if defined(_WIN32)
+  static_cast<void>(strncpy_s(taskNameCopy, taskNameLen + 1,
+                              _taskName, _TRUNCATE));
+#else
   (void) strncpy(/*dst=*/taskNameCopy, /*src=*/_taskName, taskNameLen);
   taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
+#endif
 
   auto record =
       ::new (allocation) TaskNameStatusRecord(taskNameCopy);

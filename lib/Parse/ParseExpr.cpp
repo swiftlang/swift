@@ -3639,7 +3639,7 @@ Parser::parseExprCollectionElement(std::optional<bool> &isDictionary) {
   } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     Value = makeParserResult(makeParserError(),
-                             new (Context) ErrorExpr(SourceRange()));
+                             new (Context) ErrorExpr(PreviousLoc));
   }
 
   // Make a tuple of Key Value pair.
