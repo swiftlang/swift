@@ -220,6 +220,8 @@ do {
 do {
   nonisolated
   func nonisolatedF() {
+    let x = 0
+
     let _ = { () -> Void in }
 
     let _ = { @concurrent () async -> Void in }
@@ -227,11 +229,14 @@ do {
 
     // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{15-15=@concurrent }}{{none}}
     let _ = { () async -> Void in }
-
-    func takesInts(_: Int...) {}
+    // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{15-15=@concurrent }}{{none}}
+    let _ = { [x] () async -> Void in _ = x }
 
     // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{14-14= @concurrent in }}{{none}}
     let _ = {await globalAsyncF()}
+      // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{14-14=@concurrent }}{{none}}
+    let _ = {[x] in await globalAsyncF(); _ = x}
+
     // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{14-14= @concurrent in }}{{none}}
     let _ = {
       await globalAsyncF()
@@ -239,26 +244,40 @@ do {
     // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{14-14= @concurrent in }}{{none}}
     let _ = {
       await globalAsyncF()
+      func takesInts(_: Int...) {}
       takesInts($0, $1, $2)
     }
+
     // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{25-25=@concurrent }}{{none}}
     let _ = { @Sendable in
       await globalAsyncF()
     }
+    // expected-warning@+1:13 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{25-25=@concurrent }}{{none}}
+    let _ = { @Sendable [x] in
+      _ = x
+      await globalAsyncF()
+    }
+
     // expected-warning@+2:18 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async function type to be treated as specified to run on the caller's actor; use @concurrent to preserve behavior}}{{18-18=@concurrent }}{{none}}
     // expected-warning@+1:45 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{47-47=@concurrent }}{{none}}
     var closure: (Int, Int) async -> Void = { a, b in
       await globalAsyncF()
     }
+    // expected-warning@+1:15 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{17-17=@concurrent }}{{none}}
+    closure = { [x] a, b in _ = x }
     // expected-warning@+1:15 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{+1:7-7=@concurrent }}{{none}}
     closure = {
-      a, b async in
-      await globalAsyncF()
+      a, b async in ()
+    }
+    // expected-warning@+1:15 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{+1:7-7=@concurrent }}{{none}}
+    closure = {
+      [x] a, b async in _ = x
     }
     // expected-warning@+1:15 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{17-17=@concurrent }}{{none}}
-    closure = { (a, b) in
-      await globalAsyncF()
-    }
+    closure = { (a, b) in () }
+
+    // expected-warning@+1:15 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use @concurrent to preserve behavior}}{{17-17=@concurrent }}{{none}}
+    closure = { [x] (a, b) in _ = x }
 
     let _ = closure
   }
