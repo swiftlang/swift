@@ -1,12 +1,4 @@
-// There seems to be a minor bug in the diagnostic of the self-capture.
-// Diagnostic algorithm does not @lvalue DeclRefExpr wrapped into LoadExpr,
-// and enabling WeakLet removes the LoadExpr.
-// As a result, diagnostic messages change slightly.
-
-// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix no-weak-let-
-// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix has-weak-let- -enable-experimental-feature WeakLet
-
-// REQUIRES: swift_feature_WeakLet
+// RUN: %target-typecheck-verify-swift -swift-version 6
 
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
@@ -944,8 +936,7 @@ class TestExtensionOnOptionalSelf {
 extension TestExtensionOnOptionalSelf? {
   func foo() {
     _ = { [weak self] in
-      // expected-no-weak-let-error@+2 {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
-      // expected-has-weak-let-error@+1 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      // expected-error@+1 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
       foo()
     }
 
@@ -956,10 +947,9 @@ extension TestExtensionOnOptionalSelf? {
     }
 
     _ = { [weak self] in
-      _ = { // expected-has-weak-let-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
-        // expected-no-weak-let-error@+3 {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
-        // expected-has-weak-let-error@+2 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-        // expected-has-weak-let-note@+1 {{reference 'self.' explicitly}}
+      _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        // expected-error@+2 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        // expected-note@+1 {{reference 'self.' explicitly}}
         foo()
         self.foo()
         self?.bar()
@@ -980,8 +970,7 @@ extension TestExtensionOnOptionalSelf? {
 extension TestExtensionOnOptionalSelf {
   func foo() {
     _ = { [weak self] in
-      // expected-no-weak-let-error@+2 {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
-      // expected-has-weak-let-error@+1 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+      // expected-error@+1 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
       foo()
       self.foo()
       self?.bar()
@@ -993,10 +982,9 @@ extension TestExtensionOnOptionalSelf {
     }
 
     _ = { [weak self] in
-      _ = { // expected-has-weak-let-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
-        // expected-no-weak-let-error@+3 {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
-        // expected-has-weak-let-error@+2 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-        // expected-has-weak-let-note@+1 {{reference 'self.' explicitly}}
+      _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+        // expected-error@+2 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        // expected-note@+1 {{reference 'self.' explicitly}}
         foo()
         self.foo()
       }

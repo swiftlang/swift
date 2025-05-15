@@ -14,9 +14,9 @@
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
 // RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
-// RUN:   %target-build-swift -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend WeakLet %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
+// RUN:   %target-build-swift -Xfrontend -disable-access-control %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
 // RUN: else \
-// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend WeakLet -o %t/Mirror; \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/Mirror; \
 // RUN: fi
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
@@ -24,7 +24,6 @@
 // REQUIRES: executable_test
 // REQUIRES: shell
 // REQUIRES: reflection
-// REQUIRES: swift_feature_WeakLet
 
 import StdlibUnittest
 
@@ -124,7 +123,6 @@ mirrors.test("class/NativeSwiftClassHasNativeWeakReferenceNoLeak") {
   expectNil(verifier)
 }
 
-#if hasFeature(WeakLet)
 class NativeSwiftClassHasWeakLet {
   weak let weakProperty: AnyObject?
   let x: Int
@@ -207,7 +205,6 @@ mirrors.test("class/NativeSwiftClassHasNativeWeakLetReferenceNoLeak") {
   }
   expectNil(verifier)
 }
-#endif
 
 #if _runtime(_ObjC)
 
@@ -378,8 +375,6 @@ mirrors.test("struct/StructHasObjCClassBoundExistential") {
   print(extractedChild)
 }
 
-#if hasFeature(WeakLet)
-
 class NativeSwiftClassHasObjCClassBoundExistentialLet {
   weak let weakProperty: ObjCClassExistential?
   let x: Int
@@ -529,8 +524,6 @@ mirrors.test("struct/StructHasObjCClassBoundExistentialLet") {
   expectEqual(child.x, extractedChild.x)
   print(extractedChild)
 }
-
-#endif
 
 #endif
 

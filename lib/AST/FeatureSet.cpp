@@ -624,15 +624,6 @@ static bool usesFeatureExtensibleAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtensibleAttr>();
 }
 
-static bool usesFeatureWeakLet(Decl *decl) {
-  if (auto *VD = dyn_cast<VarDecl>(decl)) {
-    if (auto *refAttr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
-      return VD->isLet() && refAttr->get() == ReferenceOwnership::Weak;
-    }
-  }
-  return false;
-}
-
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

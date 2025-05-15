@@ -511,9 +511,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)
 
-/// Allow `weak let` and make weak captures immutable
-EXPERIMENTAL_FEATURE(WeakLet, true)
-
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
