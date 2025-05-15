@@ -285,12 +285,12 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     // anything but still end up with an ErrorType in the AST.
     if (conformance.isConcrete()) {
       auto concrete = conformance.getConcrete();
-      auto normal = concrete->getRootNormalConformance();
-
-      if (!normal->hasComputedAssociatedConformances()) {
-        if (proto->getASTContext().evaluator.hasActiveRequest(
-              ResolveTypeWitnessesRequest{normal})) {
-          return ProtocolConformanceRef::forInvalid();
+      if (auto normal = dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
+        if (!normal->hasComputedAssociatedConformances()) {
+          if (proto->getASTContext().evaluator.hasActiveRequest(
+                ResolveTypeWitnessesRequest{normal})) {
+            return ProtocolConformanceRef::forInvalid();
+          }
         }
       }
     }
