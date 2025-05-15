@@ -168,8 +168,8 @@ static StringRef toString(ValueWitnessKind k) {
 }
 
 template <typename T>
-auto operator<<(const std::unique_ptr<DemanglerPrinter> &printer,
-                const T &n) -> decltype((*printer) << n) {
+auto operator<<(const std::unique_ptr<DemanglerPrinter> &printer, const T &n)
+    -> decltype((*printer) << n) {
   return (*printer) << n;
 }
 
@@ -181,8 +181,10 @@ private:
   bool isValid = true;
 
 public:
-  NodePrinter(DemangleOptions options, std::unique_ptr<DemanglerPrinter> printer = nullptr)
-      : Printer(printer ? std::move(printer) : std::make_unique<DemanglerPrinter>()),
+  NodePrinter(DemangleOptions options,
+              std::unique_ptr<DemanglerPrinter> printer = nullptr)
+      : Printer(printer ? std::move(printer)
+                        : std::make_unique<DemanglerPrinter>()),
         Options(options) {}
 
   std::string printRoot(NodePointer root) {

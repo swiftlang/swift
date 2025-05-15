@@ -290,7 +290,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         os << printer->getNameStart() << "," << printer->getNameEnd();
       os << ") - (";
       if (printer->hasParameters())
-        os << printer->getParametersStart() << "," << printer->getParametersEnd();
+        os << printer->getParametersStart() << ","
+           << printer->getParametersEnd();
       os << ")}";
     }
   }
