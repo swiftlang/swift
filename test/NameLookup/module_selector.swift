@@ -24,9 +24,7 @@ extension A: @retroactive Swift::Equatable {
 
   @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
   mutating func myNegate() {
-    let fn: (Swift::Int, Swift::Int) -> Swift::Int =
-      (+)
-      // FIXME: it'd be nice to handle module selectors on operators.
+    let fn: (Swift::Int, Swift::Int) -> Swift::Int = (Swift::+)
 
     let magnitude: Int.Swift::Magnitude = main::magnitude
 
@@ -69,10 +67,6 @@ extension B: @retroactive main::Equatable {
   mutating func myNegate() {
     let fn: (main::Int, main::Int) -> main::Int =
       (main::+)
-      // FIXME: it'd be nice to handle module selectors on operators.
-      // expected-error@-2 {{cannot convert value of type '()' to specified type '(Int, Int) -> Int'}}
-      // expected-error@-3 {{expected expression}}
-      // expected-error@-4 {{expected expression after operator}}
 
     let magnitude: Int.main::Magnitude = main::magnitude
 
@@ -117,10 +111,6 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
   mutating func myNegate() {
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
       (ModuleSelectorTestingKit::+)
-      // FIXME: it'd be nice to handle module selectors on operators.
-      // expected-error@-2 {{cannot convert value of type '()' to specified type '(Int, Int) -> Int'}}
-      // expected-error@-3 {{expected expression}}
-      // expected-error@-4 {{expected expression after operator}}
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
 
@@ -165,10 +155,6 @@ extension D: @retroactive Swift::Equatable {
   mutating func myNegate() {
     let fn: (Swift::Int, Swift::Int) -> Swift::Int =
       (Swift::+)
-      // FIXME: it'd be nice to handle module selectors on operators.
-      // expected-error@-2 {{cannot convert value of type '()' to specified type '(Int, Int) -> Int'}}
-      // expected-error@-3 {{expected expression}}
-      // expected-error@-4 {{expected expression after operator}}
 
     let magnitude: Int.Swift::Magnitude = Swift::magnitude
 

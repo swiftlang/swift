@@ -3247,19 +3247,26 @@ Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
   return makeParserResult(status, argList);
 }
 
+/// See if we have an operator decl ref '(<op>)'. The operator token in
+/// this case lexes as a binary operator because it neither leads nor
+/// follows a proper subexpression.
+bool listElementIsBinaryOperator(Parser &P, tok rightTok) {
+  // Look past a module selector, if present.
+  if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon_colon)) {
+    return P.lookahead(2, [&](auto &scope) {
+      return listElementIsBinaryOperator(P, rightTok);
+    });
+  }
+
+  return P.Tok.isBinaryOperator() && P.peekToken().isAny(rightTok, tok::comma);
+}
+
 ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts) {
   Identifier FieldName;
   SourceLoc FieldNameLoc;
   parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
-  // See if we have an operator decl ref '(<op>)'. The operator token in
-  // this case lexes as a binary operator because it neither leads nor
-  // follows a proper subexpression.
-  auto isUnappliedOperator = [&]() {
-    return Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma);
-  };
-
-  if (isUnappliedOperator()) {
+  if (listElementIsBinaryOperator(*this, rightTok)) {
     // Check to see if we have the start of a regex literal `/.../`. We need
     // to do this for an unapplied operator reference, as e.g `(/, /)` might
     // be a regex literal.
@@ -3268,10 +3275,8 @@ ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, Sou
 
   ParserStatus Status;
   Expr *SubExpr = nullptr;
-  if (isUnappliedOperator()) {
+  if (listElementIsBinaryOperator(*this, rightTok)) {
     DeclNameLoc Loc;
-    // FIXME: We would like to allow module selectors on binary operators, but
-    // the condition above won't let us reach this code.
     auto OperName =
         parseDeclNameRef(Loc, diag::expected_operator_ref,
                          DeclNameFlag::AllowOperators |
