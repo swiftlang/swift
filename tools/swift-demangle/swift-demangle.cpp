@@ -255,9 +255,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       return;
     }
 
-    TrackingDemanglerPrinter printer;
+    std::unique_ptr<TrackingDemanglerPrinter> printer;
     std::string string =
-        swift::Demangle::nodeToString(pointer, options, &printer);
+        swift::Demangle::nodeToString(pointer, options, std::move(printer));
     if (!CompactMode)
       os << name << " ---> ";
 
@@ -284,13 +284,13 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     os << (string.empty() ? name : llvm::StringRef(string));
 
     if (!string.empty() && Ranges &&
-        (printer.hasBaseName() || printer.hasParameters())) {
+        (printer->hasBaseName() || printer->hasParameters())) {
       os << " | {(";
-      if (printer.hasBaseName())
-        os << printer.getNameStart() << "," << printer.getNameEnd();
+      if (printer->hasBaseName())
+        os << printer->getNameStart() << "," << printer->getNameEnd();
       os << ") - (";
-      if (printer.hasParameters())
-        os << printer.getParametersStart() << "," << printer.getParametersEnd();
+      if (printer->hasParameters())
+        os << printer->getParametersStart() << "," << printer->getParametersEnd();
       os << ")}";
     }
   }

@@ -167,27 +167,29 @@ static StringRef toString(ValueWitnessKind k) {
   printer_unreachable("bad value witness kind");
 }
 
+template <typename T>
+auto operator<<(const std::unique_ptr<DemanglerPrinter> &printer,
+                const T &n) -> decltype((*printer) << n) {
+  return (*printer) << n;
+}
+
 class NodePrinter {
 private:
-  std::unique_ptr<DemanglerPrinter> PrinterStorage;
-  DemanglerPrinter &Printer;
+  std::unique_ptr<DemanglerPrinter> Printer;
   DemangleOptions Options;
   bool SpecializationPrefixPrinted = false;
   bool isValid = true;
 
 public:
-  NodePrinter(DemangleOptions options, DemanglerPrinter *printer = nullptr)
-      : PrinterStorage(),
-        Printer(printer
-                    ? *printer
-                    : *(PrinterStorage = std::make_unique<DemanglerPrinter>())),
+  NodePrinter(DemangleOptions options, std::unique_ptr<DemanglerPrinter> printer = nullptr)
+      : Printer(printer ? std::move(printer) : std::make_unique<DemanglerPrinter>()),
         Options(options) {}
 
   std::string printRoot(NodePointer root) {
     isValid = true;
     print(root, 0);
     if (isValid)
-      return std::move(Printer).str();
+      return std::move(*Printer).str();
     return "";
   }
 
@@ -808,7 +810,7 @@ private:
       return;
     }
 
-    Printer.startParameters(depth);
+    Printer->startParameters(depth);
     NodePointer Parameters = ParameterType->getFirstChild();
     assert(Parameters->getKind() == Node::Kind::Type);
     Parameters = Parameters->getFirstChild();
@@ -821,7 +823,7 @@ private:
       } else {
         Printer << "(_:)";
       }
-      Printer.endParameters(depth);
+      Printer->endParameters(depth);
       return;
     }
 
@@ -861,7 +863,7 @@ private:
         },
         [&]() { Printer << (showTypes ? ", " : ""); });
     Printer << ')';
-    Printer.endParameters(depth);
+    Printer->endParameters(depth);
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node,
@@ -2414,11 +2416,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::TypeSymbolicReference:
     Printer << "type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    Printer->writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     Printer << "opaque type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    Printer->writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
@@ -2460,7 +2462,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    Printer->writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";
@@ -3472,15 +3474,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
     Printer << "unique existential shape symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    Printer->writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     Printer << "non-unique existential shape symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    Printer->writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::ObjectiveCProtocolSymbolicReference:
     Printer << "objective-c protocol symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    Printer->writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::SymbolicExtendedExistentialType: {
     auto shape = Node->getChild(0);
@@ -3490,7 +3492,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "symbolic existential type ("
             << (isUnique ? "" : "non-")
             << "unique) 0x";
-    Printer.writeHex(shape->getIndex());
+    Printer->writeHex(shape->getIndex());
     Printer << " <";
     print(Node->getChild(1), depth + 1);
     if (Node->getNumChildren() > 2) {
@@ -3577,16 +3579,16 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
       // later in suffix form.
       PostfixContext = Context;
     } else {
-      size_t CurrentPos = Printer.getStringRef().size();
+      size_t CurrentPos = Printer->getStringRef().size();
       PostfixContext = print(Context, depth + 1, /*asPrefixContext*/ true);
 
       // Was the context printed as prefix?
-      if (Printer.getStringRef().size() != CurrentPos)
+      if (Printer->getStringRef().size() != CurrentPos)
         Printer << '.';
     }
   }
   if (Entity->shouldTrackNameRange()) {
-    Printer.startName();
+    Printer->startName();
   }
   if (hasName || !OverwriteName.empty()) {
     if (!ExtraName.empty() && MultiWordName) {
@@ -3598,7 +3600,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
       ExtraName = "";
       ExtraIndex = -1;
     }
-    size_t CurrentPos = Printer.getStringRef().size();
+    size_t CurrentPos = Printer->getStringRef().size();
     if (!OverwriteName.empty()) {
       Printer << OverwriteName;
     } else {
@@ -3609,7 +3611,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
       if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
         print(PrivateName, depth + 1);
     }
-    if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
+    if (Printer->getStringRef().size() != CurrentPos && !ExtraName.empty())
       Printer << '.';
   }
   if (!ExtraName.empty()) {
@@ -3618,7 +3620,7 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
       Printer << ExtraIndex;
   }
   if (Entity->shouldTrackNameRange()) {
-    Printer.endName();
+    Printer->endName();
   }
   if (TypePr != TypePrinting::NoType) {
     NodePointer type = getChildIf(Entity, Node::Kind::Type);
@@ -3851,11 +3853,11 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
 
 std::string Demangle::nodeToString(NodePointer root,
                                    const DemangleOptions &options,
-                                   DemanglerPrinter *printer) {
+                                   std::unique_ptr<DemanglerPrinter> printer) {
   if (!root)
     return "";
 
-  return NodePrinter(options, printer).printRoot(root);
+  return NodePrinter(options, std::move(printer)).printRoot(root);
 }
 
 #endif

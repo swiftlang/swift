@@ -492,7 +492,7 @@ public:
   std::string
   demangleSymbolAsString(llvm::StringRef MangledName,
                          const DemangleOptions &Options = DemangleOptions(),
-                         DemanglerPrinter *printer = nullptr);
+                         std::unique_ptr<DemanglerPrinter> printer = nullptr);
 
   /// Demangle the given type and return the readable name.
   ///
@@ -550,7 +550,7 @@ public:
 std::string
 demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
                        const DemangleOptions &options = DemangleOptions(),
-                       DemanglerPrinter *printer = nullptr);
+                       std::unique_ptr<DemanglerPrinter> printer = nullptr);
 
 /// Standalone utility function to demangle the given symbol as string.
 ///
@@ -561,9 +561,9 @@ demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
 inline std::string
 demangleSymbolAsString(const std::string &mangledName,
                        const DemangleOptions &options = DemangleOptions(),
-                       DemanglerPrinter *printer = nullptr) {
+                       std::unique_ptr<DemanglerPrinter> printer = nullptr) {
   return demangleSymbolAsString(mangledName.data(), mangledName.size(), options,
-                                printer);
+                                std::move(printer));
 }
 
 /// Standalone utility function to demangle the given symbol as string.
@@ -575,9 +575,9 @@ demangleSymbolAsString(const std::string &mangledName,
 inline std::string
 demangleSymbolAsString(llvm::StringRef MangledName,
                        const DemangleOptions &Options = DemangleOptions(),
-                       DemanglerPrinter *printer = nullptr) {
+                       std::unique_ptr<DemanglerPrinter> printer = nullptr) {
   return demangleSymbolAsString(MangledName.data(), MangledName.size(), Options,
-                                printer);
+                                std::move(printer));
 }
 
 /// Standalone utility function to demangle the given type as string.
@@ -752,7 +752,7 @@ ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
 ///
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions(),
-                         DemanglerPrinter *printer = nullptr);
+                         std::unique_ptr<DemanglerPrinter> printer = nullptr);
 
 /// Transforms a mangled key path accessor thunk helper
 /// into the identfier/subscript that would be used to invoke it in swift code.
