@@ -1433,8 +1433,7 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    if (TypeChecker::typeCheckForEachPreamble(DC, S))
-      return nullptr;
+    TypeChecker::typeCheckForEachPreamble(DC, S);
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
