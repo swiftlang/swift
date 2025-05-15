@@ -215,7 +215,7 @@ static std::atomic<ObjCBridgeWitnessCacheEntry> _objcBridgeWitnessCache = {};
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  auto cached = _objcBridgeWitnessCache.load(std::memory_order_relaxed);
+  auto cached = _objcBridgeWitnessCache.load(SWIFT_MEMORY_ORDER_CONSUME);
   if (cached.metadata == T) {
     return cached.witness;
   }
@@ -226,7 +226,7 @@ findBridgeWitness(const Metadata *T) {
     .metadata = T,
     .witness = result
   };
-  _objcBridgeWitnessCache.store(cached, std::memory_order_relaxed);
+  _objcBridgeWitnessCache.store(cached, std::memory_order_release);
   return result;
 }
 
