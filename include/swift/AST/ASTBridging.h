@@ -215,9 +215,22 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
     BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
     BridgedSourceLoc cRParenLoc);
 
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:"
+           "lParenLoc:argumentLabelLocs:rParenLoc:)")
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cLabelLocs, BridgedSourceLoc cRParenLoc);
+
 SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:)")
 BridgedDeclNameLoc
 BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc);
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:)")
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
@@ -591,6 +604,11 @@ void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine, BridgedSourceLoc loc, BridgedDiagID diagID,
     BridgedArrayRef arguments, BridgedSourceLoc highlightStart,
     uint32_t hightlightLength, BridgedArrayRef fixIts);
+
+SWIFT_NAME("BridgedDiagnosticEngine.getLocationFromExternalSource(self:path:line:column:)")
+BridgedSourceLoc BridgedDiagnostic_getLocationFromExternalSource(
+    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path,
+    SwiftInt line, SwiftInt column);
 
 SWIFT_NAME("getter:BridgedDiagnosticEngine.hadAnyError(self:)")
 bool BridgedDiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);

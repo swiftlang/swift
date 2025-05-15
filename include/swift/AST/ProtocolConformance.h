@@ -918,9 +918,7 @@ public:
   }
 
   ProtocolConformanceRef getAssociatedConformance(Type assocType,
-                                                  ProtocolDecl *protocol) const{
-    llvm_unreachable("self-conformances never have associated types");
-  }
+                                                  ProtocolDecl *protocol) const;
 
   bool hasWitness(ValueDecl *requirement) const {
     return true;
