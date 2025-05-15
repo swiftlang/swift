@@ -1659,19 +1659,6 @@ BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
   return getAs<swift::TypeValueInst>()->getParamType();
 }
 
-SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
-  auto tvi = getAs<swift::TypeValueInst>();
-
-  // Assume we've already checked that the parameter type is an IntegerType.
-  auto integer = tvi->getParamType()->castTo<swift::IntegerType>();
-
-  if (integer->isNegative()) {
-    return integer->getValue().getSExtValue();
-  } else {
-    return integer->getValue().getZExtValue();
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//
