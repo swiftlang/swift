@@ -6014,12 +6014,14 @@ namespace {
       if (!layoutStringsEnabled(IGM)) {
         return false;
       }
-      return !!getLayoutString() ||
-             (IGM.Context.LangOpts.hasFeature(
-                 Feature::LayoutStringValueWitnessesInstantiation) &&
-              IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
-                    (HasDependentVWT || HasDependentMetadata) &&
-                      !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
+      const auto &TI = IGM.getTypeInfo(getLoweredType());
+      return (!!getLayoutString() ||
+              (IGM.Context.LangOpts.hasFeature(
+                   Feature::LayoutStringValueWitnessesInstantiation) &&
+               IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+               (HasDependentVWT || HasDependentMetadata) &&
+               !isa<FixedTypeInfo>(TI))) &&
+             TI.isCopyable(ResilienceExpansion::Maximal);
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
@@ -6547,13 +6549,15 @@ namespace {
       if (!layoutStringsEnabled(IGM)) {
         return false;
       }
+      auto &TI = IGM.getTypeInfo(getLoweredType());
 
-      return !!getLayoutString() ||
-             (IGM.Context.LangOpts.hasFeature(
-                  Feature::LayoutStringValueWitnessesInstantiation) &&
-              IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
-              (HasDependentVWT || HasDependentMetadata) &&
-              !isa<FixedTypeInfo>(IGM.getTypeInfo(getLoweredType())));
+      return (!!getLayoutString() ||
+              (IGM.Context.LangOpts.hasFeature(
+                   Feature::LayoutStringValueWitnessesInstantiation) &&
+               IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+               (HasDependentVWT || HasDependentMetadata) &&
+               !isa<FixedTypeInfo>(TI))) &&
+             TI.isCopyable(ResilienceExpansion::Maximal);
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {
