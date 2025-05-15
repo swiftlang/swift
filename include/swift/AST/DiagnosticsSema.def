@@ -8596,6 +8596,23 @@ GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
       (ActorIsolation, Type, DeclName, ActorIsolation))
 
 //===----------------------------------------------------------------------===//
+// MARK: @_inheritActorContext
+//===----------------------------------------------------------------------===//
+ERROR(inherit_actor_context_only_on_func_types,none,
+      "%0 only applies to parameters with function types (got: %1)",
+      (DeclAttribute, Type))
+
+ERROR(inherit_actor_context_only_on_sending_or_Sendable_params,none,
+      "%0 only applies to 'sending' parameters or parameters with "
+      "'@Sendable' function types",
+      (DeclAttribute))
+
+ERROR(inherit_actor_context_only_on_async_or_isolation_erased_params,none,
+      "%0 only applies to '@isolated(any)' parameters or parameters with "
+      "asynchronous function types",
+      (DeclAttribute))
+
+//===----------------------------------------------------------------------===//
 // MARK: @concurrent and nonisolated(nonsending) attributes
 //===----------------------------------------------------------------------===//
 
