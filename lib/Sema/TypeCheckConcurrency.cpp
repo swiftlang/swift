@@ -4810,7 +4810,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
   isolation = isolation.withPreconcurrency(preconcurrency);
 
   if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-          .isEnabledForAdoption()) {
+          .isEnabledForMigration()) {
     warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, closure, isolation);
   }
 
@@ -6296,7 +6296,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(Evaluator &evaluator,
 
   auto &ctx = value->getASTContext();
   if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-          .isEnabledForAdoption()) {
+          .isEnabledForMigration()) {
     warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, value,
                                                   inferredIsolation.isolation);
   }

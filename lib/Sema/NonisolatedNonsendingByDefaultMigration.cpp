@@ -60,7 +60,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
   const auto feature = Feature::NonisolatedNonsendingByDefault;
 
   ASSERT(node);
-  ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption());
+  ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForMigration());
 
   ValueDecl *decl = nullptr;
   ClosureExpr *closure = nullptr;
@@ -150,7 +150,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
 
   const ConcurrentAttr attr(/*implicit=*/true);
 
-  const auto featureName = getFeatureName(feature);
+  const auto featureName = feature.getName();
   if (decl) {
     // Diagnose the function, but slap the attribute on the storage declaration
     // instead if the function is an accessor.

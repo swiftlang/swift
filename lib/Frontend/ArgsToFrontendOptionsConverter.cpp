@@ -206,6 +206,10 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PrintTargetInfo = true;
   }
 
+  if (Args.hasArg(OPT_print_supported_features)) {
+    Opts.PrintSupportedFeatures = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
@@ -678,8 +682,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::CompileModuleFromInterface;
   if (Opt.matches(OPT_typecheck_module_from_interface))
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
-  if (Opt.matches(OPT_emit_supported_features))
-    return FrontendOptions::ActionType::PrintFeature;
+  if (Opt.matches(OPT_emit_supported_arguments))
+    return FrontendOptions::ActionType::PrintArguments;
   llvm_unreachable("Unhandled mode option");
 }
 

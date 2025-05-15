@@ -20,9 +20,8 @@ FeatureParsingTest::FeatureParsingTest() : ArgParsingTest() {
   this->langMode = defaultLangMode;
 }
 
-FeatureWrapper::FeatureWrapper(Feature id)
-    : id(id), name(getFeatureName(id).data()) {
-  auto langMode = getFeatureLanguageVersion(id);
+FeatureWrapper::FeatureWrapper(Feature id) : id(id), name(id.getName().data()) {
+  auto langMode = id.getLanguageVersion();
   if (langMode) {
     this->langMode = std::to_string(*langMode);
   }
@@ -52,8 +51,8 @@ void swift::PrintTo(const LangOptions::FeatureState::Kind &value,
   case LangOptions::FeatureState::Kind::Off:
     *os << "Off";
     break;
-  case LangOptions::FeatureState::Kind::EnabledForAdoption:
-    *os << "EnabledForAdoption";
+  case LangOptions::FeatureState::Kind::EnabledForMigration:
+    *os << "EnabledForMigration";
     break;
   case LangOptions::FeatureState::Kind::Enabled:
     *os << "Enabled";
