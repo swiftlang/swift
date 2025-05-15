@@ -658,6 +658,15 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     }
   }
 
+  if (auto *uoc = dyn_cast<UncheckedOwnershipConversionInst>(value)) {
+    // When converting from `unowned`, which can happen for ObjectiveC blocks,
+    // we don't require and scope-ending instruction. This falls in the category:
+    // "trust me, I know what I'm doing".
+    if (uoc->getOperand()->getOwnershipKind() == OwnershipKind::Unowned) {
+      return true;
+    }
+  }
+
   // If we have an unowned value, then again there is nothing left to do.
   if (value->getOwnershipKind() == OwnershipKind::Unowned)
     return true;

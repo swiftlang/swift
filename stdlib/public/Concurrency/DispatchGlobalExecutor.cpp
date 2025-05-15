@@ -343,7 +343,7 @@ void swift_dispatchEnqueueWithDeadline(bool global,
   if (tnsec != -1) {
     uint64_t leeway;
     if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
-        || __builtin_add_overflow(tnsec, deadline, &leeway)) {
+        || __builtin_add_overflow(tnsec, leeway, &leeway)) {
       leeway = UINT64_MAX;
     }
 

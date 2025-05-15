@@ -30,7 +30,7 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:             unsafe myFunc2(nil, CInt(exactly: ptr?.count ?? 0)!)
 // CHECK-NEXT:         } else {
 // CHECK-NEXT:             unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:                 return unsafe myFunc2(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT:                 return unsafe myFunc2(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:             }
 // CHECK-NEXT:         }
 // CHECK-NEXT:     }()
@@ -45,7 +45,7 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:                     unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
 // CHECK-NEXT:                 } else {
 // CHECK-NEXT:                     unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:                         return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                         return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                 }
 // CHECK-NEXT:             }()
@@ -53,10 +53,10 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:             unsafe ptr2!.withUnsafeMutableBufferPointer { _ptr2Ptr in
 // CHECK-NEXT:                 return { () in
 // CHECK-NEXT:                     return if ptr == nil {
-// CHECK-NEXT:                         unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                         unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: _ptr2Ptr.count)!)
 // CHECK-NEXT:                     } else {
 // CHECK-NEXT:                         unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:                             return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                             return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!, _ptr2Ptr.baseAddress, CInt(exactly: _ptr2Ptr.count)!)
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                 }()

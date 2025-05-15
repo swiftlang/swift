@@ -229,16 +229,11 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
   std::vector<ScannerImportStatementInfo> importStatements;
   std::vector<ScannerImportStatementInfo> optionalImportStatements;
 
-  std::vector<std::string> auxiliaryFiles;
-
   auto addCommonDependencyInfo =
-      [&importedClangDependenciesIDs, &auxiliaryFiles,
-       &macroDependencies](ModuleDependencyInfo &moduleDep) {
+      [&importedClangDependenciesIDs, &macroDependencies]
+      (ModuleDependencyInfo &moduleDep) {
         // Add qualified dependencies of this module
         moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
-
-        // Add any auxiliary files
-        moduleDep.setAuxiliaryFiles(auxiliaryFiles);
 
         // Add macro dependencies
         for (const auto &md : macroDependencies)
@@ -441,8 +436,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           importedSwiftDependenciesIDsArrayID,
           importedClangDependenciesIDsArrayID,
           crossImportOverlayDependenciesIDsArrayID,
-          swiftOverlayDependenciesIDsArrayID, moduleCacheKeyID,
-          AuxiliaryFilesArrayID;
+          swiftOverlayDependenciesIDsArrayID, moduleCacheKeyID;
 
       ModuleInfoLayout::readRecord(Scratch, moduleNameID, moduleImportsArrayID,
                                    optionalImportsArrayID, linkLibraryArrayID,
@@ -451,7 +445,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
                                    importedClangDependenciesIDsArrayID,
                                    crossImportOverlayDependenciesIDsArrayID,
                                    swiftOverlayDependenciesIDsArrayID,
-                                   moduleCacheKeyID, AuxiliaryFilesArrayID);
+                                   moduleCacheKeyID);
       auto moduleName = getIdentifier(moduleNameID);
       if (!moduleName)
         llvm::report_fatal_error("Bad module name");
@@ -467,11 +461,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
           getOptionalImportStatementInfoArray(optionalImportsArrayID);
       if (optionalOptionalImportStatementInfos)
         optionalImportStatements = *optionalOptionalImportStatementInfos;
-
-      auto optionalAuxiliaryFiles = getStringArray(AuxiliaryFilesArrayID);
-      if (optionalAuxiliaryFiles)
-        for (const auto &af : *optionalAuxiliaryFiles)
-          auxiliaryFiles.push_back(af);
 
       auto optionalImportedSwiftDependenciesIDs =
           getModuleDependencyIDArray(importedSwiftDependenciesIDsArrayID);
@@ -1042,7 +1031,6 @@ enum ModuleIdentifierArrayKind : uint8_t {
   ImportedClangDependenciesIDs,
   CrossImportOverlayDependenciesIDs,
   SwiftOverlayDependenciesIDs,
-  AuxiliaryFileIDs,
   CompiledModuleCandidates,
   BuildCommandLine,
   SourceFiles,
@@ -1490,9 +1478,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
           ModuleIdentifierArrayKind::CrossImportOverlayDependenciesIDs),
       getIdentifierArrayID(
           moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependenciesIDs),
-      getIdentifier(dependencyInfo.getModuleCacheKey()),
-      getIdentifierArrayID(moduleID,
-                           ModuleIdentifierArrayKind::AuxiliaryFileIDs));
+      getIdentifier(dependencyInfo.getModuleCacheKey()));
 
   switch (dependencyInfo.getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
@@ -1778,9 +1764,6 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
       addDependencyIDArray(
           moduleID, ModuleIdentifierArrayKind::SwiftOverlayDependenciesIDs,
           dependencyInfo->getSwiftOverlayDependencies());
-
-      addStringArray(moduleID, ModuleIdentifierArrayKind::AuxiliaryFileIDs,
-                     dependencyInfo->getAuxiliaryFiles());
 
       std::vector<std::string> clangHeaderDependencyNames;
       for (const auto &headerDepID :

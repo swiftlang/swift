@@ -2500,6 +2500,9 @@ public:
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
+  void visitVectorBaseAddrInst(VectorBaseAddrInst *vbai) {
+    *this << getIDAndType(vbai->getVector());
+  }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     *this << (EI->isImmutable() ? "[immutable] " : "")
           << getIDAndType(EI->getOperand()) << ", #";
@@ -2761,6 +2764,9 @@ public:
   void visitEndCOWMutationInst(EndCOWMutationInst *ECMI) {
     if (ECMI->doKeepUnique())
       *this << "[keep_unique] ";
+    *this << getIDAndType(ECMI->getOperand());
+  }
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *ECMI) {
     *this << getIDAndType(ECMI->getOperand());
   }
   void visitEndInitLetRefInst(EndInitLetRefInst *I) {

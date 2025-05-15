@@ -1860,8 +1860,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   };
 
   // Check for casts between specific concrete types that cannot succeed.
-  if (auto toElementType = toType->isArrayType()) {
-    if (auto fromElementType = fromType->isArrayType()) {
+  if (auto toElementType = toType->getArrayElementType()) {
+    if (auto fromElementType = fromType->getArrayElementType()) {
       return checkElementCast(fromElementType, toElementType,
                               CheckedCastKind::ArrayDowncast);
     }

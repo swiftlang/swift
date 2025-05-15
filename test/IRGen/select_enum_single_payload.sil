@@ -13,9 +13,10 @@ enum ManyEmptyCases {
 
 // CHECK-LABEL-64: define{{( protected)?}} swiftcc i1 @select_enum_A(i64)
 // CHECK-64:  %2 = load i32, ptr %temp-coercion.coerced
-// CHECK-64:  %4 = load i1, ptr %3
+// CHECK-64:  %4 = load i8, ptr %3
 // CHECK-64:  [[PAYLOAD:%.*]] = icmp eq i32 %2, 0
-// CHECK-64:  [[EXTRA:%.*]] = and i1 %4, [[PAYLOAD]]
+// CHECK-64:  [[TAG_TRUNC:%.*]] = icmp eq i8 %4, 1
+// CHECK-64:  [[EXTRA:%.*]] = and i1 [[TAG_TRUNC]], [[PAYLOAD]]
 // CHECK-64:  ret i1 [[EXTRA]]
 
 // CHECK-LABEL-32: define{{( protected)?}} swiftcc i1 @select_enum_A(i32, i8) {{.*}}{
@@ -34,9 +35,10 @@ entry(%0 : $ManyEmptyCases):
 
 // CHECK-LABEL-64: define{{( protected)?}} swiftcc i1 @select_enum_B(i64)
 // CHECK-64:  %2 = load i32, ptr %temp-coercion.coerced
-// CHECK-64:  %4 = load i1, ptr %3
+// CHECK-64:  %4 = load i8, ptr %3
 // CHECK-64:  [[PAYLOAD:%.*]] = icmp eq i32 %2, 1
-// CHECK-64:  [[EXTRA:%.*]] = and i1 %4, [[PAYLOAD]]
+// CHECK-64:  [[TAG_TRUNC:%.*]] = icmp eq i8 %4, 1
+// CHECK-64:  [[EXTRA:%.*]] = and i1 [[TAG_TRUNC]], [[PAYLOAD]]
 // CHECK-64:  ret i1 [[EXTRA]]
 
 // CHECK-LABEL-32: define{{( protected)?}} swiftcc i1 @select_enum_A(i32, i8) {{.*}}{

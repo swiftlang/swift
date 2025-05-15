@@ -266,10 +266,10 @@ swift::buildSubstitutionMapWithCapturedEnvironments(
         return mapIntoLocalContext(param, baseDepth, capturedEnvs);
       return Type(type).subst(baseSubMap);
     },
-    [&](CanType origType, Type substType,
-        ProtocolDecl *proto) -> ProtocolConformanceRef {
+    [&](InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto)
+          -> ProtocolConformanceRef {
       if (origType->getRootGenericParam()->getDepth() >= baseDepth)
-        return ProtocolConformanceRef::forAbstract(substType, proto);
-      return baseSubMap.lookupConformance(origType, proto);
+        return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);
+      return baseSubMap.lookupConformance(origType->getCanonicalType(), proto);
     });
 }

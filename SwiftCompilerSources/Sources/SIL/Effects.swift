@@ -161,12 +161,7 @@ extension Function {
       break
     }
     if isProgramTerminationPoint {
-      // We can ignore any memory writes in a program termination point, because it's not relevant
-      // for the caller. But we need to consider memory reads, otherwise preceding memory writes
-      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
-      // for error strings which are printed by the program termination point.
-      // Regarding ownership: a program termination point must not touch any reference counted objects.
-      return SideEffects.GlobalEffects(memory: SideEffects.Memory(read: true))
+      return SideEffects.GlobalEffects.worstEffects.forProgramTerminationPoints
     }
     var result = SideEffects.GlobalEffects.worstEffects
     switch effectAttribute {
@@ -566,6 +561,18 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
         break
       }
       return result
+    }
+
+    /// Effects with all effects removed which are not relevant for program termination points (like `fatalError`).
+    public var forProgramTerminationPoints: GlobalEffects {
+      // We can ignore any memory writes in a program termination point, because it's not relevant
+      // for the caller. But we need to consider memory reads, otherwise preceding memory writes
+      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
+      // for error strings which are printed by the program termination point.
+      // Regarding ownership: a program termination point must not touch any reference counted objects.
+      // Also, the deinit-barrier effect is not relevant because functions like `fatalError` and `exit` are
+      // not accessing objects (except strings).
+      return GlobalEffects(memory: Memory(read: memory.read))
     }
 
     public static var worstEffects: GlobalEffects {

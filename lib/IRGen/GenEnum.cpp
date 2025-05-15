@@ -1430,10 +1430,7 @@ namespace {
   // types other than i1 or power-of-two-byte sizes like i8, i16, etc. inhibit
   // FastISel and expose backend bugs.
   static unsigned getIntegerBitSizeForTag(unsigned tagBits) {
-    // i1 is used to represent bool in C so is fairly well supported.
-    if (tagBits == 1)
-      return 1;
-    // Otherwise, round the physical size in bytes up to the next power of two.
+    // Round the physical size in bytes up to the next power of two.
     unsigned tagBytes = (tagBits + 7U)/8U;
     if (!llvm::isPowerOf2_32(tagBytes))
       tagBytes = llvm::NextPowerOf2(tagBytes);
@@ -2221,15 +2218,9 @@ namespace {
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
       if (tagBits) {
-        if (ExtraTagBitCount == 1) {
-          if (extraTag == 1)
-            tagResult = tagBits;
-          else
-            tagResult = IGF.Builder.CreateNot(tagBits);
-        } else {
-          tagResult = IGF.Builder.CreateICmpEQ(tagBits,
-                    llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
-        }
+        tagResult = IGF.Builder.CreateICmpEQ(
+            tagBits,
+            llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
       }
       
       if (tagResult && payloadResult)
@@ -2311,7 +2302,9 @@ namespace {
             oneDest = llvm::BasicBlock::Create(C);
             tagBitBlocks.push_back(oneDest);
           }
-          IGF.Builder.CreateCondBr(tagBits, oneDest, zeroDest);
+          auto isOne = IGF.Builder.CreateICmpEQ(
+              tagBits, llvm::ConstantInt::get(tagBits->getType(), 1));
+          IGF.Builder.CreateCondBr(isOne, oneDest, zeroDest);
         } else {
           auto swi = SwitchBuilder::create(IGF, tagBits,
                            SwitchDefaultDest(unreachableBB, IsUnreachable),
@@ -2587,14 +2580,9 @@ namespace {
       // If we have extra tag bits, they will be zero if we contain a payload.
       if (ExtraTagBitCount > 0) {
         assert(extraBits);
-        llvm::Value *isNonzero;
-        if (ExtraTagBitCount == 1) {
-          isNonzero = extraBits;
-        } else {
-          llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
-          isNonzero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                                         extraBits, zero);
-        }
+        llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
+        llvm::Value *isNonzero =
+            IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE, extraBits, zero);
 
         auto *zeroBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         IGF.Builder.CreateCondBr(isNonzero, nonzeroBB, zeroBB);

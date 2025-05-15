@@ -229,6 +229,7 @@ extension ASTGenVisitor {
         .eagerMove,
         .exported,
         .extensible,
+        .preEnumExtensibility,
         .discardableResult,
         .disfavoredOverload,
         .dynamicMemberLookup,

@@ -2352,12 +2352,7 @@ public:
   }
   
   bool isCopyable() const {
-    if (!hasGeneralizationSignature()) {
-      return true;
-    }
-    auto *reqts = getGenSigRequirements();
-    for (unsigned i = 0, e = getNumGenSigRequirements(); i < e; ++i) {
-      auto &reqt = reqts[i];
+    for (auto &reqt : getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
         continue;
       }

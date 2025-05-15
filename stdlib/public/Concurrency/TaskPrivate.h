@@ -829,12 +829,8 @@ struct AsyncTask::PrivateStorage {
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      // Task is completing
       assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
-      assert(!oldStatus.isStatusRecordLocked() &&
-             "Task is completing, cannot be locked anymore!");
-
       assert(oldStatus.isRunning());
 
       // Remove drainer, enqueued and override bit if any

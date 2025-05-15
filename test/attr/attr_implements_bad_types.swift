@@ -21,5 +21,9 @@ struct S0 : NeedsF0 {  // expected-error {{type 'S0' does not conform to protoco
   @_implements(Equatable, ==(_:_:)) // expected-error {{containing type 'S0' does not conform to protocol 'Equatable'}}
   static func gg2(x:S0, y:S0) -> Bool {
   }
+
+  @_implements(NonexistentType, ff3()) // expected-error {{cannot find type 'NonexistentType' in scope}}
+  func gg3() {
+  }
 }
 

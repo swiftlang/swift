@@ -2694,6 +2694,18 @@ namespace {
             }
           }
 
+          // @isolated(any) functions (async or not) cannot be converted to
+          // synchronous, non-@isolated(any) functions.
+          if (fromIsolation.isErased() && !toIsolation.isErased() &&
+              !toFnType->isAsync()) {
+            ctx.Diags
+                .diagnose(funcConv->getLoc(),
+                          diag::isolated_any_conversion_to_synchronous_func,
+                          fromFnType, toFnType)
+                .warnUntilFutureSwiftVersion();
+            return;
+          }
+
           // Conversions from non-Sendable types are handled by
           // region-based isolation.
           // Function conversions are used to inject concurrency attributes
@@ -2810,6 +2822,29 @@ namespace {
         }
       }
     }
+
+    /// Function object that refines isolation for each actor isolation it is
+    /// given, returning true if all of the provided isolations have been
+    /// accounted for, or false if the caller should handle them.
+    class RefineConformances {
+      ActorIsolationChecker &self;
+
+    public:
+      RefineConformances(ActorIsolationChecker &self) : self(self) { }
+
+      bool operator()(ArrayRef<ActorIsolation> isolations) const {
+        bool anyRefined = false;
+        bool anyUnrefined = false;
+        for (const auto &isolation : isolations) {
+          if (self.refineRequiredIsolation(isolation))
+            anyRefined = true;
+          else
+            anyUnrefined = true;
+        }
+
+        return anyRefined && !anyUnrefined;
+      }
+    };
 
     bool refineRequiredIsolation(ActorIsolation refinedIsolation) {
       if (requiredIsolationLoc.isInvalid())
@@ -3040,7 +3075,7 @@ namespace {
           // If the local function is generic and this is one of its generic
           // parameters, ignore it.
           if (genericSig.getNextDepth() > 0 &&
-              genericDepth < genericSig.getNextDepth() - 1)
+              genericDepth >= genericSig.getNextDepth())
             continue;
 
           if (type->isTypeParameter() && innermostGenericDC)
@@ -3320,13 +3355,13 @@ namespace {
       if (auto erasureExpr = dyn_cast<ErasureExpr>(expr)) {
         checkIsolatedConformancesInContext(
             erasureExpr->getConformances(), erasureExpr->getLoc(),
-            getDeclContext());
+            getDeclContext(), RefineConformances{*this});
       }
 
       if (auto *underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
         checkIsolatedConformancesInContext(
             underlyingToOpaque->substitutions, underlyingToOpaque->getLoc(),
-            getDeclContext());
+            getDeclContext(), RefineConformances{*this});
       }
 
       return Action::Continue(expr);
@@ -4435,7 +4470,8 @@ namespace {
         return false;
 
       // Make sure isolated conformances are formed in the right context.
-      checkIsolatedConformancesInContext(declRef, loc, getDeclContext());
+      checkIsolatedConformancesInContext(declRef, loc, getDeclContext(),
+                                         RefineConformances{*this});
 
       auto *const decl = declRef.getDecl();
 
@@ -4680,6 +4716,10 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
               explicitClosure->getAttrs().getAttribute<NonisolatedAttr>();
           attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
         return ActorIsolation::forNonisolated(attr->isUnsafe());
+      }
+
+      if (explicitClosure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+        return ActorIsolation::forNonisolated(/*unsafe=*/false);
       }
     }
 
@@ -4933,10 +4973,11 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // return caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
-          func && func->hasAsync() &&
-          func->getModuleContext() == decl->getASTContext().MainModule) {
-        return ActorIsolation::forCallerIsolationInheriting();
+      if (auto *value = dyn_cast<ValueDecl>(decl)) {
+        if (value->isAsync() &&
+            value->getModuleContext() == decl->getASTContext().MainModule) {
+          return ActorIsolation::forCallerIsolationInheriting();
+        }
       }
     }
 
@@ -5768,38 +5809,16 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       return {};
     };
 
-    // Otherwise, see if we have one specified by our file unit.
-    bool ignoreUnspecifiedMeansMainActorIsolated = false;
-    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
-      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
-        auto options = sourceFile->getLanguageOptions();
-        if (auto isolation = options.defaultIsolation) {
-          if (*isolation) {
-            auto result = globalActorHelper(*options.defaultIsolation);
-            if (result)
-              return *result;
-          } else {
-            // If we found a nil type, then we know we should ignore unspecified
-            // means main actor isolated.
-            ignoreUnspecifiedMeansMainActorIsolated = true;
-          }
-        }
-      }
-    }
-
     // If we are required to use main actor... just use that.
-    if (!ignoreUnspecifiedMeansMainActorIsolated &&
-        ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    if (ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;
   }
 
-  // If we have an async function... by default we inherit isolation.
+  // If we have an async function or storage... by default we inherit isolation.
   if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-        func && func->hasAsync() &&
-        func->getModuleContext() == ctx.MainModule) {
+    if (value->isAsync() && value->getModuleContext() == ctx.MainModule) {
       return {
           {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
     }
@@ -6212,11 +6231,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (selfTypeIsolation.isolation) {
         auto isolation = selfTypeIsolation.isolation;
 
-        if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-            ctx.LangOpts.hasFeature(
-                Feature::NonisolatedNonsendingByDefault) &&
-            func && func->hasAsync() &&
-            func->getModuleContext() == ctx.MainModule &&
+        if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+            value->isAsync() && value->getModuleContext() == ctx.MainModule &&
             isolation.isNonisolated()) {
           isolation = ActorIsolation::forCallerIsolationInheriting();
         }
@@ -7918,6 +7934,9 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (!rootNormal)
     return ActorIsolation::forNonisolated(false);
 
+  if (conformance != rootNormal)
+    return rootNormal->getIsolation();
+
   // If the conformance is explicitly non-isolated, report that.
   if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
@@ -7949,23 +7968,69 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   auto dc = rootNormal->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
+  auto proto = rootNormal->getProtocol();
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.
-  if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
+  if (getActorIsolation(proto).isActorIsolated())
     return ActorIsolation::forNonisolated(false);
 
-  // If we are inferring isolated conformances and the conforming type is
-  // isolated to a global actor, use the conforming type's isolation.
+  // SendableMetatype disables isolation inference.
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (sendableMetatypeProto && proto->inheritsFrom(sendableMetatypeProto))
+    return ActorIsolation::forNonisolated(false);
+
+  // @preconcurrency disables isolation inference.
+  if (rootNormal->isPreconcurrency())
+    return ActorIsolation::forNonisolated(false);
+
+
+  // Isolation inference rules follow. If we aren't inferring isolated conformances,
+  // we're done.
+  if (!ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances))
+    return ActorIsolation::forNonisolated(false);
+
   auto nominal = dc->getSelfNominalTypeDecl();
-  if (ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances) &&
-      nominal) {
-    auto nominalIsolation = getActorIsolation(nominal);
-    if (nominalIsolation.isGlobalActor())
-      return nominalIsolation;
+  if (!nominal) {
+    return ActorIsolation::forNonisolated(false);
   }
 
-  return ActorIsolation::forNonisolated(false);
+  // If we are inferring isolated conformances and the conforming type is
+  // isolated to a global actor, we may use the conforming type's isolation.
+  auto nominalIsolation = getActorIsolation(nominal);
+  if (!nominalIsolation.isGlobalActor()) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  // If all of the value witnesses are nonisolated, then we should not infer
+  // global actor isolation.
+  bool anyIsolatedWitness = false;
+  auto protocol = conformance->getProtocol();
+  for (auto requirement : protocol->getMembers()) {
+    if (isa<TypeDecl>(requirement))
+      continue;
+
+    auto valueReq = dyn_cast<ValueDecl>(requirement);
+    if (!valueReq)
+      continue;
+
+    auto witness = conformance->getWitnessDecl(valueReq);
+    if (!witness)
+      continue;
+
+    auto witnessIsolation = getActorIsolation(witness);
+    if (witnessIsolation.isActorIsolated()) {
+      anyIsolatedWitness = true;
+      break;
+    }
+  }
+
+  if (!anyIsolatedWitness) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  return nominalIsolation;
 }
 
 namespace {
@@ -7974,11 +8039,14 @@ namespace {
   class MismatchedIsolatedConformances {
     llvm::TinyPtrVector<ProtocolConformance *> badIsolatedConformances;
     DeclContext *fromDC;
+    HandleConformanceIsolationFn handleBad;
     mutable std::optional<ActorIsolation> fromIsolation;
 
   public:
-    MismatchedIsolatedConformances(const DeclContext *fromDC)
-      : fromDC(const_cast<DeclContext *>(fromDC)) { }
+    MismatchedIsolatedConformances(const DeclContext *fromDC,
+                                   HandleConformanceIsolationFn handleBad)
+      : fromDC(const_cast<DeclContext *>(fromDC)),
+        handleBad(handleBad) { }
 
     ActorIsolation getContextIsolation() const {
       if (!fromIsolation)
@@ -8018,6 +8086,16 @@ namespace {
       if (badIsolatedConformances.empty())
         return false;
 
+      if (handleBad) {
+        // Capture all of the actor isolations from the conformances.
+        std::vector<ActorIsolation> badIsolations;
+        for (auto conformance : badIsolatedConformances)
+          badIsolations.push_back(conformance->getIsolation());
+
+        if (handleBad(badIsolations))
+          return false;
+      }
+
       ASTContext &ctx = fromDC->getASTContext();
       auto firstConformance = badIsolatedConformances.front();
       ctx.Diags.diagnose(
@@ -8033,32 +8111,40 @@ namespace {
 
 }
 
+bool swift::doNotDiagnoseConformanceIsolation(ArrayRef<ActorIsolation>) {
+  return false;
+}
+
 bool swift::checkIsolatedConformancesInContext(
-    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(declRef, mismatched);
   return mismatched.diagnose(loc);
 }
 
 bool swift::checkIsolatedConformancesInContext(
     ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
-    const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   for (auto conformance: conformances)
     forEachConformance(conformance, mismatched);
   return mismatched.diagnose(loc);
 }
 
 bool swift::checkIsolatedConformancesInContext(
-    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(subs, mismatched);
   return mismatched.diagnose(loc);
 }
 
 bool swift::checkIsolatedConformancesInContext(
-    Type type, SourceLoc loc, const DeclContext *dc) {
-  MismatchedIsolatedConformances mismatched(dc);
+    Type type, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad) {
+  MismatchedIsolatedConformances mismatched(dc, handleBad);
   forEachConformance(type, mismatched);
   return mismatched.diagnose(loc);
 }

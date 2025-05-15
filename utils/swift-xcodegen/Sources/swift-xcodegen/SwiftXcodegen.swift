@@ -204,7 +204,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       if self.addClangToolsExtra {
         spec.addClangTargets(
           below: "../clang-tools-extra", addingPrefix: "extra-",
-          mayHaveUnbuildableFiles: true
+          mayHaveUnbuildableFiles: true, excluding: ["test"]
         )
         if self.addTestFolders {
           spec.addReference(to: "../clang-tools-extra/test")

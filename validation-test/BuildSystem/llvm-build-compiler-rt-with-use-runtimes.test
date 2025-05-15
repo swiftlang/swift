@@ -1,7 +1,7 @@
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
 # RUN: %empty-directory(%t)
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=1 --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
 
@@ -14,7 +14,7 @@
 # LLVM-USE-RUNTIMES-SAME: llvm
 
 # RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
 # RUN: %empty-directory(%t)
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=1 --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
 

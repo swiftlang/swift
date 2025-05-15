@@ -258,6 +258,14 @@ public:
     }
   }
 
+  void visitPreEnumExtensibilityAttr(PreEnumExtensibilityAttr *attr) {
+    if (!D->getAttrs().hasAttribute<ExtensibleAttr>()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::pre_enum_extensibility_without_extensible, attr);
+      return;
+    }
+  }
+
   void visitConcurrentAttr(ConcurrentAttr *attr) {
     checkExecutionBehaviorAttribute(attr);
 
@@ -4273,8 +4281,25 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   ProtocolDecl *PD = attr->getProtocol(DC);
 
   if (!PD) {
-    diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
-      .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    // `ImplementsAttr::getProtocol()` returns `nullptr` both when a type fails
+    // to resolve, and when it resolves to something other than a protocol.
+    // Due to layering concerns, it doesn't resolve in a way that emits
+    // diagnostics.
+    //
+    // Distinguish between these situations by trying to resolve the type again.
+    // If it doesn't resolve, TypeResolution will have diagnosed the problem; if
+    // it does, it must have resolved to a non-protocol, so emit a diagnostic to
+    // that effect.
+    TypeResolutionOptions options(TypeResolverContext::None);
+    auto resolvedType = TypeResolution::resolveContextualType(
+        attr->getProtocolTypeRepr(), DC, options,
+        // Unbound generics and placeholders are not allowed within this attr.
+        /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+
+    if (resolvedType && !resolvedType->hasError())
+      diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     return;
   }
 
@@ -8364,9 +8389,10 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   if (attr->Rename.empty())
     return nullptr;
 
+  auto &ctx = attached->getASTContext();
   auto attachedContext = attached->getDeclContext();
   auto parsedName = parseDeclName(attr->Rename);
-  auto nameRef = parsedName.formDeclNameRef(attached->getASTContext());
+  auto nameRef = parsedName.formDeclNameRef(ctx);
 
   // Handle types separately
   if (isa<NominalTypeDecl>(attached)) {
@@ -8375,7 +8401,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
-                                     nameRef.withoutArgumentLabels(),
+                                     nameRef.withoutArgumentLabels(ctx),
                                      attr->getLocation(), NL_OnlyTypes,
                                      lookupResults);
     if (lookupResults.size() == 1)

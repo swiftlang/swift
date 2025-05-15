@@ -8,13 +8,14 @@ let package = Package(
     name: "swift-xcodegen",
     platforms: [.macOS(.v13)],
     targets: [
-        .target(name: "Xcodeproj", exclude: ["README.md"]),
         .target(
             name: "SwiftXcodeGen",
             dependencies: [
               .product(name: "ArgumentParser", package: "swift-argument-parser"),
               .product(name: "SwiftOptions", package: "swift-driver"),
-              "Xcodeproj"
+            ],
+            exclude: [
+              "Xcodeproj/README.md",
             ],
             swiftSettings: [
               .enableExperimentalFeature("StrictConcurrency")

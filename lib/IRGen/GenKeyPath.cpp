@@ -783,7 +783,7 @@ emitKeyPathComponent(IRGenModule &IGM,
                                 if (auto *openedExistential =
                                         t->getAs<ExistentialArchetypeType>()) {
                                   auto &ctx = openedExistential->getASTContext();
-                                  return GenericTypeParamType::getType(0, 0, ctx);
+                                  return ctx.TheSelfType;
                                 }
                                 return std::nullopt;
                               })

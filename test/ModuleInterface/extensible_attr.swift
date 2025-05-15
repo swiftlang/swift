@@ -16,3 +16,14 @@
 @extensible
 public enum E {
 }
+
+// CHECK: #if compiler(>=5.3) && $ExtensibleAttribute
+// CHECK-NEXT: @preEnumExtensibility @extensible public enum F {
+// CHECK: #else
+// CHECK-NEXT: public enum F {
+// CHECK: #endif
+@preEnumExtensibility
+@extensible
+public enum F {
+  case a
+}

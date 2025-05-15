@@ -57,15 +57,15 @@ entry(%x : $float3):
 }
 
 // x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
-// i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1)
+// i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1)
 // aarch64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // arm64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
-// armv6-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1)
+// armv6-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1)
 // armv7-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // armv7s-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // armv7k-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // arm64_32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
-// powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1)
+// powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1)
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // wasm32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)

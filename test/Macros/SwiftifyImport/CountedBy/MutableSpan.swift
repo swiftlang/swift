@@ -10,6 +10,6 @@ func myFunc(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt) {
 // CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr)
 // CHECK-NEXT: func myFunc(_ ptr: inout MutableSpan<CInt>) {
 // CHECK-NEXT:     return unsafe   ptr.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.count)!)
+// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }

@@ -1692,7 +1692,7 @@ struct TypeSimplifier {
             auto elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
 
             if (proto == arrayProto && assocType == elementAssocTy) {
-              return lookupBaseType->isArrayType();
+              return lookupBaseType->getInlineArrayElementType();
             }
           }
 

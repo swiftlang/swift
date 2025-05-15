@@ -57,15 +57,15 @@ struct Conformer2: Q {
   func qMethod() {}
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables7erasure1cAA2QQ_pAA9ConformerV_tF"(ptr noalias nocapture sret({{.*}}) %0)
-// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T18sil_witness_tables2QQP, ptr %0, i32 0, i32 2
+// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables7erasure1cAA2QQ_pAA9ConformerV_tF"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0)
+// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds{{.*}} %T18sil_witness_tables2QQP, ptr %0, i32 0, i32 2
 // CHECK-NEXT:    store ptr [[CONFORMER_QQ_WITNESS_TABLE:@"\$s.*WP"]], ptr [[WITNESS_TABLE_ADDR]], align 8
 func erasure(c: Conformer) -> QQ {
   return c
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables15externalErasure1c0a1_b1_c1_D12_conformance9ExternalP_pAD0G9ConformerV_tF"(ptr noalias nocapture sret({{.*}}) %0)
-// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T39sil_witness_tables_external_conformance9ExternalPP, ptr %0, i32 0, i32 2
+// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables15externalErasure1c0a1_b1_c1_D12_conformance9ExternalP_pAD0G9ConformerV_tF"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0)
+// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds{{.*}} %T39sil_witness_tables_external_conformance9ExternalPP, ptr %0, i32 0, i32 2
 // CHECK-NEXT:    store ptr [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE]], ptr %2, align 8
 func externalErasure(c: ExternalConformer) -> ExternalP {
   return c

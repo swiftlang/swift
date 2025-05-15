@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
       "state" : {
-        "revision" : "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
-        "version" : "1.4.0"
+        "revision" : "41982a3656a71c768319979febd796c6fd111d5c",
+        "version" : "1.5.0"
       }
     },
     {
@@ -15,16 +15,16 @@
       "location" : "https://github.com/swiftlang/swift-driver",
       "state" : {
         "branch" : "main",
-        "revision" : "c647e91574122f2b104d294ab1ec5baadaa1aa95"
+        "revision" : "974a26ed254ae0bd1e2da678de66afe819c09cf3"
       }
     },
     {
       "identity" : "swift-llbuild",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-llbuild.git",
+      "location" : "https://github.com/swiftlang/swift-llbuild.git",
       "state" : {
         "branch" : "main",
-        "revision" : "e4ea3d267974bf75e637ec65c0b753558b22a451"
+        "revision" : "19db29ba20592429bcf74c672f6c44f5b035bec9"
       }
     },
     {
@@ -32,26 +32,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-toolchain-sqlite",
       "state" : {
-        "revision" : "9cff1f87bf66f6642ba510d42da7a3bb10006bba",
-        "version" : "0.1.1"
+        "revision" : "4ee66b3ab1c40d20176045e61d8276242e73b01d",
+        "version" : "1.0.3"
       }
     },
     {
       "identity" : "swift-tools-support-core",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-tools-support-core.git",
+      "location" : "https://github.com/swiftlang/swift-tools-support-core.git",
       "state" : {
         "branch" : "main",
-        "revision" : "a76104dbd3c3fff41adb70bc7e917a4b2d076cef"
-      }
-    },
-    {
-      "identity" : "yams",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/jpsim/Yams.git",
-      "state" : {
-        "revision" : "0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3",
-        "version" : "5.0.6"
+        "revision" : "e8fbc8b05a155f311b862178d92d043afb216fe3"
       }
     }
   ],

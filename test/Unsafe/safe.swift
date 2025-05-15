@@ -200,6 +200,8 @@ func unsafeFun() {
   _ = color
 
   if unsafe { }
+
+  _ = unsafe ? 1 : 0
 }
 
 func moreUnsafeFunc(unsafe: [Int]) {
@@ -216,6 +218,13 @@ func yetMoreUnsafeFunc(unsafe: () -> Void) {
 
   _ = unsafe ()
   // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+}
+
+func yetMoreMoreUnsafeFunc(unsafe: Int?) {
+  _ = unsafe!
+  if let unsafe {
+    _ = unsafe + 1
+  }
 }
 
 // @safe suppresses unsafe-type-related diagnostics on an entity

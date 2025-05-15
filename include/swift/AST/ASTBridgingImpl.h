@@ -436,6 +436,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasDynamicSelf() const {
+  return unbridged()->hasDynamicSelfType();
+}
+
 bool BridgedASTType::isArchetype() const {
   return unbridged()->is<swift::ArchetypeType>();
 }
@@ -538,8 +542,16 @@ bool BridgedASTType::isBuiltinVector() const {
   return unbridged()->is<swift::BuiltinVectorType>();
 }
 
+bool BridgedASTType::isBuiltinFixedArray() const {
+  return unbridged()->is<swift::BuiltinFixedArrayType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
+}
+
+BridgedASTType BridgedASTType::getBuiltinFixedArrayElementType() const {
+  return {unbridged()->castTo<swift::BuiltinFixedArrayType>()->getElementType().getPointer()};
 }
 
 bool BridgedASTType::isBuiltinFixedWidthInteger(SwiftInt width) const {
@@ -554,6 +566,10 @@ bool BridgedASTType::isOptional() const {
 
 bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
+}
+
+bool BridgedASTType::isBuiltinType() const {
+  return unbridged()->isBuiltinType();
 }
 
 OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
@@ -594,17 +610,6 @@ BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionT
 
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
   return {unbridged().subst(substMap.unbridged()).getPointer()};
-}
-
-
-BridgedASTType BridgedASTType::subst(BridgedASTType fromType, BridgedASTType toType) const {
-  auto *fromTy = fromType.unbridged()->castTo<swift::SubstitutableType>();
-  swift::Type toTy = toType.unbridged();
-  return {unbridged().subst([fromTy, toTy](swift::SubstitutableType *t) -> swift::Type {
-    if (t == fromTy)
-      return toTy;
-    return t;
-  }, swift::LookUpConformanceInModule(), swift::SubstFlags::SubstituteLocalArchetypes).getPointer()};
 }
 
 BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const {

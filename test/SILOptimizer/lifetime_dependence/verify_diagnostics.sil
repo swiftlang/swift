@@ -53,6 +53,7 @@ sil @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @ow
 
 sil @initHolder : $@convention(thin) () -> @out Holder
 sil @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @getNEIndirect : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
 
 sil @initTrivialHolder : $@convention(thin) () -> @out TrivialHolder
 sil @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
@@ -175,6 +176,7 @@ bb0(%0 : @guaranteed $NE):
   %2 = function_ref @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
   %3 = apply %2(%0) : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note @-6{{it depends on the lifetime of an argument of 'testReborrow'}}
   %4 = mark_dependence [unresolved] %3 on %0
   return %4 // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
@@ -184,6 +186,7 @@ bb0(%0 : @guaranteed $NE):
   %2 = function_ref @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
   %3 = apply %2(%0) : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note @-5{{it depends on the lifetime of an argument of 'testBorrowValue'}}
   %4 = mark_dependence [unresolved] %3 on %0
   return %4 // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
@@ -217,4 +220,29 @@ bb0(%0 : $*T, %1 : $@thick T.Type):
   dealloc_stack %3
   %21 = tuple ()
   return %21
+}
+
+// Test VariableDefUseWalker: initialization with copy_addr.
+sil shared [thunk] [ossa] @testCopyInit : $@convention(thin) (@in_guaranteed Holder) -> @out NE {
+bb0(%0 : $*NE, %1 : $*Holder):
+  %2 = alloc_stack $Holder
+  copy_addr %1 to [init] %2
+  %4 = load [take] %2
+  %5 = alloc_stack $Holder
+  %6 = store_borrow %4 to %5
+  %7 = alloc_stack $NE // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-8{{it depends on the lifetime of an argument of 'testCopyInit'}}
+
+  %8 = function_ref @getNEIndirect : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
+  %9 = apply %8(%7, %6) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
+  mark_dependence_addr [unresolved] %7 on %6
+  %11 = load [take] %7
+  store %11 to [init] %0 // expected-note {{this use causes the lifetime-dependent value to escape}}
+  end_borrow %6
+  dealloc_stack %7
+  dealloc_stack %5
+  destroy_value %4
+  dealloc_stack %2
+  %18 = tuple ()
+  return %18
 }

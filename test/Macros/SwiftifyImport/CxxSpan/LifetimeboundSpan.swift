@@ -59,27 +59,27 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc(SpanOfInt(span))), copying: ())
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc(SpanOfInt(span))), copying: ())
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec) @_disfavoredOverload
 // CHECK-NEXT: func myFunc2(_ vec: borrowing VecOfInt) -> Span<CInt> {
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc2(vec)), copying: ())
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc2(vec)), copying: ())
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span1, copy span2)
 // CHECK-NEXT: func myFunc3(_ span1: Span<CInt>, _ span2: Span<CInt>) -> Span<CInt> {
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc3(SpanOfInt(span1), SpanOfInt(span2))), copying: ())
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc3(SpanOfInt(span1), SpanOfInt(span2))), copying: ())
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, copy span)
 // CHECK-NEXT: func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc4(vec, SpanOfInt(span))), copying: ())
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc4(vec, SpanOfInt(span))), copying: ())
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc5()), copying: ())
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc5()), copying: ())
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
@@ -88,7 +88,7 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe ptr.withUnsafeBytes { _ptrPtr in
 // CHECK-NEXT:         return unsafe myFunc6(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)
 // CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
@@ -99,7 +99,7 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe ptr.withUnsafeBytes { _ptrPtr in
 // CHECK-NEXT:         return unsafe myFunc7(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)
 // CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
@@ -110,14 +110,14 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe ptr.withUnsafeBytes { _ptrPtr in
 // CHECK-NEXT:         return unsafe myFunc8(_ptrPtr.baseAddress!, SpanOfInt(span), count, size)
 // CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) @lifetime(span: copy span)
 // CHECK-NEXT: func myFunc9(_ span: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
-// CHECK-NEXT:     return unsafe _cxxOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
 // CHECK-NEXT:         return unsafe myFunc9(MutableSpanOfInt(_spanPtr))
 // CHECK-NEXT:    }), copying: ())
 // CHECK-NEXT: }

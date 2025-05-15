@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-rvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-rvalue-elimination | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -825,5 +825,20 @@ bb0:
   dealloc_stack %0
   %12 = tuple ()
   return %12
+}
+
+// CHECK-LABEL: sil @store_to_temp :
+// CHECK:         %1 = load %0
+// CHECK-NEXT:    return %1
+// CHECK-LABEL: } // end sil function 'store_to_temp'
+sil @store_to_temp : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load %0
+  %2 = alloc_stack $Klass
+  store %1 to %2
+  %4 = load %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
 }
 

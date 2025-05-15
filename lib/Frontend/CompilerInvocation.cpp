@@ -254,7 +254,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
   // If this is set, we don't want any runtime import paths.
-  if (SearchPathOpts.SkipRuntimeLibraryImportPaths) {
+  if (SearchPathOpts.SkipAllImplicitImportPaths) {
     SearchPathOpts.setRuntimeLibraryImportPaths({});
     return;
   }
@@ -270,7 +270,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 
-  if (!SearchPathOpts.ExcludeSDKPathsFromRuntimeLibraryImportPaths && !SearchPathOpts.getSDKPath().empty()) {
+  if (!SearchPathOpts.SkipSDKImportPaths && !SearchPathOpts.getSDKPath().empty()) {
     const char *swiftDir = FrontendOpts.UseSharedResourceFolder
       ? "swift" : "swift_static";
 
@@ -298,6 +298,35 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
   SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
+}
+
+static void
+updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
+                                   const LangOptions &LangOpts) {
+  if (SearchPathOpts.SkipAllImplicitImportPaths) {
+    SearchPathOpts.setImplicitFrameworkSearchPaths({});
+    return;
+  }
+
+  std::vector<std::string> ImplicitFrameworkSearchPaths;
+  if (LangOpts.Target.isOSDarwin()) {
+    if (!SearchPathOpts.SkipSDKImportPaths &&
+        !SearchPathOpts.getSDKPath().empty()) {
+      StringRef SDKPath = SearchPathOpts.getSDKPath();
+      SmallString<128> systemFrameworksScratch(SDKPath);
+      llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
+                              "Frameworks");
+      SmallString<128> systemSubFrameworksScratch(SDKPath);
+      llvm::sys::path::append(systemSubFrameworksScratch, "System", "Library",
+                              "SubFrameworks");
+      SmallString<128> frameworksScratch(SDKPath);
+      llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
+      ImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
+                                      systemSubFrameworksScratch.str().str(),
+                                      frameworksScratch.str().str()};
+    }
+  }
+  SearchPathOpts.setImplicitFrameworkSearchPaths(ImplicitFrameworkSearchPaths);
 }
 
 static void
@@ -411,11 +440,13 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
   SearchPathOpts.setSDKPath(Path);
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
 }
 
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
@@ -761,12 +792,10 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
                                             std::string(Value));
   }
 
-  for (const auto &A : Args.getAllArgValues(OPT_cas_fs))
-    Opts.CASFSRootIDs.emplace_back(A);
-  for (const auto &A : Args.getAllArgValues(OPT_clang_include_tree_root))
-    Opts.ClangIncludeTrees.emplace_back(A);
-  for (const auto &A : Args.getAllArgValues(OPT_clang_include_tree_filelist))
-    Opts.ClangIncludeTreeFileList.emplace_back(A);
+  if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
+    Opts.ClangIncludeTree = A->getValue();
+  if (auto *A = Args.getLastArg(OPT_clang_include_tree_filelist))
+    Opts.ClangIncludeTreeFileList = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_input_file_key))
     Opts.InputFileKey = A->getValue();
@@ -774,8 +803,7 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (const Arg*A = Args.getLastArg(OPT_bridging_header_pch_key))
     Opts.BridgingHeaderPCHCacheKey = A->getValue();
 
-  if (!Opts.CASFSRootIDs.empty() || !Opts.ClangIncludeTrees.empty() ||
-      !Opts.ClangIncludeTreeFileList.empty())
+  if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
   return false;
@@ -2130,10 +2158,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
   if (CASOpts.EnableCaching) {
-    // Only set UseClangIncludeTree when caching is enabled since it is not
-    // useful in non-caching context.
-    Opts.UseClangIncludeTree |= !Args.hasArg(OPT_no_clang_include_tree);
-    Opts.HasClangIncludeTreeRoot |= Args.hasArg(OPT_clang_include_tree_root);
     // Caching requires direct clang import cc1 scanning.
     Opts.ClangImporterDirectCC1Scan = true;
   }
@@ -2387,8 +2411,8 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
 
-  Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
-  Opts.ExcludeSDKPathsFromRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdlibimport);
+  Opts.SkipAllImplicitImportPaths |= Args.hasArg(OPT_nostdimport);
+  Opts.SkipSDKImportPaths |= Args.hasArg(OPT_nostdlibimport);
 
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
@@ -2548,7 +2572,20 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.EmitMacroExpansionFiles = !negated;
   }
 
-  Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
+  {
+    OptSpecifier obsoleteOpts[] = {
+      OPT_fixit_all,
+      OPT_emit_fixits_path,
+    };
+
+    for (auto option: obsoleteOpts) {
+      if (auto *arg = Args.getLastArg(option)) {
+        Diags.diagnose(SourceLoc(), diag::ignoring_option_obsolete,
+                       arg->getOption().getPrefixedName());
+      }
+    }
+  }
+
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {
@@ -4043,6 +4080,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
   setDefaultInProcessPluginServerPathIfNecessary();

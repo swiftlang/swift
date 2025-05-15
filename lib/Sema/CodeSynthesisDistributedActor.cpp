@@ -1077,11 +1077,8 @@ GetDistributedActorAsActorConformanceRequest::evaluate(
   if (!ext)
     return nullptr;
 
-  auto genericParam = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0,
-                                                    ctx);
-
   auto distributedActorAsActorConformance = ctx.getNormalConformance(
-      Type(genericParam), actorProto, SourceLoc(), ext,
+      Type(ctx.TheSelfType), actorProto, SourceLoc(), ext,
       ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
   // NOTE: Normally we "register" a conformance, but here we don't
   // because we cannot (currently) register them in a protocol,

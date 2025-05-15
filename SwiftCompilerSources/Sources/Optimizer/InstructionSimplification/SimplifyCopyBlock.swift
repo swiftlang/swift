@@ -29,7 +29,7 @@ extension CopyBlockInst : Simplifiable, SILCombineSimplifiable {
   ///
   func simplify(_ context: SimplifyContext) {
     if hasValidUses(block: self) {
-      replaceBlock( self, with: operand.value, context)
+      replaceBlock(self, with: operand.value, context)
       context.erase(instruction: self)
     }
   }
@@ -44,6 +44,13 @@ private func hasValidUses(block: Value) -> Bool {
       }
     case let apply as FullApplySite where apply.isCallee(operand: use):
       break
+    case let partialApply as PartialApplyInst:
+      // If the block is passed to another function - either as closure argument or as closure capture -
+      // it's "converted" to a swift closure with the help of a thunk. The thunk just calls the block.
+      // If this is a non-escaping partial_apply and it's such a thunk, the block does not escape.
+      if partialApply.canClosureArgumentEscape(closure: use) {
+        return false
+      }
     case is EndBorrowInst, is DestroyValueInst:
       break
     default:
@@ -61,10 +68,40 @@ private func replaceBlock(_ block: Value, with original: Value, _ context: Simpl
       context.erase(instruction: beginBorrow)
     case is FullApplySite:
       use.set(to: original, context)
+    case let partialApply as PartialApplyInst:
+      if original.ownership == .unowned {
+        let builder = Builder(before: partialApply, context)
+        let conv = builder.createUncheckedOwnershipConversion(operand: original, resultOwnership: .guaranteed)
+        use.set(to: conv, context)
+      } else {
+        use.set(to: original, context)
+      }
     case is EndBorrowInst, is DestroyValueInst:
       context.erase(instruction: use.instruction)
     default:
       fatalError("unhandled use")
     }
   }
+}
+
+private extension PartialApplyInst {
+  func canClosureArgumentEscape(closure: Operand) -> Bool {
+    guard isOnStack,
+          let callee = referencedFunction,
+          callee.isDefinition,
+          let argIdx = calleeArgumentIndex(of: closure),
+          // If the callee only _calls_ the closure argument, it does not escape.
+          callee.arguments[argIdx].uses.allSatisfy(isCalleeOperandOfApply)
+    else {
+      return true
+    }
+    return false
+  }
+}
+
+private func isCalleeOperandOfApply(_ operand: Operand) -> Bool {
+  if let apply = operand.instruction as? FullApplySite, apply.isCallee(operand: operand) {
+    return true
+  }
+  return false
 }

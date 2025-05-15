@@ -28,11 +28,11 @@ if #available(SwiftStdlib 5.7, *) {
     // Divide by 1000 to get back to a duration with representable components:
     let smallerDuration = duration / 1000
     expectEqual(smallerDuration.components, (170_000_000_000_000_000, 0))
-    #if !os(WASI)
+#if !os(WASI)
     // Now check that the components of the original value trap:
     expectCrashLater()
     let _ = duration.components
-    #endif
+#endif
   }
   
   suite.test("milliseconds from Double") {
@@ -264,5 +264,16 @@ if #available(SwiftStdlib 6.0, *) {
     expectEqual(max.attoseconds, .max)
     let min = Duration(_high: -9_223_372_036_854_775_808, low: 0)
     expectEqual(min.attoseconds, .min)
+  }
+}
+
+if #available(SwiftStdlib 6.2, *) {
+  suite.test("nanoseconds from Double") {
+    for _ in 0 ..< 100 {
+      let integerValue = Double(Int64.random(in: 0 ... 0x7fff_ffff_ffff_fc00))
+      let (sec, attosec) = Duration.nanoseconds(integerValue).components
+      expectEqual(sec, Int64(integerValue) / 1_000_000_000)
+      expectEqual(attosec, Int64(integerValue) % 1_000_000_000 * 1_000_000_000)
+    }
   }
 }

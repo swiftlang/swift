@@ -242,7 +242,9 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('INTERNAL_INSTALL_PREFIX', 'local')
 
         if host_target.startswith('linux'):
-            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
+            toolchain_file = self.generate_linux_toolchain_file(
+                platform, arch,
+                crosscompiling=self.is_cross_compile_target(host_target))
             llvm_cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
             if not self.is_release():
                 # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
@@ -269,7 +271,10 @@ class LLVM(cmake_product.CMakeProduct):
                     'llvm-size'
                 ])
         else:
-            build_targets = ['all']
+            # We build LLVMTestingSupport unconditionally
+            # to support scenarios where tests are run
+            # outside of `build-script` (e.g. with `run-test`)
+            build_targets = ['all', 'LLVMTestingSupport']
 
             if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
                self.is_cross_compile_target(host_target):
@@ -306,14 +311,28 @@ class LLVM(cmake_product.CMakeProduct):
         if host_target.startswith('linux'):
             # This preserves the behaviour we had when using
             # LLVM_BUILD_EXTERNAL COMPILER_RT --
-            # that is, having the linker not complaing if symbols used
+            # that is, having the linker not complaining if symbols used
             # by TSan are undefined (namely the ones for Blocks Runtime)
             # In the long term, we want to remove this and
             # build Blocks Runtime before LLVM
-            llvm_cmake_options.define(
-                'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
+            if ("-DCLANG_DEFAULT_LINKER=gold" in llvm_cmake_options
+                or "-DCLANG_DEFAULT_LINKER:STRING=gold" in llvm_cmake_options):
+                print("Assuming just built clang will use a gold linker -- "
+                      "if that's not the case, please adjust the value of "
+                      "`SANITIZER_COMMON_LINK_FLAGS` in `extra-llvm-cmake-options`",
+                      flush=True)
+                llvm_cmake_options.define(
+                    'SANITIZER_COMMON_LINK_FLAGS:STRING',
+                    '-Wl,--unresolved-symbols,ignore-in-object-files')
+            else:
+                print("Assuming just built clang will use a non gold linker -- "
+                      "if that's not the case, please adjust the value of "
+                      "`SANITIZER_COMMON_LINK_FLAGS` in `extra-llvm-cmake-options`",
+                      flush=True)
+                llvm_cmake_options.define(
+                    'SANITIZER_COMMON_LINK_FLAGS:STRING', '-Wl,-z,undefs')
 
-        builtins_runtimes_target_for_darwin = 'arm64-apple-darwin'
+        builtins_runtimes_target_for_darwin = f'{arch}-apple-darwin'
         if system() == "Darwin":
             llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'
@@ -385,11 +404,6 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_lld:
             llvm_enable_projects.append('lld')
 
-        if self.args.test:
-            # LLVMTestingSupport is not built at part of `all`
-            # and is required by some Swift tests
-            build_targets.append('LLVMTestingSupport')
-
         llvm_cmake_options.define('LLVM_ENABLE_PROJECTS',
                                   ';'.join(llvm_enable_projects))
         llvm_cmake_options.define('LLVM_ENABLE_RUNTIMES',
@@ -453,6 +467,7 @@ class LLVM(cmake_product.CMakeProduct):
 
         self.cmake_options.extend(host_config.cmake_options)
         self.cmake_options.extend(llvm_cmake_options)
+        self.cmake_options.extend_raw(self.args.extra_llvm_cmake_options)
 
         self._handle_cxx_headers(host_target, platform)
 

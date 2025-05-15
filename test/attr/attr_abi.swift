@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
-// REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_Extern
@@ -279,17 +278,20 @@ var async11Var: Int { get async { fatalError() } }
 // PBD shape checking
 //
 
-@abi(var x1, y1: Int) // expected-error {{cannot give pattern binding the ABI of a binding with more patterns}}
-var x1: Int = 0
+@abi(var x1, y1: Int)
+var x1: Int = 0 // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
 
 @abi(var x2: Int)
-var x2 = 0, y2: Int = 0 // expected-error {{cannot give pattern binding the ABI of a binding with fewer patterns}}
+var x2 = 0, y2: Int = 0 // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
 
-@abi(var (x3, y3): (Int, Int), (a3, b3): (Int, Int)) // expected-error {{no match for ABI var 'b3'}}
-var (x3, y3): (Int, Int) = (0, 0), a3: Int = 0
+@abi(var (x3, y3): (Int, Int), (a3, b3): (Int, Int))
+var (x3, y3): (Int, Int) = (0, 0), a3: Int = 0 // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
 
 @abi(var (x4, y4): (Int, Int), a4: Int)
-var (x4, y4): (Int, Int) = (0, 0), (a4, b4): (Int, Int) = (0, 0) // expected-error {{no match for var 'b4' in the ABI}}
+var (x4, y4): (Int, Int) = (0, 0), (a4, b4): (Int, Int) = (0, 0) // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
+
+@abi(var x5: Int)
+var x5: Int = 0
 
 //
 // Redeclaration diagnostics

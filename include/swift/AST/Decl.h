@@ -1151,6 +1151,10 @@ public:
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
 
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context, and the macro was attached to a node imported from clang.
+  bool isInMacroExpansionFromClangHeader() const;
+
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
   ///
@@ -2519,9 +2523,7 @@ public:
                                                Pattern *Pat, Expr *E,
                                                DeclContext *Parent);
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : VarLoc;
-  }
+  SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
 
   unsigned getNumPatternEntries() const {
@@ -6993,6 +6995,10 @@ public:
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
 
+  static ParamDecl *cloneAccessor(const ASTContext &Ctx,
+                                  ParamDecl const *subscriptParam,
+                                  DeclContext *Parent);
+
   static ParamDecl *
   createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                  SourceLoc argumentNameLoc, Identifier argumentName,
@@ -8409,9 +8415,8 @@ public:
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
-  }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }

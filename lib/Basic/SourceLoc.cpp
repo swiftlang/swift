@@ -482,7 +482,7 @@ namespace {
 
 std::optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
-  assert(Loc.isValid());
+  ASSERT(Loc.isValid());
 
   // If the cache is out-of-date, update it now.
   unsigned numBuffers = LLVMSourceMgr.getNumBuffers();

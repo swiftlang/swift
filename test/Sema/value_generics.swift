@@ -51,6 +51,8 @@ func c<let M: Int>(with a: A<M>) {} // OK
 func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'N'}}
 func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
 
+func *<let X: Int, let Y: Int>(l: A<X>, r: A<Y>) -> Int { l.int * r.int }
+
 struct Generic<T: ~Copyable & ~Escapable> {}
 struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 

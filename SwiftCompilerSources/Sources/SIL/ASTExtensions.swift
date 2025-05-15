@@ -76,16 +76,16 @@ extension Conformance {
 
 extension DiagnosticEngine {
   public func diagnose(_ id: DiagID, _ args: DiagnosticArgument..., at location: Location) {
-    diagnose(id, args, at: location.sourceLoc)
+    diagnose(id, args, at: location.getSourceLocation(diagnosticEngine: self))
   }
 
   public func diagnose(_ id: DiagID, _ args: [DiagnosticArgument], at location: Location) {
-    diagnose(id, args, at: location.sourceLoc)
+    diagnose(id, args, at: location.getSourceLocation(diagnosticEngine: self))
   }
 }
 
-extension Diagnostic {
+extension Diagnostic where SourceLocation == Location {
   public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: Location) {
-    self.init(id, arguments, at: location.sourceLoc)
+    self.init(id, arguments, at: location)
   }
 }

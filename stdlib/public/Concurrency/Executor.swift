@@ -382,11 +382,26 @@ extension SerialExecutor {
     #endif
   }
 
+  #if SWIFT_CONCURRENCY_USES_DISPATCH
+  @available(SwiftStdlib 6.2, *)
+  private var _dispatchQueue: OpaquePointer? {
+    return _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
+  }
+  #endif
+
   @available(SwiftStdlib 6.2, *)
   internal func _isSameExecutor(_ rhs: some SerialExecutor) -> Bool {
     if rhs === self {
       return true
     }
+    #if SWIFT_CONCURRENCY_USES_DISPATCH
+    if let rhsQueue = rhs._dispatchQueue {
+      if let ourQueue = _dispatchQueue, ourQueue == rhsQueue {
+        return true
+      }
+      return false
+    }
+    #endif
     if let rhs = rhs as? Self {
       return isSameExclusiveExecutionContext(other: rhs)
     }

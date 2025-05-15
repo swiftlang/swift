@@ -4,6 +4,17 @@ else()
 set(swift_reflection_test_darwin_dependencies)
 endif()
 
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # We need to make this dependency explicit because this library
+  # imports Darwin and Darwin re-exports _Builtin_float,
+  # but in most configurations we pull Darwin from the SDK,
+  # meaning we specify no Darwin dependency in the build system
+  list(APPEND swift_reflection_test_darwin_dependencies _Builtin_float)
+endif()
+
 if (SWIFT_INCLUDE_TESTS AND SWIFT_BUILD_DYNAMIC_STDLIB)
   add_swift_target_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     SwiftReflectionTest.swift

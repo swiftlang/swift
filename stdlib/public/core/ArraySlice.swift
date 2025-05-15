@@ -1305,10 +1305,16 @@ extension ArraySlice {
     @lifetime(&self)
     @_alwaysEmitIntoClient
     mutating get {
+      // _makeMutableAndUnique*() inserts begin_cow_mutation.
+      // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+      // We have runtime verification to check if begin_cow_mutation/end_cow_mutation are properly nested in asserts build of stdlib,
+      // disable checking whenever it is turned on since the compiler generated `end_cow_mutation_addr` is conservative and cannot be verified.
+      _makeMutableAndUniqueUnchecked()
+#else
       _makeMutableAndUnique()
-      // NOTE: We don't have the ability to schedule a call to
-      //       ContiguousArrayBuffer.endCOWMutation().
-      //       rdar://146785284 (lifetime analysis for end of mutation)
+#endif
+      // LifetimeDependence analysis inserts call to Builtin.endCOWMutation.
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
       let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)

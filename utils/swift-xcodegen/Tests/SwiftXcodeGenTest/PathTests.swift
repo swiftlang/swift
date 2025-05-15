@@ -37,4 +37,28 @@ class PathTests: XCTestCase {
     XCTAssertEqual(RelativePath("foo/bar").dropLast(2), "")
     XCTAssertEqual(RelativePath("foo/bar").dropLast(5), "")
   }
+
+  func testExtension() throws {
+    func match(
+      _ ext: FileExtension, with path: String,
+      value: Bool = true, file: StaticString = #file, line: UInt = #line
+    ) {
+      XCTAssert(path.hasExtension(ext) == value, file: file, line: line)
+      XCTAssert(AnyPath(path).hasExtension(ext) == value, file: file, line: line)
+    }
+    match(.swift, with: "x.swift")
+    match(.swift, with: "/x.swift")
+    match(.swift, with: ".swift", value: false)
+    match(.swift, with: "/.swift", value: false)
+
+    match(.swift, with: "x.SWIFT")
+    match(.swift, with: "/x.SWIFT")
+    match(.swift, with: ".SWIFT", value: false)
+    match(.swift, with: "/.SWIFT", value: false)
+
+    match(.swift, with: "x.swiftx", value: false)
+
+    XCTAssert("x.sWift".hasExtension(.asm, .swift))
+    XCTAssert(AnyPath("x.sWift").hasExtension(.asm, .swift))
+  }
 }

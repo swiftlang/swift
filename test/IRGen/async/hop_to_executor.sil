@@ -20,7 +20,7 @@ import _Concurrency
 // CHECK: [[RESUME_CTX:%[0-9]+]] = call ptr @__swift_async_resume_get_context(
 // CHECK: store ptr [[RESUME_CTX]], ptr [[CTX_ADDR]]
 // CHECK: [[CTX:%[0-9+]+]] = load ptr, ptr [[CTX_ADDR]]
-// CHECK: [[CONT_ADDR:%[0-9]+]] = getelementptr inbounds <{ ptr, ptr }>, ptr [[CTX]], i32 0, i32 1
+// CHECK: [[CONT_ADDR:%[0-9]+]] = getelementptr inbounds{{.*}} <{ ptr, ptr }>, ptr [[CTX]], i32 0, i32 1
 // CHECK: [[RET_CONTINUATION:%.*]] = load ptr, ptr [[CONT_ADDR]]
 // CHECK-arm64e:  [[T0:%.*]] = ptrtoint ptr [[RET_CONTINUATION]] to i64
 // CHECK-arm64e:  [[T1:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[T0]]

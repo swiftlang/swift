@@ -680,6 +680,13 @@ bb0(%0 : $*X):
   return %r : $()
 }
 
+sil [_semantics "programtermination_point"] @exitfunc_defined : $@convention(thin) () -> Never {
+bb0:
+  %u = function_ref @unknown_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  unreachable
+}
+
 // CHECK-LABEL: sil @call_noreturn
 // CHECK-NEXT:  [global: read]
 // CHECK-NEXT:  {{^[^[]}}
@@ -689,6 +696,23 @@ bb0:
 
 bb1:
   %u = function_ref @exitfunc : $@convention(thin) () -> Never
+  %a = apply %u() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_defined_noreturn
+// CHECK-NEXT:  [global: read]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_defined_noreturn : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %u = function_ref @exitfunc_defined : $@convention(thin) () -> Never
   %a = apply %u() : $@convention(thin) () -> Never
   unreachable
 

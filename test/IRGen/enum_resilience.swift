@@ -184,7 +184,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 
-// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK: [[WITNESS_FOR_SIZE:%size]] = load [[INT]], ptr [[WITNESS_ADDR]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
@@ -260,7 +260,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias %1, ptr swiftself %2)
+// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias %1, ptr swiftself %2)
 
 
 // Enums with resilient payloads from a different resilience domain

@@ -49,4 +49,4 @@ func onMainActor(person: Person) async {
 
 This eliminates the risk of data-races because `printNameConcurrently` continues to run on the main actor, so all access to `person` is serialized.
 
-You can also enable the `AsyncCallerExecution` upcoming feature to make `nonisolated(nonsending)` the default for async functions on non-`Sendable` types.
+You can also enable the `NonisolatedNonsendingByDefault` upcoming feature to make `nonisolated(nonsending)` the default for async functions on non-`Sendable` types.

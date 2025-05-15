@@ -1220,6 +1220,16 @@ sil @alloc_stack_test : $() -> () {
 // CHECK: } // end sil function 'alloc_stack_test'
 }
 
+// CHECK-LABEL: sil @vector_base_addr :
+// CHECK:         %1 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-LABEL: } // end sil function 'vector_base_addr'
+sil @vector_base_addr : $@convention(thin) (@inout Builtin.FixedArray<10, Int>) -> Int {
+bb0(%0 : $*Builtin.FixedArray<10, Int>):
+  %1 = vector_base_addr %0
+  %2 = load %1
+  return %2
+}
+
 sil_global @staticProp: $Int
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {

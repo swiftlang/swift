@@ -45,7 +45,13 @@ func passClosure() {
   }
 }
 
-
+// FIXME: No 'var x = x' fix-it.
+do {
+  func f(x: Int) {
+    x = 3 // expected-error@:5 {{cannot assign to value: 'x' is a 'let' constant}}{{none}}
+    x += 3 // expected-error@:7 {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}{{none}}
+  }
+}
 
 class FooClass {
   class let type_let = 5 // expected-error {{class stored properties not supported in classes}}

@@ -317,9 +317,13 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   case Kind::OpenedExistential:
   case Kind::OpenedElement:
   case Kind::Opaque: {
-    OuterSubstitutions replacer{
-        getOuterSubstitutions(), getGenericSignature()->getMaxDepth()};
-    return type.subst(replacer, replacer);
+    if (auto subs = getOuterSubstitutions()) {
+      OuterSubstitutions replacer{subs,
+                                  getGenericSignature()->getMaxDepth()};
+      return type.subst(replacer, replacer);
+    }
+
+    return type;
   }
   }
 }

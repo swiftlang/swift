@@ -25,7 +25,7 @@ public func testEnums(_ model: CGColorSpaceModel) -> Int {
 
      default: return -1
   }
-// CHECK:   [[GEP:%.+]] = getelementptr inbounds [8 x i64], ptr [[SWITCHTABLE]], i64 0, i64 %{{.*}}
+// CHECK:   [[GEP:%.+]] = getelementptr inbounds{{.*}} [8 x i64], ptr [[SWITCHTABLE]], i64 0, i64 %{{.*}}
 // CHECK:   [[LOAD:%.+]] = load i64, ptr [[GEP]], align 8
 // CHECK:   [[PHI:%.*]] = phi i64 [ [[LOAD]], %{{.*}} ], [ -1, %{{.*}} ]
 // CHECK:   ret i64 [[PHI]] 

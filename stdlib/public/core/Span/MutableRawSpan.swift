@@ -588,10 +588,14 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(first maxLength: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -611,11 +615,15 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(droppingLast k: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
   }
 
   /// Returns a span containing the final elements of the span,
@@ -660,11 +668,15 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(droppingFirst k: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newStart = unsafe _pointer?.advanced(by: droppedCount)
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
   }
 }

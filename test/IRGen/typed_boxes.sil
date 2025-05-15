@@ -9,7 +9,7 @@ sil @pod_box_8_8_a : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias ptr @swift_allocObject(ptr {{.*}} [[POD_8_8_METADATA:@metadata[0-9.]*]], i32 0, i32 2), [[WORD:i[0-9]+]] [[POD_8_8_SIZE:[0-9]+]], [[WORD]] 7)
   %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
-  // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]], ptr [[BOX]], i32 0, i32 1
+  // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds{{.*}} [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]], ptr [[BOX]], i32 0, i32 1
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   // CHECK: call void @swift_deallocUninitializedObject(ptr [[BOX]], [[WORD]] [[POD_8_8_SIZE]], [[WORD]] 7)
   dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
@@ -21,7 +21,7 @@ sil @pod_box_8_8_b : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias ptr @swift_allocObject(ptr {{.*}} [[POD_8_8_METADATA]], i32 0, i32 2), [[WORD]] [[POD_8_8_SIZE]], [[WORD]] 7)
   %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>
-  // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], ptr [[BOX]], i32 0, i32 1
+  // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds{{.*}} [[POD_8_8_LAYOUT]], ptr [[BOX]], i32 0, i32 1
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
   // CHECK: call void @swift_deallocUninitializedObject(ptr [[BOX]], [[WORD]] [[POD_8_8_SIZE]], [[WORD]] 7)
   dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>
@@ -145,7 +145,7 @@ entry:
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @proj_box
 sil @proj_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 entry(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
-  // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], ptr %0, i32 0, i32 1
+  // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds{{.*}} [[POD_8_8_LAYOUT]], ptr %0, i32 0, i32 1
   %p = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   // CHECK: [[R:%.*]] = load i64, ptr [[BOX_DATA]]
   %l = load %p : $*Builtin.Int64

@@ -25,18 +25,21 @@ struct IntByteAndByte {
 
 struct S {
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV6simples11InlineArrayVy$2_SiGvpZ : $InlineArray<3, Int> = {
-  // CHECK:         %initval = vector
+  // CHECK:         [[V:%.*]] = vector
+  // CHECK:         %initval = struct $InlineArray<3, Int> ([[V]])
   // CHECK:       }
   static let simple: InlineArray = [1, 2, 3]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV12optionalIntss11InlineArrayVy$2_SiSgGvpZ : $InlineArray<3, Optional<Int>> = {
-  // CHECK:         %initval = vector
+  // CHECK:         [[V:%.*]] = vector
+  // CHECK:         %initval = struct $InlineArray<3, Optional<Int>> ([[V]])
   // CHECK:       }
   static let optionalInts: InlineArray<_, Int?> = [10, 20, 30]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV13optionalArrays06InlineC0Vy$2_SiGSgvpZ : $Optional<InlineArray<3, Int>> = {
   // CHECK:         [[V:%.*]] = vector
-  // CHECK:         %initval = enum $Optional<InlineArray<3, Int>>, #Optional.some!enumelt, [[V]]
+  // CHECK:         [[A:%.*]] = struct $InlineArray<3, Int> ([[V]])
+  // CHECK:         %initval = enum $Optional<InlineArray<3, Int>>, #Optional.some!enumelt, [[A]]
   // CHECK:       }
   static let optionalArray: InlineArray? = [1, 2, 3]
 
@@ -44,13 +47,15 @@ struct S {
   // CHECK:         [[S0:%.*]] = struct $IntByte
   // CHECK:         [[S1:%.*]] = struct $IntByte
   // CHECK:         [[S2:%.*]] = struct $IntByte
-  // CHECK:         %initval = vector ([[S0]], [[S1]], [[S2]])
+  // CHECK:         [[V:%.*]] = vector ([[S0]], [[S1]], [[S2]])
+  // CHECK:         %initval = struct $InlineArray<3, IntByte> ([[V]])
   // CHECK:       }
   static let intBytePairs: InlineArray<_, IntByte> = [IntByte(i: 1, b: 2), IntByte(i: 3, b: 4), IntByte(i: 5, b: 6)]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV26optionalInlineArrayOfPairss0cD0Vy$2_AA7IntByteVGSgvpZ : $Optional<InlineArray<3, IntByte>> = {
   // CHECK:         [[V:%.*]] = vector
-  // CHECK:         %initval = enum $Optional<InlineArray<3, IntByte>>, #Optional.some!enumelt, [[V]]
+  // CHECK:         [[A:%.*]] = struct $InlineArray<3, IntByte> ([[V]])
+  // CHECK:         %initval = enum $Optional<InlineArray<3, IntByte>>, #Optional.some!enumelt, [[A]]
   // CHECK:       }
   static let optionalInlineArrayOfPairs: InlineArray<_, IntByte>? = [IntByte(i: 11, b: 12), IntByte(i: 13, b: 14), IntByte(i: 15, b: 16)]
 
@@ -58,21 +63,27 @@ struct S {
   // CHECK:         [[T0:%.*]] = tuple
   // CHECK:         [[T1:%.*]] = tuple
   // CHECK:         [[T2:%.*]] = tuple
-  // CHECK:         %initval = vector ([[T0]], [[T1]], [[T2]])
+  // CHECK:         [[V:%.*]] = vector ([[T0]], [[T1]], [[T2]])
+  // CHECK:         %initval = struct $InlineArray<3, (Int, Int)> ([[V]])
   // CHECK:       }
   static let tuples: InlineArray = [(10, 20), (30, 40), (50, 60)]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV6nesteds11InlineArrayVy$2_AFy$1_SiGGvpZ : $InlineArray<3, InlineArray<2, Int>> = {
   // CHECK:         [[V0:%.*]] = vector
+  // CHECK:         [[A0:%.*]] = struct $InlineArray<2, Int> ([[V0]])
   // CHECK:         [[V1:%.*]] = vector
+  // CHECK:         [[A1:%.*]] = struct $InlineArray<2, Int> ([[V1]])
   // CHECK:         [[V2:%.*]] = vector
-  // CHECK:         %initval = vector ([[V0]], [[V1]], [[V2]])
+  // CHECK:         [[A2:%.*]] = struct $InlineArray<2, Int> ([[V2]])
+  // CHECK:         [[V:%.*]] = vector ([[A0]], [[A1]], [[A2]])
+  // CHECK:         %initval = struct $InlineArray<3, InlineArray<2, Int>> ([[V]])
   // CHECK:       }
   static let nested: InlineArray<3, InlineArray<2, Int>> = [[100, 200], [300, 400], [500, 600]]
 
   // CHECK-LABEL: sil_global hidden [let] @$s4test1SV010intByteAndC0AA03IntcdC0VvpZ : $IntByteAndByte = {
   // CHECK:         [[V:%.*]] = vector
-  // CHECK:         %initval = struct $IntByteAndByte ([[V]],
+  // CHECK:         [[A:%.*]] = struct $InlineArray<3, IntByte> ([[V]])
+  // CHECK:         %initval = struct $IntByteAndByte ([[A]],
   // CHECK:       }
   static let intByteAndByte = IntByteAndByte(a: [IntByte(i: 1, b: 2), IntByte(i: 3, b: 4), IntByte(i: 5, b: 6)], x: 27)
 }

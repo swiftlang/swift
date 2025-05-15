@@ -68,7 +68,7 @@ public:
     if (!typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes())
       return subs;
 
-    return subs.mapIntoTypeExpansionContext(typeExpansionContext);
+    return substOpaqueTypesWithUnderlyingTypes(subs, typeExpansionContext);
   }
 
   // Substitute a function type.

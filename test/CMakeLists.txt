@@ -114,8 +114,6 @@ function(get_test_dependencies SDK result_var_name)
 
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries
-      arcmt-test
-      c-arcmt-test
       c-index-test
       CASPluginTest
       clang

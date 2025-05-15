@@ -16,7 +16,7 @@ entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @call_block(ptr %0, ptr %1) {{.*}} {
 // CHECK:       entry:
-// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, ptr %0, i32 0, i32 3
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr %0, i32 0, i32 3
 // CHECK:         [[T1:%.*]] = load ptr, ptr [[T0]]
 // CHECK:         [[T4:%.*]] = call ptr [[T1]](ptr %0, ptr %1)
 // CHECK:         ret ptr [[T4]]

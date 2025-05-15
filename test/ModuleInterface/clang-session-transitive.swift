@@ -16,6 +16,9 @@ import TestModule
  // CHECK-DAG:          "swift": "Swift"
  // CHECK-DAG:          "swift": "SwiftOnoneSupport"
 
+// Additional occurence in source-imported dependencies field
+ // CHECK:      "swift": "TestModule"
+
  // CHECK:      "swift": "TestModule"
  // CHECK-NEXT:    },
  // CHECK-NEXT:    {

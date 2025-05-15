@@ -387,8 +387,11 @@ static bool getModuleInterfaceInfo(
       Options.SkipInlineCXXNamespace = true;
     }
   }
+  // Skip submodules but include any exported modules that have the same public
+  // module name as this module.
   ModuleTraversalOptions TraversalOptions =
-      std::nullopt; // Don't print submodules.
+      ModuleTraversal::VisitMatchingExported;
+
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);

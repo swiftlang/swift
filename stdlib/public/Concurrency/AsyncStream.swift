@@ -177,7 +177,6 @@ public struct AsyncStream<Element> {
       case bufferingNewest(Int)
     }
 
-    @usableFromInline
     let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -478,17 +477,14 @@ extension AsyncStream.Continuation.YieldResult: Sendable where Element: Sendable
 
 @available(SwiftStdlib 6.2, *)
 extension AsyncStream.Continuation: Hashable {
-  @inlinable
   @available(SwiftStdlib 6.2, *)
   public func hash(into hasher: inout Hasher) {
     return hasher.combine(ObjectIdentifier(storage))
   }
-  @inlinable
   @available(SwiftStdlib 6.2, *)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
-  @inlinable
   @available(SwiftStdlib 6.2, *)
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.storage === rhs.storage

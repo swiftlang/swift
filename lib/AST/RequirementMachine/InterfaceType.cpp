@@ -281,11 +281,11 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::getType(0, 0, ctx.getASTContext()));
+        handleRoot(ctx.getASTContext().TheSelfType);
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::getType(0, 0, ctx.getASTContext()));
+        handleRoot(ctx.getASTContext().TheSelfType);
 
         // An associated type symbol at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.

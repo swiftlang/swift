@@ -37,7 +37,7 @@ let embeddedSwiftDiagnostics = ModulePass(name: "embedded-swift-diagnostics") {
     do {
       assert(checker.callStack.isEmpty)
       try checker.checkFunction(function)
-    } catch let error as Diagnostic {
+    } catch let error as Diagnostic<Location> {
       checker.diagnose(error)
     } catch {
       fatalError("unknown error thrown")
@@ -130,15 +130,27 @@ private struct FunctionChecker {
         throw Diagnostic(.embedded_swift_allocating_type, (instruction as! SingleValueInstruction).type,
                               at: instruction.location)
       }
-    case is BeginApplyInst:
-      throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
+
     case is ThunkInst:
-      throw Diagnostic(.embedded_swift_allocating, at: instruction.location)
+      if context.options.noAllocations {
+        throw Diagnostic(.embedded_swift_allocating, at: instruction.location)
+      }
+
+    case let ba as BeginApplyInst:
+      if context.options.noAllocations {
+        throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
+      }
+      try checkApply(apply: ba)
 
     case let pai as PartialApplyInst:
       if context.options.noAllocations && !pai.isOnStack {
         throw Diagnostic(.embedded_swift_allocating_closure, at: instruction.location)
       }
+      try checkApply(apply: pai)
+
+    // Remaining apply instructions
+    case let apply as ApplySite:
+      try checkApply(apply: apply)
 
     case let bi as BuiltinInst:
       switch bi.id {
@@ -156,39 +168,45 @@ private struct FunctionChecker {
         break
       }
 
-    case let apply as ApplySite:
-      if context.options.noAllocations && apply.isAsync {
-        throw Diagnostic(.embedded_swift_allocating_type, at: instruction.location)
-      }
-
-      if !apply.callee.type.hasValidSignatureForEmbedded,
-         // Some runtime functions have generic parameters in SIL, which are not used in IRGen.
-         // Therefore exclude runtime functions at all.
-         !apply.callsEmbeddedRuntimeFunction
-      {
-        switch apply.callee {
-        case let cmi as ClassMethodInst:
-          throw Diagnostic(.embedded_cannot_specialize_class_method, cmi.member, at: instruction.location)
-        case let wmi as WitnessMethodInst:
-          throw Diagnostic(.embedded_cannot_specialize_witness_method, wmi.member, at: instruction.location)
-        default:
-          throw Diagnostic(.embedded_call_generic_function, at: instruction.location)
-        }
-      }
-
-      // Although all (non-generic) functions are initially put into the worklist there are two reasons
-      // to call `checkFunction` recursively:
-      // * To get a better caller info in the diagnostics.
-      // * When passing an opened existential to a generic function, it's valid in Embedded swift even if the
-      //   generic is not specialized. We need to check such generic functions, too.
-      if let callee = apply.referencedFunction {
-        callStack.push(CallSite(apply: apply, callee: callee))
-        try checkFunction(callee)
-        _ = callStack.pop()
-      }
-
     default:
       break
+    }
+  }
+
+  mutating func checkApply(apply: ApplySite) throws {
+    if context.options.noAllocations && apply.isAsync {
+      throw Diagnostic(.embedded_swift_allocating_type, at: apply.location)
+    }
+
+    if !apply.callee.type.hasValidSignatureForEmbedded,
+       // Some runtime functions have generic parameters in SIL, which are not used in IRGen.
+       // Therefore exclude runtime functions at all.
+       !apply.callsEmbeddedRuntimeFunction
+    {
+      switch apply.callee {
+      case let cmi as ClassMethodInst:
+        throw Diagnostic(.embedded_cannot_specialize_class_method, cmi.member, at: apply.location)
+      case let wmi as WitnessMethodInst:
+        throw Diagnostic(.embedded_cannot_specialize_witness_method, wmi.member, at: apply.location)
+      default:
+        if apply.substitutionMap.replacementTypes.contains(where: { $0.hasDynamicSelf }),
+           apply.calleeHasGenericSelfMetatypeParameter
+        {
+          throw Diagnostic(.embedded_call_generic_function_with_dynamic_self, at: apply.location)
+        }
+        throw Diagnostic(.embedded_call_generic_function, at: apply.location)
+      }
+    }
+
+    // Although all (non-generic) functions are initially put into the worklist there are two reasons
+    // to call `checkFunction` recursively:
+    // * To get a better caller info in the diagnostics.
+    // * When passing an opened existential to a generic function, it's valid in Embedded swift even if the
+    //   generic is not specialized. We need to check such generic functions, too.
+    if let callee = apply.referencedFunction {
+      callStack.push(CallSite(apply: apply, callee: callee))
+      try checkFunction(callee)
+      _ = callStack.pop()
     }
   }
 
@@ -230,9 +248,9 @@ private struct FunctionChecker {
     }
   }
 
-  mutating func diagnose(_ error: Diagnostic) {
+  mutating func diagnose(_ error: Diagnostic<Location>) {
     var diagPrinted = false
-    if error.position != nil {
+    if error.location.hasValidLineNumber {
       context.diagnosticEngine.diagnose(error)
       diagPrinted = true
     }
@@ -354,6 +372,15 @@ private extension ApplySite {
       return true
     }
     return false
+  }
+
+  var calleeHasGenericSelfMetatypeParameter: Bool {
+    let convention = FunctionConvention(for: callee.type.canonicalType, in: parentFunction)
+    guard convention.hasSelfParameter, let selfParam = convention.parameters.last else {
+      return false
+    }
+    let selfParamType = selfParam.type
+    return selfParamType.isMetatype && selfParamType.instanceTypeOfMetatype.isGenericTypeParameter
   }
 }
 

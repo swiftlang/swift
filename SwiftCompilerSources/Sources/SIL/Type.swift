@@ -80,7 +80,13 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     !isNoEscapeFunction && isEscapable(in: function)
   }
 
-  public var builtinVectorElementType: Type { canonicalType.builtinVectorElementType.silType! }
+  public func builtinVectorElementType(in function: Function) -> Type {
+    canonicalType.builtinVectorElementType.loweredType(in: function)
+  }
+
+  public func builtinFixedArrayElementType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
+    canonicalType.builtinFixedArrayElementType.loweredType(in: function, maximallyAbstracted: maximallyAbstracted)
+  }
 
   public var superClassType: Type? { canonicalType.superClassType?.silType }
 

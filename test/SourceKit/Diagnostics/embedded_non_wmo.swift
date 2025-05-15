@@ -16,6 +16,11 @@ func foo() {
     bar(Int.self)
 }
 
+func testNonCopyable() {
+  let nc = NonCopyable()
+  nc.doSomething()
+}
+
 @main
 struct Main {
     var someClass = SomeClass()
@@ -30,6 +35,11 @@ struct Main {
 final class SomeClass {}
 
 func bar<T>(_ T: T.Type) {}
+
+struct NonCopyable : ~Copyable {
+  func doSomething() {}
+  deinit {}
+}
 
 // CHECK:      {
 // CHECK-NEXT:   key.diagnostics: [

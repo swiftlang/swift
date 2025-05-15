@@ -1,10 +1,7 @@
-
 func fromClangFramework()
 
 
 // MARK: - BystandingLibrary Additions
-
-import SwiftOnoneSupport
 
 // Available when BystandingLibrary is imported with ClangFramework
 func fromClangFrameworkCrossImport()
@@ -13,47 +10,37 @@ func fromClangFrameworkCrossImport()
 [
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1,
+    key.offset: 0,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6,
+    key.offset: 5,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 29,
+    key.offset: 28,
     key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 32,
+    key.offset: 31,
     key.length: 35
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 69,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 76,
-    key.length: 17
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 95,
+    key.offset: 68,
     key.length: 68
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 163,
+    key.offset: 136,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 168,
+    key.offset: 141,
     key.length: 29
   }
 ]
@@ -62,7 +49,7 @@ func fromClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.name: "fromClangFramework()",
     key.usr: "c:@F@fromClangFramework",
-    key.offset: 1,
+    key.offset: 0,
     key.length: 25,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fromClangFramework</decl.name>()</decl.function.free>"
   },
@@ -70,7 +57,7 @@ func fromClangFrameworkCrossImport()
     key.kind: source.lang.swift.decl.function.free,
     key.name: "fromClangFrameworkCrossImport()",
     key.usr: "s:33_ClangFramework_BystandingLibrary04fromaB11CrossImportyyF",
-    key.offset: 163,
+    key.offset: 136,
     key.length: 36,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fromClangFrameworkCrossImport</decl.name>()</decl.function.free>",
     key.required_bystanders: [

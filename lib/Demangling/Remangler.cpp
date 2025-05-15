@@ -2781,8 +2781,8 @@ ManglingError Remangler::mangleDependentProtocolConformanceOpaque(Node *node,
                                                                   unsigned depth) {
   DEMANGLER_ASSERT(node->getKind() == Node::Kind::DependentProtocolConformanceOpaque,
                    node);
-  mangleAnyProtocolConformance(node->getChild(0), depth + 1);
-  mangleType(node->getChild(1), depth + 1);
+  RETURN_IF_ERROR(mangleAnyProtocolConformance(node->getChild(0), depth + 1));
+  RETURN_IF_ERROR(mangleType(node->getChild(1), depth + 1));
   Buffer << "HO";
   return ManglingError::Success;
 }

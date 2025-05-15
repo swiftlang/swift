@@ -269,8 +269,7 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift",
-    "SwiftSettings.swift"
+    "InlineArray.swift"
   ],
   "Result": [
     "Result.swift"

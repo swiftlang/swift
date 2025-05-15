@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/* FIXME: rdar://150067288
-
 import TestsUtils
 import CxxStdlibPerformance
 import CxxStdlib
@@ -60,5 +58,3 @@ public func run_cxxToSwift(_ n: Int) {
     blackHole(x)
   }
 }
-
-*/

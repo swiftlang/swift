@@ -58,13 +58,13 @@ func genericMetatypes<T, U>(_ t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define hidden swiftcc { ptr, ptr } @"$s17generic_metatypes14protocolTypeof{{.*}}"(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK: define hidden swiftcc { ptr, ptr } @"$s17generic_metatypes14protocolTypeof{{.*}}"(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0)
 func protocolTypeof(_ x: Bas) -> Bas.Type {
-  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, ptr [[X:%.*]], i32 0, i32 1
+  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17generic_metatypes3BasP, ptr [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load ptr, ptr [[METADATA_ADDR]]
   // CHECK: [[VALUE_ADDR:%.*]] = call ptr @__swift_project_boxed_opaque_existential_1(ptr [[X]], ptr [[METADATA]])
   // CHECK: [[METATYPE:%.*]] = call ptr @swift_getDynamicType(ptr [[VALUE_ADDR]], ptr [[METADATA]], i1 true)
-  // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, ptr %0, i32 0, i32 2
+  // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17generic_metatypes3BasP, ptr %0, i32 0, i32 2
   // CHECK: [[WTABLE:%.*]] = load ptr, ptr [[WTABLE_ADDR]]
   // CHECK-NOT: call void @__swift_destroy_boxed_opaque_existential_1(ptr %0)
   // CHECK: [[T0:%.*]] = insertvalue { ptr, ptr } undef, ptr [[METATYPE]], 0

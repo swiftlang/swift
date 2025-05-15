@@ -5,10 +5,10 @@
 import Closure
 
 // CHECK: define linkonce_odr hidden void @"$sSo10NonTrivialVIegn_ABIeyBX_TR"(ptr %[[V0:.*]], ptr %[[V1:.*]])
-// CHECK: %[[V2:.*]] = getelementptr inbounds { %{{.*}}, %{{.*}} }, ptr %[[V0]], i32 0, i32 1
-// CHECK-NEXT: %[[_FN:.*]] = getelementptr inbounds %{{.*}}, ptr %[[V2]], i32 0, i32 0
+// CHECK: %[[V2:.*]] = getelementptr inbounds{{.*}} { %{{.*}}, %{{.*}} }, ptr %[[V0]], i32 0, i32 1
+// CHECK-NEXT: %[[_FN:.*]] = getelementptr inbounds{{.*}} %{{.*}}, ptr %[[V2]], i32 0, i32 0
 // CHECK-NEXT: %[[V3:.*]] = load ptr, ptr %[[_FN]], align 8
-// CHECK-NEXT: %[[_DATA:.*]] = getelementptr inbounds %{{.*}}, ptr %[[V2]], i32 0, i32 1
+// CHECK-NEXT: %[[_DATA:.*]] = getelementptr inbounds{{.*}} %{{.*}}, ptr %[[V2]], i32 0, i32 1
 // CHECK-NEXT: %[[V4:.*]] = load ptr, ptr %[[_DATA]], align 8
 // CHECK-NEXT: call ptr @swift_retain(ptr returned %[[V4]])
 // CHECK-NEXT: call swiftcc void %[[V3]](ptr noalias dereferenceable(8) %[[V1]], ptr swiftself %[[V4]])
@@ -44,7 +44,7 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 // CHECK: define swiftcc { ptr, ptr } @"$s4main13returnFuncPtrySo10NonTrivialVcyF"()
 // CHECK: %[[V0:.*]] = call ptr @_Z8getFnPtrv()
 // CHECK: %[[V1:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%{{.*}}, ptr @{{.*}}, i32 0, i32 2), i64 24, i64 7)
-// CHECK: %[[V2:.*]] = getelementptr inbounds <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
+// CHECK: %[[V2:.*]] = getelementptr inbounds{{.*}} <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
 // CHECK: store ptr %[[V0]], ptr %[[V2]], align 8
 // CHECK: %[[V3:.*]] = insertvalue { ptr, ptr } { ptr @"$sSo10NonTrivialVIetCX_ABIegn_TRTA{{(\.ptrauth)?}}", ptr undef }, ptr %[[V1]], 1
 // CHECK: ret { ptr, ptr } %[[V3]]
@@ -62,7 +62,7 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 // CHECK-NEXT: ret void
 
 // CHECK: define internal swiftcc void @"$sSo10NonTrivialVIetCX_ABIegn_TRTA"(ptr noalias dereferenceable(8) %[[V0]], ptr swiftself %[[V1]])
-// CHECK: %[[V2]] = getelementptr inbounds <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
+// CHECK: %[[V2]] = getelementptr inbounds{{.*}} <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
 // CHECK-NEXT: %[[V3]] = load ptr, ptr %[[V2]], align 8
 // CHECK-NEXT: tail call swiftcc void @"$sSo10NonTrivialVIetCX_ABIegn_TR"(ptr noalias dereferenceable(8) %[[V0]], ptr %[[V3]])
 // CHECK-NEXT: ret void

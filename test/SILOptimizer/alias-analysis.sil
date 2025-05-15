@@ -99,3 +99,44 @@ bb0(%0 : $*MyStruct, %1 : $Builtin.Word):
   %99 = tuple ()
   return %99 : $()
 }
+
+// CHECK-LABEL: @testVectorBaseAddr
+// CHECK:       PAIR #18.
+// CHECK-NEXT:      %2 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-NEXT:      %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #21.
+// CHECK-NEXT:      %2 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-NEXT:      %6 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:    NoAlias
+// CHECK:       PAIR #22.
+// CHECK-NEXT:      %2 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-NEXT:      %7 = index_addr %2 : $*Int, %5 : $Builtin.Word
+// CHECK-NEXT:    NoAlias
+// CHECK:       PAIR #27.
+// CHECK-NEXT:      %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT:      %6 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #28.
+// CHECK-NEXT:      %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT:      %7 = index_addr %2 : $*Int, %5 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #40.
+// CHECK-NEXT:      %6 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:      %7 = index_addr %2 : $*Int, %5 : $Builtin.Word
+// CHECK-NEXT:    NoAlias
+sil @testVectorBaseAddr : $@convention(thin) (@inout Builtin.FixedArray<10, Int>, Builtin.Word) -> () {
+bb0(%0 : $*Builtin.FixedArray<10, Int>, %1 : $Builtin.Word):
+  %2 = vector_base_addr %0
+  %3 = index_addr %2, %1
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = integer_literal $Builtin.Word, 2
+  %6 = index_addr %2, %4
+  %7 = index_addr %2, %5
+  fix_lifetime %2
+  fix_lifetime %3
+  fix_lifetime %6
+  fix_lifetime %7
+  %99 = tuple ()
+  return %99 : $()
+}

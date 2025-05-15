@@ -2183,7 +2183,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-    
+  
+  // Ignore end_cow_mutation_addr.
+  if (isa<EndCOWMutationAddrInst>(user)) {
+    return true;
+  }
+
   // Ignore sanitizer markers.
   if (auto bu = dyn_cast<BuiltinInst>(user)) {
     if (bu->getBuiltinKind() == BuiltinValueKind::TSanInoutAccess) {

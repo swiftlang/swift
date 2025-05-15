@@ -367,6 +367,28 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   _ = z
 }
 
+do {
+  func f(an : Any, oan: Any?) -> AnyObject? {
+    let a1 : AnyObject
+    a1 = an
+    // expected-error@-1:8 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{none}}
+    // expected-note@-2:8 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{12-12= as AnyObject}}
+    let a2 : AnyObject?
+    a2 = an
+    // expected-error@-1:10 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{12-12= as AnyObject}}
+    let a3 : AnyObject!
+    a3 = an
+    // expected-error@-1:10 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{12-12= as AnyObject}}
+
+    let obj: AnyObject = an
+    // expected-error@-1:26 {{value of type 'Any' expected to be instance of class or class-constrained type}}{{none}}
+    // expected-note@-2:26 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{28-28= as AnyObject}}
+
+    return oan
+    // expected-error@-1:12 {{return expression of type 'Any' expected to be an instance of a class or class-constrained type}}{{15-15= as AnyObject}}
+  }
+}
+
 func bridgeAnyContainerToAnyObject(x: [Any], y: [NSObject: Any]) {
   var z: AnyObject
   z = x as AnyObject

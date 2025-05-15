@@ -41,12 +41,15 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   set(SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES Darwin)
 endif()
 
-set(SWIFT_SYNCHRONIZATION_DEPENDENCIES)
 if((SWIFT_BUILD_CLANG_OVERLAYS
     OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
    AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
         OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
-  set(SWIFT_SYNCHRONIZATION_DEPENDENCIES _Builtin_float)
+  # We need to make this dependency explicit because this library
+  # imports Darwin and Darwin re-exports _Builtin_float,
+  # but in most configurations we pull Darwin from the SDK,
+  # meaning we specify no Darwin dependency in the build system
+  list(APPEND SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES _Builtin_float)
 endif()
 
 set(SWIFT_SYNCHRONIZATION_DARWIN_SOURCES
@@ -112,8 +115,6 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
   SWIFT_SOURCES_DEPENDS_FREESTANDING
     Mutex/MutexUnavailable.swift
 
-  SWIFT_MODULE_DEPENDS
-    ${SWIFT_SYNCHRONIZATION_DEPENDENCIES}
   SWIFT_MODULE_DEPENDS_OSX
     ${SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES}
   SWIFT_MODULE_DEPENDS_IOS
