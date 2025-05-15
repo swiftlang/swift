@@ -307,8 +307,6 @@ static CanPackType getReducedShapeOfPack(const ASTContext &ctx,
     }
 
     // Use () as a placeholder for scalar shape.
-    assert(!elt->template is<PackArchetypeType>() &&
-           "Pack archetype outside of a pack expansion");
     elts.push_back(ctx.TheEmptyTupleType);
   }
 
