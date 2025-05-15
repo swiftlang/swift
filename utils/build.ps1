@@ -674,6 +674,7 @@ function Invoke-BuildStep {
 enum Project {
   BuildTools
   RegsGen2
+  EarlySwiftDriver
 
   Compilers
   FoundationMacros
@@ -1205,10 +1206,10 @@ function Get-PinnedToolchainToolsDir() {
     "unknown-Asserts-development.xctoolchain", "usr", "bin")
 }
 
-function Get-PinnedToolchainSDK() {
+function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
     "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
-    "Windows.platform", "Developer", "SDKs", "Windows.sdk")
+    "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
@@ -1448,7 +1449,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
           $SwiftFlags = if ($UsePinnedCompilers.Contains("Swift")) {
-            @("-sdk", (Get-PinnedToolchainSDK))
+            @("-sdk", $(if ($SwiftSDK) { $SwiftSDK } else { Get-PinnedToolchainSDK }))
           } elseif ($SwiftSDK) {
             @("-sdk", $SwiftSDK)
           } else {
@@ -1577,8 +1578,8 @@ function Build-CMakeProject {
           # TODO(compnerd) remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
-          $SwiftFlags = if ($USePinnedCompilers.Contains("Swift")) {
-            @("-sdk", (Get-PinnedToolchainSDK))
+          $SwiftFlags = if ($UsePinnedCompilers.Contains("Swift")) {
+            @("-sdk", $(if ($SwiftSDK) { $SwiftSDK } else { Get-PinnedToolchainSDK }))
           } elseif ($SwiftSDK) {
             @(
               "-sdk", $SwiftSDK,
@@ -1885,6 +1886,26 @@ function Build-BuildTools([Hashtable] $Platform) {
     }
 }
 
+function Build-EarlySwiftDriver {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-driver `
+    -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS -Identifier "$($BuildPlatform.OS)Experimental") `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      # TODO(compnerd) - enforce dynamic BlocksRuntime and dispatch
+      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir", "-Xcc", "-static-libclosure", "-Xcc", "-Ddispatch_STATIC");
+      SWIFT_DRIVER_BUILD_TOOLS = "NO";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
+    }
+}
+
 function Write-PList {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1954,6 +1975,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
@@ -3601,6 +3623,8 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $BuildPlatform
   Invoke-BuildStep Build-BuildTools $BuildPlatform
+  Invoke-BuildStep Build-SQLite $BuildPlatform
+  Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-XML2 $BuildPlatform
     Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
