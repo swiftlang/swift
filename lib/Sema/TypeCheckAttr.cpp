@@ -184,7 +184,6 @@ public:
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(ImplicitSelfCapture)
-  IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
@@ -442,8 +441,10 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
   void visitIsolatedAttr(IsolatedAttr *attr);
 
+  void visitInheritActorContextAttr(InheritActorContextAttr *attr);
+
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
-  
+
   void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
@@ -7843,6 +7844,40 @@ void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
       attr->setInvalid();
       return;
     }
+  }
+}
+
+void AttributeChecker::visitInheritActorContextAttr(
+    InheritActorContextAttr *attr) {
+  auto *P = dyn_cast<ParamDecl>(D);
+  if (!P)
+    return;
+
+  auto paramTy = P->getInterfaceType();
+  auto *funcTy =
+      paramTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  if (!funcTy) {
+    diagnoseAndRemoveAttr(attr, diag::inherit_actor_context_only_on_func_types,
+                          attr, paramTy);
+    return;
+  }
+
+  // The type has to be either `@Sendable` or `sending` _and_
+  // `async` or `@isolated(any)`.
+  if (!(funcTy->isSendable() || P->isSending())) {
+    diagnose(attr->getLocation(),
+             diag::inherit_actor_context_only_on_sending_or_Sendable_params,
+             attr)
+        .warnUntilFutureSwiftVersion();
+  }
+
+  // Eiether `async` or `@isolated(any)`.
+  if (!(funcTy->isAsync() || funcTy->getIsolation().isErased())) {
+    diagnose(
+        attr->getLocation(),
+        diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
+        attr)
+        .warnUntilFutureSwiftVersion();
   }
 }
 

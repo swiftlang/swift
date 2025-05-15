@@ -256,3 +256,6 @@ struct LayoutOuter {
 struct AnyEraser: EraserProto {
   init<T: EraserProto>(erasing: T) {}
 }
+
+func takeNone(@_inheritActorContext param: @Sendable () async -> ()) { }
+func takeAlways(@_inheritActorContext(always) param: sending @isolated(any) () -> ()) { }
