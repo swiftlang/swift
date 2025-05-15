@@ -637,7 +637,7 @@ function Invoke-BuildStep {
     [Parameter(Position=1, Mandatory)]
     [Hashtable] $Platform,
     [Parameter(ValueFromRemainingArguments)]
-    $RemainingArgs
+    [Object[]] $RemainingArgs
   )
 
   if ($Summary) {
@@ -645,13 +645,31 @@ function Invoke-BuildStep {
   }
 
   $SplatArgs = @{}
-  foreach ($Arg in $RemainingArgs) {
-    if ($Arg -is [Hashtable]) {
-      $SplatArgs += $Arg
-    } elseif ($Arg -is [string]) {
-      $SplatArgs[$Arg.TrimStart('-')] = $true
-    } else {
-      throw "$Arg is unknown type: $($Arg.GetType())"
+  if ($RemainingArgs) {
+    $i = 0
+    while ($i -lt $RemainingArgs.Count) {
+      $Arg = $RemainingArgs[$i]
+      if ($Arg -is [Hashtable]) {
+        $SplatArgs += $Arg
+        $i++
+      } elseif ($Arg -is [string] -and $Arg.StartsWith('-')) {
+        $paramName = $Arg.TrimStart('-')
+        
+        # Check if the next argument is a value for this parameter
+        if ($i -lt $RemainingArgs.Count - 1 -and ($RemainingArgs[$i + 1] -isnot [string] -or !$RemainingArgs[$i + 1].StartsWith('-'))) {
+          # This is a named parameter with a value
+          $SplatArgs[$paramName] = $RemainingArgs[$i + 1]
+          $i += 2
+        } else {
+          # This is a switch parameter (flag)
+          $SplatArgs[$paramName] = $true
+          $i++
+        }
+      } else {
+        # Handle positional parameter
+        throw "Positional parameter '$Arg' found. The Invoke-BuildStep function only supports named parameters after the required Name and Platform parameters."
+        $i++
+      }
     }
   }
 
@@ -661,6 +679,7 @@ function Invoke-BuildStep {
     Add-TimingData $Platform $Name $Stopwatch.Elapsed
   }
 }
+
 
 enum Project {
   BuildTools
