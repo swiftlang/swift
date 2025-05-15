@@ -673,6 +673,21 @@ public enum MultiPayloadAnyObject {
     case z(AnyObject)
 }
 
+public struct NonCopyableGenericStruct<T>: ~Copyable {
+    let x: Int
+    let y: T
+
+    public init(x: Int, y: T) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public enum NonCopyableGenericEnum<T>: ~Copyable {
+    case x(Int, T?)
+    case y(Int)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -748,6 +763,11 @@ public func testGenericDestroy<T>(_ ptr: __owned UnsafeMutableRawPointer, of tpe
 
 @inline(never)
 public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    buffer.deinitialize()
+}
+
+@inline(never)
+public func testGenericArrayDestroy<T: ~Copyable>(_ buffer: UnsafeMutableBufferPointer<T>) {
     buffer.deinitialize()
 }
 
