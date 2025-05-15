@@ -122,8 +122,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
   (function: Function, context: FunctionPassContext) in
 
   guard !function.isDefinedExternally,
-        function.isAutodiffVJP,
-        function.blocks.singleElement != nil else {
+        function.isAutodiffVJP else {
     return
   }
   
