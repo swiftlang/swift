@@ -4976,7 +4976,6 @@ public:
   TRIVIAL_ATTR_PRINTER(ImplicitSelfCapture, implicit_self_capture)
   TRIVIAL_ATTR_PRINTER(Indirect, indirect)
   TRIVIAL_ATTR_PRINTER(Infix, infix)
-  TRIVIAL_ATTR_PRINTER(InheritActorContext, inherit_actor_context)
   TRIVIAL_ATTR_PRINTER(InheritsConvenienceInitializers,
                        inherits_convenience_initializers)
   TRIVIAL_ATTR_PRINTER(Inlinable, inlinable)
@@ -5299,6 +5298,12 @@ public:
     printCommon(Attr, "nonisolated_attr", label);
     printFlag(Attr->isUnsafe(), "unsafe");
     printFlag(Attr->isNonSending(), "nonsending");
+    printFoot();
+  }
+  void visitInheritActorContextAttr(InheritActorContextAttr *Attr,
+                                    Label label) {
+    printCommon(Attr, "inherit_actor_context_attr", label);
+    printFlag(Attr->isAlways(), "always");
     printFoot();
   }
   void visitObjCAttr(ObjCAttr *Attr, Label label) {
