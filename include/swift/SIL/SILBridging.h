@@ -699,11 +699,6 @@ struct BridgedInstruction {
     unknown
   };
 
-  struct OptionalInt {
-    SwiftInt value;
-    bool hasValue;
-  };
-
   enum class MarkDependenceKind {
     Unresolved, Escaping, NonEscaping
   };
@@ -744,7 +739,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
-  BRIDGED_INLINE OptionalInt IntegerLiteralInst_getValue() const;
+  BRIDGED_INLINE BridgedOptionalInt IntegerLiteralInst_getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef StringLiteralInst_getValue() const;
   BRIDGED_INLINE int StringLiteralInst_getEncoding() const;
   BRIDGED_INLINE SwiftInt TupleExtractInst_fieldIndex() const;

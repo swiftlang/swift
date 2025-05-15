@@ -1170,12 +1170,9 @@ BridgedFunction BridgedInstruction::FunctionRefBaseInst_getReferencedFunction() 
   return {getAs<swift::FunctionRefBaseInst>()->getInitiallyReferencedFunction()};
 }
 
-BridgedInstruction::OptionalInt BridgedInstruction::IntegerLiteralInst_getValue() const {
+BridgedOptionalInt BridgedInstruction::IntegerLiteralInst_getValue() const {
   llvm::APInt result = getAs<swift::IntegerLiteralInst>()->getValue();
-  if (result.getSignificantBits() <= std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
-    return {(SwiftInt)result.getSExtValue(), true};
-  }
-  return {0, false};
+  return BridgedOptionalInt::getFromAPInt(result);
 }
 
 BridgedStringRef BridgedInstruction::StringLiteralInst_getValue() const {
