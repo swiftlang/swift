@@ -1340,10 +1340,8 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
     return true;
   }
 
-  // Then see if we have a inout_aliasable full apply site use. In that case, we
-  // are going to try and extend move checking into the partial apply using
-  // cloning to eliminate destroys or reinits.
   if (auto fas = FullApplySite::isa(op->getUser())) {
+    // Bail on apply uses of fields.
     if (stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(
           llvm::dbgs()
@@ -1352,6 +1350,9 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
       return false;
     }
 
+    // Then see if we have an inout_aliasable full apply site use. In that case,
+    // we are going to try and extend move checking into the partial apply
+    // using cloning to eliminate destroys or reinits.
     if (fas.getCaptureConvention(*op) ==
         SILArgumentConvention::Indirect_InoutAliasable) {
       // If we don't find the function, we can't handle this, so bail.
