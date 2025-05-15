@@ -92,6 +92,7 @@ extension B: @retroactive main::Equatable {
     let fn: (main::Int, main::Int) -> main::Int =
     // FIXME improve: expected-error@-1 3{{cannot find type 'main::Int' in scope}}
       (main::+)
+      // FIXME: should fail????
 
     let magnitude: Int.main::Magnitude = main::magnitude
     // FIXME improve: expected-error@-1 {{'main::Magnitude' is not a member type of struct 'Swift.Int'}}
@@ -151,6 +152,7 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
     // FIXME improve: expected-error@-1 3{{cannot find type 'ModuleSelectorTestingKit::Int' in scope}}
       (ModuleSelectorTestingKit::+)
+      // FIXME: should fail????
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // FIXME improve: expected-error@-1 {{'ModuleSelectorTestingKit::Magnitude' is not a member type of struct 'Swift.Int'}}
