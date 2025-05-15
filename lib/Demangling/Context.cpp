@@ -55,10 +55,9 @@ NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
 
 #if SWIFT_STDLIB_HAS_TYPE_PRINTING
 
-std::string
-Context::demangleSymbolAsString(llvm::StringRef MangledName,
-                                const DemangleOptions &Options,
-                                std::unique_ptr<DemanglerPrinter> printer) {
+std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
+                                            const DemangleOptions &Options,
+                                            std::unique_ptr<DemanglerPrinter> printer) {
   NodePointer root = demangleSymbolAsNode(MangledName);
   if (!root) return MangledName.str();
 
