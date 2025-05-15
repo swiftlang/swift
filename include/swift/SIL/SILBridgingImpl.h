@@ -639,6 +639,13 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
   swift::SourceLoc sourceLoc = silLoc.getSourceLoc();
   return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
 }
+bool BridgedLocation::isFilenameAndLocation() const {
+  return getLoc().getLocation().isFilenameAndLocation();
+}
+BridgedLocation::FilenameAndLocation BridgedLocation::getFilenameAndLocation() const {
+  auto fnal = getLoc().getLocation().getFilenameAndLocation();
+  return {BridgedStringRef(fnal->filename), (SwiftInt)fnal->line, (SwiftInt)fnal->column};
+}
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
 }

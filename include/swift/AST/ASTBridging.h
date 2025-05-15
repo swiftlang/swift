@@ -605,6 +605,11 @@ void BridgedDiagnosticEngine_diagnose(
     BridgedArrayRef arguments, BridgedSourceLoc highlightStart,
     uint32_t hightlightLength, BridgedArrayRef fixIts);
 
+SWIFT_NAME("BridgedDiagnosticEngine.getLocationFromExternalSource(self:path:line:column:)")
+BridgedSourceLoc BridgedDiagnostic_getLocationFromExternalSource(
+    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path,
+    SwiftInt line, SwiftInt column);
+
 SWIFT_NAME("getter:BridgedDiagnosticEngine.hadAnyError(self:)")
 bool BridgedDiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
 
