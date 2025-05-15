@@ -19,3 +19,12 @@ func f<each T: P>(_ t: repeat each T) -> (repeat (each T).A) {
 // CHECK:  call void @llvm.stackrestore.p0(ptr [[SPSAVE2]])
 // CHECK:  call void @llvm.stackrestore.p0(ptr [[SPSAVE1]])
 // CHECK:  ret void
+
+struct G<each T> {
+  init(_: repeat each T) {}
+}
+
+func f2<each T: P, each U>(t: repeat each T, u: repeat each U) async -> (repeat G<(each T).A, repeat each U>) {
+  let x = (repeat G((each t).a, repeat each u))
+  return x
+}
