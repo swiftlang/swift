@@ -141,6 +141,7 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
 
       ModuleSelectorTestingKit::negate()
+      // expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::negate' in scope}}
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
@@ -209,11 +210,11 @@ extension D: @retroactive Swift::Equatable {
 }
 
 let mog: Never = fatalError()
+// expected-note@-1 {{did you mean 'mog'?}}
 
 func localVarsCantBeAccessedByModuleSelector() {
   let mag: Int.Swift::Magnitude = main::mag
-  // expected-error@-1 {{use of local variable 'main::mag' before its declaration}}
-  // expected-note@-2 {{'mag' declared here}}
+  // expected-error@-1 {{cannot find 'main::mag' in scope}}
 
   let mog: Never = main::mog
 }
