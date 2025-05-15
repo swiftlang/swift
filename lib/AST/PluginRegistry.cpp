@@ -213,14 +213,17 @@ LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
 #else
   close(input);
   close(output);
+  kill(process.Pid, SIGTERM);
 #endif
 
   // Set `SecondsToWait` non-zero so it waits for the timeout and kill it after
   // that. Usually when the pipe is closed above, the plugin detects the EOF in
   // the stdin and exits immediately, so this usually doesn't wait for the
   // timeout. Note that we can't use '0' because it performs a non-blocking
-  // wait, which make the plugin a zombie if it hasn't exited.
-  llvm::sys::Wait(process, /*SecondsToWait=*/1);
+  // wait, which make the plugin a zombie if it hasn't exited. We don't use
+  // a small number like '1' because the timeout alarm(3) can fire before the
+  // wait4(2).
+  llvm::sys::Wait(process, /*SecondsToWait=*/10);
 }
 
 ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
