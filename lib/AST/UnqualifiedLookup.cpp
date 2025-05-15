@@ -472,11 +472,24 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 }
 
 void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
+  assert(dc);
+
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                       : isOriginallyMacroLookup ? ResolutionKind::MacrosOnly
                       : ResolutionKind::Overloadable;
+  auto moduleToLookIn = dc;
+  if (Name.hasModuleSelector())
+    // FIXME: Should we look this up relative to dc?
+    // We'd need a new ResolutionKind.
+    moduleToLookIn =
+        dc->getASTContext().getLoadedModule(Name.getModuleSelector());
+  
+  // If we didn't find the module, it obviously can't have any results.
+  if (!moduleToLookIn)
+    return;
+
   auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
     nlOptions |= NL_IncludeUsableFromInline;
@@ -484,7 +497,7 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
     nlOptions |= NL_ExcludeMacroExpansions;
   if (options.contains(Flags::ABIProviding))
     nlOptions |= NL_ABIProviding;
-  lookupInModule(dc, Name.getFullName(), CurModuleResults,
+  lookupInModule(moduleToLookIn, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc,
                  Loc, nlOptions);
 
