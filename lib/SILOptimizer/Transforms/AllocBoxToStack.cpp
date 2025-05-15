@@ -409,6 +409,13 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
       continue;
     }
 
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(User)) {
+      if (lookThroughOwnershipInsts(mdi->getBase()) == Box) {
+        continue;
+      }
+      return User;
+    }
+
     if (auto Apply = ApplySite::isa(User)) {
       if (CurrentRecurDepth > MaxLocalApplyRecurDepth) {
         return User;
@@ -739,6 +746,14 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
       continue;
     }
 
+    if (auto *oldMDI = dyn_cast<MarkDependenceInst>(User)) {
+      auto *newMDI = SILBuilderWithScope(oldMDI).createMarkDependence(
+          oldMDI->getLoc(), oldMDI->getValue(), StackBox,
+          oldMDI->dependenceKind());
+      oldMDI->replaceAllUsesWith(newMDI);
+      oldMDI->eraseFromParent();
+      continue;
+    }
     assert(isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
            isa<DeallocBoxInst>(User) || isa<ProjectBoxInst>(User) ||
            isa<DestroyValueInst>(User) || isa<EndBorrowInst>(User));
