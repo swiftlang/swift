@@ -3134,7 +3134,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinFixedArrayElementType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isOptional() const;
   BRIDGED_INLINE bool isBuiltinType() const;
@@ -3145,6 +3146,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getStaticTypeOfDynamicSelf() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getSuperClassType() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
+  BRIDGED_INLINE BridgedOptionalInt getValueOfIntegerType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
