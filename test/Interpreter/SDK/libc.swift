@@ -13,6 +13,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #elseif os(Windows)
   import CRT
 

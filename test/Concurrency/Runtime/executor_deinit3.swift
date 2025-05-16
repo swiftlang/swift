@@ -16,6 +16,8 @@
     import Glibc
 #elseif canImport(Android)
     import Android
+#elseif canImport(FreeBSD)
+    import FreeBSD
 #endif
 
 @available(SwiftStdlib 5.1, *)

@@ -15,6 +15,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif

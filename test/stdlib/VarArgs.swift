@@ -37,6 +37,9 @@ runAllTests()
   #else
     typealias CGFloat = Float
   #endif
+#elseif canImport(FreeBSD)
+  import FreeBSD
+  typealias CGFloat = Double
 #else
 #error("Unsupported platform")
 #endif

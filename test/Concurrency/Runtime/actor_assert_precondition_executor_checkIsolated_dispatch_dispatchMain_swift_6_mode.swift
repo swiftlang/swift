@@ -24,6 +24,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 @main struct Main {

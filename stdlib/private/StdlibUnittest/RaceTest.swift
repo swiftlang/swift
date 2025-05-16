@@ -52,6 +52,8 @@ internal import WASILibc
 #elseif os(Windows)
 internal import CRT
 internal import WinSDK
+#elseif canImport(FreeBSD)
+internal import FreeBSD
 #endif
 
 #if _runtime(_ObjC)

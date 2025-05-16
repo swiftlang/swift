@@ -33,6 +33,8 @@
 // work on other Platforms (e.g. Microsoft Windows).
 #if canImport(Glibc)
     import Glibc
+#elseif canImport(FreeBSD)
+    import FreeBSD
 #else
     import Darwin.C
 #endif

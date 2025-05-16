@@ -9,6 +9,8 @@
 import _Differentiation
 #if canImport(Glibc)
 import Glibc
+#elseif canImport(FreeBSD)
+import FreeBSD
 #else
 import Foundation
 #endif

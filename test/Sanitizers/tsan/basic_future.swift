@@ -10,6 +10,8 @@ import Dispatch
 
 #if canImport(Darwin)
 import Darwin
+#elseif canImport(FreeBSD)
+import FreeBSD
 #elseif canImport(Glibc)
 import Glibc
 #endif

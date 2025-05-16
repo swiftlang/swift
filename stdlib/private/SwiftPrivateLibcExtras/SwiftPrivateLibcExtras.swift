@@ -23,6 +23,8 @@ import Android
 import WASILibc
 #elseif os(Windows)
 import CRT
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CInt {

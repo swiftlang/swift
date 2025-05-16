@@ -1237,6 +1237,8 @@ StringTests.test("Conversions") {
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #endif
 
 StringTests.test("lowercased()") {

@@ -18,6 +18,8 @@
     import WASILibc
 #elseif os(Windows)
     import WinSDK
+#elseif canImport(FreeBSD)
+    import FreeBSD
 #endif
 
 class Canary {

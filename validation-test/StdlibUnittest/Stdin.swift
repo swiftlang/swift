@@ -12,6 +12,8 @@ import StdlibUnittest
   import MSVCRT
 #elseif canImport(Android)
   import Android
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif

@@ -236,6 +236,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lswiftSynchronization",
       "-lswiftGlibc",
       "-lswiftAndroid",
+      "-lswiftFreeBSD",
       "-lBlocksRuntime",
       // Dispatch-specific Swift runtime libs
       "-ldispatch",
