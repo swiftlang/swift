@@ -168,21 +168,21 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
     ctx.Diags
         .diagnose(functionDecl->getLoc(),
                   diag::attr_execution_nonisolated_behavior_will_change_decl,
-                  featureName, functionDecl, &attr)
+                  featureName, functionDecl)
         .fixItInsertAttribute(
             decl->getAttributeInsertionLoc(/*forModifier=*/false), &attr);
   } else if (closure) {
     ctx.Diags
         .diagnose(closure->getLoc(),
                   diag::attr_execution_nonisolated_behavior_will_change_closure,
-                  featureName, &attr)
+                  featureName)
         .fixItAddAttribute(&attr, closure);
   } else {
     ctx.Diags
         .diagnose(
             functionRepr->getStartLoc(),
             diag::attr_execution_nonisolated_behavior_will_change_typerepr,
-            featureName, &attr)
+            featureName)
         .fixItInsertAttribute(functionRepr->getStartLoc(), &attr);
   }
 }
