@@ -1843,6 +1843,18 @@ static void diagnoseRetroactiveConformances(
     bool inserted = protocols.insert(std::make_pair(
         proto, conformance->isRetroactive())).second;
     ASSERT(inserted);
+
+    if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
+
+    // Implied conformance to Sendable is a special case that should not be
+    // diagnosed. Pretend it's always @retroactive.
+    if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+        proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        extendedNominalDecl->hasClangNode()) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
   }
 
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
