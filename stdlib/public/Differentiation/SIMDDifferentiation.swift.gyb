@@ -405,9 +405,6 @@ where
   }
 }
 
-// FIXME(TF-1103): Derivative registration does not yet support
-// `@_alwaysEmitIntoClient` original functions like `SIMD.sum()`.
-/*
 extension SIMD
 where
   Self: Differentiable,
@@ -417,6 +414,7 @@ where
   TangentVector == Self
 {
   @inlinable
+  @_alwaysEmitIntoClient
   @derivative(of: sum)
   func _vjpSum() -> (
     value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector
@@ -425,6 +423,7 @@ where
   }
 
   @inlinable
+  @_alwaysEmitIntoClient
   @derivative(of: sum)
   func _jvpSum() -> (
     value: Scalar, differential: (TangentVector) -> Scalar.TangentVector
@@ -432,7 +431,6 @@ where
     return (sum(), { v in Scalar.TangentVector(v.sum()) })
   }
 }
-*/
 
 extension SIMD
 where
