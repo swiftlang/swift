@@ -28,8 +28,8 @@
 // CHECK: #endif
 
 /// My documentation
-@cdecl("simple")
-func a_simple(x: Int, bar y: Int) -> Int { return x }
+@cdecl(simple)
+func a0_simple(x: Int, bar y: Int) -> Int { return x }
 // CHECK-LABEL: // My documentation
 // CHECK-LABEL: SWIFT_EXTERN ptrdiff_t simple(ptrdiff_t x, ptrdiff_t y) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
