@@ -6,7 +6,23 @@
 
 // REQUIRES: swift_feature_CDecl
 
-@cdecl("cdecl_foo") func foo(x: Int) -> Int { return x }
+@cdecl(cdecl_foo) func foo(x: Int) -> Int { return x }
+
+@cdecl(not an identifier) func invalidName() {}
+// expected-error @-1 {{expected ')' in 'cdecl' attribute}}
+// expected-error @-2 {{expected declaration}}
+
+@cdecl() func emptyParen() {}
+// expected-error @-1 {{expected C identifier in 'cdecl' attribute}}
+// expected-error @-2 {{expected declaration}}
+
+@cdecl(42) func aNumber() {}
+// expected-error @-1 {{expected C identifier in 'cdecl' attribute}}
+// expected-error @-2 {{expected declaration}}
+
+@cdecl(a:selector:) func selectordName() {}
+// expected-error @-1 {{expected ')' in 'cdecl' attribute}}
+// expected-error @-2 {{expected declaration}}
 
 @cdecl("") // expected-error{{@cdecl symbol name cannot be empty}}
 func emptyName(x: Int) -> Int { return x }
