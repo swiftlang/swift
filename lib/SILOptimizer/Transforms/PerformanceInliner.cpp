@@ -145,6 +145,10 @@ llvm::cl::opt<int> OSizeClassMethodBenefit(
     llvm::cl::desc("The benefit of inlining class methods with -Osize. We only "
                    "inline very small class methods with -Osize."));
 
+llvm::cl::opt<int> GlobalInitBenefit(
+    "sil-inline-global-init-benefit", llvm::cl::init(100),
+    llvm::cl::desc("The benefit of inlining constructors into global initializers."));
+
 llvm::cl::opt<int> TrivialFunctionThreshold(
     "sil-inline-trivial-function-threshold", llvm::cl::init(18),
     llvm::cl::desc("Approximately up to this cost level a function can be "
@@ -442,6 +446,14 @@ bool isFunctionAutodiffVJP(SILFunction *callee) {
     }
   }
 
+  return false;
+}
+
+bool isAllocator(SILFunction *callee) {
+  swift::Demangle::Context Ctx;
+  if (auto *Root = Ctx.demangleSymbolAsNode(callee->getName())) {
+    return Root->findByKind(swift::Demangle::Node::Kind::Allocator, 3) != nullptr;
+  }
   return false;
 }
 
@@ -783,6 +795,12 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   if (AllAccessesBeneficialToInline) {
     Benefit = std::max(Benefit, ExclusivityBenefitWeight);
+  }
+
+  if (AI.getFunction()->isGlobalInitOnceFunction() && isAllocator(Callee)) {
+    // Inlining constructors into global initializers increase the changes that
+    // the global can be initialized statically.
+    CallerWeight.updateBenefit(Benefit, GlobalInitBenefit);
   }
 
   if (AI.getFunction()->isThunk()) {
