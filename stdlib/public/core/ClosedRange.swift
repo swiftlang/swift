@@ -357,7 +357,6 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @_transparent
   public func contains(_ other: Range<Bound>) -> Bool {
     if other.isEmpty { return true }
     let otherInclusiveUpper = other.upperBound.advanced(by: -1)
