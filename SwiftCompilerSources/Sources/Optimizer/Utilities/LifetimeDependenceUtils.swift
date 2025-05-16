@@ -543,6 +543,8 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
                                           AddressUseVisitor {
   var function: Function { get }
 
+  var destructorAnalysis: DestructorAnalysis { get }
+
   /// Dependence tracking through local variables.
   var localReachabilityCache: LocalVariableReachabilityCache { get }
 
@@ -1028,12 +1030,15 @@ let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
 private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
   let context: Context
   let function: Function
+  let destructorAnalysis: DestructorAnalysis
+
   let localReachabilityCache = LocalVariableReachabilityCache()
   var visitedValues: ValueSet
   
-  init(function: Function, _ context: Context) {
+  init(function: Function, _ context: FunctionPassContext) {
     self.context = context
     self.function = function
+    self.destructorAnalysis = context.destructorAnalysis
     self.visitedValues = ValueSet(context)
   }
   
