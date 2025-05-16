@@ -165,5 +165,7 @@ SEMANTICS_ATTR(USE_FRAME_POINTER, "use_frame_pointer")
 SEMANTICS_ATTR(FIXED_STORAGE_CHECK_INDEX, "fixed_storage.check_index")
 SEMANTICS_ATTR(FIXED_STORAGE_GET_COUNT, "fixed_storage.get_count")
 
+SEMANTICS_ATTR(NO_SIL_VERIFICATION, "sil.verify_none")
+
 #undef SEMANTICS_ATTR
 

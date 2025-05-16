@@ -7430,6 +7430,10 @@ void SILFunction::verify(CalleeCache *calleeCache,
   if (!verificationEnabled(getModule()))
     return;
 
+  if (hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
+
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
