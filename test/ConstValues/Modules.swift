@@ -4,6 +4,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-as-library -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
+// RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
+
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-as-library -enable-experimental-feature CompileTimeValues
 // RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature CompileTimeValues
 

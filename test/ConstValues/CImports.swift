@@ -4,6 +4,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// RUN: %target-swift-frontend -emit-ir -primary-file %t/main.swift -parse-as-library -import-bridging-header %t/bridging_header.h -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
 // RUN: %target-swift-frontend -emit-ir -primary-file %t/main.swift -parse-as-library -import-bridging-header %t/bridging_header.h -enable-experimental-feature CompileTimeValues
 
 //--- bridging_header.h

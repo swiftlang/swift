@@ -1,6 +1,7 @@
 // Constant globals on inline arrays
 // REQUIRES: swift_feature_CompileTimeValues
 // REQUIRES: rdar146954768
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -disable-availability-checking -enable-experimental-feature CompileTimeValues -enable-experimental-feature CompileTimeValuesPreview
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -disable-availability-checking -enable-experimental-feature CompileTimeValues
 
 @const let constGlobal1: InlineArray = [1, 2, 3]
