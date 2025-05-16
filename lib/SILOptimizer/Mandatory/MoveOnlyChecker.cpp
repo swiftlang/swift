@@ -163,6 +163,10 @@ void MoveOnlyChecker::completeObjectLifetimes(
   for (auto *block : poa->get(fn)->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        if (llvm::any_of(result->getUsers(),
+                         [](auto *user) { return isa<BranchInst>(user); })) {
+          continue;
+        }
         if (!transitiveValues.isVisited(result))
           continue;
         if (completion.completeOSSALifetime(
@@ -173,7 +177,9 @@ void MoveOnlyChecker::completeObjectLifetimes(
       }
     }
     for (SILArgument *arg : block->getArguments()) {
-      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (arg->isReborrow()) {
+        continue;
+      }
       if (!transitiveValues.isVisited(arg))
         continue;
       if (completion.completeOSSALifetime(
