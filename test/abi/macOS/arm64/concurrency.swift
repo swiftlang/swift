@@ -320,6 +320,12 @@ Added: _$sScf13checkIsolatedyyFTq
 // withTaskCancellationHandler gains #isolated
 Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF
 Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlFTu
+// withTaskCancellationHandler but with caller execution
+// Swift.withTaskCancellationHandler<A>(operation: nonisolated(nonsending) () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A
+// async function pointer to Swift.withTaskCancellationHandler<A>(operation: nonisolated(nonsending) () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A
+Added: _$ss27withTaskCancellationHandler9operation8onCancelxxyYaKYCXE_yyYbXEtYaKlF
+Added: _$ss27withTaskCancellationHandler9operation8onCancelxxyYaKYCXE_yyYbXEtYaKlFTu
+
 // TaskGroup.with... APIs gain #isolated
 Added: _$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEtYalF
 Added: _$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEtYalFTu
