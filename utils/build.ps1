@@ -1693,7 +1693,7 @@ function Build-WiXProject() {
 
   $MSBuildArgs = @( "-noLogo", "-maxCpuCount", "-restore", "$SourceCache\swift-installer-scripts\platforms\Windows\$FileName" )
   foreach ($Property in $Properties.GetEnumerator()) {
-    if ($Property.Value.Contains(" ")) {
+    if ($Property.Value -is [string] -and $Property.Value.Contains(" ")) {
       $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
     } else {
       $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
@@ -3272,7 +3272,7 @@ function Build-Installer([Hashtable] $Platform) {
     BundleFlavor = "offline";
     ImageRoot = "$(Get-InstallDir $Platform)\";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
-    INCLUDE_NOASSERTS = $IncludeNoAsserts
+    INCLUDE_NOASSERTS = $IncludeNoAsserts;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
