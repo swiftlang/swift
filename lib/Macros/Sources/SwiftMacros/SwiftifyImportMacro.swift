@@ -389,10 +389,8 @@ func isMutablePointerType(_ type: TypeSyntax) -> Bool {
 protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
-  // The second component of the return value is true when only the return type of the
-  // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> (FunctionSignatureSyntax, Bool)
+    -> FunctionSignatureSyntax
 }
 
 func getParam(_ signature: FunctionSignatureSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
@@ -420,7 +418,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> (FunctionSignatureSyntax, Bool)
+    -> FunctionSignatureSyntax
   {
     var newParams = base.signature.parameterClause.parameters.enumerated().filter {
       let type = argTypes[$0.offset]
@@ -443,7 +441,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     if returnType != nil {
       sig = sig.with(\.returnClause!.type, returnType!)
     }
-    return (sig, (argTypes.count == 0 && returnType != nil))
+    return sig
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -493,7 +491,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> (FunctionSignatureSyntax, Bool)
+    -> FunctionSignatureSyntax
   {
     var types = argTypes
     types[index] = try newType
@@ -543,7 +541,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> (FunctionSignatureSyntax, Bool)
+    -> FunctionSignatureSyntax
   {
     assert(returnType == nil)
     return try base.buildFunctionSignature(argTypes, newType)
@@ -680,7 +678,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> (FunctionSignatureSyntax, Bool)
+    -> FunctionSignatureSyntax
   {
     assert(returnType == nil)
     return try base.buildFunctionSignature(argTypes, newType)
@@ -739,7 +737,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   var generateSpan: Bool { nonescaping }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> (FunctionSignatureSyntax, Bool)
+    -> FunctionSignatureSyntax
   {
     var types = argTypes
     types[index] = try newType
@@ -1502,7 +1500,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         { (prev, parsedArg) in
           parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
         })
-      let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
+      let newSignature = try builder.buildFunctionSignature([:], nil)
       let checks =
         skipTrivialCount
         ? [] as [CodeBlockItemSyntax]
@@ -1520,13 +1518,12 @@ public struct SwiftifyImportMacro: PeerMacro {
         returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
       let availabilityAttr = try getAvailability(newSignature, spanAvailability)
       let disfavoredOverload: [AttributeListSyntax.Element] =
-        (onlyReturnTypeChanged
-          ? [
-            .attribute(
-              AttributeSyntax(
-                atSign: .atSignToken(),
-                attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
-          ] : [])
+        [
+          .attribute(
+            AttributeSyntax(
+              atSign: .atSignToken(),
+              attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
+        ]
       let newFunc =
         funcDecl
         .with(\.signature, newSignature)

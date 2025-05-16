@@ -26,29 +26,29 @@ func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 // CHECK-NEXT:     return unsafe nonnullUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
 // CHECK-NEXT:     return unsafe nullableUnsafeRawBufferPointer(OpaquePointer(ptr?.baseAddress), CInt(exactly: ptr?.count ?? 0)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 // CHECK-NEXT:     return unsafe impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nonnullSpan(_ ptr: RawSpan) {
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
 // CHECK-NEXT:         return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nullableSpan(_ ptr: RawSpan?) {
 // CHECK-NEXT:     return { () in
 // CHECK-NEXT:         return if ptr == nil {
@@ -61,7 +61,7 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func impNullableSpan(_ ptr: RawSpan) {
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
 // CHECK-NEXT:         return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: _ptrPtr.count)!)

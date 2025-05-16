@@ -6,7 +6,7 @@
 func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer, _ size: CInt) {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = size
 // CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
