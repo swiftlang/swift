@@ -24,6 +24,8 @@
 import StdlibUnittest
 import Synchronization
 
+protocol P {}
+
 @available(SwiftStdlib 6.2, *)
 @main
 enum InlineArrayTests {
@@ -171,6 +173,9 @@ enum InlineArrayTests {
       }
       _expectThrows {
         let _ = try InlineArray<1, String> { _ in throw error }
+      }
+      _expectThrows {
+        let _ = try InlineArray<1, any P> { _ in throw error }
       }
       _expectThrows {
         let _ = try InlineArray<2, String> { index in
