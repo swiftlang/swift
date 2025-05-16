@@ -399,6 +399,18 @@ extension OutputSpan where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.2, *)
+extension OutputSpan where Element: BitwiseCopyable {
+  //FIXME: We need this for Element: ~Copyable
+  @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
+  public mutating func append<let N: Int>(
+    consuming source: consuming InlineArray<N, Element>
+  ) {
+    source._consume { append(moving: &$0) }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)

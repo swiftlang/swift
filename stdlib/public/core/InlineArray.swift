@@ -502,6 +502,25 @@ extension InlineArray where Element: ~Copyable {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: BitwiseCopyable {
+
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public consuming func _consume<E: Error, Result: ~Copyable>(
+    _ body: (inout OutputSpan<Element>) throws(E) -> Result
+  ) throws(E) -> Result {
+    var span = unsafe OutputSpan(
+      _uncheckedBuffer: _mutableBuffer, initializedCount: count
+    )
+    defer {
+      _precondition(span.count == 0, "must consume all elements")
+    }
+    //FIXME: discard self
+    return try body(&span)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: - Unsafe APIs
 //===----------------------------------------------------------------------===//

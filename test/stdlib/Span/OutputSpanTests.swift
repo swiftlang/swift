@@ -420,3 +420,16 @@ suite.test("InlineArray initialization throws")
   }
 }
 #endif
+
+suite.test("InlineArray consumed")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let a: InlineArray<4, Int> = [1, 2, 3, 4]
+  let b = Array(capacity: 20, initializingWith: {
+    $0.append(consuming: a)
+  })
+  expectEqual(a.count, b.count)
+  let i = a.indices.randomElement()!
+  expectEqual(b[i], a[i])
+}
