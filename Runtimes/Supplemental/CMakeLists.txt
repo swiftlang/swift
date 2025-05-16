@@ -22,6 +22,7 @@ endif()
 
 set(COMMON_OPTIONS
   -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}
+  -DSwift_SDKROOT=${Swift_SDKROOT}
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
   -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}
   -DCMAKE_INSTALL_NAME_DIR=${CMAKE_INSTALL_NAME_DIR}
@@ -42,6 +43,17 @@ if(SwiftRuntime_ENABLE_stringprocessing)
   ExternalProject_Add(StringProcessing
     PREFIX "StringProcessing"
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/StringProcessing"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
+
+# Synchronization
+if(SwiftRuntime_ENABLE_synchronization)
+  ExternalProject_Add(Synchronization
+    PREFIX "Synchronization"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Synchronization"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
     CMAKE_ARGS
