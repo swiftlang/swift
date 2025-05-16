@@ -45,7 +45,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Strings.h"
-#include "clang/Basic/Module.h"
+#include "clang/CAS/IncludeTree.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
@@ -69,7 +69,6 @@
 #include <sstream>
 #include <stack>
 #include <string>
-#include <algorithm>
 
 using namespace swift;
 using namespace swift::dependencies;
@@ -100,9 +99,6 @@ public:
     // If the dependency is already finalized, nothing needs to be done.
     if (resolvingDepInfo.isFinalized())
       return false;
-
-    if (auto ID = resolvingDepInfo.getClangIncludeTree())
-      includeTrees.push_back(*ID);
 
     for (const auto &depModuleID : dependencies) {
       const auto &depInfo = cache.findKnownDependency(depModuleID);
@@ -322,8 +318,10 @@ private:
     // Collect CAS deppendencies from clang modules.
     if (!clangDepDetails.CASFileSystemRootID.empty())
       rootIDs.push_back(clangDepDetails.CASFileSystemRootID);
-    if (!clangDepDetails.CASClangIncludeTreeRootID.empty())
-      includeTrees.push_back(clangDepDetails.CASClangIncludeTreeRootID);
+    if (!clangDepDetails.CASClangIncludeTreeRootID.empty()) {
+      if (addIncludeTree(clangDepDetails.CASClangIncludeTreeRootID))
+        return true;
+    }
 
     collectUsedVFSOverlay(clangDepDetails);
 
@@ -358,12 +356,14 @@ private:
           auto bridgeRoot = tracker->createTreeFromDependencies();
           if (!bridgeRoot)
             return diagnoseCASFSCreationError(bridgeRoot.takeError());
-          fileListIDs.push_back(bridgeRoot->getID().toString());
+
+          fileListRefs.push_back(bridgeRoot->getRef());
         }
       }
-    } else
-      includeTrees.push_back(sourceDepDetails.textualModuleDetails
-                                 .CASBridgingHeaderIncludeTreeRootID);
+    } else if (addIncludeTree(sourceDepDetails.textualModuleDetails
+                                  .CASBridgingHeaderIncludeTreeRootID))
+      return true;
+
     return false;
   };
 
@@ -499,9 +499,7 @@ private:
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
-      auto rootID = root->getID().toString();
-      dependencyInfoCopy.updateCASFileSystemRootID(rootID);
-      fileListIDs.push_back(rootID);
+      fileListRefs.push_back(root->getRef());
     } else if (auto *textualDep =
                    resolvingDepInfo.getAsSwiftInterfaceModule()) {
       tracker->startTracking();
@@ -516,9 +514,7 @@ private:
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
-      auto rootID = root->getID().toString();
-      dependencyInfoCopy.updateCASFileSystemRootID(rootID);
-      fileListIDs.push_back(rootID);
+      fileListRefs.push_back(root->getRef());
     }
 
     // Update build command line.
@@ -530,15 +526,8 @@ private:
         commandline.push_back(rootID);
       }
 
-      for (auto tree : includeTrees) {
-        commandline.push_back("-clang-include-tree-root");
-        commandline.push_back(tree);
-      }
-
-      for (auto list : fileListIDs) {
-        commandline.push_back("-clang-include-tree-filelist");
-        commandline.push_back(list);
-      }
+      if (computeCASFileSystem(dependencyInfoCopy))
+        return true;
     }
 
     // Compute and update module cache key.
@@ -636,6 +625,53 @@ private:
       cmd.push_back("-cache-disable-replay");
   }
 
+  bool addIncludeTree(StringRef includeTree) {
+    auto &db = cache.getScanService().getCAS();
+    auto casID = db.parseID(includeTree);
+    if (!casID) {
+      instance.getDiags().diagnose(SourceLoc(), diag::error_invalid_cas_id,
+                                   includeTree, toString(casID.takeError()));
+      return true;
+    }
+    auto ref = db.getReference(*casID);
+    if (!ref) {
+      instance.getDiags().diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                                   includeTree);
+      return true;
+    }
+
+    auto root = clang::cas::IncludeTreeRoot::get(db, *ref);
+    if (!root) {
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_malformed_input,
+                                   includeTree, toString(root.takeError()));
+      return true;
+    }
+
+    fileListRefs.push_back(root->getFileListRef());
+    return false;
+  }
+
+  bool computeCASFileSystem(ModuleDependencyInfo &dependencyInfoCopy) {
+    if (fileListRefs.empty())
+      return false;
+
+    auto &db = cache.getScanService().getCAS();
+    auto casFS =
+        clang::cas::IncludeTree::FileList::create(db, {}, fileListRefs);
+    if (!casFS) {
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                   "CAS IncludeTree FileList creation",
+                                   toString(casFS.takeError()));
+      return true;
+    }
+
+    auto casID = casFS->getID().toString();
+    dependencyInfoCopy.updateCASFileSystemRootID(casID);
+    commandline.push_back("-clang-include-tree-filelist");
+    commandline.push_back(casID);
+    return false;
+  }
+
 private:
   const ModuleDependencyID &moduleID;
   ModuleDependenciesCache &cache;
@@ -644,8 +680,7 @@ private:
 
   std::optional<SwiftDependencyTracker> tracker;
   std::vector<std::string> rootIDs;
-  std::vector<std::string> includeTrees;
-  std::vector<std::string> fileListIDs;
+  std::vector<llvm::cas::ObjectRef> fileListRefs;
   std::vector<std::string> commandline;
   std::vector<std::string> bridgingHeaderBuildCmd;
   llvm::StringMap<MacroPluginDependency> macros;
