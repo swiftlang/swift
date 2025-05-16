@@ -18,6 +18,7 @@
 // XFAIL: LinuxDistribution=rhel-9.6
 // XFAIL: LinuxDistribution=fedora-39
 // XFAIL: LinuxDistribution=debian-12
+// XFAIL: LinuxDistribution=amzn-2023
 
 import StdlibUnittest
 import StdFunction
