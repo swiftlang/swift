@@ -682,7 +682,7 @@ extension PartialRangeFrom: RangeExpression {
   ) -> Range<Bound> where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
   }
-  @inlinable // trivial-implementation
+  @_transparent
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element
   }
