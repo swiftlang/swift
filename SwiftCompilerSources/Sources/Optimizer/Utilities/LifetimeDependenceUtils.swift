@@ -660,13 +660,18 @@ extension LifetimeDependenceDefUseWalker {
       // Catch .instantaneousUse operations that are dependence leaf uses.
       return leafUse(of: operand)
 
-    case is DestroyValueInst, is EndLifetimeInst, is DeallocRefInst,
-         is DeallocBoxInst, is DeallocExistentialBoxInst,
-         is BeginCOWMutationInst, is EndCOWMutationInst,
-         is EndInitLetRefInst, is DeallocPartialRefInst, is BeginDeallocRefInst:
-      // Catch .destroyingConsume operations that are dependence leaf
-      // uses.
+    case is DestroyValueInst:
+      // Handles dependent value destroys.
+      //
+      // Ignore destroys on a type whose members recursively only have default deinits.
+      if !destructorAnalysis.deinitMayHaveEffects(type: operand.value.type, in: function) {
+        return .continueWalk
+      }
       return leafUse(of: operand)
+
+    case is DeallocBoxInst, is DeallocExistentialBoxInst, is DeallocPartialRefInst, is DeallocRefInst,
+         is EndLifetimeInst:
+      return .continueWalk
 
     case let si as StoringInstruction where si.sourceOperand == operand:
       return visitStoredUses(of: operand, into: si.destinationOperand.value)
