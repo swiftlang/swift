@@ -22,11 +22,13 @@
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
+#include "../lib/Serialization/ModuleFormat.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachO.h"
+#include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -164,17 +166,11 @@ collectMangledNames(const std::string &FilePath,
 
 llvm::BumpPtrAllocator Alloc;
 
-static bool
-collectASTModules(llvm::cl::list<std::string> &InputNames,
-                  llvm::SmallVectorImpl<std::pair<char *, uint64_t>> &Modules) {
-  for (auto &name : InputNames) {
-    auto OF = llvm::object::ObjectFile::createObjectFile(name);
-    if (!OF) {
-      llvm::outs() << "error: " << name << " "
-                   << errorToErrorCode(OF.takeError()).message() << "\n";
-      return false;
-    }
-    auto *Obj = OF->getBinary();
+static bool collectASTModules(
+    llvm::cl::list<std::string> &InputNames, std::vector<StringRef> &Modules,
+    std::vector<llvm::object::OwningBinary<llvm::object::Binary>> &Binaries,
+    std::vector<std::unique_ptr<llvm::object::MachOObjectFile>> &SliceObjects) {
+  auto handleObject = [&](llvm::object::ObjectFile *Obj) {
     auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
     auto *ELF = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
     auto *COFF = llvm::dyn_cast<llvm::object::COFFObjectFile>(Obj);
@@ -223,14 +219,46 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
         llvm::Expected<llvm::StringRef> ContentsReference =
             Section.getContents();
         if (!ContentsReference) {
-          llvm::errs() << "error: " << name << " "
-                       << errorToErrorCode(OF.takeError()).message() << "\n";
+          llvm::errs()
+              << "error: " << Name << " "
+              << errorToErrorCode(ContentsReference.takeError()).message()
+              << "\n";
           return false;
         }
         char *Module = Alloc.Allocate<char>(Size);
         std::memcpy(Module, (void *)ContentsReference->begin(), Size);
         Modules.push_back({Module, Size});
       }
+    }
+    return true;
+  };
+  for (auto &name : InputNames) {
+    auto BinOrErr = llvm::object::createBinary(name);
+    if (!BinOrErr) {
+      llvm::outs() << "error: " << llvm::toString(BinOrErr.takeError()) << "\n";
+      return false;
+    }
+    Binaries.push_back(std::move(*BinOrErr));
+    if (auto *Obj = llvm::dyn_cast<llvm::object::ObjectFile>(
+            Binaries.back().getBinary())) {
+      if (!handleObject(Obj))
+        return false;
+    } else if (auto *Fat = llvm::dyn_cast<llvm::object::MachOUniversalBinary>(
+                   Binaries.back().getBinary())) {
+      for (auto &ObjForArch : Fat->objects()) {
+        auto ObjOrErr = ObjForArch.getAsObjectFile();
+        if (!ObjOrErr) {
+          llvm::outs() << "error: " << llvm::toString(ObjOrErr.takeError())
+                       << "\n";
+          return false;
+        }
+        SliceObjects.push_back(std::move(*ObjOrErr));
+        if (!handleObject(SliceObjects.back().get()))
+          return false;
+      }
+    } else {
+      llvm::outs() << "error: " << name << " unhandled file type\n";
+      return false;
     }
   }
   return true;
@@ -315,8 +343,10 @@ int main(int argc, char **argv) {
 
   // Fetch the serialized module bitstreams from the Mach-O files and
   // register them with the module loader.
-  llvm::SmallVector<std::pair<char *, uint64_t>, 8> Modules;
-  if (!collectASTModules(InputNames, Modules))
+  std::vector<StringRef> Modules;
+  std::vector<llvm::object::OwningBinary<llvm::object::Binary>> Binaries;
+  std::vector<std::unique_ptr<llvm::object::MachOObjectFile>> SliceObjects;
+    if (!collectASTModules(InputNames, Modules, Binaries, SliceObjects))
     return 1;
 
   if (Modules.empty())
@@ -326,13 +356,48 @@ int main(int argc, char **argv) {
   swift::serialization::ExtendedValidationInfo extendedInfo;
   llvm::SmallVector<swift::serialization::SearchPath> searchPaths;
   for (auto &Module : Modules) {
-    info = {};
-    extendedInfo = {};
-    if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules,
-                        info, extendedInfo, searchPaths)) {
-      llvm::errs() << "Malformed module!\n";
-      return 1;
+    StringRef buf = Module;
+    while (buf.size()) {
+      info = swift::serialization::validateSerializedAST(
+          buf, EnableOSSAModules,
+          /*requiredSDK*/ StringRef());
+
+      if (Verbose)
+        llvm::outs() << "Module name = " << info.name << "\n";
+      switch (info.status) {
+      case swift::serialization::Status::FormatTooOld:
+        llvm::outs() << "error: format too old\n";
+        break;
+      case swift::serialization::Status::FormatTooNew:
+        llvm::outs() << "error: format too new\n";
+        break;
+      case swift::serialization::Status::Valid:
+        break;
+      default:
+        llvm::outs() << "error: other validation error\n";
+        break;
+      }
+
+      if (!info.bytes)
+        break;
+
+      if (Verbose)
+        llvm::outs() << "size = " << info.bytes << "\n";
+
+      if (info.bytes > buf.size()) {
+        llvm::errs() << "AST section too small.";
+        return 1;
+      }
+
+      info = {};
+      extendedInfo = {};
+      if (!validateModule(buf, Verbose, EnableOSSAModules, info, extendedInfo,
+                          searchPaths)) {
+        llvm::errs() << "Malformed module!\n";
+        return 1;
+      }
+      buf = buf.substr(llvm::alignTo(
+          info.bytes, swift::serialization::SWIFTMODULE_ALIGNMENT));
     }
   }
 
@@ -394,9 +459,8 @@ int main(int argc, char **argv) {
   llvm::raw_svector_ostream errs(error);
   llvm::Triple filter(Filter);
   for (auto &Module : Modules) {
-    auto Result = parseASTSection(
-        *CI.getMemoryBufferSerializedModuleLoader(),
-        StringRef(Module.first, Module.second), filter);
+    auto Result = parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
+                                  Module, filter);
     if (auto E = Result.takeError()) {
       std::string error = toString(std::move(E));
       llvm::errs() << "error: Failed to parse AST section! " << error << "\n";
