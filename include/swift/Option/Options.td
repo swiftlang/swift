@@ -33,9 +33,9 @@ def ModuleWrapOption : OptionFlag;
 def NoDriverOption : OptionFlag;
 
 // Some options should not be available depending on whether this is the
-// interactive driver 'swift', or the batch compiler 'swiftc'.
+// interactive driver 'swift', or the aot compiler 'swiftc'.
 def NoInteractiveOption : OptionFlag;
-def NoBatchOption : OptionFlag;
+def NoStandardOption : OptionFlag;
 
 // The option should not force a full rebuild if added, changed, or removed.
 def DoesNotAffectIncrementalBuild : OptionFlag;
@@ -488,12 +488,12 @@ def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
-  Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
+  Flags<[FrontendOption, SwiftAPIDigesterOption, NoStandardOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit a serialized diagnostics file to <path>">,
   MetaVarName<"<path>">;
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
-  Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
+  Flags<[FrontendOption, SwiftAPIDigesterOption, NoStandardOption,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   Alias<serialize_diagnostics_path>;
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
@@ -1255,28 +1255,28 @@ def AssertConfig : Separate<["-"], "assert-config">,
 def code_formatting_Group : OptionGroup<"<code formatting options>">;
 
 def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption]>,
+  Flags<[NoInteractiveOption, NoStandardOption]>,
   HelpText<"Use tabs for indentation.">;
 
 def indent_switch_case : Flag<["-"], "indent-switch-case">,
   Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption]>,
+  Flags<[NoInteractiveOption, NoStandardOption]>,
   HelpText<"Indent cases in switch statements.">;
 
 def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption]>,
+  Flags<[NoInteractiveOption, NoStandardOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
 def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption]>,
+  Flags<[NoInteractiveOption, NoStandardOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
 def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption]>,
+  Flags<[NoInteractiveOption, NoStandardOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
 def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
-  Flags<[NoInteractiveOption, NoBatchOption]>,
+  Flags<[NoInteractiveOption, NoStandardOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
@@ -1460,11 +1460,11 @@ def dump_pcm : Flag<["-"], "dump-pcm">,
 // Other Modes
 def repl : Flag<["-"], "repl">,
   HelpText<"REPL mode (the default if there is no input file)">,
-  Flags<[FrontendOption, NoBatchOption, HelpHidden]>, ModeOpt;
+  Flags<[FrontendOption, NoStandardOption, HelpHidden]>, ModeOpt;
 def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
-  Flags<[NoBatchOption, HelpHidden]>, ModeOpt;
+  Flags<[NoStandardOption, HelpHidden]>, ModeOpt;
 def deprecated_integrated_repl : Flag<["-"], "deprecated-integrated-repl">,
-  Flags<[FrontendOption, NoBatchOption]>, ModeOpt;
+  Flags<[FrontendOption, NoStandardOption]>, ModeOpt;
 def i : Flag<["-"], "i">, ModeOpt; // only used to provide diagnostics.
 
 def whole_module_optimization : Flag<["-"], "whole-module-optimization">,
