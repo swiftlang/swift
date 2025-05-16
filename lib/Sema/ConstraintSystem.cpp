@@ -1414,11 +1414,6 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
-  // `@concurrent` attribute is only valid on asynchronous function types.
-  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
-    async = true;
-  }
-
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1432,11 +1427,17 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   if (!body)
     return ASTExtInfoBuilder().withSendable(sendable).build();
 
+  // `@concurrent` attribute is only valid on asynchronous function types.
+  bool asyncFromAttr = false;
+  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
+    asyncFromAttr = true;
+  }
+
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
-      .withAsync(bool(findAsyncNode(expr)))
+      .withAsync(asyncFromAttr || bool(findAsyncNode(expr)))
       .withSendable(sendable)
       .build();
 }
