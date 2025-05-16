@@ -6,7 +6,7 @@
 func myFunc(_ ptr: UnsafePointer<CInt>, _ ptr2: UnsafePointer<CInt>, _ len: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ len: CInt) {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = len
 // CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
