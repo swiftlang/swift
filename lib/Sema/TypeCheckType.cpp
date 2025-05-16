@@ -2407,6 +2407,11 @@ namespace {
   class TypeAttrSet {
     const ASTContext &ctx;
 
+    /// FIXME:
+    ///  `nonisolated(nonsending)` is modeled as a separate `TypeRepr`, but
+    ///  needs to be considered together with subsequent attributes.
+    CallerIsolatedTypeRepr *nonisolatedNonsendingAttr;
+
     llvm::TinyPtrVector<CustomAttr*> customAttrs;
     EnumMap<TypeAttrKind, TypeAttribute *> typeAttrs;
 
@@ -2418,7 +2423,9 @@ namespace {
 #endif
 
   public:
-    TypeAttrSet(const ASTContext &ctx) : ctx(ctx) {}
+    TypeAttrSet(const ASTContext &ctx,
+                CallerIsolatedTypeRepr *nonisolatedNonsendingAttr = nullptr)
+        : ctx(ctx), nonisolatedNonsendingAttr(nonisolatedNonsendingAttr) {}
 
     TypeAttrSet(const TypeAttrSet &) = delete;
     TypeAttrSet &operator=(const TypeAttrSet &) = delete;
@@ -2436,6 +2443,10 @@ namespace {
     /// Accumulate attributes from the given array.  Duplicate attributes
     /// will be diagnosed.
     void accumulate(ArrayRef<TypeOrCustomAttr> attrs);
+
+    CallerIsolatedTypeRepr *getNonisolatedNonsendingAttr() const {
+      return nonisolatedNonsendingAttr;
+    }
 
     /// Return all of the custom attributes.
     ArrayRef<CustomAttr*> getCustomAttrs() const {
@@ -2536,8 +2547,16 @@ namespace {
   }
 
   template <class AttrClass>
-  AttrClass *getWithoutClaiming(TypeAttrSet *attrs) {
+  std::enable_if_t<std::is_base_of_v<TypeAttribute, AttrClass>, AttrClass *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
     return (attrs ? getWithoutClaiming<AttrClass>(*attrs) : nullptr);
+  }
+
+  template <class AttrClass>
+  std::enable_if_t<std::is_same_v<AttrClass, CallerIsolatedTypeRepr>,
+                   CallerIsolatedTypeRepr *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
+    return attrs ? attrs->getNonisolatedNonsendingAttr() : nullptr;
   }
 } // end anonymous namespace
 
@@ -4233,10 +4252,19 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   };
 
   if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+    if (auto *nonisolatedNonsendingAttr =
+            getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+      diagnoseInvalid(
+          nonisolatedNonsendingAttr, nonisolatedNonsendingAttr->getStartLoc(),
+          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
+          nonisolatedNonsendingAttr);
+    }
+
     checkExecutionBehaviorAttribute(concurrentAttr);
+
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
-  } else {
+  } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
     if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
             .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
@@ -5267,7 +5295,20 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  Type type = resolveType(repr->getBase(), options);
+  Type type;
+  {
+    TypeAttrSet attrs(getASTContext(), repr);
+
+    auto *baseRepr = repr->getBase();
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(baseRepr)) {
+      baseRepr = attrs.accumulate(attrRepr);
+    }
+
+    type = resolveAttributedType(baseRepr, options, attrs);
+
+    attrs.diagnoseUnclaimed(resolution, options, type);
+  }
+
   if (type->hasError())
     return ErrorType::get(getASTContext());
 
@@ -5281,15 +5322,6 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
   if (!fnType->isAsync()) {
     diagnoseInvalid(repr, repr->getStartLoc(),
                     diag::nonisolated_nonsending_only_on_async, repr);
-  }
-
-  if (auto *ATR = dyn_cast<AttributedTypeRepr>(repr->getBase())) {
-    if (ATR->get(TypeAttrKind::Concurrent)) {
-      diagnoseInvalid(
-          repr, repr->getStartLoc(),
-          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
-          repr);
-    }
   }
 
   switch (fnType->getIsolation().getKind()) {
