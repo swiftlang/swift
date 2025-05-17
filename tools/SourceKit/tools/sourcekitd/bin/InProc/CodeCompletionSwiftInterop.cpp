@@ -75,7 +75,6 @@ class Connection {
   std::shared_ptr<CodeCompletionCache> completionCache;
   std::string swiftExecutablePath;
   std::string runtimeResourcePath;
-  std::string diagnosticsDocumentationPath;
   std::shared_ptr<SourceKit::RequestTracker> requestTracker;
 
 public:
@@ -87,7 +86,6 @@ public:
         completionCache(std::make_shared<CodeCompletionCache>()),
         swiftExecutablePath(getSwiftExecutablePath()),
         runtimeResourcePath(getRuntimeResourcesPath()),
-        diagnosticsDocumentationPath(getDiagnosticDocumentationPath()),
         requestTracker(new SourceKit::RequestTracker()),
         sessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
     if (ideInspectionInstance == nullptr) {
@@ -371,8 +369,8 @@ void Connection::codeComplete(
   std::string compilerInvocationError;
   bool creatingInvocationFailed = initCompilerInvocation(
       invocation, args, FrontendOptions::ActionType::Typecheck, diags, path,
-      fileSystem, swiftExecutablePath, runtimeResourcePath,
-      diagnosticsDocumentationPath, sessionTimestamp, compilerInvocationError);
+      fileSystem, swiftExecutablePath, runtimeResourcePath, sessionTimestamp,
+      compilerInvocationError);
   if (creatingInvocationFailed) {
     callback(ResultType::failure(compilerInvocationError));
     return;
