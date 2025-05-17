@@ -1195,7 +1195,7 @@ static void determineBestChoicesInContext(
         // since everything else is going to increase to score.
         if (options.contains(MatchFlag::Literal)) {
           if (isUnboundArrayType(candidateType))
-            return paramType->isArrayType() ? 0.3 : 0;
+            return paramType->isArray() ? 0.3 : 0;
 
           if (isUnboundDictionaryType(candidateType))
             return cs.isDictionaryType(paramType) ? 0.3 : 0;
@@ -1321,7 +1321,7 @@ static void determineBestChoicesInContext(
 
       // Possible Array<T> -> Unsafe*Pointer conversion.
       if (options.contains(MatchFlag::OnParam)) {
-        if (candidateType->isArrayType() &&
+        if (candidateType->isArray() &&
             paramType->getAnyPointerElementType())
           return 1;
       }
