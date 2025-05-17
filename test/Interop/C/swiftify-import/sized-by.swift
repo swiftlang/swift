@@ -9,15 +9,15 @@
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by parameters.
 import SizedByClang
 
-// CHECK:      @_alwaysEmitIntoClient public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: UnsafeMutableRawBufferPointer)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_  p: UnsafeMutableRawBufferPointer)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_  p: UnsafeMutableRawBufferPointer)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullable(_  p: UnsafeMutableRawBufferPointer?)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func opaque(_  p: UnsafeRawBufferPointer)
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_  p: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_  p: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_  p: UnsafeMutableRawBufferPointer?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_  p: UnsafeRawBufferPointer)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeMutableRawBufferPointer
-// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: UnsafeMutableRawBufferPointer)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simple(_  p: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_  p: UnsafeMutableRawBufferPointer)
 
 @inlinable
 public func callComplexExpr(_ p: UnsafeMutableRawBufferPointer) {
