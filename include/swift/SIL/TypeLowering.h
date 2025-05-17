@@ -266,7 +266,7 @@ public:
     static constexpr RecursiveProperties forResilient() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient,
               IsNotTypeExpansionSensitive, HasRawPointer, IsNotLexical,
-              HasNoPack, IsAddressableForDependencies};
+              HasNoPack, IsNotAddressableForDependencies};
     }
 
     void addSubobject(RecursiveProperties other) {
