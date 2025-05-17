@@ -17,6 +17,7 @@
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include <string>
@@ -63,11 +64,13 @@ public:
   /// Constructs an input file from the provided data.
   InputFile(StringRef name, bool isPrimary, llvm::MemoryBuffer *buffer,
             file_types::ID FileID)
-      : Filename(
-            convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
-        FileID(FileID), BufferAndIsPrimary(buffer, isPrimary),
+      : FileID(FileID), BufferAndIsPrimary(buffer, isPrimary),
         PSPs(PrimarySpecificPaths()) {
     assert(!name.empty());
+    llvm::SmallString<261> Path{
+        convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)};
+    llvm::sys::path::make_preferred(Path);
+    Filename = Path.str().str();
   }
 
 public:
