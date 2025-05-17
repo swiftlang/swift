@@ -1473,9 +1473,23 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
 
+  SILFunction *origFn = fri->getReferencedFunction();
+  for (auto *w : mod.lookUpDifferentiabilityWitnessesForFunction(
+         origFn->getName())) {
+    assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
+    auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
+    SILDifferentiabilityWitness::createDefinition(
+      mod, linkage, clonedFn,
+      w->getKind(), w->getParameterIndices(), w->getResultIndices(),
+      w->getDerivativeGenericSignature(),
+      /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
+      w->getAttribute());
+  }
+
   // Mark the original partial apply function as deletable if it doesn't have
   // uses later.
-  fri->getReferencedFunction()->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
+  origFn->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
