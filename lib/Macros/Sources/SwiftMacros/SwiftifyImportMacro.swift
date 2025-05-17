@@ -45,19 +45,23 @@ protocol ParamInfo: CustomStringConvertible {
   ) -> BoundsCheckedThunkBuilder
 }
 
-func getParamName(_ param: FunctionParameterSyntax, _ paramIndex: Int) -> TokenSyntax {
-  let name = param.secondName ?? param.firstName
-  if name.trimmed.text == "_" {
-    return "_param\(raw: paramIndex)"
+func getParamName(_ param: FunctionParameterSyntax, _ paramIndex: Int, _ functionName: TokenSyntax) -> TokenSyntax {
+  if let secondName = param.secondName {
+    let paramName = secondName.trimmed.text
+    let funcName = functionName.trimmed.text
+    if paramName != funcName && "`\(paramName)`" != funcName {
+      return secondName
+    }
   }
-  return name
+  return "_param\(raw: paramIndex)"
 }
 
 func tryGetParamName(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> TokenSyntax? {
   switch expr {
   case .param(let i):
     let funcParam = getParam(funcDecl, i - 1)
-    return getParamName(funcParam, i - 1)
+    // escape here, since self should not be escaped
+    return "`\(getParamName(funcParam, i - 1, funcDecl.name))`"
   case .`self`:
     return .keyword(.self)
   default: return nil
@@ -95,14 +99,14 @@ struct CxxSpan: ParamInfo {
     case .param(let i):
       return CxxSpanThunkBuilder(
         base: base, index: i - 1, signature: funcDecl.signature,
-        typeMappings: typeMappings, node: original, nonescaping: nonescaping)
+        typeMappings: typeMappings, node: original, nonescaping: nonescaping, functionName: funcDecl.name)
     case .return:
       if dependencies.isEmpty {
         return base
       }
       return CxxSpanReturnThunkBuilder(
         base: base, signature: funcDecl.signature,
-        typeMappings: typeMappings, node: original)
+        typeMappings: typeMappings, node: original, functionName: funcDecl.name)
     case .self:
       return base
     }
@@ -133,12 +137,12 @@ struct CountedBy: ParamInfo {
       return CountedOrSizedPointerThunkBuilder(
         base: base, index: i - 1, countExpr: count,
         signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy, skipTrivialCount: skipTrivialCount)
+        nonescaping: nonescaping, isSizedBy: sizedBy, skipTrivialCount: skipTrivialCount, functionName: funcDecl.name)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
         signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy, dependencies: dependencies)
+        nonescaping: nonescaping, isSizedBy: sizedBy, dependencies: dependencies, functionName: funcDecl.name)
     case .self:
       return base
     }
@@ -427,12 +431,8 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
       // filter out deleted parameters, i.e. ones where argTypes[i] _contains_ nil
       return type == nil || type! != nil
     }.map { (i: Int, e: FunctionParameterSyntax) in
-      let param = e.with(\.type, (argTypes[i] ?? e.type)!)
-      let name = param.secondName ?? param.firstName
-      if name.trimmed.text == "_" {
-        return param.with(\.secondName, getParamName(param, i))
-      }
-      return param
+      e.with(\.type, (argTypes[i] ?? e.type)!)
+        .with(\.secondName, getParamName(e, i, base.name))
     }
     if let last = newParams.popLast() {
       newParams.append(last.with(\.trailingComma, nil))
@@ -450,9 +450,9 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     let functionRef = DeclReferenceExprSyntax(baseName: base.name)
     let args: [ExprSyntax] = base.signature.parameterClause.parameters.enumerated()
       .map { (i: Int, param: FunctionParameterSyntax) in
-        let name = getParamName(param, i)
-        let declref = DeclReferenceExprSyntax(baseName: name)
-        return pointerArgs[i] ?? ExprSyntax(declref)
+        let name = getParamName(param, i, base.name)
+        let declref = ExprSyntax("`\(name)`")
+        return pointerArgs[i] ?? declref
       }
     let labels: [TokenSyntax?] = base.signature.parameterClause.parameters.map { param in
       let firstName = param.firstName.trimmed
@@ -485,6 +485,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
   public let nonescaping: Bool
+  public let functionName: TokenSyntax
   let isSizedBy: Bool = false
   let isParameter: Bool = true
 
@@ -507,7 +508,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
 
     let (_, isConst) = dropCxxQualifiers(try genericArg)
     if isConst {
-      args[index] = ExprSyntax("\(raw: typeName)(\(raw: name))")
+      args[index] = ExprSyntax("\(raw: typeName)(`\(raw: name)`)")
       return try base.buildFunctionCall(args)
     } else {
       let unwrappedName = TokenSyntax("_\(name)Ptr")
@@ -518,7 +519,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
       // so unwrap it to an UnsafeMutableBufferPointer that we can cast
       let unwrappedCall = ExprSyntax(
         """
-          unsafe \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
+          unsafe `\(name)`.withUnsafeMutableBufferPointer { \(unwrappedName) in
             return \(call)
           }
         """)
@@ -532,6 +533,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   public let signature: FunctionSignatureSyntax
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
+  public let functionName: TokenSyntax
   let isParameter: Bool = false
 
   var oldType: TypeSyntax {
@@ -566,6 +568,7 @@ protocol BoundsThunkBuilder: BoundsCheckedThunkBuilder {
   var oldType: TypeSyntax { get }
   var newType: TypeSyntax { get throws }
   var signature: FunctionSignatureSyntax { get }
+  var functionName: TokenSyntax { get }
 }
 
 protocol SpanBoundsThunkBuilder: BoundsThunkBuilder {
@@ -660,7 +663,7 @@ extension ParamBoundsThunkBuilder {
   }
 
   var name: TokenSyntax {
-    getParamName(param, index)
+    getParamName(param, index, functionName)
   }
 }
 
@@ -671,6 +674,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let dependencies: [LifetimeDependence]
+  public let functionName: TokenSyntax
   let isParameter: Bool = false
 
   var generateSpan: Bool { !dependencies.isEmpty }
@@ -726,6 +730,27 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 }
 
+class CountExprRewriter: SyntaxRewriter {
+  public let signature: FunctionSignatureSyntax
+  public let functionName: TokenSyntax
+
+  init(_ sig: FunctionSignatureSyntax, _ name: TokenSyntax) {
+    signature = sig
+    functionName = name
+  }
+
+  override func visit(_ node: DeclReferenceExprSyntax) -> ExprSyntax {
+    do {
+      let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, node)
+      let param = getParam(signature, i)
+      let newName: TokenSyntax = .identifier("`\(getParamName(param, i, functionName))`",
+        leadingTrivia: node.baseName.leadingTrivia, trailingTrivia: node.baseName.trailingTrivia)
+      return ExprSyntax(node.with(\.baseName, newName))
+    } catch {}
+    return "`\(node)`"
+  }
+}
+
 struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
@@ -734,6 +759,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let skipTrivialCount: Bool
+  public let functionName: TokenSyntax
   let isParameter: Bool = true
 
   var generateSpan: Bool { nonescaping }
@@ -755,8 +781,9 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     var res = try base.buildBoundsChecks()
     let countName: TokenSyntax = "_\(raw: name)Count"
+    let newCountExpr = CountExprRewriter(signature, functionName).visit(countExpr)
     let count: VariableDeclSyntax = try VariableDeclSyntax(
-      "let \(countName): some BinaryInteger = \(countExpr)")
+      "let \(countName): some BinaryInteger = \(newCountExpr)")
     res.append(CodeBlockItemSyntax.Item(count))
 
     let countCheck = ExprSyntax(
@@ -804,7 +831,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
       }
     }
     let call = try base.buildFunctionCall(args)
-    let ptrRef = unwrapIfNullable(ExprSyntax(DeclReferenceExprSyntax(baseName: name)))
+    let ptrRef = unwrapIfNullable("`\(name)`")
 
     let funcName =
       switch (isSizedBy, isMutablePointerType(oldType)) {
@@ -825,9 +852,9 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   func getCount() -> ExprSyntax {
     let countName = isSizedBy && generateSpan ? "byteCount" : "count"
     if nullable {
-      return ExprSyntax("\(name)?.\(raw: countName) ?? 0")
+      return ExprSyntax("`\(name)`?.\(raw: countName) ?? 0")
     }
-    return ExprSyntax("\(name).\(raw: countName)")
+    return ExprSyntax("`\(name)`.\(raw: countName)")
   }
 
   func peelOptionalType(_ type: TypeSyntax) -> TypeSyntax {
@@ -850,9 +877,9 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
 
   func getPointerArg() throws -> ExprSyntax {
     if nullable {
-      return ExprSyntax("\(name)?.baseAddress")
+      return ExprSyntax("`\(name)`?.baseAddress")
     }
-    return ExprSyntax("\(name).baseAddress!")
+    return ExprSyntax("`\(name)`.baseAddress!")
   }
 
   func buildFunctionCall(_ argOverrides: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -875,7 +902,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         nullArgs[index] = ExprSyntax(NilLiteralExprSyntax(nilKeyword: .keyword(.nil)))
         return ExprSyntax(
           """
-            { () in return if \(name) == nil {
+            { () in return if `\(name)` == nil {
                 \(try base.buildFunctionCall(nullArgs))
               } else {
                 \(unwrappedCall)
@@ -1411,18 +1438,18 @@ func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSynt
 
 // Mutable[Raw]Span parameters need explicit @lifetime annotations since they are inout
 func paramLifetimeAttributes(
-  _ newSignature: FunctionSignatureSyntax, _ oldAttrs: AttributeListSyntax
+  _ newSignature: FunctionSignatureSyntax, _ oldAttrs: AttributeListSyntax, _ functionName: TokenSyntax
 ) -> [AttributeListSyntax.Element] {
   var defaultLifetimes: [AttributeListSyntax.Element] = []
-  for param in newSignature.parameterClause.parameters {
+  for (i, param) in newSignature.parameterClause.parameters.enumerated() {
     if !isMutableSpan(param.type) {
       continue
     }
-    let paramName = param.secondName ?? param.firstName
+    let paramName = getParamName(param, i, functionName)
     if containsLifetimeAttr(oldAttrs, for: paramName) {
       continue
     }
-    let expr = ExprSyntax("\(paramName): copy \(paramName)")
+    let expr = ExprSyntax("`\(paramName)`: copy `\(paramName)`")
 
     defaultLifetimes.append(
       .attribute(
@@ -1517,7 +1544,7 @@ public struct SwiftifyImportMacro: PeerMacro {
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
       let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
       let lifetimeAttrs =
-        returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
+        returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes, funcDecl.name)
       let availabilityAttr = try getAvailability(newSignature, spanAvailability)
       let disfavoredOverload: [AttributeListSyntax.Element] =
         (onlyReturnTypeChanged

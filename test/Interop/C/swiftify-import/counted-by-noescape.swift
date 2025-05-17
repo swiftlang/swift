@@ -14,30 +14,59 @@ import CountedByNoEscapeClang
 // CHECK:      @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_param1: copy _param1)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func anonymous(_ _param1: inout MutableSpan<Int32>?)
-// CHECK-NEXT:  @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>)
+
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(_param1: copy _param1)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func `func`(_ _param1: inout MutableSpan<Int32>?)
+
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(_param1: copy _param1)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func funcRename(func _param1: inout MutableSpan<Int32>?)
+
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(func: copy func)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func keyword(_ func: inout MutableSpan<Int32>?)
+
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func lenName(_ _param0: Int32, _ size: Int32, _ p: inout MutableSpan<Int32>?)
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_ p: inout MutableSpan<Int32>)
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_ p: inout MutableSpan<Int32>)
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullable(_ p: inout MutableSpan<Int32>?)
+
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(_param1: copy _param1)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func pointerName(_ _param1: inout MutableSpan<Int32>?)
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func returnLifetimeBound(_ len1: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
+
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32>
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p1: copy p1)
 // CHECK-NEXT: @lifetime(p2: copy p2)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int32, _ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>)
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_ p: inout MutableSpan<Int32>)
+
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_ p: inout MutableSpan<Int32>)
@@ -106,8 +135,44 @@ public func callSwiftAttr(_ p: inout MutableSpan<CInt>) {
   swiftAttr(&p)
 }
 
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @lifetime(p: copy p)
 @inlinable
 public func callAnonymous(_ p: inout MutableSpan<CInt>?) {
   anonymous(&p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@lifetime(p: copy p)
+@inlinable
+public func callKeyword(_ p: inout MutableSpan<CInt>?) {
+  keyword(&p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@lifetime(p: copy p)
+@inlinable
+public func callFunc(_ p: inout MutableSpan<CInt>?) {
+  `func`(&p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@lifetime(p: copy p)
+@inlinable
+public func callFuncRename(_ p: inout MutableSpan<CInt>?) {
+  funcRename(func: &p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@lifetime(p: copy p)
+@inlinable
+public func callPointerName(_ p: inout MutableSpan<CInt>?) {
+  pointerName(&p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@lifetime(p: copy p)
+@inlinable
+public func callLenName(_ p: inout MutableSpan<CInt>?) {
+  lenName(CInt(p?.count ?? 0), 2, &p)
 }
