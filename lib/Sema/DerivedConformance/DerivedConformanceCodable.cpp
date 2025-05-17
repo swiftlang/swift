@@ -155,16 +155,6 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);
 
-  switch (C.LangOpts.DefaultIsolationBehavior) {
-  case DefaultIsolation::MainActor:
-    enumDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
-    break;
-
-  case DefaultIsolation::Nonisolated:
-    // Nothing to do.
-    break;
-  }
-
   // For classes which inherit from something Encodable or Decodable, we
   // provide case `super` as the first key (to be used in encoding super).
   auto *classDecl = dyn_cast<ClassDecl>(target);
