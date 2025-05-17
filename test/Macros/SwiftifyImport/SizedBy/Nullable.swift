@@ -8,5 +8,6 @@ func myFunc(_ ptr: UnsafeRawPointer?, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer?) {
-// CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT:     let `size` = CInt(exactly: unsafe ptr?.count ?? 0)!
+// CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, size)
 // CHECK-NEXT: }
