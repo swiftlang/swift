@@ -176,6 +176,10 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     let start = _guts.validateInclusiveScalarIndex(start)
     let end = _guts.validateInclusiveScalarIndex(end)
 
+    if _guts.isASCII {
+      return end._encodedOffset - start._encodedOffset
+    }
+    
     var i = start
     var count = 0
     if i < end {
@@ -195,6 +199,12 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   @_alwaysEmitIntoClient
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     var i = _guts.validateInclusiveScalarIndex(i)
+    
+    if _guts.isASCII {
+      return _guts.validateInclusiveScalarIndex(
+        i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
+      )
+    }
 
     if distance >= 0 {
       for _ in stride(from: 0, to: distance, by: 1) {
@@ -222,8 +232,15 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     let start = _guts.ensureMatchingEncoding(i)
 
     var i = _guts.validateInclusiveScalarIndex(i)
-
+    
     if distance >= 0 {
+      if _guts.isASCII {
+        let idx = _guts.validateInclusiveScalarIndex(
+          i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
+        )
+        guard limit < start || idx <= limit else { return nil }
+        return idx
+      }
       for _ in stride(from: 0, to: distance, by: 1) {
         guard limit < start || i < limit else { return nil }
         _precondition(i._encodedOffset < _guts.count, "String index is out of bounds")
@@ -231,6 +248,13 @@ extension String.UnicodeScalarView: BidirectionalCollection {
       }
       guard limit < start || i <= limit else { return nil }
     } else {
+      if _guts.isASCII {
+        let idx = _guts.validateInclusiveScalarIndex(
+          i.encoded(offsetBy: distance)._scalarAligned._knownUTF8
+        )
+        guard limit > start || idx >= limit else { return nil }
+        return idx
+      }
       for _ in stride(from: 0, to: distance, by: -1) {
         guard limit > start || i > limit else { return nil }
         _precondition(i._encodedOffset > 0, "String index is out of bounds")
