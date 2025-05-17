@@ -297,6 +297,7 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::EndLifetimeInst:
     return true;
   case SILInstructionKind::DropDeinitInst:
     assert(memOper->get()->getType().isValueTypeWithDeinit());
