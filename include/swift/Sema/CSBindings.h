@@ -527,6 +527,12 @@ public:
   void forEachLiteralRequirement(
       llvm::function_ref<void(KnownProtocolKind)> callback) const;
 
+  void forEachAdjacentVariable(
+      llvm::function_ref<void(TypeVariableType *)> callback) const {
+    for (auto *typeVar : AdjacentVars)
+      callback(typeVar);
+  }
+
   /// Return a literal requirement that has the most impact on the binding
   /// score.
   LiteralBindingKind getLiteralForScore() const;

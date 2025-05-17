@@ -1671,7 +1671,7 @@ public:
   /// Check to see if the given function application throws, is async, or
   /// involves unsafe behavior.
   Classification classifyApply(
-      Expr *call,
+      ApplyExpr *call,
       const AbstractFunction &fnRef,
       Expr *calleeFn,
       const AnyFunctionType *fnType,
@@ -1817,7 +1817,7 @@ public:
           // to fix their code.
           if (kind == EffectKind::Async &&
               fnRef.getKind() == AbstractFunction::Function) {
-            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(calleeFn)) {
+            if (auto *ctor = dyn_cast<ConstructorRefCallExpr>(call->getFn())) {
               if (ctor->getFn()->isImplicit() && args->isUnlabeledUnary())
                 result.setDowngradeToWarning(true);
             }
