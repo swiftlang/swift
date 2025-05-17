@@ -5,15 +5,18 @@
 // Check that doc comments are carried over from clang to the safe macro expansion.
 
 // CHECK:func begin()
-// CHECK-NEXT:func lineComment(_ len: {{.*}}, _ p: UnsafeMutablePointer<{{.*}}>!)
+// CHECK-NEXT:func lineComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
+
 // CHECK-NEXT:/// line doc comment
 // CHECK-NEXT:/// 
 // CHECK-NEXT:/// Here's a more complete description.
 // CHECK-NEXT:///
 // CHECK-NEXT:/// @param len the buffer length
 // CHECK-NEXT:/// @param p the buffer
-// CHECK-NEXT:func lineDocComment(_ len: {{.*}}, _ p: UnsafeMutablePointer<{{.*}}>!)
-// CHECK-NEXT:func blockComment(_ len: {{.*}}, _ p: UnsafeMutablePointer<{{.*}}>!)
+// CHECK-NEXT:func lineDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
+
+// CHECK-NEXT:func blockComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
+
 // CHECK-NEXT:/**
 // CHECK-NEXT: * block doc comment
 // CHECK-NEXT: * 
@@ -21,8 +24,11 @@
 // CHECK-NEXT: * @param len don't mess this one up
 // CHECK-NEXT: * @param p   some integers to play with
 // CHECK-NEXT: */
-// CHECK-NEXT:func blockDocComment(_ len: {{.*}}, _ p: UnsafeMutablePointer<{{.*}}>!)
-// CHECK-NEXT:@_alwaysEmitIntoClient public func blockComment(_ p: UnsafeMutableBufferPointer<{{.*}}>)
+// CHECK-NEXT:func blockDocComment(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!)
+
+// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:@_alwaysEmitIntoClient public func blockComment(_ p: UnsafeMutableBufferPointer<Int32>)
+
 // CHECK-NEXT:/**
 // CHECK-NEXT: * block doc comment
 // CHECK-NEXT: * 
@@ -30,12 +36,17 @@
 // CHECK-NEXT: * @param len don't mess this one up
 // CHECK-NEXT: * @param p   some integers to play with
 // CHECK-NEXT: */
-// CHECK-NEXT:@_alwaysEmitIntoClient public func blockDocComment(_ p: UnsafeMutableBufferPointer<{{.*}}>)
-// CHECK-NEXT:@_alwaysEmitIntoClient public func lineComment(_ p: UnsafeMutableBufferPointer<{{.*}}>)
+// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:@_alwaysEmitIntoClient public func blockDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
+
+// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:@_alwaysEmitIntoClient public func lineComment(_ p: UnsafeMutableBufferPointer<Int32>)
+
 // CHECK-NEXT:/// line doc comment
 // CHECK-NEXT:/// 
 // CHECK-NEXT:/// Here's a more complete description.
 // CHECK-NEXT:///
 // CHECK-NEXT:/// @param len the buffer length
 // CHECK-NEXT:/// @param p the buffer
-// CHECK-NEXT:@_alwaysEmitIntoClient public func lineDocComment(_ p: UnsafeMutableBufferPointer<{{.*}}>)
+// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:@_alwaysEmitIntoClient public func lineDocComment(_ p: UnsafeMutableBufferPointer<Int32>)
