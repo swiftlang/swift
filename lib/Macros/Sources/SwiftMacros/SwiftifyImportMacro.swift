@@ -40,8 +40,7 @@ protocol ParamInfo: CustomStringConvertible {
   var dependencies: [LifetimeDependence] { get set }
 
   func getBoundsCheckedThunkBuilder(
-    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
-    _ skipTrivialCount: Bool
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax
   ) -> BoundsCheckedThunkBuilder
 }
 
@@ -80,20 +79,19 @@ struct CxxSpan: ParamInfo {
   }
 
   func getBoundsCheckedThunkBuilder(
-    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
-    _ skipTrivialCount: Bool
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
       return CxxSpanThunkBuilder(
-        base: base, index: i - 1, signature: funcDecl.signature,
+        base: base, index: i - 1, funcDecl: funcDecl,
         typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     case .return:
       if dependencies.isEmpty {
         return base
       }
       return CxxSpanReturnThunkBuilder(
-        base: base, signature: funcDecl.signature,
+        base: base, funcDecl: funcDecl,
         typeMappings: typeMappings, node: original)
     case .self:
       return base
@@ -117,19 +115,18 @@ struct CountedBy: ParamInfo {
   }
 
   func getBoundsCheckedThunkBuilder(
-    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
-    _ skipTrivialCount: Bool
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
       return CountedOrSizedPointerThunkBuilder(
         base: base, index: i - 1, countExpr: count,
-        signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy, skipTrivialCount: skipTrivialCount)
+        funcDecl: funcDecl,
+        nonescaping: nonescaping, isSizedBy: sizedBy)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
-        signature: funcDecl.signature,
+        funcDecl: funcDecl,
         nonescaping: nonescaping, isSizedBy: sizedBy, dependencies: dependencies)
     case .self:
       return base
@@ -380,7 +377,16 @@ func isMutablePointerType(_ type: TypeSyntax) -> Bool {
 
 protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
-  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
+  // buildBasicBoundsChecks creates a variable with the same name as the parameter it replaced,
+  // or if that variable already exists (because another pointer has the same count), checks that
+  // the values match.
+  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item]
+  // buildCompoundBoundsChecks performs bounds checks of count expressions that contain operations.
+  // It may refer to names constructed in buildBasicBoundsChecks (in the case of shared variables),
+  // so those must come before this in the function body.
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
+  // The second component of the return value is true when only the return type of the
+  // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
 }
@@ -405,7 +411,10 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     base = function
   }
 
-  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
+    return []
+  }
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return []
   }
 
@@ -465,15 +474,18 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
 struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
-  public let signature: FunctionSignatureSyntax
+  public let funcDecl: FunctionDeclSyntax
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
   public let nonescaping: Bool
   let isSizedBy: Bool = false
   let isParameter: Bool = true
 
-  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBoundsChecks()
+  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  }
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildCompoundBoundsChecks()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -502,9 +514,9 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
       // so unwrap it to an UnsafeMutableBufferPointer that we can cast
       let unwrappedCall = ExprSyntax(
         """
-          unsafe \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
-            return \(call)
-          }
+        unsafe \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
+          return \(call)
+        }
         """)
       return unwrappedCall
     }
@@ -513,7 +525,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
 
 struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
-  public let signature: FunctionSignatureSyntax
+  public let funcDecl: FunctionDeclSyntax
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
   let isParameter: Bool = false
@@ -522,8 +534,11 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
     return signature.returnClause!.type
   }
 
-  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBoundsChecks()
+  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  }
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildCompoundBoundsChecks()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -549,7 +564,13 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
 protocol BoundsThunkBuilder: BoundsCheckedThunkBuilder {
   var oldType: TypeSyntax { get }
   var newType: TypeSyntax { get throws }
-  var signature: FunctionSignatureSyntax { get }
+  var funcDecl: FunctionDeclSyntax { get }
+}
+
+extension BoundsThunkBuilder {
+  var signature: FunctionSignatureSyntax {
+    funcDecl.signature
+  }
 }
 
 protocol SpanBoundsThunkBuilder: BoundsThunkBuilder {
@@ -654,7 +675,7 @@ extension ParamBoundsThunkBuilder {
 struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let countExpr: ExprSyntax
-  public let signature: FunctionSignatureSyntax
+  public let funcDecl: FunctionDeclSyntax
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let dependencies: [LifetimeDependence]
@@ -673,8 +694,11 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
     return try base.buildFunctionSignature(argTypes, newType)
   }
 
-  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBoundsChecks()
+  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  }
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildCompoundBoundsChecks()
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -719,10 +743,9 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
   public let countExpr: ExprSyntax
-  public let signature: FunctionSignatureSyntax
+  public let funcDecl: FunctionDeclSyntax
   public let nonescaping: Bool
   public let isSizedBy: Bool
-  public let skipTrivialCount: Bool
   let isParameter: Bool = true
 
   var generateSpan: Bool { nonescaping }
@@ -732,29 +755,48 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   {
     var types = argTypes
     types[index] = try newType
-    if skipTrivialCount {
-      if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
-        let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
-        types[i] = nil as TypeSyntax?
-      }
+    if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+      let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
+      types[i] = nil as TypeSyntax?
     }
     return try base.buildFunctionSignature(types, returnType)
   }
 
-  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
-    var res = try base.buildBoundsChecks()
-    let countName: TokenSyntax = "_\(raw: name)Count"
-    let count: VariableDeclSyntax = try VariableDeclSyntax(
-      "let \(countName): some BinaryInteger = \(countExpr)")
-    res.append(CodeBlockItemSyntax.Item(count))
-
-    let countCheck = ExprSyntax(
+  func checkBound(countName spanCount: ExprSyntax) -> StmtSyntax {
+    return
       """
-        if \(getCount()) < \(countName) || \(countName) < 0 {
-          fatalError("bounds check failure when calling unsafe function")
-        }
-      """)
-    res.append(CodeBlockItemSyntax.Item(countCheck))
+      if \(spanCount) != \(countExpr) {
+        fatalError("bounds check failure in \(funcDecl.name): expected \\(\(countExpr)) but got \\(\(spanCount))")
+      }
+      """
+  }
+
+  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildBasicBoundsChecks(&extractedCountArgs)
+    if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+      let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
+      if extractedCountArgs.contains(i) {
+        res.append(CodeBlockItemSyntax.Item(checkBound(countName: makeCount())))
+      } else {
+        // this is the first parameter with this count parameter, nothing to compare against
+        let count = castIntToTargetType(expr: makeCount(), type: getParam(signature, i).type)
+        res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
+          "let \(countVar.baseName) = \(count)")))
+        extractedCountArgs.insert(i)
+      }
+    }
+    return res
+  }
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildCompoundBoundsChecks()
+
+    if !countExpr.is(DeclReferenceExprSyntax.self) {
+      let countName = ExprSyntax("_\(name)Count")
+      let count: VariableDeclSyntax = try VariableDeclSyntax(
+        "let \(countName) = \(makeCount())")
+      res.append(CodeBlockItemSyntax.Item(count))
+      res.append(CodeBlockItemSyntax.Item(checkBound(countName: countName)))
+    }
     return res
   }
 
@@ -785,13 +827,6 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
     args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
-    if skipTrivialCount {
-      if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
-        let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
-        args[i] = castIntToTargetType(
-          expr: "\(unwrappedName).count", type: getParam(signature, i).type)
-      }
-    }
     let call = try base.buildFunctionCall(args)
     let ptrRef = unwrapIfNullable("\(name)")
 
@@ -804,18 +839,26 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
       }
     let unwrappedCall = ExprSyntax(
       """
-        unsafe \(ptrRef).\(raw: funcName) { \(unwrappedName) in
-          return \(call)
-        }
+      unsafe \(ptrRef).\(raw: funcName) { \(unwrappedName) in
+        return \(call)
+      }
       """)
     return unwrappedCall
   }
 
-  func getCount() -> ExprSyntax {
+  func makeCount() -> ExprSyntax {
+    let unsafeKw = generateSpan ? "" : "unsafe "
     if nullable {
-      return ExprSyntax("\(name)?.\(raw: countLabel) ?? 0")
+      return ExprSyntax("\(raw: unsafeKw)\(name)?.\(raw: countLabel) ?? 0")
     }
-    return ExprSyntax("\(name).\(raw: countLabel)")
+    return ExprSyntax("\(raw: unsafeKw)\(name).\(raw: countLabel)")
+  }
+
+  func getCountName() -> TokenSyntax {
+    if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+      return countVar.baseName
+    }
+    return "_\(raw: name)Count"
   }
 
   func peelOptionalType(_ type: TypeSyntax) -> TypeSyntax {
@@ -845,15 +888,6 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
 
   func buildFunctionCall(_ argOverrides: [Int: ExprSyntax]) throws -> ExprSyntax {
     var args = argOverrides
-    if skipTrivialCount {
-      assert(
-        countExpr.is(DeclReferenceExprSyntax.self) || countExpr.is(IntegerLiteralExprSyntax.self))
-      if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
-        let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
-        assert(args[i] == nil)
-        args[i] = castIntToTargetType(expr: getCount(), type: getParam(signature, i).type)
-      }
-    }
     assert(args[index] == nil)
     if generateSpan {
       assert(nonescaping)
@@ -863,11 +897,11 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         nullArgs[index] = ExprSyntax(NilLiteralExprSyntax(nilKeyword: .keyword(.nil)))
         return ExprSyntax(
           """
-            { () in return if \(name) == nil {
-                \(try base.buildFunctionCall(nullArgs))
-              } else {
-                \(unwrappedCall)
-              } }()
+          { () in return if \(name) == nil {
+              \(try base.buildFunctionCall(nullArgs))
+            } else {
+              \(unwrappedCall)
+            } }()
           """)
       }
       return unwrappedCall
@@ -1203,29 +1237,6 @@ func parseMacroParam(
   }
 }
 
-func hasTrivialCountVariants(_ parsedArgs: [ParamInfo]) -> Bool {
-  let countExprs = parsedArgs.compactMap {
-    switch $0 {
-    case let c as CountedBy: return c.count
-    default: return nil
-    }
-  }
-  let trivialCounts = countExprs.filter {
-    $0.is(DeclReferenceExprSyntax.self) || $0.is(IntegerLiteralExprSyntax.self)
-  }
-  // don't generate trivial count variants if there are any non-trivial counts
-  if trivialCounts.count < countExprs.count {
-    return false
-  }
-  let countVars = trivialCounts.filter { $0.is(DeclReferenceExprSyntax.self) }
-  let distinctCountVars = Set(
-    countVars.map {
-      return $0.as(DeclReferenceExprSyntax.self)!.baseName.text
-    })
-  // don't generate trivial count variants if two count expressions refer to the same parameter
-  return countVars.count == distinctCountVars.count
-}
-
 func checkArgs(_ args: [ParamInfo], _ funcDecl: FunctionDeclSyntax) throws {
   var argByIndex: [Int: ParamInfo] = [:]
   var ret: ParamInfo? = nil
@@ -1557,20 +1568,18 @@ public struct SwiftifyImportMacro: PeerMacro {
       }
       let baseBuilder = FunctionCallBuilder(funcDecl)
 
-      let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
-
       let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
         baseBuilder,
         { (prev, parsedArg) in
-          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
+          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl)
         })
       let newSignature = try builder.buildFunctionSignature([:], nil)
-      let checks =
-        skipTrivialCount
-        ? [] as [CodeBlockItemSyntax]
-        : try builder.buildBoundsChecks().map { e in
-          CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
-        }
+      var eliminatedArgs = Set<Int>()
+      let basicChecks = try builder.buildBasicBoundsChecks(&eliminatedArgs)
+      let compoundChecks = try builder.buildCompoundBoundsChecks()
+      let checks = (basicChecks + compoundChecks).map { e in
+        CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
+      }
       let call = CodeBlockItemSyntax(
         item: CodeBlockItemSyntax.Item(
           ReturnStmtSyntax(
