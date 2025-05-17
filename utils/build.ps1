@@ -643,6 +643,8 @@ enum Project {
   ClangRuntime
   SwiftInspect
   ExperimentalRuntime
+  ExperimentalOverlay
+  ExperimentalStringProcessing
   StaticFoundation
 }
 
@@ -2279,6 +2281,38 @@ function Build-ExperimentalRuntime {
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
         SwiftCore_ENABLE_CONCURRENCY = "YES";
       }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Overlay `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalOverlay) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\StringProcessing `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStringProcessing) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
   }
 }
 
@@ -3131,6 +3165,7 @@ function Build-Installer([Hashtable] $Platform) {
   $Properties = @{
     BundleFlavor = "offline";
     ImageRoot = "$(Get-InstallDir $Platform)\";
+    IncludeExperimentalSDK = "True";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
@@ -3225,6 +3260,11 @@ if (-not $SkipBuild) {
       Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
     }
 
+    Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+    }
+
     Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
   }
 
@@ -3240,6 +3280,11 @@ if (-not $SkipBuild) {
       Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
         Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
         Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\" | Out-Null
+      }
+
+      Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match "*.a$|*.so$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
       }
     }
 
