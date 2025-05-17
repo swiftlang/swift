@@ -93,6 +93,7 @@ struct CompilerPlugin {
   struct Capability {
     enum Feature: String {
       case loadPluginLibrary = "load-plugin-library"
+      case inferNonisolatedConformances = "infer-nonisolated-conformances"
     }
 
     var protocolVersion: Int
