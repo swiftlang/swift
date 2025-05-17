@@ -392,11 +392,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// if any. 0 = None, 1 = Forward, 2 = Backward.
   unsigned trailingClosureMatching : 2;
 
-  /// For a SyntacticElement constraint, identify whether the result of this
-  /// node is unused.
-  unsigned isDiscarded : 1;
-
-  // 22 bits remaining
+  // 23 bits remaining
 
   union {
     struct {
@@ -505,7 +501,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a closure body element constraint.
-  Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
+  Constraint(ASTNode node, ContextualTypeInfo context,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -611,16 +607,12 @@ public:
       std::optional<TrailingClosureMatching> trailingClosureMatching,
       DeclContext *useDC, ConstraintLocator *locator);
 
-  static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                            ASTNode node,
-                                            ConstraintLocator *locator,
-                                            bool isDiscarded = false);
+  static Constraint *createSyntacticElement(ConstraintSystem &cs, ASTNode node,
+                                            ConstraintLocator *locator);
 
-  static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                            ASTNode node,
+  static Constraint *createSyntacticElement(ConstraintSystem &cs, ASTNode node,
                                             ContextualTypeInfo context,
-                                            ConstraintLocator *locator,
-                                            bool isDiscarded = false);
+                                            ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -889,11 +881,6 @@ public:
   ContextualTypeInfo getElementContext() const {
     ASSERT(Kind == ConstraintKind::SyntacticElement);
     return *getTrailingObjects<ContextualTypeInfo>();
-  }
-
-  bool isDiscardedElement() const {
-    assert(Kind == ConstraintKind::SyntacticElement);
-    return isDiscarded;
   }
 
   /// Retrieve the DC in which the overload was used.
