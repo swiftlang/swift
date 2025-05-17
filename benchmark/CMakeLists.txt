@@ -210,10 +210,10 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
-#    cxx-source/CxxSetToCollection
-#    cxx-source/CxxSpanTests
-#    cxx-source/CxxStringConversion
-#    cxx-source/CxxVectorSum
+    cxx-source/CxxSetToCollection
+    cxx-source/CxxSpanTests
+    cxx-source/CxxStringConversion
+    cxx-source/CxxVectorSum
     # TODO: rdar://92120528
     # cxx-source/ReadAccessor
 )
