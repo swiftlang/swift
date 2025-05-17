@@ -28,9 +28,8 @@ let strings = [
   "A long ASCII string exceeding 16 code units.",
   "🇯🇵",
   "🏂☃❅❆❄︎⛄️❄️",
-// Enable the following once the small native string form is supported
-//  "z",
-//  "",
+  "z",
+  "",
 ]
 
 strings.forEach { expected in
