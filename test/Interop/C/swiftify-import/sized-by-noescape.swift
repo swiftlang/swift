@@ -35,7 +35,7 @@ import SizedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ len: Int{{.*}}, _ p1: RawSpan, _ p2: RawSpan)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: RawSpan, _ p2: RawSpan)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -79,7 +79,7 @@ public func callReturnPointer() {
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callShared(_ p: RawSpan, _ p2: RawSpan) {
-  shared(CInt(p.byteCount), p, p2)
+  shared(p, p2)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
