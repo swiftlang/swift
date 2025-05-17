@@ -393,15 +393,17 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
                                       const ClosureExpr *E) {
   ASSERT(!E->isImplicit());
 
-  SourceLoc insertionLoc;
+  SourceLoc insertionLoc = E->getBracketRange().Start;
 
-  if (auto *paramList = E->getParameters()) {
-    // HACK: Don't set insertion loc to param list start loc if it's equal to
-    // closure start loc (meaning it's implicit).
-    // FIXME: Don't set the start loc of an implicit param list, or put an
-    // isImplicit bit on ParameterList.
-    if (paramList->getStartLoc() != E->getStartLoc()) {
-      insertionLoc = paramList->getStartLoc();
+  if (insertionLoc.isInvalid()) {
+    if (auto *paramList = E->getParameters()) {
+      // HACK: Don't set insertion loc to param list start loc if it's equal to
+      // closure start loc (meaning it's implicit).
+      // FIXME: Don't set the start loc of an implicit param list, or put an
+      // isImplicit bit on ParameterList.
+      if (paramList->getStartLoc() != E->getStartLoc()) {
+        insertionLoc = paramList->getStartLoc();
+      }
     }
   }
 
