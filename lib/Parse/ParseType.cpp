@@ -402,6 +402,9 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///
 ParserResult<TypeRepr> Parser::parseTypeScalar(
     Diag<> MessageID, ParseTypeReason reason) {
+  // If we have an invalid module selector, consume that first.
+  parseModuleSelector(ModuleSelectorReason::InvalidOnly);
+
   // Start a context for creating type syntax.
   ParserStatus status;
 
@@ -1875,6 +1878,9 @@ bool Parser::canParseCollectionType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
+  // Parse a module selector, if present.
+  parseModuleSelector(ModuleSelectorReason::Allowed);
+  
   // Parse an identifier.
   //
   // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.

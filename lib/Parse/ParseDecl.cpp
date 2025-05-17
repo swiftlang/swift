@@ -564,8 +564,8 @@ bool Parser::parseSpecializeAttributeArguments(
     std::optional<bool> &Exported,
     std::optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, AvailabilityRange *SILAvailability,
-    SmallVectorImpl<Identifier> &spiGroups,
+    DeclNameRef &targetFunction, DeclNameLoc &targetFunctionLoc,
+    AvailabilityRange *SILAvailability, SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
@@ -666,13 +666,13 @@ bool Parser::parseSpecializeAttributeArguments(
       }
       if (ParamLabel == "target") {
         if (!parseSILTargetName(*this)) {
-          DeclNameLoc loc;
           targetFunction = parseDeclNameRef(
-              loc, diag::attr_specialize_expected_function,
+              targetFunctionLoc, diag::attr_specialize_expected_function,
               DeclNameFlag::AllowZeroArgCompoundNames |
                   DeclNameFlag::AllowKeywordsUsingSpecialNames |
                   DeclNameFlag::AllowOperators |
-                  DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+                  DeclNameFlag::AllowLowercaseAndUppercaseSelf,
+              ModuleSelectorReason::SiblingDeclName);
         }
       }
       if (ParamLabel == "spiModule") {
@@ -688,6 +688,7 @@ bool Parser::parseSpecializeAttributeArguments(
           consumeToken();
           return false;
         }
+        parseModuleSelector(ModuleSelectorReason::SPIGroup);
         auto text = Tok.getText();
         spiGroups.push_back(Context.getIdentifier(text));
         consumeToken();
@@ -881,12 +882,13 @@ bool Parser::parseSpecializeAttribute(
   TrailingWhereClause *trailingWhereClause = nullptr;
 
   DeclNameRef targetFunction;
+  DeclNameLoc targetFunctionLoc;
   SmallVector<Identifier, 4> spiGroups;
   SmallVector<AvailableAttr *, 4> availableAttrs;
   if (!parseSpecializeAttributeArguments(
           ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
-          targetFunction, SILAvailability, spiGroups, availableAttrs,
-          parseSILTargetName, parseSILSIPModule)) {
+          targetFunction, targetFunctionLoc, SILAvailability, spiGroups,
+          availableAttrs, parseSILTargetName, parseSILSIPModule)) {
     return false;
   }
 
@@ -916,8 +918,8 @@ bool Parser::parseSpecializeAttribute(
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                                 trailingWhereClause, exported.value(),
-                                kind.value(), targetFunction, spiGroups,
-                                availableAttrs);
+                                kind.value(), targetFunction, targetFunctionLoc,
+                                spiGroups, availableAttrs);
   return true;
 }
 
@@ -1116,7 +1118,8 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
           MemberNameLoc, diag::attr_implements_expected_member_name,
           DeclNameFlag::AllowZeroArgCompoundNames |
               DeclNameFlag::AllowOperators |
-              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf,
+          ModuleSelectorReason::SiblingDeclName);
       if (!MemberName) {
         Status.setIsParseError();
       }
@@ -1138,7 +1141,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return Status;
   }
 
-  // FIXME(ModQual): Reject module qualification on MemberName.
+  assert(MemberName.getModuleSelector().empty());
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
                            ProtocolType.get(), MemberName.getFullName(),
@@ -1787,11 +1790,10 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
   IsNullarySelector = true;
   while (true) {
     // Empty selector piece.
-    if (Tok.is(tok::colon)) {
+    if (consumeIfColonSplittingDoubles()) {
       Names.push_back(Identifier());
-      NameLocs.push_back(Tok.getLoc());
+      NameLocs.push_back(PreviousLoc);
       IsNullarySelector = false;
-      consumeToken();
       continue;
     }
 
@@ -1802,8 +1804,7 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
       consumeToken();
 
       // If we have a colon, consume it.
-      if (Tok.is(tok::colon)) {
-        consumeToken();
+      if (consumeIfColonSplittingDoubles()) {
         IsNullarySelector = false;
         continue;
       }
@@ -2421,7 +2422,8 @@ Parser::parseMacroRoleAttribute(
             (DeclNameFlag::AllowOperators | DeclNameFlag::AllowKeywords |
              DeclNameFlag::AllowKeywordsUsingSpecialNames |
              DeclNameFlag::AllowCompoundNames |
-             DeclNameFlag::AllowZeroArgCompoundNames));
+             DeclNameFlag::AllowZeroArgCompoundNames),
+            ModuleSelectorReason::AttrParameter);
         if (!name) {
           status.setIsParseError();
           return status;
@@ -2497,6 +2499,8 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
     P.CodeCompletionCallbacks->completeDeclAttrParam(*PDK, 0, /*HasLabel=*/false);
     P.consumeToken(tok::code_complete);
   }
+
+  P.parseModuleSelector(Parser::ModuleSelectorReason::AttrParameter);
 
   StringRef parsedName = P.Tok.getText();
   if (!P.consumeIf(tok::identifier)) {
@@ -2971,6 +2975,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       consumeIf(tok::r_paren);
       return makeParserSuccess();
     }
+
+    parseModuleSelector(ModuleSelectorReason::SPIGroup);
 
     auto text = Tok.getText();
     // An spi group name can be '_' as in @_spi(_), a specifier for implicit import of the SPI.
@@ -3515,6 +3521,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     SourceLoc LParenLoc = consumeAttributeLParen();
     DeclNameRef replacedFunction;
+    DeclNameLoc replacedFunctionLoc;
     {
       // Parse 'for'.
       if (Tok.getText() != "for") {
@@ -3529,15 +3536,12 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return makeParserSuccess();
       }
       consumeToken(tok::colon);
-      {
-        DeclNameLoc loc;
-        replacedFunction = parseDeclNameRef(
-            loc, diag::attr_dynamic_replacement_expected_function,
-            DeclNameFlag::AllowZeroArgCompoundNames |
-                DeclNameFlag::AllowKeywordsUsingSpecialNames |
-                DeclNameFlag::AllowOperators |
-                DeclNameFlag::AllowLowercaseAndUppercaseSelf);
-      }
+      replacedFunction = parseDeclNameRef(
+          replacedFunctionLoc, diag::attr_dynamic_replacement_expected_function,
+          DeclNameFlag::AllowZeroArgCompoundNames |
+              DeclNameFlag::AllowKeywordsUsingSpecialNames |
+              DeclNameFlag::AllowOperators |
+              DeclNameFlag::AllowLowercaseAndUppercaseSelf);
     }
 
     // Parse the matching ')'.
@@ -3551,7 +3555,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
 
     DynamicReplacementAttr *attr = DynamicReplacementAttr::create(
-        Context, AtLoc, Loc, LParenLoc, replacedFunction, RParenLoc);
+        Context, AtLoc, Loc, LParenLoc, replacedFunction, replacedFunctionLoc,
+                                                                  RParenLoc);
     Attributes.add(attr);
     break;
   }
@@ -4176,11 +4181,15 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
         .warnUntilSwiftVersion(6);
   }
 
+  bool hasModuleSelector = Context.LangOpts.hasFeature(Feature::ModuleSelector)
+                              && peekToken().is(tok::colon_colon);
+
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
       Tok.isNot(tok::kw_inout) &&
-      Tok.isNot(tok::kw_rethrows)) {
+      Tok.isNot(tok::kw_rethrows) &&
+      !hasModuleSelector) {
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
@@ -4201,7 +4210,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
-  std::optional<DeclAttrKind> DK =
+  std::optional<DeclAttrKind> DK = hasModuleSelector ? std::nullopt :
       DeclAttribute::getAttrKindFromString(Tok.getText());
   if (DK == DeclAttrKind::Rethrows) {
     DK = DeclAttrKind::AtRethrows;
@@ -4213,7 +4222,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   auto checkInvalidAttrName =
       [&](StringRef invalidName, StringRef correctName, DeclAttrKind kind,
           std::optional<Diag<StringRef, StringRef>> diag = std::nullopt) {
-        if (!DK && Tok.getText() == invalidName) {
+        if (!DK && !hasModuleSelector && Tok.getText() == invalidName) {
           DK = kind;
 
           if (diag) {
@@ -4277,7 +4286,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                        DeclAttrKind::Preconcurrency,
                        diag::attr_renamed_warning);
 
-  if (!DK && Tok.getText() == "warn_unused_result") {
+  if (!DK && !hasModuleSelector && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
     SourceLoc attrLoc = consumeToken();
@@ -4352,9 +4361,10 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     return parseNewDeclAttribute(Attributes, AtLoc, *DK, isFromClangAttribute);
   }
 
-  if (TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
+  if (!hasModuleSelector &&
+        TypeAttribute::getAttrKindFromString(Tok.getText()).has_value())
     diagnose(Tok, diag::type_attribute_applied_to_decl);
-  else if (Tok.isContextualKeyword("unknown")) {
+  else if (!hasModuleSelector && Tok.isContextualKeyword("unknown")) {
     diagnose(Tok, diag::unknown_attr_name, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
@@ -6574,7 +6584,9 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
           .fixItRemove(Tok.getLoc());
         return nullptr;
     }
-    HasNext = consumeIf(tok::period);
+    HasNext = consumeIf(tok::period) ||
+        (Context.LangOpts.hasFeature(Feature::ModuleSelector) &&
+         consumeIf(tok::colon_colon));
   } while (HasNext);
 
   if (Tok.is(tok::code_complete)) {
@@ -6705,6 +6717,8 @@ static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
                         StringRef DeclKindName,
                         llvm::function_ref<bool(const Token &)> canRecover) {
+  P.parseModuleSelector(Parser::ModuleSelectorReason::NameInDecl, DeclKindName);
+
   if (P.Tok.is(tok::identifier)) {
     Loc = P.consumeIdentifier(Result, /*diagnoseDollarPrefix=*/true);
 
@@ -7546,6 +7560,9 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   // the default, not actually try to parse something.
   if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
     StartLoc = P.consumeToken(tok::l_paren);
+
+    P.parseModuleSelector(Parser::ModuleSelectorReason::ParamDecl);
+
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_accessor_parameter_name,
                  Kind == AccessorKind::Set ? 0 :
@@ -10108,8 +10125,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   // designated protocol. These both look like identifiers, so we
   // parse them both as identifiers here and sort it out in type
   // checking.
-  SourceLoc colonLoc, groupLoc;
-  Identifier groupName;
+  SourceLoc colonLoc;
+  DeclNameLoc groupLoc;
+  DeclNameRef groupName;
   if (Tok.is(tok::colon)) {
     colonLoc = consumeToken();
     if (Tok.is(tok::code_complete)) {
@@ -10122,9 +10140,11 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
-    (void)parseIdentifier(groupName, groupLoc,
-                          diag::operator_decl_expected_precedencegroup,
-                          /*diagnoseDollarPrefix=*/false);
+    // TODO: We could support module selectors for precedence groups if we
+    //       implemented the lookup for it.
+    groupName = parseDeclNameRef(groupLoc,
+                                 diag::operator_decl_expected_precedencegroup,
+                                 {}, ModuleSelectorReason::PrecedenceGroup);
 
     if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       // Designated types have been removed; consume the list (mainly for source
@@ -10139,7 +10159,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         // These have no precedence group, so we already parsed the first entry
         // in the designated types list. Retroactively include it in the range.
         typesStartLoc = colonLoc;
-        typesEndLoc = groupLoc;
+        typesEndLoc = groupLoc.getEndLoc();
       }
 
       while (Tok.isNot(tok::eof)) {
@@ -10158,7 +10178,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
     } else {
       if (isPrefix || isPostfix) {
         // If we have nothing after the colon, then just remove the colon.
-        auto endLoc = groupLoc.isValid() ? groupLoc : colonLoc;
+        auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
         diagnose(colonLoc, diag::precedencegroup_not_infix)
             .fixItRemove({colonLoc, endLoc});
       }
@@ -10169,6 +10189,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   }
 
   // Diagnose deprecated operator body syntax `operator + { ... }`.
+  SourceLoc lastGoodLoc = PreviousLoc;
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
     if (isInfix && !Tok.is(tok::r_brace)) {
@@ -10176,7 +10197,6 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
     } else {
       auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
-        SourceLoc lastGoodLoc = groupLoc.isValid() ? groupLoc : NameLoc;
         SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
                                                               lastGoodLoc);
         SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
@@ -10198,7 +10218,8 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   else
     res = new (Context)
         InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, colonLoc,
-                          groupName, groupLoc);
+                          groupName.getBaseIdentifier(),
+                          groupLoc.getBaseNameLoc());
 
   diagnoseOperatorFixityAttributes(*this, Attributes, res);
 
@@ -10217,6 +10238,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     diagnose(precedenceGroupLoc, diag::decl_inner_scope);
     return nullptr;
   }
+
+  parseModuleSelector(ModuleSelectorReason::PrecedenceGroup);
 
   Identifier name;
   SourceLoc nameLoc;
@@ -10417,14 +10440,17 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
           return abortBody(/*hasCodeCompletion*/true);
         }
 
-        if (Tok.isNot(tok::identifier)) {
-          diagnose(Tok, diag::expected_precedencegroup_relation, attrName);
+        DeclNameLoc nameLoc;
+        auto name = parseDeclNameRef(nameLoc,
+                                     { diag::expected_precedencegroup_relation,
+                                       attrName },
+                                     {},
+                                     ModuleSelectorReason::PrecedenceGroup);
+        if (!name) {
           return abortBody();
         }
-        Identifier name;
-        SourceLoc nameLoc = consumeIdentifier(name,
-                                              /*diagnoseDollarPrefix=*/false);
-        relations.push_back({nameLoc, name, nullptr});
+        relations.push_back({nameLoc.getBaseNameLoc(), name.getBaseIdentifier(),
+                             nullptr});
 
         if (skipUnspacedCodeCompleteToken())
           return abortBody(/*hasCodeCompletion*/true);

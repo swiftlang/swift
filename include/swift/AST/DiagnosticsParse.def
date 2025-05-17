@@ -93,6 +93,21 @@ ERROR(forbidden_interpolated_string,none,
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
+ERROR(expected_identifier_in_module_selector,none,
+      "expected identifier in module selector", ())
+ERROR(module_selector_not_allowed,none,
+      "%select{%error|%error|name in %1 declaration|captured variable name|"
+      "parameter name|generic parameter name|argument label|SPI group|"
+      "Objective-C name|name of sibling declaration|precedence group name|"
+      "attribute parameter value|%error}0 cannot be qualified with a module "
+      "selector",
+      (uint8_t, StringRef))
+NOTE(fixit_remove_module_selector,none,
+     "remove module selector from this name", ())
+NOTE(fixit_capture_with_explicit_name,none,
+     "explicitly capture into a variable named '%0'",
+     (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -2182,6 +2197,10 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
       "expected ')' after 'nonisolated' modifier", ())
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
+
+ERROR(impossible_parse,none,
+      "parser entered impossible state; please file a bug report with this "
+      "source file", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1493,6 +1493,33 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       return ErrorType::get(ctx);
     }
 
+    // Is there an incorrect module selector?
+    if (repr->getNameRef().hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+      auto anyModuleResults =
+      TypeChecker::lookupUnqualifiedType(dc, anyModuleName,
+                                         repr->getLoc(), lookupOptions);
+      if (!anyModuleResults.empty()) {
+        diags.diagnose(repr->getNameLoc(), diag::type_not_in_module,
+                       repr->getNameRef().getFullName(),
+                       repr->getNameRef().getModuleSelector());
+
+        SourceLoc moduleSelectorLoc = repr->getNameLoc().getModuleSelectorLoc();
+
+        for (auto result : anyModuleResults) {
+          TypeDecl * decl = static_cast<TypeDecl*>(result.getValueDecl());
+          Identifier moduleName = decl->getModuleContext()->getName();
+
+          diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                         moduleName)
+              .fixItReplace(moduleSelectorLoc, moduleName.str());
+        }
+
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return ErrorType::get(ctx);
+      }
+    }
+
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
@@ -1582,6 +1609,32 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     }
 
     return ErrorType::get(ctx);
+  }
+
+  // Is there an incorrect module selector?
+  if (repr->getNameRef().hasModuleSelector()) {
+    auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+    auto anyModuleResults = TypeChecker::lookupMemberType(
+        dc, parentType, anyModuleName, repr->getLoc(), lookupOptions);
+    if (anyModuleResults) {
+      diags.diagnose(repr->getNameLoc(), diag::type_not_in_module,
+                     repr->getNameRef().getFullName(),
+                     repr->getNameRef().getModuleSelector());
+
+      SourceLoc moduleSelectorLoc = repr->getNameLoc().getModuleSelectorLoc();
+
+      for (auto result : anyModuleResults) {
+        TypeDecl * decl = result.Member;
+        Identifier moduleName = decl->getModuleContext()->getName();
+
+        diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                       moduleName)
+            .fixItReplace(moduleSelectorLoc, moduleName.str());
+      }
+
+      // FIXME: Can we recover by assuming the first/best result is correct?
+      return ErrorType::get(ctx);
+    }
   }
 
   // Try ignoring access control.

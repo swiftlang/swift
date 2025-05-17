@@ -1207,19 +1207,22 @@ class DynamicReplacementAttr final
   friend class DynamicallyReplacedDeclRequest;
 
   DeclNameRef ReplacedFunctionName;
+  DeclNameLoc ReplacedFunctionNameLoc;
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
   /// Create an @_dynamicReplacement(for:) attribute written in the source.
   DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
                          DeclNameRef replacedFunctionName,
+                         DeclNameLoc replacedFunctionNameLoc,
                          SourceRange parenRange);
 
   DynamicReplacementAttr(DeclNameRef name, AbstractFunctionDecl *f)
       : DeclAttribute(DeclAttrKind::DynamicReplacement, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name), Resolver(nullptr), ResolverContextData(0) {
+        ReplacedFunctionName(name), ReplacedFunctionNameLoc(),
+        Resolver(nullptr), ResolverContextData(0) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1228,8 +1231,8 @@ class DynamicReplacementAttr final
       : DeclAttribute(DeclAttrKind::DynamicReplacement, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name), Resolver(Resolver),
-        ResolverContextData(Data) {
+        ReplacedFunctionName(name), ReplacedFunctionNameLoc(),
+        Resolver(Resolver), ResolverContextData(Data) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1250,7 +1253,8 @@ class DynamicReplacementAttr final
 public:
   static DynamicReplacementAttr *
   create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
-         SourceLoc LParenLoc, DeclNameRef replacedFunction, SourceLoc RParenLoc);
+         SourceLoc LParenLoc, DeclNameRef replacedFunction,
+         DeclNameLoc replacedFunctionNameLoc, SourceLoc RParenLoc);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
                                         DeclNameRef replacedFunction,
@@ -1263,6 +1267,10 @@ public:
 
   DeclNameRef getReplacedFunctionName() const {
     return ReplacedFunctionName;
+  }
+
+  DeclNameLoc getReplacedFunctionNameLoc() const {
+    return ReplacedFunctionNameLoc;
   }
 
   /// Retrieve the location of the opening parentheses, if there is one.
@@ -1752,6 +1760,7 @@ private:
   GenericSignature specializedSignature;
 
   DeclNameRef targetFunctionName;
+  DeclNameLoc targetFunctionNameLoc;
   LazyMemberLoader *resolver = nullptr;
   uint64_t resolverContextData;
   size_t numSPIGroups;
@@ -1762,7 +1771,9 @@ private:
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
-                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 DeclNameRef targetFunctionName,
+                 DeclNameLoc targetFunctionNameLoc,
+                 ArrayRef<Identifier> spiGroups,
                  ArrayRef<AvailableAttr *> availabilityAttrs,
                  size_t typeErasedParamsCount);
 
@@ -1770,7 +1781,8 @@ public:
   static SpecializeAttr *
   create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
          TrailingWhereClause *clause, bool exported, SpecializationKind kind,
-         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+         DeclNameRef targetFunctionName, DeclNameLoc targetFunctionNameLoc,
+         ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
          GenericSignature specializedSignature = nullptr);
 
@@ -1847,6 +1859,10 @@ public:
 
   DeclNameRef getTargetFunctionName() const {
     return targetFunctionName;
+  }
+
+  DeclNameLoc getTargetFunctionNameLoc() const {
+    return targetFunctionNameLoc;
   }
 
   /// \p forDecl is the value decl that the attribute belongs to.
