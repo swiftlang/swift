@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_LifetimeDependence
 
 // FIXME swift-ci linux tests do not support std::span
-// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
 
 #if !BRIDGING_HEADER
 import StdSpan
