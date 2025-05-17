@@ -102,6 +102,14 @@ public:
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
+  /// Metadata fulfillment in tuple conformance witness thunks.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchTupleTypeMetadata(IRGenModule &IGM, CanTupleType type, IsExact_t isExact,
+                               MetadataState metadataState,
+                               unsigned sourceIndex, MetadataPath &&path,
+                               const InterestingKeysCallback &interestingKeys);
+
   /// Search the given type metadata pack for useful fulfillments.
   ///
   /// \return true if any fulfillments were added by this search.
