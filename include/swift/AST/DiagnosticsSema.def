@@ -8698,23 +8698,23 @@ GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_decl, NonisolatedNonsendingByDefault,
     none,
     "feature '%0' will cause nonisolated async %kindbase1 to run on the "
-    "caller's actor; use %2 to preserve behavior",
-    (StringRef, const AbstractFunctionDecl *, DeclAttribute))
+    "caller's actor; use '@concurrent' to preserve behavior",
+    (StringRef, const AbstractFunctionDecl *))
 
 GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_closure,
     NonisolatedNonsendingByDefault, none,
     "feature '%0' will cause nonisolated async closure to run on the caller's "
-    "actor; use %1 to preserve behavior",
-    (StringRef, DeclAttribute))
+    "actor; use '@concurrent' to preserve behavior",
+    (StringRef))
 
 GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_typerepr,
     NonisolatedNonsendingByDefault, none,
     "feature '%0' will cause nonisolated async function type to be treated as "
-    "specified to run on the caller's actor; use %1 to preserve "
+    "specified to run on the caller's actor; use '@concurrent' to preserve "
     "behavior",
-    (StringRef, DeclAttribute))
+    (StringRef))
 
 //===----------------------------------------------------------------------===//
 // MARK: @extensible and @preEnumExtensibility Attributes
