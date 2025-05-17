@@ -31,7 +31,7 @@ actor MyActor {
 }
 
 // CHECK-IR:      @swift_deletedAsyncMethodErrorTu =
-// CHECK-IR:      @"$e4main7MyActorCN" = global <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ 
+// CHECK-IR:      @"$e4main7MyActorCN" = {{.*}}global <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{
 // CHECK-IR-SAME:   ptr null,
 // CHECK-IR-SAME:   ptr @"$e4main7MyActorCfD",
 // CHECK-IR-SAME:   ptr null,
@@ -45,6 +45,6 @@ actor MyActor {
 
 // CHECK-IR-NOT:  $e4main7MyActorC12thisIsUnusedyyYaF
 
-// CHECK-IR: define swifttailcc void @swift_deletedAsyncMethodError(ptr swiftasync %0)
+// CHECK-IR: define {{.*}}swifttailcc void @swift_deletedAsyncMethodError(ptr swiftasync %0)
 
 // CHECK: value: 42

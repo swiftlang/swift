@@ -16,8 +16,8 @@
 // CHECK-DAG: @"$e4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
 // CHECK-DAG: @"$e4test3StrV9staticLet_WZTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
 // CHECK-DAG: @"$e4test3StrV9staticVar_WZTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test3StrV9staticVarSaySiGvpZ" = global {{.*}} ptr @"$e4test3StrV9staticVar_WZTv_r"
-// CHECK-DAG: @"$e4test3StrV14twoDimensionalSaySaySiGGvpZ" = global {{.*}} ptr @"$e4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r"
+// CHECK-DAG: @"$e4test3StrV9staticVarSaySiGvpZ" = {{.*}}global {{.*}} ptr @"$e4test3StrV9staticVar_WZTv_r"
+// CHECK-DAG: @"$e4test3StrV14twoDimensionalSaySaySiGGvpZ" = {{.*}}global {{.*}} ptr @"$e4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r"
 
 // Currently, constant static arrays only work on Darwin platforms.
 // REQUIRES: VENDOR=apple
