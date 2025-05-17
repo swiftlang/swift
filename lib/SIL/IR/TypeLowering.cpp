@@ -2490,6 +2490,7 @@ namespace {
                                     IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties properties =
           getReferenceRecursiveProperties(isSensitive);
+      properties = mergeHasPack(HasPack_t(classType->hasAnyPack()), properties);
 
       if (C->getLifetimeAnnotation() == LifetimeAnnotation::EagerMove)
         properties.setLexical(IsNotLexical);
@@ -2506,6 +2507,8 @@ namespace {
       RecursiveProperties properties;
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+      properties =
+          mergeHasPack(HasPack_t(structType->hasAnyPack()), properties);
 
       // Bail out if the struct layout relies on itself.
       TypeConverter::LowerAggregateTypeRAII loweringStruct(TC, structType);
@@ -2624,6 +2627,7 @@ namespace {
       RecursiveProperties properties;
 
       properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+      properties = mergeHasPack(HasPack_t(enumType->hasAnyPack()), properties);
 
       // Bail out if the enum layout relies on itself.
       TypeConverter::LowerAggregateTypeRAII loweringEnum(TC, enumType);
