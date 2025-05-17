@@ -174,7 +174,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     LLVM_FALLTHROUGH;
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
     arguments.push_back(inputArgs.MakeArgString(Triple.str()));
     break;
@@ -548,7 +547,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
       switch (context.OI.CompilerMode) {
       case OutputInfo::Mode::StandardCompile:
-      case OutputInfo::Mode::BatchModeCompile:
         // In the 'multiple invocations for each file' mode we don't need to
         // validate the PCH every time, it has been validated with the initial
         // -emit-pch invocation.
@@ -714,7 +712,6 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::SingleCompile:
-  case OutputInfo::Mode::BatchModeCompile:
     break;
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
@@ -812,7 +809,6 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
     assert(InputActions.size() == 1 &&
            "Standard-compile mode takes exactly one input (the primary file)");
     break;
-  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::SingleCompile:
     break;
   case OutputInfo::Mode::Immediate:
@@ -1079,7 +1075,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     }
     break;
   }
-  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
@@ -1111,7 +1106,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
         context.Args.MakeArgString(OutNames[job.getInputIndex()]));
     break;
   }
-  case OutputInfo::Mode::BatchModeCompile:
   case OutputInfo::Mode::Immediate:
   case OutputInfo::Mode::REPL:
     llvm_unreachable("invalid mode for backend job");
