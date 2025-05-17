@@ -22,7 +22,7 @@ import CountedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func offBySome(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_  len: Int{{.*}}) -> UnsafeMutableBufferPointer<Int{{.*}}>
 // CHECK-NEXT: @_alwaysEmitIntoClient public func scalar(_ m: Int32, _ n: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableBufferPointer<Int{{.*}}>, _ p2: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ p1: UnsafeMutableBufferPointer<Int{{.*}}>, _ p2: UnsafeMutableBufferPointer<Int{{.*}}>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simpleFlipped(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func sizeofParam(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
@@ -72,7 +72,7 @@ public func callScalar(_ p: UnsafeMutableBufferPointer<CInt>) {
 
 @inlinable
 public func callShared(_ p: UnsafeMutableBufferPointer<CInt>, _ p2: UnsafeMutableBufferPointer<CInt>) {
-  shared(CInt(p.count), p, p2)
+  shared(p, p2)
 }
 
 @inlinable

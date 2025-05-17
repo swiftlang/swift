@@ -34,7 +34,7 @@ import CountedByNoEscapeClang
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p1: copy p1)
 // CHECK-NEXT: @lifetime(p2: copy p2)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int32, _ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>)
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_ p: inout MutableSpan<Int32>)
@@ -89,7 +89,7 @@ public func callReturnPointer() {
 @lifetime(p2: copy p2)
 @inlinable
 public func callShared(_ p: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>) {
-  shared(CInt(p.count), &p, &p2)
+  shared(&p, &p2)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
