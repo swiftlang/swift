@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -73,4 +73,43 @@ public func max<T: Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
     maxValue = value
   }
   return maxValue
+}
+
+/// Returns all mutually equal values ​​in the input values
+///
+/// - Parameters:
+///   - value: Many values to **compare**.
+///   - orElse: **Default** output value.
+///
+/// - Returns: The values of all two or more **repeated** *values* will be return. **One or more** values **returned**, the **return** values **not** be repeated, and the **return** values arranged in the order of input.
+///
+/// - Note:
+/// If **none** of the values in the input *value* are equal to other values, *orElse* can be return. There must be **two** or more input *value*.
+///
+/// - Complexity: O( *n^3* )
+@inlinable // protocol-only
+public func equal<T: Comparable>(_ value: T..., default orElse: T) -> [T] { // Create a function that contains a generic type T, two values, and outputs generic type T.
+    
+    var resultValue: [T] = [] // All variables with equal values.
+    var marryCount: Int = 0 // Stores the number of repetitions of a value.
+    
+    for primitiveValue in value {
+        for contrastValue in value {
+            // Loop through all values, matching two values ​​against each other. Complexity is O(n^2).
+            
+            if primitiveValue == contrastValue { // When two values ​​match...
+                if marryCount > 0 { // When the number of matches with a value reaches 2...
+                    if !resultValue.contains(primitiveValue) { // To ensure that the return result is not repeated, check whether the result has been stored... Complexity is O(n).
+                        resultValue.append(primitiveValue) // Store results!
+                    }
+                } else {
+                    marryCount += 1 // Increase the secondary value an equal number of times.
+                }
+            }
+        }
+        
+        marryCount = 0 // Initialize the value of the loop to prevent previous data from affecting current data.
+    }
+    
+    return resultValue == [] ? [orElse] : resultValue // Output the result. If the result is empty, output the default value.
 }
