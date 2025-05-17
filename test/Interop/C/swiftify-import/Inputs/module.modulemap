@@ -14,7 +14,3 @@ module SizedByNoEscapeClang {
     header "sized-by-noescape.h"
     export *
 }
-module NoSwiftifyClang {
-    header "no-swiftify.h"
-    export *
-}
