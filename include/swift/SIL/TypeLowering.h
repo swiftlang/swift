@@ -1389,6 +1389,14 @@ CanSILFunctionType getNativeSILFunctionType(
     std::optional<SubstitutionMap> reqtSubs = std::nullopt,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());
 
+/// origConstant is the parent decl ref in the case of class methods and the
+/// witness method decl ref if we are working with a protocol witness. Pass in
+/// None otherwise.
+std::optional<ActorIsolation>
+getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
+                                 std::optional<SILDeclRef> origConstant,
+                                 std::optional<SILDeclRef> constant);
+
 /// The thunk kinds used in the differentiation transform.
 enum class DifferentiationThunkKind {
   /// A reabstraction thunk.
