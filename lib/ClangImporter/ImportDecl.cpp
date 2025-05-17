@@ -9192,6 +9192,14 @@ static bool SwiftifiableCAT(const clang::CountAttributedType *CAT) {
   return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr());
 }
 
+static bool SwiftifiablePointerType(Type swiftType) {
+  // don't try to transform any Swift types that _SwiftifyImport doesn't know how to handle
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  PointerTypeKind PTK;
+  return nonnullType->isOpaquePointer() ||
+    (nonnullType->getAnyPointerElementType(PTK) && PTK != PTK_AutoreleasingUnsafeMutablePointer);
+}
+
 void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
@@ -9225,10 +9233,11 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
           return false;
         };
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
+    Type swiftReturnTy = MappedDecl->getResultInterfaceType();
     bool returnIsStdSpan = registerStdSpanTypeMapping(
-        MappedDecl->getResultInterfaceType(), ClangDecl->getReturnType());
+        swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(CAT)) {
+    if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       attachMacro = true;
     }
@@ -9242,14 +9251,15 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       auto clangParamTy = clangParam->getType();
       auto swiftParam = MappedDecl->getParameters()->get(index);
+      Type swiftParamTy = swiftParam->getInterfaceType();
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
-      if (SwiftifiableCAT(CAT)) {
+      if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftParamTy)) {
         printer.printCountedBy(CAT, index);
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan = registerStdSpanTypeMapping(
-          swiftParam->getInterfaceType(), clangParamTy);
+          swiftParamTy, clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
 
       bool paramHasLifetimeInfo = false;
@@ -9260,7 +9270,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
         printer.printLifetimeboundReturn(
             index, !paramHasBoundsInfo &&
-                       swiftParam->getInterfaceType()->isEscapable());
+                       swiftParamTy->isEscapable());
         paramHasLifetimeInfo = true;
         returnHasLifetimeInfo = true;
       }

@@ -14,4 +14,3 @@ module SizedByNoEscapeClang {
     header "sized-by-noescape.h"
     export *
 }
-
