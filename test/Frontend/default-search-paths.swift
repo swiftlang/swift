@@ -12,7 +12,7 @@
 // APPLE-NEXT: (End of search path lists.)
 
 // Non-Apple platforms don't have any implicit framework search paths.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -target x86_64-unknown-linux-android -parse %s -Rmodule-loading 2>&1 | %FileCheck -check-prefix=ANDROID %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -target x86_64-unknown-linux-android -parse -parse-stdlib %s -Rmodule-loading 2>&1 | %FileCheck -check-prefix=ANDROID %s
 // ANDROID: Implicit framework search paths:
 // ANDROID-NEXT: Runtime library import search paths:
 // ANDROID-NEXT: [0] BUILD_DIR/lib/swift/android
