@@ -89,7 +89,7 @@ extension SuspendingClock: Clock {
 
   /// The suspending clock is monotonic
   @available(SwiftStdlib 6.2, *)
-  public var traits: ClockTraits {
+  public var _traits: _ClockTraits {
     return [.monotonic]
   }
 

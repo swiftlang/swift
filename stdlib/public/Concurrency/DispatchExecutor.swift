@@ -24,12 +24,12 @@ import Swift
 // .. Main Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
+public class _DispatchMainExecutor: _RunLoopExecutor, @unchecked Sendable {
   var threaded = false
 
   public init() {}
 
-  public func run() throws {
+  public func _run() throws {
     if threaded {
       fatalError("DispatchMainExecutor does not support recursion")
     }
@@ -38,19 +38,19 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
     _dispatchMain()
   }
 
-  public func stop() {
+  public func _stop() {
     fatalError("DispatchMainExecutor cannot be stopped")
   }
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchMainExecutor: SerialExecutor {
+extension _DispatchMainExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueMain(UnownedJob(job))
   }
 
-  public var isMainExecutor: Bool { true }
+  public var _isMainExecutor: Bool { true }
 
   public func checkIsolated() {
     _dispatchAssertMainQueue()
@@ -58,15 +58,15 @@ extension DispatchMainExecutor: SerialExecutor {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchMainExecutor: SchedulableExecutor {
-  public var asSchedulable: SchedulableExecutor? {
+extension _DispatchMainExecutor: _SchedulableExecutor {
+  public var _asSchedulable: _SchedulableExecutor? {
     return self
   }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func _enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                                 at instant: C.Instant,
+                                 tolerance: C.Duration? = nil,
+                                 clock: C) {
     let tolSec, tolNanosec: CLongLong
     if let tolerance = tolerance {
       (tolSec, tolNanosec) = delay(from: tolerance, clock: clock)
@@ -86,25 +86,25 @@ extension DispatchMainExecutor: SchedulableExecutor {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchMainExecutor: MainExecutor {}
+extension _DispatchMainExecutor: _MainExecutor {}
 
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
-                                         @unchecked Sendable {
+public class _DispatchGlobalTaskExecutor: TaskExecutor, _SchedulableExecutor,
+                                          @unchecked Sendable {
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueGlobal(UnownedJob(job))
   }
 
-  public var isMainExecutor: Bool { false }
+  public var _isMainExecutor: Bool { false }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
+  public func _enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                                 at instant: C.Instant,
+                                 tolerance: C.Duration? = nil,
+                                 clock: C) {
     let tolSec, tolNanosec: CLongLong
     if let tolerance = tolerance {
       (tolSec, tolNanosec) = delay(from: tolerance, clock: clock)
@@ -172,9 +172,9 @@ extension DispatchExecutorProtocol {
 
   func timestamp<C: Clock>(for instant: C.Instant, clock: C)
     -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64) {
-    if clock.traits.contains(.continuous) {
+    if clock._traits.contains(.continuous) {
         let dispatchClock: ContinuousClock = .continuous
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
+        let instant = dispatchClock._convert(instant: instant, from: clock)!
         let (seconds, attoseconds) = clamp(instant._value.components)
         let nanoseconds = attoseconds / 1_000_000_000
         return (clockID: .continuous,
@@ -182,7 +182,7 @@ extension DispatchExecutorProtocol {
                 nanoseconds: Int64(nanoseconds))
     } else {
         let dispatchClock: SuspendingClock = .suspending
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
+        let instant = dispatchClock._convert(instant: instant, from: clock)!
         let (seconds, attoseconds) = clamp(instant._value.components)
         let nanoseconds = attoseconds / 1_000_000_000
         return (clockID: .suspending,
@@ -193,7 +193,7 @@ extension DispatchExecutorProtocol {
 
   func delay<C: Clock>(from duration: C.Duration, clock: C)
     -> (seconds: Int64, nanoseconds: Int64) {
-    let swiftDuration = clock.convert(from: duration)!
+    let swiftDuration = clock._convert(from: duration)!
     let (seconds, attoseconds) = clamp(swiftDuration.components)
     let nanoseconds = attoseconds / 1_000_000_000
     return (seconds: seconds, nanoseconds: nanoseconds)
@@ -202,11 +202,11 @@ extension DispatchExecutorProtocol {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
+extension _DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchMainExecutor: DispatchExecutorProtocol {
+extension _DispatchMainExecutor: DispatchExecutorProtocol {
 }
 
 #endif // !$Embedded && !os(WASI)

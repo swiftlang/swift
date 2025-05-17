@@ -21,37 +21,37 @@ import Swift
 extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
     return MemoryLayout<(Int, Int)>.size
-      < MemoryLayout<CooperativeExecutor.Timestamp>.size
+      < MemoryLayout<_CooperativeExecutor.Timestamp>.size
   }
 
-  fileprivate var cooperativeExecutorTimestampPointer: UnsafeMutablePointer<CooperativeExecutor.Timestamp> {
+  fileprivate var cooperativeExecutorTimestampPointer: UnsafeMutablePointer<_CooperativeExecutor.Timestamp> {
     get {
       assert(cooperativeExecutorTimestampIsIndirect)
-      return unsafe withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
+      return unsafe _withUnsafeExecutorPrivateData {
+        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<_CooperativeExecutor.Timestamp>.self) {
           return unsafe $0[0]
         }
       }
     }
     set {
       assert(cooperativeExecutorTimestampIsIndirect)
-      unsafe withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
+      unsafe _withUnsafeExecutorPrivateData {
+        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<_CooperativeExecutor.Timestamp>.self) {
           unsafe $0[0] = newValue
         }
       }
     }
   }
 
-  fileprivate var cooperativeExecutorTimestamp: CooperativeExecutor.Timestamp {
+  fileprivate var cooperativeExecutorTimestamp: _CooperativeExecutor.Timestamp {
     get {
       if cooperativeExecutorTimestampIsIndirect {
         let ptr = unsafe cooperativeExecutorTimestampPointer
         return unsafe ptr.pointee
       } else {
-        return unsafe withUnsafeExecutorPrivateData {
+        return unsafe _withUnsafeExecutorPrivateData {
           return unsafe $0.assumingMemoryBound(
-            to: CooperativeExecutor.Timestamp.self
+            to: _CooperativeExecutor.Timestamp.self
           )[0]
         }
       }
@@ -61,8 +61,8 @@ extension ExecutorJob {
         let ptr = unsafe cooperativeExecutorTimestampPointer
         unsafe ptr.pointee = newValue
      } else {
-        unsafe withUnsafeExecutorPrivateData {
-          unsafe $0.withMemoryRebound(to: CooperativeExecutor.Timestamp.self) {
+        unsafe _withUnsafeExecutorPrivateData {
+          unsafe $0.withMemoryRebound(to: _CooperativeExecutor.Timestamp.self) {
             unsafe $0[0] = newValue
           }
         }
@@ -73,10 +73,10 @@ extension ExecutorJob {
   fileprivate mutating func setupCooperativeExecutorTimestamp() {
     // If a Timestamp won't fit, allocate
     if cooperativeExecutorTimestampIsIndirect {
-      let ptr: UnsafeMutablePointer<CooperativeExecutor.Timestamp>
+      let ptr: UnsafeMutablePointer<_CooperativeExecutor.Timestamp>
       // Try to use the task allocator if it has one
       if let allocator {
-        unsafe ptr = allocator.allocate(as: CooperativeExecutor.Timestamp.self)
+        unsafe ptr = allocator.allocate(as: _CooperativeExecutor.Timestamp.self)
       } else {
         unsafe ptr = .allocate(capacity: 1)
       }
@@ -100,7 +100,7 @@ extension ExecutorJob {
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
 @available(SwiftStdlib 6.2, *)
-class CooperativeExecutor: Executor, @unchecked Sendable {
+class _CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   var waitQueue: PriorityQueue<UnownedJob>
   var shouldStop: Bool = false
@@ -174,13 +174,13 @@ class CooperativeExecutor: Executor, @unchecked Sendable {
     runQueue.push(UnownedJob(job))
   }
 
-  public var isMainExecutor: Bool { true }
+  public var _isMainExecutor: Bool { true }
 
-  public var asSchedulable: any SchedulableExecutor { self }
+  public var _asSchedulable: any _SchedulableExecutor { self }
 }
 
 @available(SwiftStdlib 6.2, *)
-extension CooperativeExecutor: SchedulableExecutor {
+extension _CooperativeExecutor: _SchedulableExecutor {
   var currentTime: Timestamp {
     var now: Timestamp = .zero
     unsafe _getTime(seconds: &now.seconds,
@@ -189,11 +189,11 @@ extension CooperativeExecutor: SchedulableExecutor {
     return now
   }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    let duration = Duration(from: clock.convert(from: delay)!)
+  public func _enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                                 after delay: C.Duration,
+                                 tolerance: C.Duration? = nil,
+                                 clock: C) {
+    let duration = Duration(from: clock._convert(from: delay)!)
     let deadline = self.currentTime + duration
 
     job.setupCooperativeExecutorTimestamp()
@@ -203,12 +203,12 @@ extension CooperativeExecutor: SchedulableExecutor {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension CooperativeExecutor: RunLoopExecutor {
-  public func run() throws {
-    try runUntil { false }
+extension _CooperativeExecutor: _RunLoopExecutor {
+  public func _run() throws {
+    try _runUntil { false }
   }
 
-  public func runUntil(_ condition: () -> Bool) throws {
+  public func _runUntil(_ condition: () -> Bool) throws {
     shouldStop = false
     while !shouldStop && !condition() {
       // Process the timer queue
@@ -244,18 +244,18 @@ extension CooperativeExecutor: RunLoopExecutor {
     }
   }
 
-  public func stop() {
+  public func _stop() {
     shouldStop = true
   }
 }
 
 @available(SwiftStdlib 6.2, *)
-extension CooperativeExecutor: SerialExecutor {}
+extension _CooperativeExecutor: SerialExecutor {}
 
 @available(SwiftStdlib 6.2, *)
-extension CooperativeExecutor: TaskExecutor {}
+extension _CooperativeExecutor: TaskExecutor {}
 
 @available(SwiftStdlib 6.2, *)
-extension CooperativeExecutor: MainExecutor {}
+extension _CooperativeExecutor: _MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

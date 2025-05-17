@@ -15,20 +15,20 @@
 import Swift
 
 @available(SwiftStdlib 6.2, *)
-public struct PlatformExecutorFactory: ExecutorFactory {
-  public static var mainExecutor: any MainExecutor {
+public struct _PlatformExecutorFactory: _ExecutorFactory {
+  public static var mainExecutor: any _MainExecutor {
     if CoreFoundation.isPresent {
-      return CFMainExecutor()
+      return _CFMainExecutor()
     } else {
-      return DispatchMainExecutor()
+      return _DispatchMainExecutor()
     }
   }
 
   public static var defaultExecutor: any TaskExecutor {
     if CoreFoundation.isPresent {
-      return CFTaskExecutor()
+      return _CFTaskExecutor()
     } else {
-      return DispatchGlobalTaskExecutor()
+      return _DispatchGlobalTaskExecutor()
     }
   }
 }

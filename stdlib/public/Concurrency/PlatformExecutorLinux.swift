@@ -16,10 +16,10 @@ import Swift
 
 // The default executors for now are Dispatch-based
 @available(SwiftStdlib 6.2, *)
-public struct PlatformExecutorFactory: ExecutorFactory {
-  public static let mainExecutor: any MainExecutor = DispatchMainExecutor()
+public struct _PlatformExecutorFactory: _ExecutorFactory {
+  public static let mainExecutor: any _MainExecutor = _DispatchMainExecutor()
   public static let defaultExecutor: any TaskExecutor
-    = DispatchGlobalTaskExecutor()
+    = _DispatchGlobalTaskExecutor()
 }
 
 #endif // os(Linux)
