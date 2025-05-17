@@ -630,8 +630,38 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // Check whether generic parameters are only mentioned once in
   // the anchor's signature.
   {
-    auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
+    auto anchorTy = anchor->getInterfaceType()->castTo<AnyFunctionType>();
+    
+    if (anchor->hasCurriedSelf())
+      anchorTy = anchorTy->getResult()->castTo<AnyFunctionType>();
+    
+    auto containsTypesButDependent = [&](Type type) -> bool {
 
+      class Walker: public TypeWalker {
+        llvm::function_ref<TypeVariableType *(GenericTypeParamType *)> findParamFn;
+      public:
+        explicit Walker(llvm::function_ref<TypeVariableType *(GenericTypeParamType *)> findParam) : findParamFn(findParam) {}
+
+        Action walkToTypePre(Type ty) override {
+          if (auto *GP = ty->getAs<GenericTypeParamType>()) {
+            if (findParamFn(GP)) {
+              return Action::Stop;
+            }
+          }
+          if (auto *DMT = ty->getAs<DependentMemberType>()) {
+            if (auto *baseGP = DMT->getBase()->getAs<GenericTypeParamType>()) {
+              if (findParamFn(baseGP)) {
+                return Action::SkipNode;
+              }
+            }
+          }
+          return Action::Continue;
+        }
+      };
+
+      return type.walk(Walker(findParam));
+    };
+    
     // Reject if generic parameters are used in multiple different positions
     // in the parameter list.
 
@@ -639,7 +669,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     for (unsigned i : indices(anchorTy->getParams())) {
       const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypes(param.getPlainType()))
+      if (containsTypesButDependent(param.getPlainType()))
         affectedParams.push_back(i);
     }
 
