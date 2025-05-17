@@ -150,13 +150,15 @@ class CMake(object):
             define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", args.cmake_cxx_launcher)
 
         if self.prefer_native_toolchain and product:
+            clang_tools_path = product.native_clang_tools_path(args.host_target)
+            define("CMAKE_C_COMPILER:PATH", os.path.join(clang_tools_path,
+                                                         'bin', 'clang'))
+            define("CMAKE_CXX_COMPILER:PATH", os.path.join(clang_tools_path,
+                                                           'bin', 'clang++'))
+
             toolchain_path = product.native_toolchain_path(args.host_target)
             cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER',
                                           os.path.join(toolchain_path, 'bin', 'swiftc'))
-            define("CMAKE_C_COMPILER:PATH", os.path.join(toolchain_path,
-                                                         'bin', 'clang'))
-            define("CMAKE_CXX_COMPILER:PATH", os.path.join(toolchain_path,
-                                                           'bin', 'clang++'))
             define("CMAKE_Swift_COMPILER:PATH", cmake_swiftc_path)
         else:
             cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER', toolchain.swiftc)
