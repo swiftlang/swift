@@ -1550,6 +1550,7 @@ public struct SwiftifyImportMacro: PeerMacro {
             + availabilityAttr
             + lifetimeAttrs
             + disfavoredOverload)
+        .with(\.leadingTrivia, node.leadingTrivia)
       return [DeclSyntax(newFunc)]
     } catch let error as DiagnosticError {
       context.diagnose(
