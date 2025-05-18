@@ -316,6 +316,7 @@ func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<Heap
 }
 
 @_cdecl("swift_retain")
+@discardableResult
 public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
   if !isValidPointerForNativeRetain(object: object) { return object }
 
@@ -344,6 +345,7 @@ func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> Uns
 }
 
 @_cdecl("swift_bridgeObjectRetain")
+@discardableResult
 public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
   return swift_bridgeObjectRetain_n(object: object, n: 1)
 }
