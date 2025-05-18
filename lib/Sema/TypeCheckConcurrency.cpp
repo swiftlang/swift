@@ -5808,19 +5808,41 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       auto *dc = value->getInnermostDeclContext();
       while (dc && !inActorContext) {
         if (auto *nominal = dc->getSelfNominalTypeDecl()) {
-          inActorContext = nominal->isAnyActor();
+          if (nominal->isAnyActor())
+            return {};
         }
         dc = dc->getParent();
       }
 
-      if (!inActorContext) {
-        // FIXME: deinit should be implicitly MainActor too.
-        if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
-            isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
-            isa<ConstructorDecl>(value)) {
-          return {
-              {{ActorIsolation::forGlobalActor(globalActor), {}}, nullptr, {}}};
+      // If this is or is a non-type member of a nominal type that conforms to a
+      // SendableMetatype-inheriting protocol in its primary definition, disable
+      // @MainActor inference.
+      auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(value);
+      if (!nominalTypeDecl && !isa<TypeDecl>(value)) {
+        nominalTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl();
+      }
+      if (nominalTypeDecl) {
+        auto sendable = ctx.getProtocol(KnownProtocolKind::Sendable);
+        auto sendableMetatype = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+        if (sendableMetatype && !isa<ProtocolDecl>(nominalTypeDecl)) {
+          InvertibleProtocolSet inverses;
+          bool anyObject = false;
+          auto inherited = getDirectlyInheritedNominalTypeDecls(
+              nominalTypeDecl, inverses, anyObject);
+          for (const auto &entry : inherited) {
+            auto proto = dyn_cast<ProtocolDecl>(entry.Item);
+            if (proto && proto != sendable && proto->inheritsFrom(sendableMetatype))
+              return { };
+          }
         }
+      }
+
+      // FIXME: deinit should be implicitly MainActor too.
+      if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
+          isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
+          isa<ConstructorDecl>(value)) {
+        return {
+            {{ActorIsolation::forGlobalActor(globalActor), {}}, nullptr, {}}};
       }
 
       return {};
