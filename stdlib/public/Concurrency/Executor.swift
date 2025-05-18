@@ -385,7 +385,7 @@ extension SerialExecutor {
   #if SWIFT_CONCURRENCY_USES_DISPATCH
   @available(SwiftStdlib 6.2, *)
   private var _dispatchQueue: OpaquePointer? {
-    return _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
+    return unsafe _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
   }
   #endif
 
@@ -395,8 +395,8 @@ extension SerialExecutor {
       return true
     }
     #if SWIFT_CONCURRENCY_USES_DISPATCH
-    if let rhsQueue = rhs._dispatchQueue {
-      if let ourQueue = _dispatchQueue, ourQueue == rhsQueue {
+    if let rhsQueue = unsafe rhs._dispatchQueue {
+      if let ourQueue = unsafe _dispatchQueue, ourQueue == rhsQueue {
         return true
       }
       return false
