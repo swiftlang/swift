@@ -17,6 +17,8 @@
 #ifndef SWIFT_BASIC_ASSERTIONS_H
 #define SWIFT_BASIC_ASSERTIONS_H
 
+#include "swift/Basic/LLVM.h"
+
 // Only for use in this header
 #if __has_builtin(__builtin_expect)
 #define ASSERT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
@@ -182,5 +184,34 @@ extern int CONDITIONAL_ASSERT_Global_enable_flag;
 // Older version of the same idea:
 #define SWIFT_ASSERT_ONLY_DECL DEBUG_ASSERT_DECL
 #define SWIFT_ASSERT_ONLY DEBUG_ASSERT_EXPR
+
+// ================================ Abort ======================================
+
+/// Implementation for \c ABORT, not to be used directly.
+[[noreturn]]
+void _ABORT(const char *file, int line, const char *func,
+            llvm::function_ref<void(llvm::raw_ostream &)> message);
+
+/// Implementation for \c ABORT, not to be used directly.
+[[noreturn]]
+void _ABORT(const char *file, int line, const char *func,
+            llvm::StringRef message);
+
+// Aborts the program, printing a given message to a PrettyStackTrace frame
+// before exiting. This should be preferred over manually logging to stderr and
+// `abort()`'ing since that won't be picked up by the crash reporter.
+//
+// There are two different forms of ABORT:
+//
+// ```
+// ABORT("abort with string");
+//
+// ABORT([&](auto &out) {
+//   out << "abort with arbitrary stream";
+//   node.dump(out);
+// });
+// ```
+//
+#define ABORT(arg) _ABORT(_FILENAME_FOR_ASSERT, __LINE__, __func__, (arg))
 
 #endif // SWIFT_BASIC_ASSERTIONS_H

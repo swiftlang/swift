@@ -50,19 +50,6 @@ public:
   void print(llvm::raw_ostream &OS) const override;
 };
 
-/// Aborts the program, printing a given message to a PrettyStackTrace frame
-/// before exiting. This should be preferred over manually logging to stderr and
-/// aborting since that won't be picked up by the crash reporter.
-[[noreturn]]
-void abortWithPrettyStackTraceMessage(
-    llvm::function_ref<void(llvm::raw_ostream &)> message);
-
-/// Aborts the program, printing a given message to a PrettyStackTrace frame
-/// before exiting. This should be preferred over manually logging to stderr and
-/// aborting since that won't be picked up by the crash reporter.
-[[noreturn]]
-void abortWithPrettyStackTraceMessage(llvm::StringRef message);
-
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PRETTYSTACKTRACE_H

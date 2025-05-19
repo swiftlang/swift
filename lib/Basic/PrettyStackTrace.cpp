@@ -39,39 +39,3 @@ void PrettyStackTraceFileContents::print(llvm::raw_ostream &out) const {
 void PrettyStackTraceSwiftVersion::print(llvm::raw_ostream &out) const {
   out << version::getSwiftFullVersion() << '\n';
 }
-
-namespace {
-/// Similar to PrettyStackTraceString, but formats multi-line strings for
-/// the stack trace.
-class PrettyStackTraceMultilineString : public llvm::PrettyStackTraceEntry {
-  StringRef Str;
-
-public:
-  PrettyStackTraceMultilineString(StringRef str) : Str(str) {}
-  void print(raw_ostream &OS) const override {
-    // For each line, add a leading character and indentation to better match
-    // the formatting of the stack trace.
-    for (auto c : Str.rtrim('\n')) {
-      OS << c;
-      if (c == '\n')
-        OS << "| \t";
-    }
-    OS << '\n';
-  }
-};
-} // end anonymous namespace
-
-void swift::abortWithPrettyStackTraceMessage(
-    llvm::function_ref<void(llvm::raw_ostream &)> message) {
-  llvm::SmallString<0> errorStr;
-  llvm::raw_svector_ostream out(errorStr);
-  message(out);
-
-  PrettyStackTraceMultilineString trace(errorStr);
-  abort();
-}
-
-void swift::abortWithPrettyStackTraceMessage(StringRef message) {
-  PrettyStackTraceMultilineString trace(message);
-  abort();
-}
