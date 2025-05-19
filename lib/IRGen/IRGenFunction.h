@@ -78,6 +78,9 @@ public:
   OptimizationMode OptMode;
   bool isPerformanceConstraint;
 
+  // Destination basic blocks for condfail traps.
+  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
+
   llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
