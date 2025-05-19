@@ -420,9 +420,6 @@ public:
 
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   
-  // Destination basic blocks for condfail traps.
-  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
-
   SILFunction *CurSILFn;
   // If valid, the address by means of which a return--which is direct in
   // SIL--is passed indirectly in IR.  Such indirection is necessary when the
@@ -1188,15 +1185,6 @@ public:
     IGM.DebugInfo->emitVariableDeclaration(
         Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
         ArtificialKind::RealValue, DbgInstrKind);
-  }
-
-  void emitFailBB() {
-    if (!FailBBs.empty()) {
-      // Move the trap basic blocks to the end of the function.
-      for (auto *FailBB : FailBBs) {
-        CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
-      }
-    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -1967,9 +1955,6 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
 
 IRGenSILFunction::~IRGenSILFunction() {
   assert(Builder.hasPostTerminatorIP() && "did not terminate BB?!");
-  // Emit the fail BB if we have one.
-  if (!FailBBs.empty())
-    emitFailBB();
   LLVM_DEBUG(CurFn->print(llvm::dbgs()));
 }
 
@@ -8292,35 +8277,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
-
-  // The condition should be false, or we die.
-  auto expectedCond = Builder.CreateExpect(cond,
-                                         llvm::ConstantInt::get(IGM.Int1Ty, 0));
-  
-  // Emit individual fail blocks so that we can map the failure back to a source
-  // line.
-  auto origInsertionPoint = Builder.GetInsertBlock();
-
-  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
-
-  if (IGM.getOptions().AnnotateCondFailMessage && !i->getMessage().empty())
-    br->addAnnotationMetadata(i->getMessage());
-
-  Builder.SetInsertPoint(&CurFn->back());
-  Builder.emitBlock(failBB);
-  if (IGM.DebugInfo)
-    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
-    // instruction emitted from ``Builtin.condfail`` should have an inlined
-    // debug location. This is because zero is not an artificial line location
-    // in CodeView.
-    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
-  emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
-  
-  Builder.SetInsertPoint(origInsertionPoint);
-  Builder.emitBlock(contBB);
-  FailBBs.push_back(failBB);
+  emitConditionalTrap(cond, i->getMessage(), i->getDebugScope());
 }
 
 void IRGenSILFunction::visitIncrementProfilerCounterInst(
