@@ -478,6 +478,9 @@ public:
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
   void emitTrap(StringRef failureMessage, bool EmitUnreachable);
 
+  void emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                           const SILDebugScope *debugScope = nullptr);
+
   /// Given at least a src address to a list of elements, runs body over each
   /// element passing its address. An optional destination address can be
   /// provided which this will run over as well to perform things like
