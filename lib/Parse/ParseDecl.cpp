@@ -535,6 +535,11 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     // Parse the trailing comma
     if (consumeIf(tok::comma)) {
       HasUpcomingEntry = true;
+
+      // If this is a trailing comma then there are no more entries
+      if (Tok.is(tok::r_paren)) {
+        break;
+      }
     } else {
       HasUpcomingEntry = false;
     }
@@ -1008,6 +1013,11 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
       // Parse the comma, if the list continues.
       hasNextProperty = consumeIf(tok::comma);
+      
+      // If this was a trailing comma, the list is complete.
+      if (Tok.is(tok::r_paren)) {
+        break;
+      }
     } while (hasNextProperty);
 
     return status;
@@ -2015,7 +2025,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
       do {
         Result = parseListItem(
             Status, tok::r_paren, LeftLoc, RightLoc,
-            /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
+            /*AllowSepAfterLast=*/true, [&]() -> ParserStatus {
               return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
                                                 ParsedUnrecognizedPlatformName);
             });
@@ -2137,7 +2147,7 @@ Parser::parseAttributeArguments(SourceLoc attrLoc, StringRef attrName,
   }
 
   return parseList(tok::r_paren, parensRange.Start, parensRange.End,
-                   /*allow sep after last*/ true,
+                   /*AllowSepAfterLast=*/true,
                    {diag::attr_expected_rparen, {attrName, isModifier}},
                    parseArg);
 }
@@ -2257,7 +2267,7 @@ Parser::parseMacroRoleAttribute(
   SmallVector<Expr *, 2> conformances;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
-      /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
+      /*AllowSepAfterLast=*/true, diag::expected_rparen_expr_list, [&] {
         ParserStatus status;
 
         if (consumeIf(tok::code_complete)) {
@@ -3245,7 +3255,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
     bool ParsedUnrecognizedPlatformName = false;
-    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
+    if (parseList(tok::r_paren, LeftLoc, RightLoc,
+                  /*AllowSepAfterLast=*/true,
                   diag::originally_defined_in_missing_rparen,
                   [&]() -> ParserStatus {
       SWIFT_DEFER {
@@ -4978,7 +4989,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   SourceLoc rParenLoc;
   bool foundParamId = false;
   status = parseList(
-      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast*/ false,
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/true,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
         ParserStatus listStatus;
         foundParamId = true;
@@ -9524,6 +9535,11 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
 
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
+    
+    // The list ends if we find a trailing comma
+    if (startsWithGreater(Tok)) {
+      break;
+    }
   } while (HasNextParam);
 
   return Result;

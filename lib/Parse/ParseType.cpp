@@ -194,7 +194,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       SourceLoc rbLoc;
       SmallVector<TypeRepr *, 8> elements;
       auto status = parseList(tok::r_brace, lbLoc, rbLoc,
-                              /*AllowSepAfterLast=*/false,
+                              /*AllowSepAfterLast=*/true,
                               diag::expected_rbrace_pack_type_list,
                               [&] () -> ParserStatus {
         auto element = parseType(diag::expected_type);
@@ -742,6 +742,10 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
       // Parse the comma, if the list continues.
       if (!consumeIf(tok::comma))
         break;
+      
+      // If the comma was a trailing comma, finish parsing the list of types
+      if (startsWithGreater(Tok))
+        break;
     }
   }
 
@@ -1161,7 +1165,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   SmallVector<TupleTypeReprElement, 8> ElementsR;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
-                                  /*AllowSepAfterLast=*/false,
+                                  /*AllowSepAfterLast=*/true,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;

@@ -66,20 +66,20 @@ struct S {
 
 if #unavailable(iOS 15, watchOS 9,) { }
 
-if #available(iOS 15,) { }  // expected-error {{expected platform name}}
+if #available(iOS 15,) { }
 
 // Built-in Attributes
 
-@attached(extension, conformances: OptionSet,)  // expected-error {{unexpected ',' separator}}
+@attached(extension, conformances: OptionSet,)
 macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
 
 @inline(never,) // expected-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
 func foo() { }
 
-@available(iOS 15,) // expected-error {{expected platform name}} expected-error {{expected declaration}} 
+@available(iOS 15,)
 func foo() { }
 
-@backDeployed(before: SwiftStdlib 6.0,) // expected-error {{unexpected ',' separator}}
+@backDeployed(before: SwiftStdlib 6.0,)
 func foo() { }
 
 struct Foo {
@@ -88,7 +88,7 @@ struct Foo {
   var y: Int
   
   var value: (Int, Int) {
-    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in '@storageRestrictions' list}}
+    @storageRestrictions(initializes: x, y,)
     init(initialValue) {
       self.x = initialValue.0
       self.y = initialValue.1
@@ -98,7 +98,7 @@ struct Foo {
 
 }
 
-func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{unexpected ',' separator}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}} 
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}} 
 
 @derivative(of: Self.other,) // expected-error {{unexpected ',' separator}}
 func foo() {}

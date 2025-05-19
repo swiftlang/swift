@@ -45,7 +45,10 @@ func test_use_of_initializes_accesses_on_non_inits() {
     var y: String
 
     var _x: Int {
-      @storageRestrictions(initializes: x, accesses: y)
+      @storageRestrictions(
+        initializes: x,
+        accesses: y,
+      )
       init(initialValue) { // Ok
       }
 
