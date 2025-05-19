@@ -38,3 +38,14 @@ func async() async throws {
     group.addImmediateTaskUnlessCancelled { () async throws -> Void in }
   }
 }
+
+@available(SwiftStdlib 6.2, *)
+actor TestSelfCapture {
+    func method() {}
+
+    func test() {
+        Task.immediate {
+            method() // Ok due to `@_implicitSelfCapture`
+        }
+    }
+}

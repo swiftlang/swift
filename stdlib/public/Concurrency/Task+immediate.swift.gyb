@@ -38,7 +38,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func startSynchronously(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
     immediate(name: name, priority: priority, operation: operation)
   }
@@ -73,7 +73,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
     priority: TaskPriority? = nil,
     % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
     % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
-    @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 
     let builtinSerialExecutor =
