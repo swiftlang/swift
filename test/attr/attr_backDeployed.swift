@@ -394,8 +394,8 @@ public func missingVersionFunc3() {}
 @backDeployed(before: macOS 0) // expected-warning {{expected version number in '@backDeployed' attribute; this is an error in the Swift 6 language mode}}
 public func missingVersionFunc4() {}
 
-@backDeployed(before: macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}}
-public func unexpectedSeparatorFunc() {}
+@backDeployed(before: macOS 12.0, iOS 15.0,)
+public func trailingCommaFunc1() {}
 
 @backDeployed(before: macOS 12.0.1) // expected-warning {{'@backDeployed' only uses major and minor version number}}
 public func patchVersionFunc() {}
@@ -440,8 +440,8 @@ public func missingColonAfterBeforeFunc() {}
 @backDeployed(before macOS 12.0) // expected-error {{expected ':' after 'before' in '@backDeployed' attribute}} {{21-21=:}}
 public func missingColonBetweenBeforeAndPlatformFunc() {}
 
-@backDeployed(before: macOS 12.0,) // expected-error {{unexpected ',' separator}} {{33-34=}}
-public func unexpectedTrailingCommaFunc() {}
+@backDeployed(before: macOS 12.0,)
+public func trailingCommaFunc2() {}
 
 @backDeployed(before: macOS 12.0,, iOS 15.0) // expected-error {{unexpected ',' separator}} {{34-35=}}
 public func extraCommaFunc() {}

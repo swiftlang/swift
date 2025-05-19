@@ -94,7 +94,7 @@ if #available(OSX 51, iOS 8.0, *) {
 if #available(OSX 51, { // expected-error {{expected platform name}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
-if #available(OSX 51,) { // expected-error {{expected platform name}}
+if #available(OSX 51,) { // expected-error {{must handle potential future platforms with '*'}}
 }
 
 if #available(OSX 51, iOS { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}

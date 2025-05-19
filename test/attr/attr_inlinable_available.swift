@@ -530,7 +530,10 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
-  if #available(macOS 11, *) {
+  if #available(
+    macOS 11,
+    *,
+  ) {
     _ = AfterDeploymentTarget()
   }
 }
@@ -720,7 +723,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
 
-  if #available(macOS 11, *) {
+  if #available(macOS 11, *,) {
     _ = AfterDeploymentTarget()
   }
 

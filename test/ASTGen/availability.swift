@@ -30,11 +30,21 @@ func testSwift4OrLater() {}
 @available(macOS 12, iOS 13.1, *)
 func testShorthandMulti() {}
 
+@available(macOS 12, iOS 13.1, *,)
+func testShorthandMulti2() {}
+
 @available(macOS, unavailable)
 func testUnavailableMacOS() {}
 
 @available(macOS, deprecated: 12.0.5, message: "whatever")
 func testDeprecaed12MacOS() {}
+
+@available(
+  macOS,
+  deprecated: 12.0.5,
+  message: "whatever",
+)
+func testDeprecaed12MacOS2() {}
 
 @available(_iOS53Aligned, *)
 func testMacroNameOnly() {}
@@ -48,9 +58,26 @@ func testSpecialize<T>(arg: T) -> T {}
 @backDeployed(before: _iOS53Aligned)
 public func testBackDeployed() {}
 
+@backDeployed(
+  before: _iOS53Aligned,
+)
+public func testBackDeployed2() {}
+
 @available(macOS 10, iOS 12, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 12.0, iOS 23.2)
 public func testOriginallyDefinedIn() {}
+
+@available(
+  macOS 10,
+  iOS 12,
+  *,
+)
+@_originallyDefinedIn(
+  module: "OriginalModule",
+  macOS 12.0,
+  iOS 23.2,
+)
+public func testOriginallyDefinedIn2() {}
 
 
 func testPoundIf() {
