@@ -120,6 +120,10 @@ static void _abortWithMessage(llvm::StringRef message) {
   // crash reporter.
   PrettyStackTraceMultilineString trace(message);
 
+  // If pretty backtracing is disabled, fall back to dumping to stderr.
+  if (!llvm::SavePrettyStackState())
+    llvm::errs() << message << '\n';
+
   abort();
 }
 
