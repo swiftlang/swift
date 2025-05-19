@@ -749,8 +749,12 @@ Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
   return Type();
 }
 
-SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
-  auto genericSig = getGenericSignature();
+SubstitutionMap
+GenericEnvironment::getForwardingSubstitutionMap(GenericSignature genericSig)
+const {
+  if (!genericSig) {
+    genericSig = getGenericSignature();
+  }
   return SubstitutionMap::get(genericSig,
                               BuildForwardingSubstitutions(this),
                               MakeAbstractConformanceForGenericType());

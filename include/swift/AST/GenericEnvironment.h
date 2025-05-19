@@ -327,7 +327,14 @@ public:
 
   /// Returns a substitution map that sends every generic parameter to its
   /// corresponding archetype in this generic environment.
-  SubstitutionMap getForwardingSubstitutionMap() const;
+  ///
+  /// If \c sig is provided, it must be a generic signature that has the same
+  /// generic parameters as the generic environment, and a subset of the
+  /// requirements (in other words, it must be a superset of `this` generic
+  /// environment). By default, the generic environment's own signature is
+  /// used.
+  SubstitutionMap getForwardingSubstitutionMap(
+    GenericSignature sig = GenericSignature()) const;
 
   void dump(raw_ostream &os) const;
 

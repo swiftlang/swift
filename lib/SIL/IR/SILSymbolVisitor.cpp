@@ -569,7 +569,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     // Add the property descriptor if the decl needs it.
-    if (ASD->exportsPropertyDescriptor()) {
+    if (ASD->getPropertyDescriptorGenericSignature()) {
       Visitor.addPropertyDescriptor(ASD);
     }
 

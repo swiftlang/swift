@@ -1306,8 +1306,8 @@ void swift::validateGenericSignaturesInModule(ModuleDecl *module) {
   }
 }
 
-GenericSignature
-swift::buildGenericSignature(ASTContext &ctx,
+GenericSignatureWithError
+swift::buildGenericSignatureWithError(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
                              SmallVector<Requirement, 2> addedRequirements,
@@ -1319,7 +1319,18 @@ swift::buildGenericSignature(ASTContext &ctx,
         addedParameters,
         addedRequirements,
         allowInverses},
-      GenericSignatureWithError()).getPointer();
+      GenericSignatureWithError());
+}
+
+GenericSignature
+swift::buildGenericSignature(ASTContext &ctx,
+                             GenericSignature baseSignature,
+                             SmallVector<GenericTypeParamType *, 2> addedParameters,
+                             SmallVector<Requirement, 2> addedRequirements,
+                             bool allowInverses) {
+  return buildGenericSignatureWithError(ctx, baseSignature,
+                                        addedParameters, addedRequirements,
+                                        allowInverses).getPointer();
 }
 
 GenericSignature GenericSignature::withoutMarkerProtocols() const {
