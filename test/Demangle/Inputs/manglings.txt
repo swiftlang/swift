@@ -368,7 +368,10 @@ $sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specializat
 $s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
 $s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
-$s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
+@$s8keypaths1KV3valACSi_tcfcACmTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, K>)
+@$s8keypaths1KVACycfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out K)
+$s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq  ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
+$s18resilient_protocol24ResilientDerivedProtocolPxAA0c4BaseE0Tn --> associated conformance descriptor for resilient_protocol.ResilientDerivedProtocol.A: resilient_protocol.ResilientBaseProtocol
 $s3red4testyAA3ResOyxSayq_GAEs5ErrorAAq_sAFHD1__HCg_GADyxq_GsAFR_r0_lF ---> red.test<A, B where B: Swift.Error>(red.Res<A, B>) -> red.Res<A, [B]>
 $s3red4testyAA7OurTypeOy4them05TheirD0Vy5AssocQzGAjE0F8ProtocolAAxAA0c7DerivedH0HD1_AA0c4BaseH0HI1_AieKHA2__HCg_GxmAaLRzlF ---> red.test<A where A: red.OurDerivedProtocol>(A.Type) -> red.OurType<them.TheirType<A.Assoc>>
 $s17property_wrappers10WithTuplesV9fractionsSd_S2dtvpfP ---> property wrapper backing initializer of property_wrappers.WithTuples.fractions : (Swift.Double, Swift.Double, Swift.Double)
@@ -386,6 +389,10 @@ $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee ---> $s0059xx
 $sx1td_t ---> (t: A...)
 $s7example1fyyYaF ---> example.f() async -> ()
 $s7example1fyyYaKF ---> example.f() async throws -> ()
+s7example1fyyYjfYaKF -> example.f@differentiable(_forward) () async throws -> ()
+s7example1fyyYjrYaKF -> example.f@differentiable(reverse) () async throws -> ()
+s7example1fyyYjdYaKF -> example.f@differentiable () async throws -> ()
+s7example1fyyYjlYaKF -> example.f@differentiable(_linear) () async throws -> ()
 $s4main20receiveInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF ---> main.receiveInstantiation(inout __C.__CxxTemplateInst12MagicWrapperIiE) -> ()
 $s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF ---> main.returnInstantiation() -> __C.__CxxTemplateInst12MagicWrapperIiE
 $s4main6testityyYaFTu ---> async function pointer to main.testit() async -> ()
@@ -447,7 +454,7 @@ $s14swift_ide_test14myColorLiteral3red5green4blue5alphaAA0E0VSf_S3ftcfm ---> swi
 $s14swift_ide_test10myFilenamexfm ---> swift_ide_test.myFilename : A
 $s9MacroUser13testStringify1a1bySi_SitF9stringifyfMf1_ ---> freestanding macro expansion #3 of stringify in MacroUser.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 $s9MacroUser016testFreestandingA9ExpansionyyF4Foo3L_V23bitwidthNumberedStructsfMf_6methodfMu0_ ---> unique name #2 of method in freestanding macro expansion #1 of bitwidthNumberedStructs in Foo3 #1 in MacroUser.testFreestandingMacroExpansion() -> ()
-@__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_ ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
+@__swiftmacro_1a13testStringifyAA1bySi_SitF9stringifyfMf_  ---> freestanding macro expansion #1 of stringify in a.testStringify(a: Swift.Int, b: Swift.Int) -> ()
 @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_ ---> peer macro @addCompletionHandler expansion #1 of f in macro_expand_peers.S
 @__swiftmacro_9MacroUser16MemberNotCoveredV33_4361AD9339943F52AE6186DD51E04E91Ll0dE0fMf0_ ---> freestanding macro expansion #2 of NotCovered(in _4361AD9339943F52AE6186DD51E04E91) in MacroUser.MemberNotCovered
 $sxSo8_NSRangeVRlzCRl_Cr0_llySo12ModelRequestCyxq_GIsPetWAlYl_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(witness_method) @yield_once <A, B where A: AnyObject, B: AnyObject> @substituted <A> (@inout A) -> (@yields @inout __C._NSRange) for <__C.ModelRequest<A, B>>
@@ -466,12 +473,15 @@ $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction t
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi1_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.<bit 2>> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
+
 $s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC ---> concrete protocol conformance variadic_generic_opaque.G2<Pack{variadic_generic_opaque.S1, variadic_generic_opaque.S2}> to protocol conformance ref (type's module) variadic_generic_opaque.P with conditional requirements: (pack protocol conformance (concrete protocol conformance variadic_generic_opaque.S1 to protocol conformance ref (type's module) variadic_generic_opaque.Q, concrete protocol conformance variadic_generic_opaque.S2 to protocol conformance ref (type's module) variadic_generic_opaque.Q))
+
 $s9MacroUser0023macro_expandswift_elFCffMX436_4_23bitwidthNumberedStructsfMf_ ---> freestanding macro expansion #1 of bitwidthNumberedStructs in module MacroUser file macro_expand.swift line 437 column 5
 $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
 $s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
 $s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
-$s2hi1SVIetMIy_TC ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
+$s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
+
 $s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
 $s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
 $s3red7MyActorC3runyxxyYaKACYcYTXEYaKlFZ ---> static red.MyActor.run<A>(@red.MyActor () async throws -> sending A) async throws -> A
@@ -487,3 +497,4 @@ _$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo
 _$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()
 $s7Library1BC1iSivxTwd ---> default override of Library.B.i.modify2 : Swift.Int
 $s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.modify2 : Swift.Int
+$s3use1xAA3OfPVy3lib1GVyAA1fQryFQOyQo_GAjE1PAAxAeKHD1_AIHO_HCg_Gvp ---> use.x : use.OfP<lib.G<<<opaque return type of use.f() -> some>>.0>>
