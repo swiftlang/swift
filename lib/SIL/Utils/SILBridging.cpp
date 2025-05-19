@@ -50,8 +50,10 @@ bool swiftModulesInitialized() {
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
   if (nodeMetatypesInitialized && !metatype) {
-    llvm::errs() << "Instruction " << getSILInstructionName((SILInstructionKind)kind) << " not registered\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Instruction " << getSILInstructionName((SILInstructionKind)kind)
+          << " not registered";
+    });
   }
   return metatype;
 }
@@ -103,16 +105,18 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
     prefixedName = std::string("SIL") + std::string(className);
     iter = valueNamesToKind.find(prefixedName);
     if (iter == valueNamesToKind.end()) {
-      llvm::errs() << "Unknown bridged node class " << className << '\n';
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unknown bridged node class " << className;
+      });
     }
     className = prefixedName;
   }
   SILNodeKind kind = iter->second;
   SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
   if (existingTy) {
-    llvm::errs() << "Double registration of class " << className << '\n';
-    abort();
+    ABORT([&](auto &out) {
+      out << "Double registration of class " << className;
+    });
   }
   nodeMetatypes[(unsigned)kind] = metatype;
 }

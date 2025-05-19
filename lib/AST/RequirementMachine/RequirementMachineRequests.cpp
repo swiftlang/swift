@@ -163,15 +163,16 @@ static void splitConcreteEquivalenceClasses(
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
 
   if (attempt >= maxAttempts) {
-    llvm::errs() << "Splitting concrete equivalence classes did not "
-                 << "reach fixed point after " << attempt << " attempts.\n";
-    llvm::errs() << "Last attempt produced these requirements:\n";
-    for (auto req : requirements) {
-      req.dump(llvm::errs());
-      llvm::errs() << "\n";
-    }
-    machine->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Splitting concrete equivalence classes did not "
+          << "reach fixed point after " << attempt << " attempts.\n";
+      out << "Last attempt produced these requirements:\n";
+      for (auto req : requirements) {
+        req.dump(out);
+        out << "\n";
+      }
+      machine->dump(out);
+    });
   }
 
   splitRequirements.clear();

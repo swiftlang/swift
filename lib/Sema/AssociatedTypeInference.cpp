@@ -449,10 +449,11 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
-    llvm::errs() << "Cannot look up associated type for imported conformance:\n";
-    conformance->getType().dump(llvm::errs());
-    assocType->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Cannot look up associated type for imported conformance:\n";
+      conformance->getType().dump(out);
+      assocType->dump(out);
+    });
   }
 
   NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes |
@@ -1608,11 +1609,12 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
   if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext())) {
-    llvm::errs() << "Cannot infer associated types for imported conformance:\n";
-    conformance->getType().dump(llvm::errs());
-    for (auto assocTypeDecl : allUnresolved)
-      assocTypeDecl->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Cannot infer associated types for imported conformance:\n";
+      conformance->getType().dump(out);
+      for (auto assocTypeDecl : allUnresolved)
+        assocTypeDecl->dump(out);
+    });
   }
 
   TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
@@ -2720,19 +2722,19 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
   LLVM_DEBUG(llvm::dbgs() << "Simplifying type witnesses -- iteration " << iterations << "\n");
 
     if (++iterations > 100) {
-      llvm::errs() << "Too many iterations in simplifyCurrentTypeWitnesses()\n";
+      ABORT([&](auto &out) {
+        out << "Too many iterations in simplifyCurrentTypeWitnesses()\n";
 
-      for (auto assocType : proto->getAssociatedTypeMembers()) {
-        if (conformance->hasTypeWitness(assocType))
-          continue;
+        for (auto assocType : proto->getAssociatedTypeMembers()) {
+          if (conformance->hasTypeWitness(assocType))
+            continue;
 
-        auto known = typeWitnesses.begin(assocType);
-        assert(known != typeWitnesses.end());
+          auto known = typeWitnesses.begin(assocType);
+          assert(known != typeWitnesses.end());
 
-        llvm::errs() << assocType->getName() << ": " << known->first << "\n";
-      }
-
-      abort();
+          out << assocType->getName() << ": " << known->first << "\n";
+        }
+      });
     }
 
     auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();

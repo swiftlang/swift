@@ -557,11 +557,12 @@ protected:
     }
 
     if (substConf.isInvalid()) {
-      llvm::errs() << "Invalid substituted conformance in SIL cloner:\n";
-      Functor.dump(llvm::errs());
-      llvm::errs() << "\noriginal conformance:\n";
-      conformance.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Invalid substituted conformance in SIL cloner:\n";
+        Functor.dump(out);
+        out << "\noriginal conformance:\n";
+        conformance.dump(out);
+      });
     }
 
     if (asImpl().shouldSubstOpaqueArchetypes()) {
