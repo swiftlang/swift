@@ -39,6 +39,7 @@ find_package(SwiftCore REQUIRED)
 include(GNUInstallDirs)
 
 include(AvailabilityMacros)
+include(CompilerSettings)
 include(EmitSwiftInterface)
 include(InstallSwiftInterface)
 include(PlatformInfo)
