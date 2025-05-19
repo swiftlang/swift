@@ -63,6 +63,11 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
 }
 
 IRGenFunction::~IRGenFunction() {
+  // Move the trap basic blocks to the end of the function.
+  for (auto *FailBB : FailBBs) {
+    CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
+  }
+
   emitEpilogue();
 
   // Restore the debug location.
