@@ -244,10 +244,7 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 }
 
 const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
-  const clang::Type *underlyingType = decl->getIntegerType().getTypePtr();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(underlyingType))
-    underlyingType = elaborated->desugar().getTypePtr();
-  return underlyingType;
+  return importer::desugarIfElaborated(decl->getIntegerType().getTypePtr());
 }
 
 /// Determine the prefix to be stripped from the names of the enum constants
