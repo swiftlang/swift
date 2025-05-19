@@ -4988,28 +4988,28 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 NOTE(noescape_parameter,none,
-    "parameter %1 is implicitly %select{non-escaping|non-sendable}0",
+    "parameter %1 is implicitly %select{non-escaping|non-Sendable}0",
      (unsigned, Identifier))
 NOTE(generic_parameters_always_escaping,none,
      "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
-      "passing %select{non-escaping|non-sendable}0 parameter %1 to function "
+      "passing %select{non-escaping|non-Sendable}0 parameter %1 to function "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noescape_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
-      "assigning %select{non-escaping|non-sendable}0 parameter %1 to "
+      "assigning %select{non-escaping|non-Sendable}0 parameter %1 to "
       "%select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
-      "using %select{non-escaping|non-sendable}0 parameter %1 in a context "
+      "using %select{non-escaping|non-Sendable}0 parameter %1 in a context "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
-      "converting %select{non-escaping|non-sendable function}0 value to %1 "
+      "converting %select{non-escaping|non-Sendable function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 NOTE(escape_expected_at_parameter_position,none,
@@ -5652,15 +5652,15 @@ GROUPED_ERROR(concurrent_access_of_inout_param,SendableClosureCaptures,none,
       "concurrently-executing code",
       (DeclName))
 GROUPED_ERROR(non_sendable_capture,SendableClosureCaptures,none,
-      "capture of %1 with non-sendable type %0 in a '@Sendable' "
+      "capture of %1 with non-Sendable type %0 in a '@Sendable' "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
 ERROR(non_sendable_isolated_capture,none,
-      "capture of %1 with non-sendable type %0 in an isolated "
+      "capture of %1 with non-Sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
 ERROR(non_sendable_metatype_capture,none,
-      "capture of non-sendable type %0 in an isolated "
+      "capture of non-Sendable type %0 in an isolated "
       "%select{local function|closure}1",
       (Type, bool))
 ERROR(self_capture_deinit_task,none,
@@ -5796,77 +5796,77 @@ NOTE(in_derived_witness, none,
      (DescriptiveDeclKind, DeclName, Type))
 
 ERROR(non_sendable_arg_into_actor,none,
-      "non-sendable type %0 cannot be sent into %2 context in call to %kind1",
+      "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_arg_exits_actor,none,
-      "non-sendable type %0 cannot exit %2 context in call to nonisolated "
+      "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_witness,none,
-      "non-sendable parameter type %0 cannot be sent from caller of "
+      "non-Sendable parameter type %0 cannot be sent from caller of "
       "protocol requirement %1 into %2 implementation",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_override,none,
-      "non-sendable parameter type %0 cannot be sent from caller of "
+      "non-Sendable parameter type %0 cannot be sent from caller of "
       "superclass %kind1 into %2 override",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_objc,none,
-      "non-sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
+      "non-Sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
       "boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
 ERROR(non_sendable_result_into_actor,none,
-      "non-sendable result type %0 cannot be sent from %2 context in call "
+      "non-Sendable result type %0 cannot be sent from %2 context in call "
       "to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_exits_actor,none,
-      "non-sendable result type %0 cannot exit %2 context in call to "
+      "non-Sendable result type %0 cannot exit %2 context in call to "
       "nonisolated %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_in_witness,none,
-      "non-sendable type %0 cannot be returned from %2 implementation "
+      "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_in_override,none,
-      "non-sendable type %0 cannot be returned from %2 override to "
+      "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_in_objc,none,
-      "non-sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
+      "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
 ERROR(non_sendable_call_result_type,none,
-      "non-sendable result type %0 cannot be sent from %1 context in call "
+      "non-Sendable result type %0 cannot be sent from %1 context in call "
       "to async function",
       (Type, ActorIsolation))
 
 ERROR(non_sendable_property_exits_actor,none,
-      "non-sendable type %0 of %kind1 cannot exit %2 context",
+      "non-Sendable type %0 of %kind1 cannot exit %2 context",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_into_actor,none,
-      "non-sendable type %0 of nonisolated %kind1 cannot be sent to "
+      "non-Sendable type %0 of nonisolated %kind1 cannot be sent to "
       "%2 context",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_in_witness,none,
-      "non-sendable type %0 cannot be returned from %2 implementation "
+      "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_in_override,none,
-      "non-sendable type %0 cannot be returned from %2 override to "
+      "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_in_objc,none,
-      "non-sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
+      "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
 ERROR(non_sendable_keypath_capture,none,
-      "cannot form key path that captures non-sendable type %0",
+      "cannot form key path that captures non-Sendable type %0",
       (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'Sendable'-conforming %kind3 has non-sendable type %0",
+      "'Sendable'-conforming %kind3 has non-Sendable type %0",
       (Type, bool, DeclName, const ValueDecl *))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %kind1 is mutable",

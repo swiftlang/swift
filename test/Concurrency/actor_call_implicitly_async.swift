@@ -180,7 +180,7 @@ func someAsyncFunc() async {
   // expected-error@+1{{actor-isolated property 'effPropA' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = a.effPropA
 
-  // expected-warning@+3 {{non-sendable type 'Box' of property 'effPropT' cannot exit actor-isolated context}}
+  // expected-warning@+3 {{non-Sendable type 'Box' of property 'effPropT' cannot exit actor-isolated context}}
   // expected-error@+2{{property access can throw, but it is not marked with 'try' and the error is not handled}}
   // expected-error@+1{{actor-isolated property 'effPropT' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = a.effPropT
@@ -190,8 +190,8 @@ func someAsyncFunc() async {
   _ = a.effPropAT
 
   // (mostly) corrected ones
-  _ = await a.effPropA  // expected-warning {{non-sendable type 'Box' of property 'effPropA' cannot exit actor-isolated context}}
-  _ = try! await a.effPropT // expected-warning {{non-sendable type 'Box' of property 'effPropT' cannot exit actor-isolated context}}
+  _ = await a.effPropA  // expected-warning {{non-Sendable type 'Box' of property 'effPropA' cannot exit actor-isolated context}}
+  _ = try! await a.effPropT // expected-warning {{non-Sendable type 'Box' of property 'effPropT' cannot exit actor-isolated context}}
   _ = try? await a.effPropAT
 
   print("ok!")
