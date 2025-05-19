@@ -190,11 +190,4 @@ extern int CONDITIONAL_ASSERT_Global_enable_flag;
 #define SWIFT_ASSERT_ONLY_DECL DEBUG_ASSERT_DECL
 #define SWIFT_ASSERT_ONLY DEBUG_ASSERT_EXPR
 
-// ================================ Utility and Helper Functions ================================
-
-// Utility function to print out help information for
-// various command-line options that affect the assertion
-// behavior.
-void ASSERT_help();
-
 #endif // SWIFT_BASIC_ASSERTIONS_H

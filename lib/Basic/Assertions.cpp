@@ -34,6 +34,24 @@ int CONDITIONAL_ASSERT_Global_enable_flag =
   1; // Default to `on` in debug builds
 #endif
 
+static void ASSERT_help() {
+  static int ASSERT_help_shown = 0;
+  if (ASSERT_help_shown) {
+    return;
+  }
+  ASSERT_help_shown = 1;
+
+  if (!AssertHelp) {
+    llvm::errs() << "(to display assertion configuration options: -Xllvm -assert-help)\n";
+    return;
+  }
+
+  llvm::errs() << "\n";
+  llvm::errs() << "Control assertion behavior with one or more of the following options:\n\n";
+  llvm::errs() << " -Xllvm -assert-continue\n";
+  llvm::errs() << "     Continue after any failed assertion\n\n";
+}
+
 void ASSERT_failure(const char *expr, const char *filename, int line, const char *func) {
   // Find the last component of `filename`
   // Needed on Windows MSVC, which lacks __FILE_NAME__
@@ -60,24 +78,6 @@ void ASSERT_failure(const char *expr, const char *filename, int line, const char
   }
 
   abort();
-}
-
-void ASSERT_help() {
-  static int ASSERT_help_shown = 0;
-  if (ASSERT_help_shown) {
-    return;
-  }
-  ASSERT_help_shown = 1;
-
-  if (!AssertHelp) {
-    llvm::errs() << "(to display assertion configuration options: -Xllvm -assert-help)\n";
-    return;
-  }
-
-  llvm::errs() << "\n";
-  llvm::errs() << "Control assertion behavior with one or more of the following options:\n\n";
-  llvm::errs() << " -Xllvm -assert-continue\n";
-  llvm::errs() << "     Continue after any failed assertion\n\n";
 }
 
 // This has to be callable in the same way as the macro version,
