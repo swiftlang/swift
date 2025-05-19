@@ -17,6 +17,6 @@ actor ActorWithDeinit {
 
   deinit {
     print(ns)
-    print(ss) // expected-warning{{cannot access property 'ss' with a non-sendable type 'StrictStruct' from nonisolated deinit}}
+    print(ss) // expected-warning{{cannot access property 'ss' with a non-Sendable type 'StrictStruct' from nonisolated deinit}}
   }
 }
