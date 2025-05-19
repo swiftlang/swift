@@ -78,10 +78,6 @@ static llvm::cl::opt<bool>
 Classify("classify",
            llvm::cl::desc("Display symbol classification characters"));
 
-static llvm::cl::opt<bool>
-    Ranges("ranges",
-           llvm::cl::desc("Display symbol ranges in the demangled string"));
-
 /// Options that are primarily used for testing.
 /// \{
 static llvm::cl::opt<bool> DisplayLocalNameContexts(
@@ -141,62 +137,6 @@ static void stripSpecialization(NodePointer Node) {
       break;
   }
 }
-
-class TrackingNodePrinter : public NodePrinter {
-public:
-  std::pair<size_t, size_t> BasenameRange;
-  std::pair<size_t, size_t> ParametersRange;
-  bool hasBasename() { return BasenameRange.first < BasenameRange.second; }
-  bool hasParameters() {
-    return ParametersRange.first < ParametersRange.second;
-  }
-
-private:
-  std::optional<unsigned> parametersDepth;
-
-  void startName() {
-    if (!hasBasename())
-      BasenameRange.first = getStreamLength();
-  }
-
-  void endName() {
-    if (!hasBasename())
-      BasenameRange.second = getStreamLength();
-  }
-
-  void startParameters(unsigned depth) {
-    if (parametersDepth || !hasBasename() || hasParameters()) {
-      return;
-    }
-    ParametersRange.first = getStreamLength();
-    parametersDepth = depth;
-  }
-
-  void endParameters(unsigned depth) {
-    if (!parametersDepth || *parametersDepth != depth || hasParameters()) {
-      return;
-    }
-    ParametersRange.second = getStreamLength();
-  }
-
-  void printFunctionName(bool hasName, llvm::StringRef &OverwriteName,
-                         llvm::StringRef &ExtraName, bool MultiWordName,
-                         int &ExtraIndex, swift::Demangle::NodePointer Entity,
-                         unsigned int depth) override {
-    startName();
-    NodePrinter::printFunctionName(hasName, OverwriteName, ExtraName,
-                                   MultiWordName, ExtraIndex, Entity, depth);
-    endName();
-  }
-
-  void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
-                               unsigned depth, bool showTypes) override {
-    startParameters(depth);
-    NodePrinter::printFunctionParameters(LabelList, ParameterType, depth,
-                                         showTypes);
-    endParameters(depth);
-  }
-};
 
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      swift::Demangle::Context &DCtx,
@@ -310,7 +250,6 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       os << remangled;
       return;
     }
-
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
       os << name << " ---> ";
