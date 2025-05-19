@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
+#include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/ABI/MetadataValues.h"
@@ -2909,13 +2910,8 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
           return argumentAttrs;
         }
       }
-      auto loc = typedefDecl->getEndLoc();
-      if (loc.isMacroID()) {
-        StringRef macroName =
-            nameImporter.getClangPreprocessor().getImmediateMacroName(loc);
-        if (isCFOptionsMacro(macroName))
-          return argumentAttrs;
-      }
+      if (isCFOptionsMacro(typedefDecl, nameImporter.getClangPreprocessor()))
+        return argumentAttrs;
     }
   }
 

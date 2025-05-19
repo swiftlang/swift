@@ -255,6 +255,11 @@ ImportedType importer::findOptionSetEnum(clang::QualType type,
     // then this definitely isn't used for {CF,NS}_OPTIONS.
     return ImportedType();
 
+  if (Impl.SwiftContext.LangOpts.EnableCXXInterop &&
+      !isCFOptionsMacro(typedefType->getDecl(), Impl.getClangPreprocessor())) {
+    return ImportedType();
+  }
+
   auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType);
   if (!clangEnum)
     return ImportedType();
