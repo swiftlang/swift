@@ -247,6 +247,29 @@ const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
   return importer::desugarIfElaborated(decl->getIntegerType().getTypePtr());
 }
 
+ImportedType importer::findOptionSetEnum(clang::QualType type,
+                                         ClangImporter::Implementation &Impl) {
+  auto typedefType = dyn_cast<clang::TypedefType>(type);
+  if (!typedefType || !Impl.isUnavailableInSwift(typedefType->getDecl()))
+    // If this isn't a typedef, or it is a typedef that is available in Swift,
+    // then this definitely isn't used for {CF,NS}_OPTIONS.
+    return {};
+
+  auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType);
+  if (!clangEnum)
+    return {};
+
+  // If this fails, it means that we need a stronger predicate for
+  // determining the relationship between an enum and typedef.
+  assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+         typedefType->getCanonicalTypeInternal());
+
+  if (auto *swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion))
+    return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
+
+  return {};
+}
+
 /// Determine the prefix to be stripped from the names of the enum constants
 /// within the given enum.
 void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
