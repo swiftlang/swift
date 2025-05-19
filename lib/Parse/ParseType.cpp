@@ -194,7 +194,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       SourceLoc rbLoc;
       SmallVector<TypeRepr *, 8> elements;
       auto status = parseList(tok::r_brace, lbLoc, rbLoc,
-                              /*AllowSepAfterLast=*/true,
+                              /*AllowSepAfterLast=*/false,
                               diag::expected_rbrace_pack_type_list,
                               [&] () -> ParserStatus {
         auto element = parseType(diag::expected_type);
