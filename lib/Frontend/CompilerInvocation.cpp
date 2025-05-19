@@ -1483,10 +1483,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (Opts.AllowNonResilientAccess &&
         FrontendOptions::doesActionBuildModuleFromInterface(
             FrontendOpts.RequestedAction)) {
-      Diags.diagnose(
-          SourceLoc(), diag::warn_ignore_option_overriden_by,
-          "-allow-non-resilient-access",
-          "-compile-module-from-interface or -typecheck-module-from-interface");
+      if (FrontendOpts.RequestedAction !=
+          FrontendOptions::ActionType::TypecheckModuleFromInterface)
+        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+                       "-allow-non-resilient-access",
+                       "-compile-module-from-interface");
       Opts.AllowNonResilientAccess = false;
     }
   }
@@ -3012,9 +3013,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_PackageCMO) ||
       LangOpts.hasFeature(Feature::PackageCMO)) {
     if (!LangOpts.AllowNonResilientAccess) {
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-package-cmo",
-                     "-allow-non-resilient-access");
+      if (FEOpts.RequestedAction !=
+          FrontendOptions::ActionType::TypecheckModuleFromInterface)
+        Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                       "-package-cmo", "-allow-non-resilient-access");
     } else if (!FEOpts.EnableLibraryEvolution) {
       Diags.diagnose(SourceLoc(), diag::package_cmo_requires_library_evolution);
     } else {
