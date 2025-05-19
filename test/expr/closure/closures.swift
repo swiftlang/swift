@@ -1604,9 +1604,7 @@ final class AutoclosureTests {
       let someOptional: Self? = Self()
       var `self` = self ?? someOptional // expected-warning {{'self' was never mutated; consider changing to 'let' constant}}
       guard let self = self else { return }
-      // This is not supposed to be permitted, but has been allowed since Swift 5.8,
-      // so we have to continue allowing it to maintain source compatibility.
-      method()
+      method() // expected-error{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
   
     doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
