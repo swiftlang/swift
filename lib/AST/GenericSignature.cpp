@@ -1162,10 +1162,6 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
 
 void swift::validateGenericSignature(ASTContext &context,
                                      GenericSignature sig) {
-  llvm::errs() << "Validating generic signature: ";
-  sig->print(llvm::errs());
-  llvm::errs() << "\n";
-
   // Try building a new signature having the same requirements.
   SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto *genericParam :  sig.getGenericParams())
