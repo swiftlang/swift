@@ -36,7 +36,7 @@ int CONDITIONAL_ASSERT_Global_enable_flag =
   1; // Default to `on` in debug builds
 #endif
 
-static void ASSERT_help() {
+static void ASSERT_help(llvm::raw_ostream &out) {
   static int ASSERT_help_shown = 0;
   if (ASSERT_help_shown) {
     return;
@@ -44,14 +44,14 @@ static void ASSERT_help() {
   ASSERT_help_shown = 1;
 
   if (!AssertHelp) {
-    llvm::errs() << "(to display assertion configuration options: -Xllvm -assert-help)\n";
+    out << "(to display assertion configuration options: -Xllvm -assert-help)\n";
     return;
   }
 
-  llvm::errs() << "\n";
-  llvm::errs() << "Control assertion behavior with one or more of the following options:\n\n";
-  llvm::errs() << " -Xllvm -assert-continue\n";
-  llvm::errs() << "     Continue after any failed assertion\n\n";
+  out << "\n";
+  out << "Control assertion behavior with one or more of the following options:\n\n";
+  out << " -Xllvm -assert-continue\n";
+  out << "     Continue after any failed assertion\n\n";
 }
 
 [[noreturn]]
@@ -68,21 +68,24 @@ void ASSERT_failure(const char *expr, const char *filename, int line, const char
     }
   }
 
-  llvm::errs()
-    << "Assertion failed: "
-    << "(" << expr << "), "
-    << "function " << func << " at "
-    << filename << ":"
-    << line << ".\n";
+  llvm::SmallString<0> message;
+  llvm::raw_svector_ostream out(message);
 
-  ASSERT_help();
+  out << "Assertion failed: "
+      << "(" << expr << "), "
+      << "function " << func << " at "
+      << filename << ":"
+      << line << ".\n";
+
+  ASSERT_help(out);
 
   if (AssertContinue) {
+    llvm::errs() << message;
     llvm::errs() << "Continuing after failed assertion (-Xllvm -assert-continue)\n";
     return;
   }
 
-  abort();
+  _abortWithMessage(message);
 }
 
 // This has to be callable in the same way as the macro version,
