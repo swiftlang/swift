@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.29)
 
+if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
+  cmake_policy(SET CMP0157 OLD)
+endif()
+
 if($ENV{BUILD_NUMBER})
   math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
   set(BUILD_NUMBER ".${BUILD_NUMBER}")
 endif()
-
 project(SwiftDistributed
   LANGUAGES C CXX Swift 
   VERSION 6.3.0${BUILD_NUMBER})
@@ -20,8 +23,6 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
-set(CMAKE_Swift_LANGUAGE_VERSION 5)
-
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
@@ -29,13 +30,20 @@ set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
 set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vendor"
   CACHE FILEPATH "Location for private build system extension")
 
+find_package(SwiftCore REQUIRED)
+
+include(AvailabilityMacros)
+include(EmitSwiftInterface)
+include(InstallSwiftInterface)
+include(PlatformInfo)
+include(ResourceEmbedding)
+include(CatalystSupport)
 include(CxxStandard)
 include(SwiftCallingConventions)
-include(AvailabilityMacros)
-include(ResourceEmbedding)
-include(PlatformInfo)
 
-find_package(SwiftCore)
+option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
+set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${${PROJECT_NAME}_INSTALL_NESTED_SUBDIR}>:/${${PROJECT_NAME}_PLATFORM_SUBDIR}/${Supplemental_ARCH_SUBDIR}>" CACHE STRING "")
+set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${${PROJECT_NAME}_INSTALL_NESTED_SUBDIR}>:/${${PROJECT_NAME}_PLATFORM_SUBDIR}>" CACHE STRING "")
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
@@ -44,10 +52,6 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
-
-include(CatalystSupport)
-include(EmitSwiftInterface)
-include(InstallSwiftInterface)
 
 configure_file("CMakeConfig.h.in"
   "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
@@ -64,8 +68,6 @@ add_library(swiftDistributed
   LocalTestingDistributedActorSystem.swift)
 
 target_compile_options(swiftDistributed PRIVATE
-  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
@@ -82,7 +84,9 @@ target_compile_options(swiftDistributed PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependenceMutableAccessors>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-upcoming-feature MemberImportVisibility>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
 set_target_properties(swiftDistributed PROPERTIES
   Swift_MODULE_NAME Distributed
@@ -110,9 +114,6 @@ target_link_libraries(swiftDistributed PRIVATE
     swift_Concurrency)
     # swiftDarwin/Libc/Platform
     # builtin_float
-
-set(${PROJECT_NAME}_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}/${Supplemental_ARCH_SUBDIR}>" CACHE STRING "")
-set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${Supplemental_INSTALL_NESTED_SUBDIR}>:/${Supplemental_PLATFORM_SUBDIR}>" CACHE STRING "")
 
 install(TARGETS swiftDistributed
     EXPORT SwiftDistributedTargets
