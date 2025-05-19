@@ -2170,6 +2170,13 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     {
       SGF.B.emitBlock(errorBB);
 
+      // When the closure throws an error, it needs to clean up the buffer. This
+      // means that the buffer is uninitialized at this point.
+      // We need an `end_lifetime` so that the move-only checker doesn't insert
+      // a wrong `destroy_addr` because it thinks that the buffer is initialized
+      // here.
+      SGF.B.createEndLifetime(loc, buffer);
+
       SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
       SGF.B.createThrowAddr(loc);
