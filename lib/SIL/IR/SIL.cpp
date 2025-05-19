@@ -344,7 +344,7 @@ static bool isUnsupportedKeyPathValueType(Type ty) {
   // They would also need a new ABI that's yet to be implemented in order to
   // be properly supported, so let's suppress the descriptor for now if either
   // the container or storage type of the declaration is non-copyable.
-  if (ty->isNoncopyable())
+  if (ty->isNoncopyable() || !ty->isEscapable())
     return true;
 
   return false;
@@ -356,7 +356,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   
   if (!isStatic()) {
     if (auto contextTy = getDeclContext()->getDeclaredTypeInContext()) {
-      if (contextTy->isNoncopyable()) {
+      if (contextTy->isNoncopyable() || !contextTy->isEscapable()) {
         return false;
       }
     }
