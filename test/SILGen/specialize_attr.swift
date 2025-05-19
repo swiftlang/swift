@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -module-name A -emit-module-path %t/A.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module.swift
 // RUN: %target-swift-frontend -I %t -module-name B -emit-module-path %t/B.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module2.swift
 // RUN: %target-swift-emit-silgen -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-os
+// RUN: %target-swift-emit-silgen -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-emit-sil -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO -check-prefix=CHECK-OPT-%target-os %s
 
 // Test .swiftinterface
@@ -342,3 +343,24 @@ extension InternalThing2 {
     }
   }
 }
+
+
+// Tests for the "public" @specialized attribute.
+// CHECK2: @specialized(where T == Int, U == Float)
+// CHECK2-NEXT: @specialized(where T == Klass1, U == FakeString)
+// CHECK2-NEXT: func publicSpecializeThis<T, U>(_ t: T, u: U)
+@specialized(where T == Int, U == Float)
+@specialized(where T == Klass1, U == FakeString)
+public func publicSpecializeThis<T, U>(_ t: T, u: U) {}
+// CHECK2: extension TestPrespecialized {
+// CHECK2-NEXT:   @specialized(where T == Int)
+// CHECK2-NEXT:   public func testExtension()
+
+extension TestPrespecialized {
+    @specialized(where T == Int)
+    public func testExtension() {
+    }
+}
+
+// CHECK2: sil [_specialize exported: false, kind: full, where T == Klass1, U == FakeString] [_specialize exported: false, kind: full, where T == Int, U == Float] [ossa] @$s15specialize_attr20publicSpecializeThis_1uyx_q_tr0_lF
+// CHECK2: sil [_specialize exported: false, kind: full, where T == Int] [ossa] @$s15specialize_attr18TestPrespecializedV13testExtensionyyF

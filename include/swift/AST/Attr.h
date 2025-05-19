@@ -16,7 +16,6 @@
 
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
-
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -203,7 +202,7 @@ protected:
       ownership : NumReferenceOwnershipBits
     );
 
-    SWIFT_INLINE_BITFIELD(SpecializeAttr, DeclAttribute, 1+1,
+    SWIFT_INLINE_BITFIELD(AbstractSpecializeAttr, DeclAttribute, 1+1,
       exported : 1,
       kind : 1
     );
@@ -1730,15 +1729,17 @@ public:
   }
 };
 
-/// The @_specialize attribute, which forces specialization on the specified
-/// type list.
-class SpecializeAttr final
+/// The @_specialize/@specialize attribute, which forces specialization on the
+/// specified type list.
+template<typename Base, typename...AdditionalTrailingObjects>
+using SpecializeAttrTrailingObjects = llvm::TrailingObjects<Base,
+  Identifier, AvailableAttr *, Type , AdditionalTrailingObjects...>;
+
+class AbstractSpecializeAttr
     : public DeclAttribute,
-      private llvm::TrailingObjects<SpecializeAttr, Identifier,
-                                    AvailableAttr *, Type> {
+      private llvm::trailing_objects_internal::TrailingObjectsBase {
   friend class SpecializeAttrTargetDeclRequest;
   friend class SerializeAttrGenericSignatureRequest;
-  friend TrailingObjects;
 
 public:
   // NOTE: When adding new kinds, you must update the inline bitfield macro.
@@ -1759,37 +1760,16 @@ private:
   size_t numTypeErasedParams;
   bool typeErasedParamsInitialized;
 
-  SpecializeAttr(SourceLoc atLoc, SourceRange Range,
-                 TrailingWhereClause *clause, bool exported,
+protected:
+  AbstractSpecializeAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange Range,
+                 TrailingWhereClause *clause,
+                 bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
                  DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
                  ArrayRef<AvailableAttr *> availabilityAttrs,
                  size_t typeErasedParamsCount);
 
 public:
-  static SpecializeAttr *
-  create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
-         TrailingWhereClause *clause, bool exported, SpecializationKind kind,
-         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
-         ArrayRef<AvailableAttr *> availabilityAttrs,
-         GenericSignature specializedSignature = nullptr);
-
-  static SpecializeAttr *create(ASTContext &ctx, bool exported,
-                                SpecializationKind kind,
-                                ArrayRef<Identifier> spiGroups,
-                                ArrayRef<AvailableAttr *> availabilityAttrs,
-                                GenericSignature specializedSignature,
-                                DeclNameRef replacedFunction);
-
-  static SpecializeAttr *create(ASTContext &ctx, bool exported,
-                                SpecializationKind kind,
-                                ArrayRef<Identifier> spiGroups,
-                                ArrayRef<AvailableAttr *> availabilityAttrs,
-                                ArrayRef<Type> typeErasedParams,
-                                GenericSignature specializedSignature,
-                                DeclNameRef replacedFunction,
-                                LazyMemberLoader *resolver, uint64_t data);
-
   size_t numTrailingObjects(OverloadToken<Identifier>) const {
     return numSPIGroups;
   }
@@ -1797,17 +1777,27 @@ public:
   size_t numTrailingObjects(OverloadToken<AvailableAttr *>) const {
     return numAvailableAttrs;
   }
+  // Helper to get the trailing objects of one of the subclasses.
+  template<typename Type>
+  const Type *getSubclassTrailingObjects() const;
+
+  template<typename Type>
+  Type *getSubclassTrailingObjects() {
+    const auto *constThis = this;
+    return const_cast<Type*>(constThis->getSubclassTrailingObjects<Type>());
+  }
+
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
   /// may change with the syntax change.
   ArrayRef<Identifier> getSPIGroups() const {
-    return { this->template getTrailingObjects<Identifier>(),
+    return { getSubclassTrailingObjects<Identifier>(),
              numSPIGroups };
   }
 
   ArrayRef<AvailableAttr *> getAvailableAttrs() const {
-    return {this->template getTrailingObjects<AvailableAttr *>(),
+    return {getSubclassTrailingObjects<AvailableAttr *>(),
             numAvailableAttrs};
   }
 
@@ -1815,26 +1805,36 @@ public:
     if (!typeErasedParamsInitialized)
       return {};
 
-    return {this->template getTrailingObjects<Type>(),
+    return {getSubclassTrailingObjects<Type>(),
             numTypeErasedParams};
   }
 
   void setTypeErasedParams(const ArrayRef<Type> typeErasedParams) {
     assert(typeErasedParams.size() == numTypeErasedParams);
     if (!typeErasedParamsInitialized) {
-      std::uninitialized_copy(typeErasedParams.begin(), typeErasedParams.end(), getTrailingObjects<Type>());
+      std::uninitialized_copy(typeErasedParams.begin(), typeErasedParams.end(),
+                              getSubclassTrailingObjects<Type>());
       typeErasedParamsInitialized = true;
     }
   }
 
+  void setResolver(LazyMemberLoader *resolver, uint64_t resolverContextData) {
+    this->resolver = resolver;
+    this->resolverContextData = resolverContextData;
+  }
+
   TrailingWhereClause *getTrailingWhereClause() const;
 
+  bool isPublic() const {
+    return getKind() == DeclAttrKind::Specialized;
+  }
+
   bool isExported() const {
-    return Bits.SpecializeAttr.exported;
+    return Bits.AbstractSpecializeAttr.exported;
   }
 
   SpecializationKind getSpecializationKind() const {
-    return SpecializationKind(Bits.SpecializeAttr.kind);
+    return SpecializationKind(Bits.AbstractSpecializeAttr.kind);
   }
 
   bool isFullSpecialization() const {
@@ -1857,13 +1857,138 @@ public:
   getSpecializedSignature(const AbstractFunctionDecl *forDecl) const;
 
   static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Specialize ||
+      DA->getKind() == DeclAttrKind::Specialized;
+  }
+
+  UNIMPLEMENTED_CLONE(AbstractSpecializeAttr)
+
+  bool isEquivalent(const AbstractSpecializeAttr *other, Decl *attachedTo) const;
+};
+
+/// The @_specialize attribute.
+class SpecializeAttr final : public AbstractSpecializeAttr,
+   private SpecializeAttrTrailingObjects<SpecializeAttr> {
+  friend TrailingObjects;
+  friend AbstractSpecializeAttr;
+
+  // WARNING: Do not add storage here. The base class uses TrailingObjects.
+private:
+  SpecializeAttr(SourceLoc atLoc, SourceRange Range,
+                 TrailingWhereClause *clause,
+                 bool exported,
+                 SpecializationKind kind, GenericSignature specializedSignature,
+                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                 size_t typeErasedParamsCount) :
+    AbstractSpecializeAttr(DeclAttrKind::Specialize, atLoc, Range, clause,
+                   exported, kind, specializedSignature, targetFunctionName,
+                   spiGroups, availabilityAttrs, typeErasedParamsCount) {}
+
+public:
+  static SpecializeAttr *
+  create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
+         TrailingWhereClause *clause, bool exported,
+         SpecializationKind kind,
+         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+         ArrayRef<AvailableAttr *> availabilityAttrs,
+         GenericSignature specializedSignature = nullptr);
+
+  static SpecializeAttr *create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                ArrayRef<Identifier> spiGroups,
+                                ArrayRef<AvailableAttr *> availabilityAttrs,
+                                GenericSignature specializedSignature,
+                                DeclNameRef replacedFunction);
+
+  static SpecializeAttr *create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                ArrayRef<Identifier> spiGroups,
+                                ArrayRef<AvailableAttr *> availabilityAttrs,
+                                ArrayRef<Type> typeErasedParams,
+                                GenericSignature specializedSignature,
+                                DeclNameRef replacedFunction,
+                                LazyMemberLoader *resolver, uint64_t data);
+
+  static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialize;
   }
 
   UNIMPLEMENTED_CLONE(SpecializeAttr)
 
-  bool isEquivalent(const SpecializeAttr *other, Decl *attachedTo) const;
+  bool isEquivalent(const SpecializeAttr *other, Decl *attachedTo) const {
+    return AbstractSpecializeAttr::isEquivalent(other, attachedTo);
+  }
 };
+
+/// The @specialized attribute.
+class SpecializedAttr final : public AbstractSpecializeAttr ,
+   private SpecializeAttrTrailingObjects<SpecializeAttr> {
+  friend TrailingObjects;
+  friend AbstractSpecializeAttr;
+
+  // WARNING: Do not add storage here. The base class uses TrailingObjects.
+private:
+
+  SpecializedAttr(SourceLoc atLoc, SourceRange Range,
+                 TrailingWhereClause *clause,
+                 bool exported,
+                 SpecializationKind kind, GenericSignature specializedSignature,
+                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 ArrayRef<AvailableAttr *> availabilityAttrs,
+                 size_t typeErasedParamsCount) :
+    AbstractSpecializeAttr(DeclAttrKind::Specialized, atLoc, Range, clause,
+                   exported, kind, specializedSignature, targetFunctionName,
+                   spiGroups, availabilityAttrs, typeErasedParamsCount) {}
+
+public:
+  static SpecializedAttr *
+  create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
+         TrailingWhereClause *clause, bool exported,
+         SpecializationKind kind,
+         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+         ArrayRef<AvailableAttr *> availabilityAttrs,
+         GenericSignature specializedSignature = nullptr);
+
+  static SpecializedAttr *create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                ArrayRef<Identifier> spiGroups,
+                                ArrayRef<AvailableAttr *> availabilityAttrs,
+                                GenericSignature specializedSignature,
+                                DeclNameRef replacedFunction);
+
+  static SpecializedAttr *create(ASTContext &ctx, bool exported,
+                                SpecializationKind kind,
+                                ArrayRef<Identifier> spiGroups,
+                                ArrayRef<AvailableAttr *> availabilityAttrs,
+                                ArrayRef<Type> typeErasedParams,
+                                GenericSignature specializedSignature,
+                                DeclNameRef replacedFunction,
+                                LazyMemberLoader *resolver, uint64_t data);
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Specialized;
+  }
+
+  UNIMPLEMENTED_CLONE(SpecializedAttr)
+
+  bool isEquivalent(const SpecializedAttr *other, Decl *attachedTo) const {
+    return AbstractSpecializeAttr::isEquivalent(other, attachedTo);
+  }
+};
+
+template<typename Type>
+const Type *AbstractSpecializeAttr::getSubclassTrailingObjects() const {
+  if (auto attr = dyn_cast<SpecializedAttr>(this)) {
+    return attr->getTrailingObjects<Type>();
+  }
+  if (auto attr = dyn_cast<SpecializeAttr>(this)) {
+    return attr->getTrailingObjects<Type>();
+  }
+  llvm_unreachable("unhandled AbstractSpecializeAttr subclass?");
+}
+
+
 
 class StorageRestrictionsAttr final
     : public DeclAttribute,
