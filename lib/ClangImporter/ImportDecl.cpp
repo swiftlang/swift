@@ -846,13 +846,9 @@ static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
 using MirroredMethodEntry =
   std::tuple<const clang::ObjCMethodDecl*, ProtocolDecl*, bool /*isAsync*/>;
 
-ImportedType findOptionSetType(clang::QualType type,
-                               ClangImporter::Implementation &Impl) {
-  ImportedType importedType;
-  auto fieldType = type;
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
-    fieldType = elaborated->desugar();
-  if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
+ImportedType importer::findOptionSetEnum(clang::QualType type,
+                                         ClangImporter::Implementation &Impl) {
+  if (auto typedefType = dyn_cast<clang::TypedefType>(type)) {
     if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
       if (auto clangEnum =
               findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
@@ -862,13 +858,12 @@ ImportedType findOptionSetType(clang::QualType type,
             clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
             typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
+          return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
         }
       }
     }
   }
-  return importedType;
+  return {};
 }
 
 static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
@@ -4540,8 +4535,8 @@ namespace {
           return nullptr;
       }
 
-      auto fieldType = decl->getType();
-      ImportedType importedType = findOptionSetType(fieldType, Impl);
+      auto fieldType = desugarIfElaborated(decl->getType());
+      ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
         importedType =
@@ -6133,8 +6128,8 @@ namespace {
         }
       }
 
-      auto fieldType = decl->getType();
-      ImportedType importedType = findOptionSetType(fieldType, Impl);
+      auto fieldType = desugarIfElaborated(decl->getType());
+      ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
         importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
@@ -7098,8 +7093,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       getAccessorPropertyType(getter, false, getterName.getSelfIndex());
   if (propertyType.isNull())
     return nullptr;
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(propertyType))
-    propertyType = elaborated->desugar();
+  propertyType = desugarIfElaborated(propertyType);
 
   // If there is a setter, check that the property it implies
   // matches that of the getter.
@@ -7125,24 +7119,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (dc->isTypeContext() && !getterName.getSelfIndex())
     isStatic = true;
 
-  ImportedType importedType;
-
-  // Sometimes we import unavailable typedefs as enums. If that's the case,
-  // use the enum, not the typedef here.
-  if (auto typedefType = dyn_cast<clang::TypedefType>(propertyType.getTypePtr())) {
-    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
+  ImportedType importedType = importer::findOptionSetEnum(propertyType, Impl);
 
   if (!importedType) {
     // Compute the property type.
