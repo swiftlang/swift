@@ -30,16 +30,8 @@ extension Box {
   public func shape() -> String { return "round"}
 }
 
-@available(
-  OSX 10.7,
-  iOS 7.0,
-  *,
-)
-@_originallyDefinedIn(
-  module: "HighLevel",
-  OSX 10.9,
-  iOS 13.0,
-)
+@available(OSX 10.7, iOS 7.0, *)
+@_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0)
 public struct Candy {
   public var kind = "candy"
   public init() {}

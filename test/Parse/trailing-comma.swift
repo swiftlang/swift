@@ -9,6 +9,10 @@ let values: [Int,] = [] // expected-note {{to match this opening '['}} expected-
 // Tuple and Tuple Pattern
 
 let _ = (a: 1, b: 2, c: 3,)
+let _: (a: Int, b: Int, c: Int,) = (a: 1, b: 2, c: 3,)
+
+// Closures
+let _: (String, Int, Float,) -> Void
 
 let (_, _,) = (0,1,)
 
@@ -34,7 +38,7 @@ struct S<T1, T2,> { }
 
 func foo<T1, T2,>() { }
 
-protocol P<T1, T2> {
+protocol P<T1, T2,> {
     associatedtype T1
     associatedtype T2
 }
@@ -66,20 +70,20 @@ struct S {
 
 if #unavailable(iOS 15, watchOS 9,) { }
 
-if #available(iOS 15,) { }
+if #available(iOS 15,) { }  // expected-error {{expected platform name}}
 
 // Built-in Attributes
 
-@attached(extension, conformances: OptionSet,)
+@attached(extension, conformances: OptionSet,)  // expected-error {{unexpected ',' separator}}
 macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
 
 @inline(never,) // expected-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
 func foo() { }
 
-@available(iOS 15,)
+@available(iOS 15,) // expected-error {{expected platform name}} expected-error {{expected declaration}} 
 func foo() { }
 
-@backDeployed(before: SwiftStdlib 6.0,)
+@backDeployed(before: SwiftStdlib 6.0,) // expected-error {{unexpected ',' separator}}
 func foo() { }
 
 struct Foo {
@@ -88,7 +92,7 @@ struct Foo {
   var y: Int
   
   var value: (Int, Int) {
-    @storageRestrictions(initializes: x, y,)
+    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in '@storageRestrictions' list}}
     init(initialValue) {
       self.x = initialValue.0
       self.y = initialValue.1
@@ -98,7 +102,7 @@ struct Foo {
 
 }
 
-func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}} 
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{unexpected ',' separator}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}} 
 
 @derivative(of: Self.other,) // expected-error {{unexpected ',' separator}}
 func foo() {}
@@ -136,3 +140,11 @@ if true, { } // expected-error {{expected '{' after 'if' condition}}
 guard true, else { } // expected-error {{expected expression in conditional}} 
 
 while true, { } // expected-error {{expected '{' after 'while' condition}} 
+
+if #available(OSX 51,) { // expected-error {{expected platform name}}
+}
+
+@available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}}
+@_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-error {{unexpected ',' separator}}
+@backDeployed(before: OSX 10.9,) // expected-error {{expected version number in '@backDeployed' attribute}}
+public struct StructWithAvailability {}

@@ -6,18 +6,8 @@
 @available(*, noasync)
 func basicNoAsync() { }
 
-@available(*, noasync,)
-func basicNoAsync2() { }
-
 @available(*, noasync, message: "a message from the author")
 func messageNoAsync() { }
-
-@available(
-    *, 
-    noasync, 
-    message: "a message from the author",
-)
-func messageNoAsync2() { }
 
 @available(*, noasync, renamed: "asyncReplacement()")
 func renamedNoAsync(_ completion: @escaping (Int) -> Void) -> Void { }

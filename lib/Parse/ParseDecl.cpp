@@ -535,11 +535,6 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     // Parse the trailing comma
     if (consumeIf(tok::comma)) {
       HasUpcomingEntry = true;
-
-      // If this is a trailing comma then there are no more entries
-      if (Tok.is(tok::r_paren)) {
-        break;
-      }
     } else {
       HasUpcomingEntry = false;
     }
@@ -1013,11 +1008,6 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
       // Parse the comma, if the list continues.
       hasNextProperty = consumeIf(tok::comma);
-      
-      // If this was a trailing comma, the list is complete.
-      if (Tok.is(tok::r_paren)) {
-        break;
-      }
     } while (hasNextProperty);
 
     return status;
@@ -2025,7 +2015,7 @@ bool Parser::parseBackDeployedAttribute(DeclAttributes &Attributes,
       do {
         Result = parseListItem(
             Status, tok::r_paren, LeftLoc, RightLoc,
-            /*AllowSepAfterLast=*/true, [&]() -> ParserStatus {
+            /*AllowSepAfterLast=*/false, [&]() -> ParserStatus {
               return parsePlatformVersionInList(AtAttrName, PlatformAndVersions,
                                                 ParsedUnrecognizedPlatformName);
             });
@@ -2267,7 +2257,7 @@ Parser::parseMacroRoleAttribute(
   SmallVector<Expr *, 2> conformances;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
-      /*AllowSepAfterLast=*/true, diag::expected_rparen_expr_list, [&] {
+      /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
         ParserStatus status;
 
         if (consumeIf(tok::code_complete)) {
@@ -3256,7 +3246,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     bool SuppressLaterDiags = false;
     bool ParsedUnrecognizedPlatformName = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc,
-                  /*AllowSepAfterLast=*/true,
+                  /*AllowSepAfterLast=*/false,
                   diag::originally_defined_in_missing_rparen,
                   [&]() -> ParserStatus {
       SWIFT_DEFER {
@@ -4989,7 +4979,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   SourceLoc rParenLoc;
   bool foundParamId = false;
   status = parseList(
-      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/true,
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
         ParserStatus listStatus;
         foundParamId = true;
