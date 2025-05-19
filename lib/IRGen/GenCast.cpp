@@ -1032,7 +1032,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   }
 
   if (llvm::Value *fastResult = emitFastClassCastIfPossible(
-          IGF, instance, sourceFormalType, targetFormalType,
+          IGF, instance, sourceFormalType, targetFormalType, mode,
           sourceWrappedInOptional, nilCheckBB, nilMergeBB)) {
     Explosion fastExplosion;
     fastExplosion.add(fastResult);
@@ -1054,7 +1054,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 /// not required that the metadata is fully initialized.
 llvm::Value *irgen::emitFastClassCastIfPossible(
     IRGenFunction &IGF, llvm::Value *instance, CanType sourceFormalType,
-    CanType targetFormalType, bool sourceWrappedInOptional,
+    CanType targetFormalType, CheckedCastMode mode, bool sourceWrappedInOptional,
     llvm::BasicBlock *&nilCheckBB, llvm::BasicBlock *&nilMergeBB) {
   if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(),
                                          sourceFormalType, targetFormalType)) {
@@ -1089,15 +1089,18 @@ llvm::Value *irgen::emitFastClassCastIfPossible(
 
   // If the source was originally wrapped in an Optional, check it for nil now.
   if (sourceWrappedInOptional) {
-    auto isNotNil = IGF.Builder.CreateICmpNE(
+    auto isNil = IGF.Builder.CreateICmpEQ(
         instance, llvm::ConstantPointerNull::get(
                       cast<llvm::PointerType>(instance->getType())));
-    auto *isNotNilContBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-    nilMergeBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-    nilCheckBB = IGF.Builder.GetInsertBlock();
-    IGF.Builder.CreateCondBr(isNotNil, isNotNilContBB, nilMergeBB);
-
-    IGF.Builder.emitBlock(isNotNilContBB);
+    if (mode == CheckedCastMode::Unconditional) {
+      IGF.emitConditionalTrap(isNil, "Unexpectedly found nil while unwrapping an Optional value");
+    } else {
+      auto *isNotNilContBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      nilMergeBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      nilCheckBB = IGF.Builder.GetInsertBlock();
+      IGF.Builder.CreateCondBr(isNil, nilMergeBB, isNotNilContBB);
+      IGF.Builder.emitBlock(isNotNilContBB);
+    }
   }
 
   // Get the metadata pointer of the destination class type.
@@ -1121,11 +1124,15 @@ llvm::Value *irgen::emitFastClassCastIfPossible(
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
   
   // return isa_ptr == metadata_ptr ? instance : nullptr
-  llvm::Value *isEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ,
+  llvm::Value *isNotEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE,
                                               lhs, rhs);
+  if (mode == CheckedCastMode::Unconditional) {
+    IGF.emitConditionalTrap(isNotEqual, "Unconditional cast failed");
+    return instance;
+  }
   auto *instanceTy = cast<llvm::PointerType>(instance->getType());
   auto *nullPtr = llvm::ConstantPointerNull::get(instanceTy);
-  auto *select = IGF.Builder.CreateSelect(isEqual, instance, nullPtr);
+  auto *select = IGF.Builder.CreateSelect(isNotEqual, nullPtr, instance);
   llvm::Type *destTy = IGF.getTypeInfoForUnlowered(targetFormalType).getStorageType();
   return IGF.Builder.CreateBitCast(select, destTy);
 }
