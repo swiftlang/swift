@@ -63,9 +63,9 @@ MutableTerm TypeDifference::getReplacementSubstitution(unsigned index) const {
 }
 
 void TypeDifference::dump(llvm::raw_ostream &out) const {
-  llvm::errs() << "Base term: " << BaseTerm << "\n";
-  llvm::errs() << "LHS: " << LHS << "\n";
-  llvm::errs() << "RHS: " << RHS << "\n";
+  out << "Base term: " << BaseTerm << "\n";
+  out << "LHS: " << LHS << "\n";
+  out << "RHS: " << RHS << "\n";
 
   for (const auto &pair : SameTypes) {
     out << "- " << getOriginalSubstitution(pair.first) << " (#";
