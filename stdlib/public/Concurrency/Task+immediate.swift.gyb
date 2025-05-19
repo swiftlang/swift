@@ -66,6 +66,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ///   - operation: the operation to be run immediately upon entering the task.
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   @discardableResult
   public static func immediate(
     name: String? = nil,
@@ -188,6 +189,7 @@ extension ${GROUP_TYPE} {
   /// is semantically equivalent to its basic version which can be
   /// created using ``${GROUP_TYPE}/addTask``.
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public func ${METHOD_NAME}( // in ${GROUP_TYPE}
     name: String? = nil,
     priority: TaskPriority? = nil,
@@ -275,5 +277,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 @_silgen_name("swift_task_startOnMainActor")
 internal func _startTaskOnMainActor(_ task: Builtin.NativeObject)
 
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_immediate")
+@usableFromInline
 internal func _startTaskImmediately(_ task: Builtin.NativeObject, targetExecutor: Builtin.Executor?)
