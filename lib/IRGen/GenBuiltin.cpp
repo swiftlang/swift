@@ -1353,7 +1353,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     }
     return;
   }
-  
+
+  if (Builtin.ID == BuiltinValueKind::PrepareInitialization) {
+    ASSERT(args.size() > 0 && "only address-variant of prepareInitialization is supported");
+    (void)args.claimNext();
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
     (void)args.claimAll();
     Type valueTy = substitutions.getReplacementTypes()[0];
