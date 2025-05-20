@@ -14,3 +14,7 @@ module SizedByNoEscapeClang {
     header "sized-by-noescape.h"
     export *
 }
+module CommentsClang {
+    header "comments.h"
+    export *
+}

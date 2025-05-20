@@ -1550,6 +1550,7 @@ public struct SwiftifyImportMacro: PeerMacro {
             + availabilityAttr
             + lifetimeAttrs
             + disfavoredOverload)
+        .with(\.leadingTrivia, node.leadingTrivia + .docLineComment("/// This is an auto-generated wrapper for safer interop\n"))
       return [DeclSyntax(newFunc)]
     } catch let error as DiagnosticError {
       context.diagnose(
