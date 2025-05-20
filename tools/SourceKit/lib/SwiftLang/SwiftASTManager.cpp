@@ -564,12 +564,11 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftStatistics> Stats,
       std::shared_ptr<RequestTracker> ReqTracker,
       std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
-      StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
+      StringRef RuntimeResourcePath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
         ReqTracker(ReqTracker), Plugins(Plugins),
         SwiftExecutablePath(SwiftExecutablePath),
         RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
 
@@ -582,7 +581,6 @@ struct SwiftASTManager::Implementation {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
-  std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
@@ -668,10 +666,9 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftStatistics> Stats,
     std::shared_ptr<RequestTracker> ReqTracker,
     std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
-    StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
+    StringRef RuntimeResourcePath)
     : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker, Plugins,
-                               SwiftExecutablePath, RuntimeResourcePath,
-                               DiagnosticDocumentationPath)) {}
+                               SwiftExecutablePath, RuntimeResourcePath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -710,8 +707,8 @@ bool SwiftASTManager::initCompilerInvocation(
     std::string &Error) {
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Action, Diags, UnresolvedPrimaryFile, FileSystem,
-      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath,
-      Impl.DiagnosticDocumentationPath, Impl.SessionTimestamp, Error);
+      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath, Impl.SessionTimestamp,
+      Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(

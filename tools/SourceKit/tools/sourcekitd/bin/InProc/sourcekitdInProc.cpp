@@ -98,13 +98,6 @@ std::string sourcekitdInProc::getSwiftExecutablePath() {
   return path.str().str();
 }
 
-std::string sourcekitdInProc::getDiagnosticDocumentationPath() {
-  llvm::SmallString<128> docPath;
-  getToolchainPrefixPath(docPath);
-  llvm::sys::path::append(docPath, "share", "doc", "swift", "diagnostics");
-  return docPath.str().str();
-}
-
 static std::vector<std::string> registeredPlugins;
 
 void sourcekitd_load_client_plugins(void) {
@@ -117,10 +110,9 @@ void sourcekitd_initialize(void) {
                                    "sourcekitdInProc.msgHandlingQueue");
   if (sourcekitd::initializeClient()) {
     LOG_INFO_FUNC(High, "initializing");
-    sourcekitd::initializeService(
-        sourcekitdInProc::getSwiftExecutablePath(),
-        sourcekitdInProc::getRuntimeLibPath(),
-        sourcekitdInProc::getDiagnosticDocumentationPath(), postNotification);
+    sourcekitd::initializeService(sourcekitdInProc::getSwiftExecutablePath(),
+                                  sourcekitdInProc::getRuntimeLibPath(),
+                                  postNotification);
     static std::once_flag flag;
     std::call_once(flag, [] {
       sourcekitd::PluginInitParams pluginParams(
