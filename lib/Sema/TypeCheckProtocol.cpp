@@ -6675,6 +6675,49 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     }
   }
 
+  // If we are migrating to InferIsolatedConformances, and the
+  // nominal type is global-actor-isolated, look for conformances
+  // that are nonisolated but were not explicitly marked as such.
+  // These conformances will need to be marked 'nonisolated' to
+  // retain their current behavior.
+  if (Context.LangOpts
+          .getFeatureState(Feature::InferIsolatedConformances)
+            .isEnabledForMigration() &&
+      getActorIsolation(const_cast<NominalTypeDecl *>(nominal))
+          .isGlobalActor()) {
+    for (auto conformance : conformances) {
+      auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+      if (!normal)
+        continue;
+
+      // Explicit nonisolated and @preconcurrency suppress this.
+      auto options = normal->getOptions();
+      if (options.contains(ProtocolConformanceFlags::Nonisolated) ||
+          options.contains(ProtocolConformanceFlags::Preconcurrency))
+        continue;
+
+      // Only consider conformances that were explicitly written in the source.
+      if (normal->getSourceKind() != ConformanceEntryKind::Explicit)
+        continue;
+
+      // Only consider conformances to non-marker, nonisolated protocols.
+      auto proto = normal->getProtocol();
+      if (proto->isMarkerProtocol() || getActorIsolation(proto).isActorIsolated())
+        continue;
+
+      // Only nonisolated conformances can be affected.
+      if (!conformance->getIsolation().isNonisolated())
+        continue;
+
+      auto nameLoc = normal->getProtocolNameLoc();
+      if (nameLoc.isValid()) {
+        Context.Diags.diagnose(
+            nameLoc, diag::isolated_conformance_will_become_nonisolated, nominal, proto)
+          .fixItInsert(nameLoc, "nonisolated ");
+      }
+    }
+  }
+
   if (Context.TypeCheckerOpts.DebugGenericSignatures &&
       !conformances.empty()) {
     // Now that they're filled out, print out information about the conformances
