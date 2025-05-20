@@ -17,7 +17,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // test disabled until rdar://151476435 is fixed
-// REQUIRES: rdar://151476435
+// REQUIRES: rdar151476435
 
 import Swift
 import layout_string_witnesses_types
