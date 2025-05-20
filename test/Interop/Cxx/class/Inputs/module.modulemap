@@ -152,3 +152,9 @@ module PIMPL {
   requires cplusplus
   export *
 }
+
+module SimpleStructs {
+  header "simple-structs.h"
+  requires cplusplus
+  export *
+}
