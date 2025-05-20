@@ -9408,6 +9408,8 @@ void ClangImporter::Implementation::addOptionSetTypealiases(
                           selfType);
 }
 
+#define SIW_DBG(x) DEBUG_WITH_TYPE("safe-interop-wrappers", llvm::dbgs() << x)
+
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
@@ -9415,6 +9417,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)
     return;
+  SIW_DBG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
 
   // FIXME: for private macro generated functions we do not serialize the
   // SILFunction's body anywhere triggering assertions.
@@ -9470,11 +9473,13 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
     if (SwiftifiableCAT(getClangASTContext(), CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
+      SIW_DBG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
     bool returnHasLifetimeInfo = false;
     if (SwiftDeclConverter::getImplicitObjectParamAnnotation<
             clang::LifetimeBoundAttr>(ClangDecl)) {
+      SIW_DBG("  Found lifetimebound attribute on implicit 'this'\n");
       printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
                                        true);
       returnHasLifetimeInfo = true;
@@ -9487,6 +9492,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
       if (SwiftifiableCAT(getClangASTContext(), CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, index);
+        SIW_DBG("  Found bounds info '" << clangParamTy
+                << "' on parameter '" << *clangParam << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan = registerStdSpanTypeMapping(
@@ -9495,10 +9502,13 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
 
       bool paramHasLifetimeInfo = false;
       if (clangParam->hasAttr<clang::NoEscapeAttr>()) {
+        SIW_DBG("  Found noescape attribute on parameter '" << *clangParam << "'\n");
         printer.printNonEscaping(index);
         paramHasLifetimeInfo = true;
       }
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
+        SIW_DBG("  Found lifetimebound attribute on parameter '"
+                        << *clangParam << "'\n");
         // If this parameter has bounds info we will tranform it into a Span,
         // so then it will no longer be Escapable.
         bool willBeEscapable = swiftParamTy->isEscapable() && !paramHasBoundsInfo;
@@ -9506,17 +9516,23 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
         paramHasLifetimeInfo = true;
         returnHasLifetimeInfo = true;
       }
-      if (paramIsStdSpan && paramHasLifetimeInfo)
+      if (paramIsStdSpan && paramHasLifetimeInfo) {
+        SIW_DBG("  Found both std::span and lifetime info "
+                        "for parameter '" << *clangParam << "'\n");
         attachMacro = true;
+      }
     }
-    if (returnIsStdSpan && returnHasLifetimeInfo)
+    if (returnIsStdSpan && returnHasLifetimeInfo) {
+      SIW_DBG("  Found both std::span and lifetime info for return value\n");
       attachMacro = true;
+    }
     printer.printAvailability();
     printer.printTypeMapping(typeMapping);
 
   }
 
   if (attachMacro) {
+    SIW_DBG("Attaching safe interop macro: " << MacroString << "\n");
     if (clang::RawComment *raw =
             getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
       // swift::RawDocCommentAttr doesn't contain its text directly, but instead
@@ -9536,6 +9552,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     }
   }
 }
+#undef SIW_DBG
 
 static bool isUsingMacroName(clang::SourceManager &SM,
                              clang::SourceLocation loc,
