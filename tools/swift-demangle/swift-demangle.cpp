@@ -22,6 +22,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
 // For std::rand, to work around a bug if main()'s first function call passes
@@ -78,6 +79,10 @@ static llvm::cl::opt<bool>
 Classify("classify",
            llvm::cl::desc("Display symbol classification characters"));
 
+static llvm::cl::opt<bool>
+    Ranges("ranges",
+           llvm::cl::desc("Display symbol ranges in the demangled string"));
+
 /// Options that are primarily used for testing.
 /// \{
 static llvm::cl::opt<bool> DisplayLocalNameContexts(
@@ -120,6 +125,79 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
                                    llvm::StringRef part) {
   return whole.substr((part.data() - whole.data()) + part.size());
 }
+
+class TrackingNodePrinter : public NodePrinter {
+public:
+  TrackingNodePrinter(DemangleOptions options) : NodePrinter(options) {}
+  bool hasBasename() { return basenameRange.first < basenameRange.second; }
+  bool hasParameters() {
+    return parametersRange.first < parametersRange.second;
+  }
+  std::pair<size_t, size_t> getBasenameRange() { return basenameRange; }
+  std::pair<size_t, size_t> getParametersRange() { return parametersRange; }
+
+private:
+  std::pair<size_t, size_t> basenameRange;
+  std::pair<size_t, size_t> parametersRange;
+  std::optional<unsigned> parametersDepth;
+
+  void startName() {
+    if (!hasBasename())
+      basenameRange.first = getStreamLength();
+  }
+
+  void endName() {
+    if (!hasBasename())
+      basenameRange.second = getStreamLength();
+  }
+
+  void startParameters(unsigned depth) {
+    if (parametersDepth || !hasBasename() || hasParameters()) {
+      return;
+    }
+    parametersRange.first = getStreamLength();
+    parametersDepth = depth;
+  }
+
+  void endParameters(unsigned depth) {
+    if (!parametersDepth || *parametersDepth != depth || hasParameters()) {
+      return;
+    }
+    parametersRange.second = getStreamLength();
+  }
+
+  bool shouldTrackNameRange(NodePointer Node) const {
+    switch (Node->getKind()) {
+    case Node::Kind::Function:
+    case Node::Kind::Constructor:
+    case Node::Kind::Allocator:
+    case Node::Kind::ExplicitClosure:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  void printFunctionName(bool hasName, llvm::StringRef &OverwriteName,
+                         llvm::StringRef &ExtraName, bool MultiWordName,
+                         int &ExtraIndex, NodePointer Entity,
+                         unsigned int depth) override {
+    if (shouldTrackNameRange(Entity))
+      startName();
+    NodePrinter::printFunctionName(hasName, OverwriteName, ExtraName,
+                                   MultiWordName, ExtraIndex, Entity, depth);
+    if (shouldTrackNameRange(Entity))
+      endName();
+  }
+
+  void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
+                               unsigned depth, bool showTypes) override {
+    startParameters(depth);
+    NodePrinter::printFunctionParameters(LabelList, ParameterType, depth,
+                                         showTypes);
+    endParameters(depth);
+  }
+};
 
 static void stripSpecialization(NodePointer Node) {
   if (Node->getKind() != Node::Kind::Global)
@@ -250,7 +328,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       os << remangled;
       return;
     }
-    std::string string = swift::Demangle::nodeToString(pointer, options);
+    TrackingNodePrinter printer(options);
+    std::string string =
+        swift::Demangle::nodeToString(pointer, options, &printer);
     if (!CompactMode)
       os << name << " ---> ";
 
@@ -275,6 +355,19 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         os << '{' << Classifications << "} ";
     }
     os << (string.empty() ? name : llvm::StringRef(string));
+
+    if (!string.empty() && Ranges &&
+        (printer.hasBasename() || printer.hasParameters())) {
+      os << " | {(";
+      if (printer.hasBasename())
+        os << printer.getBasenameRange().first << ","
+           << printer.getBasenameRange().second;
+      os << ") - (";
+      if (printer.hasParameters())
+        os << printer.getParametersRange().first << ","
+           << printer.getParametersRange().second;
+      os << ")}";
+    }
   }
   DCtx.clear();
 }
