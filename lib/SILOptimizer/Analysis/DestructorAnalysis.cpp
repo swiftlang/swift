@@ -9,6 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// TODO: This pass is about to be removed because TypeLowering's CustomDeinit
+// property is superior.
+//===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
