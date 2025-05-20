@@ -2416,7 +2416,8 @@ public:
 
         // If strict memory safety checking is enabled, check the storage
         // of the nominal type.
-        if (Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+        if (Ctx.LangOpts.hasFeature(
+                Feature::StrictMemorySafety, /*allowMigration=*/true) &&
             !isa<ProtocolDecl>(nominal)) {
           checkUnsafeStorage(nominal);
         }
