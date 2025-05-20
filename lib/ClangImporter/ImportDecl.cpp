@@ -9282,10 +9282,28 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       attachMacro = true;
     printer.printAvailability();
     printer.printTypeMapping(typeMapping);
+
   }
 
-  if (attachMacro)
-    importNontrivialAttribute(MappedDecl, MacroString);
+  if (attachMacro) {
+    if (clang::RawComment *raw =
+            getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+      // swift::RawDocCommentAttr doesn't contain its text directly, but instead
+      // references the source range of the parsed comment. Instead of creating
+      // a new source file just to parse the doc comment, we can add the
+      // comment to the macro invocation attribute, which the macro has access
+      // to. Waiting until we know that the macro will be attached before
+      // emitting the comment to the string, despite the comment occurring
+      // first, avoids copying a bunch of potentially long comments for nodes
+      // that don't end up with wrappers.
+      auto commentString =
+          raw->getRawText(getClangASTContext().getSourceManager());
+      importNontrivialAttribute(MappedDecl,
+                                (commentString + "\n" + MacroString).str());
+    } else {
+      importNontrivialAttribute(MappedDecl, MacroString);
+    }
+  }
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
