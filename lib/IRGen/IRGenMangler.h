@@ -35,7 +35,18 @@ struct SymbolicMangling {
   std::string String;
   std::vector<std::pair<Mangle::ASTMangler::SymbolicReferent, unsigned>>
     SymbolicReferences;
-  
+  ClassDecl *ObjCClassRef;
+
+  SymbolicMangling(
+      std::string String,
+      std::vector<std::pair<Mangle::ASTMangler::SymbolicReferent, unsigned>>
+          SymbolicReferences,
+      ClassDecl *ObjCClassRef)
+      : String(String), SymbolicReferences(SymbolicReferences),
+        ObjCClassRef(ObjCClassRef) {}
+
+  SymbolicMangling() : SymbolicMangling("", {}, nullptr) {}
+
   unsigned runtimeSizeInBytes() const {
     return String.size();
   }
