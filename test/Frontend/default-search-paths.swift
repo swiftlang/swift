@@ -35,7 +35,7 @@
 // APPLE-NOSTDLIBIMPORT-NEXT: [0] BUILD_DIR/lib/swift/macosx
 // APPLE-NOSTDLIBIMPORT-NEXT: (End of search path lists.)
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -target x86_64-unknown-linux-android -nostdlibimport -parse %s -Rmodule-loading 2>&1 | %FileCheck -check-prefix=ANDROID-NOSTDLIBIMPORT %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -target x86_64-unknown-linux-android -nostdlibimport -parse -parse-stdlib %s -Rmodule-loading 2>&1 | %FileCheck -check-prefix=ANDROID-NOSTDLIBIMPORT %s
 // ANDROID-NOSTDLIBIMPORT: Implicit framework search paths:
 // ANDROID-NOSTDLIBIMPORT-NEXT: Runtime library import search paths:
 // ANDROID-NOSTDLIBIMPORT-NEXT: [0] BUILD_DIR/lib/swift/android

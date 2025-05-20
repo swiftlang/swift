@@ -928,9 +928,9 @@ function(_compile_swift_files
   endif()
 
   set(custom_env "PYTHONIOENCODING=UTF8")
-  if(SWIFTFILE_IS_STDLIB OR
+  if(SWIFT_INCLUDE_TOOLS AND (SWIFTFILE_IS_STDLIB OR
      # Linux "hosttools" build require builder's runtime before building the runtime.
-     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD"))
   )
     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
     if(bs_lib_dir)
