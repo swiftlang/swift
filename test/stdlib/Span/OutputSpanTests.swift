@@ -433,3 +433,20 @@ suite.test("InlineArray consumed")
   let i = a.indices.randomElement()!
   expectEqual(b[i], a[i])
 }
+
+suite.test("Array initialization")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let requested = 32
+  let actual = requested/2
+
+  let array: [UInt8] = Array(capacity: requested, initializingWith: { output in
+    for i in 0..<actual {
+      output.append(UInt8(clamping: UInt8(i)))
+    }
+  })
+  expectEqual(array.count, actual)
+  expectEqual(array.elementsEqual(0..<UInt8(actual)), true)
+  expectGE(array.capacity, requested)
+}
