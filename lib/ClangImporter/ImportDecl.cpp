@@ -8707,10 +8707,8 @@ bool importer::hasSameUnderlyingType(const clang::Type *a,
 }
 
 SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
-    ModuleDecl &module,
-    StringRef attributeText,
-    bool cached
-) {
+    ModuleDecl &module, SourceRange originalRange, StringRef attributeText,
+    bool cached) {
   ::TinyPtrVector<SourceFile *> *sourceFiles = nullptr;
   if (cached) {
     sourceFiles = &ClangSwiftAttrSourceFiles[attributeText];
@@ -8730,13 +8728,12 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   // Note that this is for an attribute.
   sourceMgr.setGeneratedSourceInfo(
       bufferID,
-      {
-        GeneratedSourceInfo::AttributeFromClang,
-        CharSourceRange(),
-        sourceMgr.getRangeForBuffer(bufferID),
-        &module
-      }
-  );
+      {GeneratedSourceInfo::AttributeFromClang,
+       // Below relies on originalRange residing in the same SourceManager
+       // as SwiftContext.SourceMgr, which is guaranteed via the initialization
+       // of ClangSourceBufferImporter and ClangImporter::Implementation.
+       Lexer::getCharSourceRangeFromSourceRange(sourceMgr, originalRange),
+       sourceMgr.getRangeForBuffer(bufferID), &module});
 
   // Create the source file.
   auto sourceFile = new (SwiftContext)
@@ -8761,10 +8758,12 @@ bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
 void ClangImporter::Implementation::importNontrivialAttribute(
     Decl *MappedDecl, llvm::StringRef AttrString) {
   bool cached = true;
+  auto SR = MappedDecl->getSourceRange();
   while (true) {
     // Dig out a source file we can use for parsing.
     auto &sourceFile = getClangSwiftAttrSourceFile(
-        *MappedDecl->getDeclContext()->getParentModule(), AttrString, cached);
+        *MappedDecl->getDeclContext()->getParentModule(), SR, AttrString,
+        cached);
 
     auto topLevelDecls = sourceFile.getTopLevelDecls();
 
