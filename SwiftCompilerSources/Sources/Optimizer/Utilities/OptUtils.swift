@@ -45,6 +45,13 @@ extension Value {
     }
   }
 
+  var lookThroughTruncOrBitCast: Value {
+    if let truncOrBitCast = self as? BuiltinInst, truncOrBitCast.id == .TruncOrBitCast {
+      return truncOrBitCast.arguments[0]
+    }
+    return self
+  }
+
   func isInLexicalLiverange(_ context: some Context) -> Bool {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
