@@ -253,11 +253,11 @@ ImportedType importer::findOptionSetEnum(clang::QualType type,
   if (!typedefType || !Impl.isUnavailableInSwift(typedefType->getDecl()))
     // If this isn't a typedef, or it is a typedef that is available in Swift,
     // then this definitely isn't used for {CF,NS}_OPTIONS.
-    return {};
+    return ImportedType();
 
   auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType);
   if (!clangEnum)
-    return {};
+    return ImportedType();
 
   // If this fails, it means that we need a stronger predicate for
   // determining the relationship between an enum and typedef.
@@ -267,7 +267,7 @@ ImportedType importer::findOptionSetEnum(clang::QualType type,
   if (auto *swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion))
     return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
 
-  return {};
+  return ImportedType();
 }
 
 /// Determine the prefix to be stripped from the names of the enum constants
