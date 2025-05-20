@@ -88,3 +88,6 @@ typealias Bar2<
   T2,
   Bool,
 >
+
+let _ = Foo2<Int, Bool, String,>.self
+let _ = Bar2<Int, Bool,>()

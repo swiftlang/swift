@@ -102,7 +102,7 @@ struct Foo {
 
 }
 
-func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{unexpected ',' separator}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}} 
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}}
 
 @derivative(of: Self.other,) // expected-error {{unexpected ',' separator}}
 func foo() {}
@@ -144,7 +144,7 @@ while true, { } // expected-error {{expected '{' after 'while' condition}}
 if #available(OSX 51,) { // expected-error {{expected platform name}}
 }
 
-@available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}}
+@available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}} expected-error {{expected declaration}}
 @_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-error {{unexpected ',' separator}}
-@backDeployed(before: OSX 10.9,) // expected-error {{expected version number in '@backDeployed' attribute}}
+@backDeployed(before: OSX 10.9,) // expected-error {{unexpected ',' separator}}
 public struct StructWithAvailability {}
