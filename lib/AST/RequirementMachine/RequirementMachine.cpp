@@ -231,19 +231,22 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
     break;
 
   case CompletionResult::MaxRuleCount:
-    llvm::errs() << "Rewrite system exceeded maximum rule count\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded maximum rule count\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxRuleLength:
-    llvm::errs() << "Rewrite system exceeded rule length limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded rule length limit\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxConcreteNesting:
-    llvm::errs() << "Rewrite system exceeded concrete type nesting depth limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type nesting depth limit\n";
+      dump(out);
+    });
   }
 }
 

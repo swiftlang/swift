@@ -291,9 +291,10 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
 
   // Everything else should be a type parameter.
   if (!type->isTypeParameter()) {
-    llvm::errs() << "Unhandled type:\n";
-    type->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Unhandled type:\n";
+      type->dump(out);
+    });
   }
 
   if (!type->getRootGenericParam()->isEqual(origParam)) {

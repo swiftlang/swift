@@ -72,7 +72,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
 void ASTScopeImpl::abortWithVerificationError(
     llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const {
-  abortWithPrettyStackTraceMessage([&](auto &out) {
+  ABORT([&](auto &out) {
     out << "ASTScopeImpl verification error in source file '"
         << getSourceFile()->getFilename() << "':\n";
     messageFn(out);
