@@ -5818,8 +5818,13 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
             isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
             isa<ConstructorDecl>(value)) {
-          return {
-              {{ActorIsolation::forGlobalActor(globalActor), {}}, nullptr, {}}};
+          // Preconcurrency here is used to stage the diagnostics
+          // when users select `@MainActor` default isolation with
+          // non-strict concurrency modes (pre Swift 6).
+          auto isolation =
+              ActorIsolation::forGlobalActor(globalActor)
+                  .withPreconcurrency(!ctx.LangOpts.isSwiftVersionAtLeast(6));
+          return {{{isolation, {}}, nullptr, {}}};
         }
       }
 
