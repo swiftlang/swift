@@ -259,8 +259,8 @@ if(NOT LINUX AND NOT ANDROID)
 endif()
 
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
-  target_sources(swiftCore PRIVATE CommandLine.swift)
-  target_link_libraries(swiftCore PRIVATE swiftCommandLineSupport)
+  target_sources(swiftCore PRIVATE
+    CommandLine.swift)
 endif()
 
 if(SwiftCore_ENABLE_VECTOR_TYPES)
