@@ -11,7 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
+#include "../../IRGen/IRGenModule.h"
+#include "swift/AST/SemanticAttrs.h"
+#include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -21,11 +27,6 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
-#include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
-#include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
-#include "swift/SIL/SILCloner.h"
-#include "../../IRGen/IRGenModule.h"
 
 using namespace swift;
 
@@ -62,6 +63,10 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
 
   if (DisableSwiftVerification)
     return;
+
+  if (f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
 
   getSwiftPassInvocation()->beginVerifyFunction(f);
   verifyFunctionFunction({getSwiftPassInvocation()}, {f});
