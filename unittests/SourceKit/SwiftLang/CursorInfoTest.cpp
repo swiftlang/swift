@@ -68,12 +68,11 @@ public:
   }
 
   CursorInfoTest()
-      : Ctx(*new SourceKit::Context(getSwiftExecutablePath(),
-                                    getRuntimeLibPath(),
-                                    /*diagnosticDocumentationPath*/ "",
-                                    SourceKit::createSwiftLangSupport,
-                                    [](SourceKit::Context &Ctx){ return nullptr; },
-                                    /*dispatchOnMain=*/false)) {
+      : Ctx(*new SourceKit::Context(
+            getSwiftExecutablePath(), getRuntimeLibPath(),
+            SourceKit::createSwiftLangSupport,
+            [](SourceKit::Context &Ctx) { return nullptr; },
+            /*dispatchOnMain=*/false)) {
     INITIALIZE_LLVM();
     // This is avoiding destroying \p SourceKit::Context because another
     // thread may be active trying to use it to post notifications.
