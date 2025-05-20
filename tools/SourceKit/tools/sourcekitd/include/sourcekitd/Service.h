@@ -27,11 +27,9 @@ using SourceKit::SourceKitCancellationToken;
 /// \param swiftExecutablePath The path of the swift-frontend executable.
 ///                            Used to find clang relative to it.
 /// \param runtimeLibPath The path to the toolchain's library directory.
-/// \param diagnosticDocumentationPath The path to diagnostics documentation.
 /// \param postNotification Callback to post a notification.
 void initializeService(
     llvm::StringRef swiftExecutablePath, llvm::StringRef runtimeLibPath,
-    llvm::StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification);
 /// Shutdown the service.
 void shutdownService();
