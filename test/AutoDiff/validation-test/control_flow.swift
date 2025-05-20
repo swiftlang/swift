@@ -5,9 +5,6 @@
 // iphonesimulator-i386-specific failures.
 // REQUIRES: CPU=x86_64
 
-// rdar://71642726 this test is crashing with optimizations.
-// REQUIRES: swift_test_mode_optimize_none
-
 import _Differentiation
 import StdlibUnittest
 
