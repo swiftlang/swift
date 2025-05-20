@@ -653,16 +653,17 @@ function Invoke-BuildStep {
         $SplatArgs += $Arg
         $i++
       } elseif ($Arg -is [string] -and $Arg.StartsWith('-')) {
-        $paramName = $Arg.TrimStart('-')
+        $ParamName = $Arg.TrimStart('-')
         
         # Check if the next argument is a value for this parameter
-        if ($i -lt $RemainingArgs.Count - 1 -and ($RemainingArgs[$i + 1] -isnot [string] -or !$RemainingArgs[$i + 1].StartsWith('-'))) {
+        $HasNextArg = ($i -lt $RemainingArgs.Count - 1)
+        if ($HasNextArg -and $RemainingArgs[$i + 1] -is [string] -and !$RemainingArgs[$i + 1].StartsWith('-')) {
           # This is a named parameter with a value
-          $SplatArgs[$paramName] = $RemainingArgs[$i + 1]
+          $SplatArgs[$ParamName] = $RemainingArgs[$i + 1]
           $i += 2
         } else {
           # This is a switch parameter (flag)
-          $SplatArgs[$paramName] = $true
+          $SplatArgs[$ParamName] = $true
           $i++
         }
       } else {
@@ -3272,7 +3273,6 @@ function Build-Installer([Hashtable] $Platform) {
     BundleFlavor = "offline";
     ImageRoot = "$(Get-InstallDir $Platform)\";
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
-    INCLUDE_NOASSERTS = $IncludeNoAsserts;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
@@ -3289,6 +3289,7 @@ function Build-Installer([Hashtable] $Platform) {
   $Properties["Platforms"] = "`"windows$(if ($Android) { ";android" })`"";
   $Properties["AndroidArchitectures"] = "`"$(($AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
   $Properties["WindowsArchitectures"] = "`"$(($WindowsSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName }) -Join ";")`""
+  $Properties["ToolchainVariants"] = "`"asserts$(if ($IncludeNoAsserts) { ";noasserts" })`"";
   foreach ($SDKPlatform in $WindowsSDKPlatforms) {
     $Properties["WindowsRuntime$($SDKPlatform.Architecture.ShortName.ToUpperInvariant())"] = [IO.Path]::Combine((Get-InstallDir $SDKPlatform), "Runtimes", "$ProductVersion");
   }
