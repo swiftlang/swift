@@ -15,7 +15,4 @@ int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * __counted_by(l
 
 int * __counted_by(len) _Nullable nullable(int len, int len2, int * __counted_by(len2) __lifetimebound _Nullable p);
 
-typedef struct foo opaque_t;
-opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * __counted_by(len2) __lifetimebound p);
-
 int * __counted_by(len) noncountedLifetime(int len, int * __lifetimebound p);

@@ -22,3 +22,7 @@ module CountedByLifetimeboundClang {
     header "counted-by-lifetimebound.h"
     export *
 }
+module CommentsClang {
+    header "comments.h"
+    export *
+}
