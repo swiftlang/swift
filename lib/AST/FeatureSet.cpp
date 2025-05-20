@@ -615,6 +615,8 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(BuiltinSelect)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

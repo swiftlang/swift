@@ -121,6 +121,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:
+    case BuiltinValueKind::Select:
     case BuiltinValueKind::ShuffleVector:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
