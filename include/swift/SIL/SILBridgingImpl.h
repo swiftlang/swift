@@ -639,6 +639,13 @@ BridgedSourceLoc BridgedLocation::getSourceLocation() const {
   swift::SourceLoc sourceLoc = silLoc.getSourceLoc();
   return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
 }
+bool BridgedLocation::isFilenameAndLocation() const {
+  return getLoc().getLocation().isFilenameAndLocation();
+}
+BridgedLocation::FilenameAndLocation BridgedLocation::getFilenameAndLocation() const {
+  auto fnal = getLoc().getLocation().getFilenameAndLocation();
+  return {BridgedStringRef(fnal->filename), (SwiftInt)fnal->line, (SwiftInt)fnal->column};
+}
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
 }
@@ -1163,12 +1170,9 @@ BridgedFunction BridgedInstruction::FunctionRefBaseInst_getReferencedFunction() 
   return {getAs<swift::FunctionRefBaseInst>()->getInitiallyReferencedFunction()};
 }
 
-BridgedInstruction::OptionalInt BridgedInstruction::IntegerLiteralInst_getValue() const {
+BridgedOptionalInt BridgedInstruction::IntegerLiteralInst_getValue() const {
   llvm::APInt result = getAs<swift::IntegerLiteralInst>()->getValue();
-  if (result.getSignificantBits() <= std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
-    return {(SwiftInt)result.getSExtValue(), true};
-  }
-  return {0, false};
+  return BridgedOptionalInt::getFromAPInt(result);
 }
 
 BridgedStringRef BridgedInstruction::StringLiteralInst_getValue() const {
@@ -1653,19 +1657,6 @@ bool BridgedInstruction::ConvertFunctionInst_withoutActuallyEscaping() const {
 
 BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
   return getAs<swift::TypeValueInst>()->getParamType();
-}
-
-SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
-  auto tvi = getAs<swift::TypeValueInst>();
-
-  // Assume we've already checked that the parameter type is an IntegerType.
-  auto integer = tvi->getParamType()->castTo<swift::IntegerType>();
-
-  if (integer->isNegative()) {
-    return integer->getValue().getSExtValue();
-  } else {
-    return integer->getValue().getZExtValue();
-  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -259,6 +259,8 @@ LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances"
 LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
+LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
+LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -507,6 +509,9 @@ EXPERIMENTAL_FEATURE(CDecl, false)
 
 /// Allow use of `@extensible` on public enums
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
+
+/// Allow use of `Module::name` syntax
+EXPERIMENTAL_FEATURE(ModuleSelector, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

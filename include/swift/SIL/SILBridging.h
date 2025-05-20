@@ -392,6 +392,12 @@ enum class BridgedMemoryBehavior {
 struct BridgedLocation {
   uint64_t storage[3];
 
+  struct FilenameAndLocation {
+    BridgedStringRef path;
+    SwiftInt line;
+    SwiftInt column;
+  };
+
   BRIDGED_INLINE BridgedLocation(const swift::SILDebugLocation &loc);
   BRIDGED_INLINE const swift::SILDebugLocation &getLoc() const;
 
@@ -402,6 +408,8 @@ struct BridgedLocation {
   BRIDGED_INLINE bool isInlined() const;
   BRIDGED_INLINE bool isEqualTo(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
+  BRIDGED_INLINE bool isFilenameAndLocation() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE FilenameAndLocation getFilenameAndLocation() const;
   BRIDGED_INLINE bool hasSameSourceLocation(BridgedLocation rhs) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   static BRIDGED_INLINE BridgedLocation fromNominalTypeDecl(BridgedDeclObj decl);
@@ -691,11 +699,6 @@ struct BridgedInstruction {
     unknown
   };
 
-  struct OptionalInt {
-    SwiftInt value;
-    bool hasValue;
-  };
-
   enum class MarkDependenceKind {
     Unresolved, Escaping, NonEscaping
   };
@@ -736,7 +739,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
-  BRIDGED_INLINE OptionalInt IntegerLiteralInst_getValue() const;
+  BRIDGED_INLINE BridgedOptionalInt IntegerLiteralInst_getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef StringLiteralInst_getValue() const;
   BRIDGED_INLINE int StringLiteralInst_getEncoding() const;
   BRIDGED_INLINE SwiftInt TupleExtractInst_fieldIndex() const;
@@ -854,7 +857,6 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt FullApplySite_numIndirectResultArguments() const;
   BRIDGED_INLINE bool ConvertFunctionInst_withoutActuallyEscaping() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType TypeValueInst_getParamType() const;
-  BRIDGED_INLINE SwiftInt TypeValueInst_getValue() const;
 
   // =========================================================================//
   //                   VarDeclInst and DebugVariableInst

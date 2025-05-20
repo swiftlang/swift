@@ -862,8 +862,12 @@ final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
     CanonicalType(bridged: bridged.TypeValueInst_getParamType())
   }
 
-  public var value: Int {
-    bridged.TypeValueInst_getValue()
+  /// Returns the value of the Integer type is known and fits into an `Int`.
+  public var value: Int? {
+    if paramType.isInteger {
+      return paramType.valueOfInteger
+    }
+    return nil
   }
 }
 

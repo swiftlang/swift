@@ -3879,7 +3879,7 @@ PackElementType::PackElementType(Type packType, unsigned level,
     packType(packType), level(level) {
   assert(packType->isParameterPack() ||
          packType->is<PackArchetypeType>() ||
-         packType->is<TypeVariableType>());
+         packType->isTypeVariableOrMember());
   assert(level > 0);
 }
 
@@ -5819,9 +5819,10 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
     break;
 
   default:
-    llvm::errs() << "Abstract conformance with bad subject type:\n";
-    conformingType->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Abstract conformance with bad subject type:\n";
+      conformingType->dump(out);
+    });
   }
 
   // Figure out which arena this should go in.

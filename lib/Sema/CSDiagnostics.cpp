@@ -4449,8 +4449,9 @@ bool MissingMemberFailure::diagnoseAsError() {
       auto &cs = getConstraintSystem();
 
       auto result = cs.performMemberLookup(
-          ConstraintKind::ValueMember, getName().withoutArgumentLabels(),
-          metatypeTy, FunctionRefInfo::doubleBaseNameApply(), getLocator(),
+          ConstraintKind::ValueMember,
+          getName().withoutArgumentLabels(getASTContext()), metatypeTy,
+          FunctionRefInfo::doubleBaseNameApply(), getLocator(),
           /*includeInaccessibleMembers=*/true);
 
       // If there are no `init` members at all produce a tailored

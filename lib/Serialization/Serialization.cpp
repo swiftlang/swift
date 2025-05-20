@@ -3204,49 +3204,34 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<SpecializeAttr>(DA);
-      auto targetFun = attr->getTargetFunctionName();
       auto *afd = cast<AbstractFunctionDecl>(D);
       auto *targetFunDecl = attr->getTargetFunctionDecl(afd);
 
       SmallVector<IdentifierID, 4> pieces;
 
-      // encodes whether this a a simple or compound name by adding one.
-      size_t numArgs = 0;
-      if (targetFun) {
-        pieces.push_back(S.addDeclBaseNameRef(targetFun.getBaseName()));
-        for (auto argName : targetFun.getArgumentNames())
-          pieces.push_back(S.addDeclBaseNameRef(argName));
-        if (targetFun.isSimpleName()) {
-          assert(pieces.size() == 1);
-          numArgs = 1;
-        } else
-          numArgs = pieces.size() + 1;
-      }
-
+      // SPI groups
+      auto numSPIGroups = attr->getSPIGroups().size();
       for (auto spi : attr->getSPIGroups()) {
         assert(!spi.empty() && "Empty SPI name");
         pieces.push_back(S.addDeclBaseNameRef(spi));
       }
 
+      // Type-erased params
       for (auto ty : attr->getTypeErasedParams()) {
         pieces.push_back(S.addTypeRef(ty));
       }
 
-      auto numSPIGroups = attr->getSPIGroups().size();
-      auto numTypeErasedParams = attr->getTypeErasedParams().size();
-      assert(pieces.size() == numArgs + numSPIGroups + numTypeErasedParams ||
-             pieces.size() == (numArgs - 1 + numSPIGroups + numTypeErasedParams));
       auto numAvailabilityAttrs = attr->getAvailableAttrs().size();
       SpecializeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
           S.addGenericSignatureRef(attr->getSpecializedSignature(afd)),
-          S.addDeclRef(targetFunDecl), numArgs, numSPIGroups,
-          numAvailabilityAttrs, numTypeErasedParams,
+          S.addDeclRef(targetFunDecl), numSPIGroups, numAvailabilityAttrs,
           pieces);
       for (auto availAttr : attr->getAvailableAttrs()) {
         writeDeclAttribute(D, availAttr);
       }
+      writeDeclNameRefIfNeeded(attr->getTargetFunctionName());
       return;
     }
 
@@ -3278,16 +3263,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode =
           S.DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
       auto theAttr = cast<DynamicReplacementAttr>(DA);
-      auto replacedFun = theAttr->getReplacedFunctionName();
-      SmallVector<IdentifierID, 4> pieces;
-      pieces.push_back(S.addDeclBaseNameRef(replacedFun.getBaseName()));
-      for (auto argName : replacedFun.getArgumentNames())
-        pieces.push_back(S.addDeclBaseNameRef(argName));
+
       auto *afd = cast<ValueDecl>(D)->getDynamicallyReplacedDecl();
       assert(afd && "Missing replaced decl!");
       DynamicReplacementDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
-          S.addDeclRef(afd), pieces.size(), pieces);
+          S.addDeclRef(afd));
+      writeDeclNameRefIfNeeded(theAttr->getReplacedFunctionName());
       return;
     }
 
@@ -3360,8 +3342,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
       auto origDeclNameRef = attr->getOriginalFunctionName();
-      auto origName = origDeclNameRef.Name.getBaseName();
-      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction(ctx));
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
@@ -3375,9 +3356,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       for (unsigned i : range(parameterIndices->getCapacity()))
         paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
           origAccessorKind.has_value(), rawAccessorKind, origDeclID,
           derivativeKind, paramIndicesVector);
+      writeDeclNameRefIfNeeded(origDeclNameRef.Name);
       return;
     }
 
@@ -3387,8 +3369,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalFunction() &&
              "`@transpose` attribute should have original declaration set "
              "during construction or parsing");
-      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
-      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
@@ -3396,8 +3377,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       for (unsigned i : range(parameterIndices->getCapacity()))
         paramIndicesVector.push_back(parameterIndices->contains(i));
       TransposeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, paramIndicesVector);
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origDeclID,
+          paramIndicesVector);
+      writeDeclNameRefIfNeeded(attr->getOriginalFunctionName().Name);
       return;
     }
 
@@ -3464,6 +3446,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<NonisolatedAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
       NonisolatedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
+      return;
+    }
+
+    case DeclAttrKind::InheritActorContext: {
+      auto *theAttr = cast<InheritActorContextAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[InheritActorContextDeclAttrLayout::Code];
+      InheritActorContextDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
       return;
@@ -3621,6 +3613,32 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
   }
 
+  void writeDeclNameRefIfNeeded(DeclNameRef name) {
+    using namespace decls_block;
+
+    // DeclNameRefs are always optional and write nothing when absent.
+    if (!name)
+      return;
+
+    bool isCompoundName = name.isCompoundName();
+    bool hasModuleSelector = name.hasModuleSelector();
+    SmallVector<IdentifierID, 8> rawPieceIDs;
+
+    if (hasModuleSelector)
+      rawPieceIDs.push_back(S.addDeclBaseNameRef(name.getModuleSelector()));
+
+    rawPieceIDs.push_back(S.addDeclBaseNameRef(name.getBaseName()));
+
+    if (isCompoundName)
+      for (auto argName : name.getArgumentNames())
+        rawPieceIDs.push_back(S.addDeclBaseNameRef(argName));
+
+    auto abbrCode = S.DeclTypeAbbrCodes[DeclNameRefLayout::Code];
+    DeclNameRefLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                  isCompoundName, hasModuleSelector,
+                                  rawPieceIDs);
+  }
+  
   size_t addConformances(const IterableDeclContext *declContext,
                          ConformanceLookupKind lookupKind,
                          SmallVectorImpl<uint64_t> &data) {
@@ -5319,7 +5337,7 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
     if (initialOffset == Out.GetCurrentBitNo()) {
-      abortWithPrettyStackTraceMessage("failed to serialize anything");
+      ABORT("failed to serialize anything");
     }
   };
 
@@ -6146,7 +6164,7 @@ void Serializer::writeASTBlockEntity(Type ty) {
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
     if (initialOffset == Out.GetCurrentBitNo()) {
-      abortWithPrettyStackTraceMessage("failed to serialize anything");
+      ABORT("failed to serialize anything");
     }
   };
 
@@ -6337,6 +6355,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
   registerDeclTypeAbbr<ABIOnlyCounterpartLayout>();
+  registerDeclTypeAbbr<DeclNameRefLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
 

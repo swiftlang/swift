@@ -126,6 +126,9 @@ UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 
+// TODO: Return true for inlinable function bodies with module selectors in them
+UNINTERESTING_FEATURE(ModuleSelector)
+
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
       [](SmallVectorImpl<InverseRequirement> &inverseReqs) {
@@ -620,6 +623,23 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 static bool usesFeatureExtensibleAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtensibleAttr>();
 }
+
+static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  if (auto *PL = VD->getParameterList()) {
+    return llvm::any_of(*PL, [&](const ParamDecl *P) {
+      auto *attr = P->getAttrs().getAttribute<InheritActorContextAttr>();
+      return attr && attr->isAlways();
+    });
+  }
+
+  return false;
+}
+
+UNINTERESTING_FEATURE(BuiltinSelect)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

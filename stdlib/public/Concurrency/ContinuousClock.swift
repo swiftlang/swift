@@ -102,7 +102,7 @@ extension ContinuousClock: Clock {
 
   /// The continuous clock is continuous and monotonic
   @available(SwiftStdlib 6.2, *)
-  public var traits: ClockTraits {
+  public var _traits: _ClockTraits {
     return [.continuous, .monotonic]
   }
 
@@ -144,7 +144,9 @@ extension ContinuousClock: Clock {
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
   @_alwaysEmitIntoClient
-  public var systemEpoch: Instant { unsafeBitCast(Duration.seconds(0), to: Instant.self) }
+  public var systemEpoch: Instant {
+    unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
+  }
 }
 
 @available(SwiftStdlib 5.7, *)

@@ -16,6 +16,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// test disabled until rdar://151476435 is fixed
+// REQUIRES: rdar151476435
+
 import Swift
 import layout_string_witnesses_types
 import layout_string_witnesses_types_resilient
@@ -1238,6 +1241,42 @@ func testGenericResilientWithUnmanagedAndWeak() {
 }
 
 testGenericResilientWithUnmanagedAndWeak()
+
+func testNonCopyableGenericStructSimpleClass() {
+    let ptr = UnsafeMutableBufferPointer<NonCopyableGenericStruct<SimpleClass>>.allocate(capacity: 1)
+
+    let x = NonCopyableGenericStruct(x: 23, y: SimpleClass(x: 23))
+    ptr[0] = x
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericArrayDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNonCopyableGenericStructSimpleClass()
+
+func testNonCopyableGenericEnumSimpleClass() {
+    let ptr = UnsafeMutableBufferPointer<NonCopyableGenericEnum<SimpleClass>>.allocate(capacity: 1)
+
+    let x = NonCopyableGenericEnum.x(23, SimpleClass(x: 23))
+    ptr[0] = x
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericArrayDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNonCopyableGenericEnumSimpleClass()
 
 #if os(macOS)
 

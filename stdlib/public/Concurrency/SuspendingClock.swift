@@ -89,7 +89,7 @@ extension SuspendingClock: Clock {
 
   /// The suspending clock is monotonic
   @available(SwiftStdlib 6.2, *)
-  public var traits: ClockTraits {
+  public var _traits: _ClockTraits {
     return [.monotonic]
   }
 
@@ -132,7 +132,9 @@ extension SuspendingClock: Clock {
 extension SuspendingClock {
   @available(SwiftStdlib 5.7, *)
   @_alwaysEmitIntoClient
-  public var systemEpoch: Instant { unsafeBitCast(Duration.seconds(0), to: Instant.self) }
+  public var systemEpoch: Instant {
+    unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
+  }
 }
 
 @available(SwiftStdlib 5.7, *)

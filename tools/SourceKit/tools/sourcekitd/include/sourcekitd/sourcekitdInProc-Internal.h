@@ -18,7 +18,6 @@
 namespace sourcekitdInProc {
 std::string getRuntimeLibPath();
 std::string getSwiftExecutablePath();
-std::string getDiagnosticDocumentationPath();
 } // namespace sourcekitdInProc
 
 #endif

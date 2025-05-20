@@ -37,7 +37,7 @@ let embeddedSwiftDiagnostics = ModulePass(name: "embedded-swift-diagnostics") {
     do {
       assert(checker.callStack.isEmpty)
       try checker.checkFunction(function)
-    } catch let error as Diagnostic {
+    } catch let error as Diagnostic<Location> {
       checker.diagnose(error)
     } catch {
       fatalError("unknown error thrown")
@@ -248,9 +248,9 @@ private struct FunctionChecker {
     }
   }
 
-  mutating func diagnose(_ error: Diagnostic) {
+  mutating func diagnose(_ error: Diagnostic<Location>) {
     var diagPrinted = false
-    if error.position != nil {
+    if error.location.hasValidLineNumber {
       context.diagnosticEngine.diagnose(error)
       diagPrinted = true
     }

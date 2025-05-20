@@ -3498,6 +3498,58 @@ public:
   /// offsets in \c customAttrOffsets.
   llvm::Error deserializeCustomAttrs();
 
+  DeclNameRef deserializeDeclNameRefIfPresent() {
+    using namespace decls_block;
+
+    SmallVector<uint64_t, 64> scratch;
+    StringRef blobData;
+
+    BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
+    llvm::BitstreamEntry entry =
+        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+
+    unsigned recordID = MF.fatalIfUnexpected(
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+
+    if (recordID != DECL_NAME_REF)
+      // This is normal--it just means there isn't a DeclNameRef here.
+      return { DeclNameRef() };
+
+    bool isCompoundName;
+    bool hasModuleSelector;
+    ArrayRef<uint64_t> rawPieceIDs;
+
+    DeclNameRefLayout::readRecord(scratch, isCompoundName, hasModuleSelector,
+                                  rawPieceIDs);
+    restoreOffset.cancel();
+
+    Identifier moduleSelector;
+    DeclBaseName baseName;
+
+    unsigned restIndex = 0;
+
+    ASSERT(rawPieceIDs.size() > 0);
+    if (hasModuleSelector) {
+      moduleSelector = MF.getIdentifier(rawPieceIDs[restIndex]);
+      restIndex++;
+    }
+
+    ASSERT(rawPieceIDs.size() > restIndex);
+    baseName = MF.getDeclBaseName(rawPieceIDs[restIndex]);
+    restIndex++;
+
+    if (isCompoundName) {
+      SmallVector<Identifier, 8> argLabels;
+      for (auto rawArgLabel : rawPieceIDs.drop_front(restIndex))
+        argLabels.push_back(MF.getIdentifier(rawArgLabel));
+
+      return DeclNameRef(ctx, moduleSelector, baseName, argLabels);
+    }
+
+    ASSERT(rawPieceIDs.size() == restIndex);
+    return DeclNameRef(ctx, moduleSelector, baseName);
+  }
+
   Expected<Decl *> getDeclCheckedImpl(
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
@@ -6141,56 +6193,32 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         unsigned specializationKindVal;
         GenericSignatureID specializedSigID;
 
-        ArrayRef<uint64_t> rawPieceIDs;
-        uint64_t numArgs;
+        ArrayRef<uint64_t> rawTrailingIDs;
         uint64_t numSPIGroups;
         uint64_t numAvailabilityAttrs;
-        uint64_t numTypeErasedParams;
         DeclID targetFunID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
             scratch, exported, specializationKindVal, specializedSigID,
-            targetFunID, numArgs, numSPIGroups, numAvailabilityAttrs,
-            numTypeErasedParams, rawPieceIDs);
+            targetFunID, numSPIGroups, numAvailabilityAttrs, rawTrailingIDs);
 
-        assert(rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams ||
-               rawPieceIDs.size() == (numArgs - 1 + numSPIGroups + numTypeErasedParams));
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
-        // The 'target' parameter.
-        DeclNameRef replacedFunctionName;
-        if (numArgs) {
-          bool numArgumentLabels = (numArgs == 1) ? 0 : numArgs - 2;
-          auto baseName = MF.getDeclBaseName(rawPieceIDs[0]);
-          SmallVector<Identifier, 4> pieces;
-          if (numArgumentLabels) {
-            for (auto pieceID : rawPieceIDs.slice(1, numArgumentLabels))
-              pieces.push_back(MF.getIdentifier(pieceID));
-          }
-          replacedFunctionName = (numArgs == 1)
-                                     ? DeclNameRef({baseName}) // simple name
-                                     : DeclNameRef({ctx, baseName, pieces});
-        }
 
+        auto specializedSig = MF.getGenericSignature(specializedSigID);
+
+        // Take `numSPIGroups` trailing identifiers for the SPI groups.
         SmallVector<Identifier, 4> spis;
-        if (numSPIGroups) {
-          auto numTargetFunctionPiecesToSkip =
-              (rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams) ? numArgs
-                                                             : numArgs - 1;
-          for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
+          for (auto id : rawTrailingIDs.take_front(numSPIGroups))
             spis.push_back(MF.getIdentifier(id));
-        }
 
+        // Take the rest for type-erased parameters.
         SmallVector<Type, 4> typeErasedParams;
-        if (numTypeErasedParams) {
-          auto numTargetFunctionPiecesToSkip =
-              (rawPieceIDs.size() == numArgs + numSPIGroups + numTypeErasedParams) ? numArgs + numSPIGroups
-                                                             : numArgs - 1 + numSPIGroups;
-          for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
-            typeErasedParams.push_back(MF.getType(id));
-        }
+        for (auto id : rawTrailingIDs.drop_front(numSPIGroups))
+          typeErasedParams.push_back(MF.getType(id));
 
+        // Read availability attrs.
         SmallVector<AvailableAttr *, 4> availabilityAttrs;
         while (numAvailabilityAttrs) {
           // Prepare to read the next record.
@@ -6220,10 +6248,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           --numAvailabilityAttrs;
         }
 
-        auto specializedSig = MF.getGenericSignature(specializedSigID);
+        // Read target function DeclNameRef, if present.
+        DeclNameRef targetFunName = deserializeDeclNameRefIfPresent();
+
         Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
                                       spis, availabilityAttrs, typeErasedParams,
-                                      specializedSig, replacedFunctionName, &MF,
+                                      specializedSig, targetFunName, &MF,
                                       targetFunID);
         break;
       }
@@ -6254,21 +6284,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::DynamicReplacement_DECL_ATTR: {
         bool isImplicit;
-        uint64_t numArgs;
-        ArrayRef<uint64_t> rawPieceIDs;
         DeclID replacedFunID;
         serialization::decls_block::DynamicReplacementDeclAttrLayout::
-            readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
+            readRecord(scratch, isImplicit, replacedFunID);
 
-        auto baseName = MF.getDeclBaseName(rawPieceIDs[0]);
-        SmallVector<Identifier, 4> pieces;
-        for (auto pieceID : rawPieceIDs.slice(1))
-          pieces.push_back(MF.getIdentifier(pieceID));
+        DeclNameRef replacedFunName = deserializeDeclNameRefIfPresent();
 
-        assert(numArgs != 0);
         assert(!isImplicit && "Need to update for implicit");
-        Attr = DynamicReplacementAttr::create(
-            ctx, DeclNameRef({ ctx, baseName, pieces }), &MF, replacedFunID);
+        Attr = DynamicReplacementAttr::create(ctx, replacedFunName, &MF,
+                                              replacedFunID);
         break;
       }
 
@@ -6339,7 +6363,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Derivative_DECL_ATTR: {
         bool isImplicit;
-        uint64_t origNameId;
         bool hasAccessorKind;
         uint64_t rawAccessorKind;
         DeclID origDeclId;
@@ -6347,7 +6370,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, hasAccessorKind, rawAccessorKind,
+            scratch, isImplicit, hasAccessorKind, rawAccessorKind,
             origDeclId, rawDerivativeKind, parameters);
 
         std::optional<AccessorKind> accessorKind = std::nullopt;
@@ -6358,8 +6381,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           accessorKind = *maybeAccessorKind;
         }
 
-        DeclNameRefWithLoc origName{DeclNameRef(MF.getDeclBaseName(origNameId)),
-                                    DeclNameLoc(), accessorKind};
         auto derivativeKind =
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)
@@ -6369,9 +6390,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           parametersBitVector[i] = parameters[i];
         auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
+        auto origName = deserializeDeclNameRefIfPresent();
+        DeclNameRefWithLoc origNameWithLoc{origName, DeclNameLoc(),
+                                           accessorKind};
+
         auto *derivativeAttr =
             DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
-                                   /*baseType*/ nullptr, origName, indices);
+                                   /*baseType*/ nullptr, origNameWithLoc,
+                                   indices);
         derivativeAttr->setOriginalFunctionResolver(&MF, origDeclId);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
@@ -6380,20 +6406,21 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Transpose_DECL_ATTR: {
         bool isImplicit;
-        uint64_t origNameId;
         DeclID origDeclId;
         ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::TransposeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, origDeclId, parameters);
+            scratch, isImplicit, origDeclId, parameters);
 
-        DeclNameRefWithLoc origName{DeclNameRef(MF.getDeclBaseName(origNameId)),
-                                    DeclNameLoc(), std::nullopt};
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
           parametersBitVector[i] = parameters[i];
         auto *indices = IndexSubset::get(ctx, parametersBitVector);
+
+        auto origNameRef = deserializeDeclNameRefIfPresent();
+        DeclNameRefWithLoc origName{origNameRef, DeclNameLoc(), std::nullopt};
+
         auto *transposeAttr =
             TransposeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
                                   /*baseTypeRepr*/ nullptr, origName, indices);
@@ -6514,6 +6541,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             scratch, modifier, isImplicit);
         Attr = new (ctx) NonisolatedAttr(
             {}, {}, static_cast<NonIsolatedModifier>(modifier), isImplicit);
+        break;
+      }
+
+      case decls_block::InheritActorContext_DECL_ATTR: {
+        unsigned modifier;
+        bool isImplicit{};
+        serialization::decls_block::InheritActorContextDeclAttrLayout::
+            readRecord(scratch, modifier, isImplicit);
+        Attr = new (ctx) InheritActorContextAttr(
+            {}, {}, static_cast<InheritActorContextModifier>(modifier),
+            isImplicit);
         break;
       }
 

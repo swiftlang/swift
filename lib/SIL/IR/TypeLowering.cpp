@@ -4676,6 +4676,24 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
   collectConstantCaptures(fn);
 
+  // @_inheritActorContext(always) attribute allows implicit
+  // capture of isolation parameter from the context. This
+  // cannot be done as part of computing captures because
+  // isolation is not available at that point because it in
+  // turn depends on captures sometimes.
+  if (auto *closure = fn.getClosureExpr()) {
+    if (closure->alwaysInheritsActorContext()) {
+      auto isolation = closure->getActorIsolation();
+      if (isolation.isActorInstanceIsolated()) {
+        if (auto *var = isolation.getActorInstance()) {
+          recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
+        } else if (auto *actorExpr = isolation.getActorInstanceExpr()) {
+          recordCapture(CapturedValue(actorExpr, /*flags=*/0));
+        }
+      }
+    }
+  }
+
   SmallVector<CapturedValue, 4> resultingCaptures;
   for (auto capturePair : varCaptures) {
     resultingCaptures.push_back(capturePair.second);

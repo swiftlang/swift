@@ -32,9 +32,9 @@ for ; other<count; other+=1 { // expected-error {{C-style for statement was remo
 }
 
 for (var number : Int8 = start; number < count; number+=1) { // expected-error {{C-style for statement was removed in Swift 3}} {{none}}
-  print(number)
+  print(number) // expected-error {{cannot find 'number' in scope}}
 }
 
 for (var m : Int8 = start; m < count; m+=1) { // expected-error {{C-style for statement was removed in Swift 3}} {{none}}
-  m += 3
+  m += 3 // expected-error {{cannot find 'm' in scope}}
 }

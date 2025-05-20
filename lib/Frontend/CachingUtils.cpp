@@ -449,43 +449,11 @@ static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
                            "CASID missing from Object Store " + ID.toString());
 }
 
-static Expected<ObjectRef> mergeCASFileSystem(ObjectStore &CAS,
-                                              ArrayRef<std::string> FSRoots) {
-  llvm::cas::HierarchicalTreeBuilder Builder;
-  for (auto &Root : FSRoots) {
-    auto ID = CAS.parseID(Root);
-    if (!ID)
-      return ID.takeError();
-
-    auto Ref = CAS.getReference(*ID);
-    if (!Ref)
-      return createCASObjectNotFoundError(*ID);
-    Builder.pushTreeContent(*Ref, "");
-  }
-
-  auto NewRoot = Builder.create(CAS);
-  if (!NewRoot)
-    return NewRoot.takeError();
-
-  return NewRoot->getRef();
-}
-
 Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
-createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
-                    const std::string &IncludeTree,
+createCASFileSystem(ObjectStore &CAS, const std::string &IncludeTree,
                     const std::string &IncludeTreeFileList) {
-  assert(!FSRoots.empty() || !IncludeTree.empty() ||
+  assert(!IncludeTree.empty() ||
          !IncludeTreeFileList.empty() && "no root ID provided");
-
-  auto NewRoot = mergeCASFileSystem(CAS, FSRoots);
-  if (!NewRoot)
-    return NewRoot.takeError();
-
-  auto FS = createCASFileSystem(CAS, CAS.getID(*NewRoot));
-  if (!FS)
-    return FS.takeError();
-
-  auto CASFS = makeIntrusiveRefCnt<vfs::OverlayFileSystem>(std::move(*FS));
 
   if (!IncludeTree.empty()) {
     auto ID = CAS.parseID(IncludeTree);
@@ -507,7 +475,7 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     if (!ITFS)
       return ITFS.takeError();
 
-    CASFS->pushOverlay(*ITFS);
+    return *ITFS;
   }
 
   if (!IncludeTreeFileList.empty()) {
@@ -526,10 +494,10 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     if (!ITFS)
       return ITFS.takeError();
 
-    CASFS->pushOverlay(std::move(*ITFS));
+    return *ITFS;
   }
 
-  return CASFS;
+  return nullptr;
 }
 
 std::vector<std::string> remapPathsFromCommandLine(

@@ -4630,9 +4630,14 @@ namespace {
             auto convertKind = ConstantConvertKind::None;
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
-            if (decl->getType()->isEnumeralType())
-              convertKind = ConstantConvertKind::Construction;
-            else if (findSwiftNewtype(decl, Impl.getClangSema(),
+            if (decl->getType()->isEnumeralType()) {
+              if (type->getEnumOrBoundGenericEnum()) {
+                // When importing as an enum, also apply implicit force unwrap
+                convertKind = ConstantConvertKind::ConstructionWithUnwrap;
+              } else {
+                convertKind = ConstantConvertKind::Construction;
+              }
+            } else if (findSwiftNewtype(decl, Impl.getClangSema(),
                                       Impl.CurrentVersion))
               convertKind = ConstantConvertKind::Construction;
 
@@ -9187,6 +9192,14 @@ static bool SwiftifiableCAT(const clang::CountAttributedType *CAT) {
   return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr());
 }
 
+static bool SwiftifiablePointerType(Type swiftType) {
+  // don't try to transform any Swift types that _SwiftifyImport doesn't know how to handle
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  PointerTypeKind PTK;
+  return nonnullType->isOpaquePointer() ||
+    (nonnullType->getAnyPointerElementType(PTK) && PTK != PTK_AutoreleasingUnsafeMutablePointer);
+}
+
 void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
@@ -9220,10 +9233,11 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
           return false;
         };
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
+    Type swiftReturnTy = MappedDecl->getResultInterfaceType();
     bool returnIsStdSpan = registerStdSpanTypeMapping(
-        MappedDecl->getResultInterfaceType(), ClangDecl->getReturnType());
+        swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(CAT)) {
+    if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       attachMacro = true;
     }
@@ -9237,14 +9251,15 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       auto clangParamTy = clangParam->getType();
       auto swiftParam = MappedDecl->getParameters()->get(index);
+      Type swiftParamTy = swiftParam->getInterfaceType();
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
-      if (SwiftifiableCAT(CAT)) {
+      if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftParamTy)) {
         printer.printCountedBy(CAT, index);
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan = registerStdSpanTypeMapping(
-          swiftParam->getInterfaceType(), clangParamTy);
+          swiftParamTy, clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
 
       bool paramHasLifetimeInfo = false;
@@ -9255,7 +9270,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
         printer.printLifetimeboundReturn(
             index, !paramHasBoundsInfo &&
-                       swiftParam->getInterfaceType()->isEscapable());
+                       swiftParamTy->isEscapable());
         paramHasLifetimeInfo = true;
         returnHasLifetimeInfo = true;
       }
@@ -9266,10 +9281,28 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       attachMacro = true;
     printer.printAvailability();
     printer.printTypeMapping(typeMapping);
+
   }
 
-  if (attachMacro)
-    importNontrivialAttribute(MappedDecl, MacroString);
+  if (attachMacro) {
+    if (clang::RawComment *raw =
+            getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+      // swift::RawDocCommentAttr doesn't contain its text directly, but instead
+      // references the source range of the parsed comment. Instead of creating
+      // a new source file just to parse the doc comment, we can add the
+      // comment to the macro invocation attribute, which the macro has access
+      // to. Waiting until we know that the macro will be attached before
+      // emitting the comment to the string, despite the comment occurring
+      // first, avoids copying a bunch of potentially long comments for nodes
+      // that don't end up with wrappers.
+      auto commentString =
+          raw->getRawText(getClangASTContext().getSourceManager());
+      importNontrivialAttribute(MappedDecl,
+                                (commentString + "\n" + MacroString).str());
+    } else {
+      importNontrivialAttribute(MappedDecl, MacroString);
+    }
+  }
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
@@ -9784,11 +9817,11 @@ static void finishTypeWitnesses(
     }
 
     if (!satisfied) {
-      llvm::errs() << ("Cannot look up associated type for "
-                        "imported conformance:\n");
-      conformance->getType().dump(llvm::errs());
-      assocType->dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot look up associated type for imported conformance:\n";
+        conformance->getType().dump(out);
+        assocType->dump(out);
+      });
     }
   }
 }
