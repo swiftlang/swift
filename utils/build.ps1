@@ -342,18 +342,42 @@ $PythonModules = @{
   "packaging" = @{
     Version = "24.1";
     SHA256 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+    Dependencies = @();
   };
   "setuptools" = @{
     Version = "75.1.0";
     SHA256 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+    Dependencies = @();
   };
   "psutil" = @{
     Version = "6.1.0";
     SHA256 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+    Dependencies = @();
   };
   "unittest2" = @{
     Version = "1.1.0";
     SHA256 = "22882a0e418c284e1f718a822b3b022944d53d2d908e1690b319a9d3eb2c0579";
+    Dependencies = @("argparse", "six", "traceback2", "linecache2");
+  };
+  "argparse" = @{
+    Version = "1.4.0";
+    SHA256 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+    Dependencies = @();
+  };
+  "six" = @{
+    Version = "1.17.0";
+    SHA256 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+    Dependencies = @();
+  };
+  "traceback2" = @{
+    Version = "1.4.0";
+    SHA256 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+    Dependencies = @();
+  };
+  "linecache2" = @{
+    Version = "1.0.0";
+    SHA256 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+    Dependencies = @();
   };
 }
 
@@ -1019,7 +1043,12 @@ function Get-Dependencies {
     }
     $TempRequirementsTxt = New-TemporaryFile
     $Module = $PythonModules[$ModuleName]
+    $Dependencies = $Module["Dependencies"]
     Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
+    for ($i = 0; $i -lt $Dependencies.Length; $i++) {
+      $Dependency = $PythonModules[$Dependencies[$i]]
+      Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
+    }
     Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
     Write-Output "$ModuleName installed."
   }
