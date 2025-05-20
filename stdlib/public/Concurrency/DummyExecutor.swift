@@ -15,14 +15,14 @@ import Swift
 // .. Main Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class _DummyMainExecutor: _MainExecutor, @unchecked Sendable {
+public final class DummyMainExecutor: MainExecutor, @unchecked Sendable {
   public init() {}
 
-  public func _run() throws {
+  public func run() throws {
     fatalError("There is no executor implementation active")
   }
 
-  public func _stop() {
+  public func stop() {
     fatalError("There is no executor implementation active")
   }
 
@@ -36,7 +36,7 @@ public final class _DummyMainExecutor: _MainExecutor, @unchecked Sendable {
   }
   #endif
 
-  public var _isMainExecutor: Bool { true }
+  public var isMainExecutor: Bool { true }
 
   public func checkIsolated() {
     // Do nothing
@@ -46,7 +46,7 @@ public final class _DummyMainExecutor: _MainExecutor, @unchecked Sendable {
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class _DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
+public final class DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}
 
   #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -59,5 +59,5 @@ public final class _DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
   }
   #endif
 
-  public var _isMainExecutor: Bool { false }
+  public var isMainExecutor: Bool { false }
 }

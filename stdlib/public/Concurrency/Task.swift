@@ -1255,7 +1255,7 @@ extension Task where Success == Never, Failure == Never {
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       if #available(SwiftStdlib 6.2, *) {
-        let executor = Task._currentExecutor
+        let executor = Task.currentExecutor
 
         executor.enqueue(ExecutorJob(context: job))
       } else {
@@ -1516,7 +1516,7 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
 
   let job = Builtin.convertTaskToJob(theTask)
   if #available(SwiftStdlib 6.2, *) {
-    MainActor._executor.enqueue(ExecutorJob(context: job))
+    MainActor.executor.enqueue(ExecutorJob(context: job))
   } else {
     Builtin.unreachable()
   }

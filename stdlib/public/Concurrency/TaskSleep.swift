@@ -30,10 +30,10 @@ extension Task where Success == Never, Failure == Never {
 
       if #available(SwiftStdlib 6.2, *) {
         #if !$Embedded
-        if let executor = Task._currentSchedulableExecutor {
-          executor._enqueue(ExecutorJob(context: job),
-                            after: .nanoseconds(duration),
-                            clock: .continuous)
+        if let executor = Task.currentSchedulableExecutor {
+          executor.enqueue(ExecutorJob(context: job),
+                           after: .nanoseconds(duration),
+                           clock: .continuous)
           return
         }
         #endif
@@ -274,10 +274,10 @@ extension Task where Success == Never, Failure == Never {
 
               if #available(SwiftStdlib 6.2, *) {
                 #if !$Embedded
-                if let executor = Task._currentSchedulableExecutor {
-                  executor._enqueue(ExecutorJob(context: job),
-                                    after: .nanoseconds(duration),
-                                    clock: .continuous)
+                if let executor = Task.currentSchedulableExecutor {
+                  executor.enqueue(ExecutorJob(context: job),
+                                   after: .nanoseconds(duration),
+                                   clock: .continuous)
                   return
                 }
                 #endif
