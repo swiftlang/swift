@@ -202,13 +202,13 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
   Demangler Dem;
   NodePointer Root = Dem.demangleSymbol(nameStr);
   if (!Root || treeContains(Root, Node::Kind::Suffix)) {
-    abortWithPrettyStackTraceMessage([&](auto &out) {
+    ABORT([&](auto &out) {
       out << "Can't demangle: " << nameStr;
     });
   }
   auto mangling = mangleNode(Root, Flavor);
   if (!mangling.isSuccess()) {
-    abortWithPrettyStackTraceMessage([&](auto &out) {
+    ABORT([&](auto &out) {
       out << "Can't remangle: " << nameStr;
     });
   }
@@ -216,7 +216,7 @@ void Mangler::verify(StringRef nameStr, ManglingFlavor Flavor) {
   if (Remangled == nameStr)
     return;
 
-  abortWithPrettyStackTraceMessage([&](auto &out) {
+  ABORT([&](auto &out) {
     out << "Remangling failed:\n";
     out << "original     = " << nameStr << "\n";
     out << "remangled    = " << Remangled;

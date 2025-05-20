@@ -9799,11 +9799,11 @@ static void finishTypeWitnesses(
     }
 
     if (!satisfied) {
-      llvm::errs() << ("Cannot look up associated type for "
-                        "imported conformance:\n");
-      conformance->getType().dump(llvm::errs());
-      assocType->dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot look up associated type for imported conformance:\n";
+        conformance->getType().dump(out);
+        assocType->dump(out);
+      });
     }
   }
 }

@@ -262,10 +262,11 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
   if (lhsRule.getRHS() == difference.BaseTerm &&
       !lhsRule.isSubstitutionSimplified()) {
     if (lhsRule.isFrozen()) {
-      llvm::errs() << "Frozen rule should already be subst-simplified: "
-                   << lhsRule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Frozen rule should already be subst-simplified: " << lhsRule
+            << "\n\n";
+        dump(out);
+      });
     }
     lhsRule.markSubstitutionSimplified();
   }
