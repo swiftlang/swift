@@ -225,6 +225,8 @@ let tupleTypeWithTrailingComma: (
   quux: String,
 )
 
+let _ = (bar: String, quux: String,).self
+
 let closureTypeWithTrailingCommas: (
   String,
   String,

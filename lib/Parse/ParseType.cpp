@@ -1609,7 +1609,8 @@ bool Parser::canParseGenericArguments() {
     if (!canParseType())
       return false;
     // Parse the comma, if the list continues.
-  } while (consumeIf(tok::comma));
+    // This could be the trailing comma.
+  } while (consumeIf(tok::comma) && !startsWithGreater(Tok));
 
   if (!startsWithGreater(Tok)) {
     return false;
