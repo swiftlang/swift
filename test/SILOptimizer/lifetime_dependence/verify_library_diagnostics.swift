@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-module -emit-module-interface-path %t/test.swiftmodule \
+// RUN:   -swift-version 5 \
 // RUN:   -o /dev/null \
 // RUN:   -enable-library-evolution \
 // RUN:   -verify \
@@ -30,7 +31,7 @@ class C {}
 
 // Test diagnostics on keypath getter.
 //
-// FIXME: rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
+// rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
 //
 // This produces the error:
 // <unknown>:0: error: unexpected error produced: lifetime-dependent value returned by generated thunk
@@ -55,8 +56,6 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
 
   public var neComputedBorrow: NE {
-    // expected-error @-1{{lifetime-dependent value returned by generated accessor '_modify'}}
-    // expected-note  @-2{{it depends on this scoped access to variable 'self'}}
     @lifetime(borrow self)
     get { ne }
 
