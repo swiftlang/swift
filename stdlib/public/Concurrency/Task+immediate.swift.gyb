@@ -38,9 +38,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func startSynchronously(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
-    immediate(name: name, priority: priority, operation)
+    immediate(name: name, priority: priority, operation: operation)
   }
 
   /// Create and immediately start running a new task in the context of the calling thread/task.
@@ -66,13 +66,14 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ///   - operation: the operation to be run immediately upon entering the task.
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   @discardableResult
   public static func immediate(
     name: String? = nil,
     priority: TaskPriority? = nil,
     % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
     % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
-    @_implicitSelfCapture _ operation: __owned @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 
     let builtinSerialExecutor =
@@ -188,6 +189,7 @@ extension ${GROUP_TYPE} {
   /// is semantically equivalent to its basic version which can be
   /// created using ``${GROUP_TYPE}/addTask``.
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public func ${METHOD_NAME}( // in ${GROUP_TYPE}
     name: String? = nil,
     priority: TaskPriority? = nil,
@@ -275,5 +277,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 @_silgen_name("swift_task_startOnMainActor")
 internal func _startTaskOnMainActor(_ task: Builtin.NativeObject)
 
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_immediate")
+@usableFromInline
 internal func _startTaskImmediately(_ task: Builtin.NativeObject, targetExecutor: Builtin.Executor?)
