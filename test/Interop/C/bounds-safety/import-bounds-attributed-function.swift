@@ -43,7 +43,8 @@ func call(_ mutIntPtr: UnsafeMutablePointer<CInt>,
           _ constCharPtr: UnsafePointer<CChar>,
           _ mutMutIntPtrPtr: UnsafeMutablePointer<UnsafeMutablePointer<CInt>?>!,
           _ mutMutCharPtrPtr: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!,
-          _ int: CInt) {
+          _ int: CInt,
+          _ args: CVaListPointer) {
     let _ = a(mutIntPtr, int)
     let _ = b(mutCharPtr, int)
     let _ = c(mutCharPtr, int)
@@ -76,4 +77,6 @@ func call(_ mutIntPtr: UnsafeMutablePointer<CInt>,
     let _ = len2
     len2 = 37
     let _ = v(mutIntPtr)
+
+    let _ = w(args)
 }

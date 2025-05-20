@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ptrcheck.h>
+#include <stdarg.h>
 
 #ifndef __unsafe_late_const
 #define __unsafe_late_const
@@ -43,3 +44,5 @@ int * __counted_by(len1) u(int * __counted_by(len1) p);
 
 int len2 __unsafe_late_const;
 int * __counted_by(len2) v(int * __counted_by(len2) p);
+
+void w(va_list p);
