@@ -1446,8 +1446,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
     case TypeKind::BuiltinUnboundGeneric:
-      llvm::errs() << "Don't know how to mangle a BuiltinUnboundGenericType\n";
-      abort();
+      ABORT("Don't know how to mangle a BuiltinUnboundGenericType");
     case TypeKind::Locatable: {
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
@@ -1756,9 +1755,10 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype:
     case TypeKind::ExistentialArchetype:
-      llvm::errs() << "Cannot mangle free-standing archetype: ";
-      tybase->dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot mangle free-standing archetype: ";
+        tybase->dump(out);
+      });
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
@@ -4468,8 +4468,7 @@ static unsigned conformanceRequirementIndex(
     ++result;
   }
 
-  llvm::errs() <<"Conformance access path step is missing from requirements";
-  abort();
+  ABORT("Conformance access path step is missing from requirements");
 }
 
 void ASTMangler::appendDependentProtocolConformance(
@@ -4573,9 +4572,10 @@ void ASTMangler::appendAnyProtocolConformance(
   } else if (conformance.isPack()) {
     appendPackProtocolConformance(conformance.getPack(), genericSig);
   } else {
-    llvm::errs() << "Bad conformance in mangler: ";
-    conformance.dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Bad conformance in mangler: ";
+      conformance.dump(out);
+    });
   }
 }
 

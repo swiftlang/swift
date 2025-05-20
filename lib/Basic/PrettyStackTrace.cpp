@@ -39,18 +39,3 @@ void PrettyStackTraceFileContents::print(llvm::raw_ostream &out) const {
 void PrettyStackTraceSwiftVersion::print(llvm::raw_ostream &out) const {
   out << version::getSwiftFullVersion() << '\n';
 }
-
-void swift::abortWithPrettyStackTraceMessage(
-    llvm::function_ref<void(llvm::raw_ostream &)> message) {
-  llvm::SmallString<0> errorStr;
-  llvm::raw_svector_ostream out(errorStr);
-  message(out);
-  llvm::PrettyStackTraceString trace(errorStr.c_str());
-  abort();
-}
-
-void swift::abortWithPrettyStackTraceMessage(StringRef message) {
-  auto messageStr = message.str();
-  llvm::PrettyStackTraceString trace(messageStr.c_str());
-  abort();
-}

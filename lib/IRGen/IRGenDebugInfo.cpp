@@ -1066,34 +1066,34 @@ private:
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
       if (!Reconstructed) {
-        llvm::errs() << "Failed to reconstruct type for " << SugaredName
-                     << "\n";
-        llvm::errs() << "Original type:\n";
-        Ty->dump(llvm::errs());
-        if (Sig)
-          llvm::errs() << "Generic signature: " << Sig << "\n";
-        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
-          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
-             "this assertion.\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Failed to reconstruct type for " << SugaredName << "\n";
+          out << "Original type:\n";
+          Ty->dump(out);
+          if (Sig)
+            out << "Generic signature: " << Sig << "\n";
+          out << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+              << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+                 "this assertion.";
+        });
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
                  // an explicit ExistentialType wrapping the constraint.
                  !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
-        llvm::errs() << "Incorrect reconstructed type for " << SugaredName
-                     << "\n";
-        llvm::errs() << "Original type:\n";
-        Ty->dump(llvm::errs());
-        llvm::errs() << "Reconstructed type:\n";
-        Reconstructed->dump(llvm::errs());
-        if (Sig)
-          llvm::errs() << "Generic signature: " << Sig << "\n";
-        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
-          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
-             "this assertion.\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Incorrect reconstructed type for " << SugaredName << "\n";
+          out << "Original type:\n";
+          Ty->dump(out);
+          out << "Reconstructed type:\n";
+          Reconstructed->dump(out);
+          if (Sig)
+            out << "Generic signature: " << Sig << "\n";
+          out << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+              << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+                 "this assertion.";
+        });
       }
     }
 
