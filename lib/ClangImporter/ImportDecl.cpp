@@ -9063,6 +9063,11 @@ public:
     printAvailabilityOfType("Span");
   }
 
+  void printDebug() {
+    printSeparator();
+    out << "debug: true";
+  }
+
 private:
   ValueDecl *getDecl(StringRef DeclName) {
     SmallVector<ValueDecl *, 1> decls;
@@ -9254,7 +9259,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
     }
     printer.printAvailability();
     printer.printTypeMapping(typeMapping);
-
+    DEBUG_WITH_TYPE("swiftify-import", printer.printDebug());
   }
 
   if (attachMacro) {
