@@ -2035,18 +2035,14 @@ static ValueDecl *getShuffleVectorOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static bool isPowerOfTwoOrZero(unsigned x) {
-  return (x & -x) == x;
-}
-
 static ValueDecl *getInterleaveOperation(ASTContext &Context, Identifier Id,
                                          Type FirstTy) {
   // (Vector<N,T>, Vector<N,T>) -> (Vector<N,T>, Vector<N,T>)
   auto VecTy = FirstTy->getAs<BuiltinVectorType>();
-  // Require power-of-two length because we don't need anything else to support
-  // SIMDn<T> and it saves us from having to define what happens for odd length
-  // vectors until we actually need to care about them.
-  if (!VecTy || !isPowerOfTwoOrZero(VecTy->getNumElements()))
+  // Require even length because we don't need anything else to support Swift's
+  // SIMD types and it saves us from having to define what happens for odd
+  // lengths until we actually need to care about them.
+  if (!VecTy || VecTy->getNumElements() % 2 != 0)
     return nullptr;
   
   Type ArgElts[] = { VecTy, VecTy };
@@ -2059,10 +2055,10 @@ static ValueDecl *getDeinterleaveOperation(ASTContext &Context, Identifier Id,
                                            Type FirstTy) {
   // (Vector<N,T>, Vector<N,T>) -> (Vector<N,T>, Vector<N,T>)
   auto VecTy = FirstTy->getAs<BuiltinVectorType>();
-  // Require power-of-two length because we don't need anything else to support
-  // SIMDn<T> and it saves us from having to define what happens for odd length
-  // vectors until we actually need to care about them.
-  if (!VecTy || !isPowerOfTwoOrZero(VecTy->getNumElements()))
+  // Require even length because we don't need anything else to support Swift's
+  // SIMD types and it saves us from having to define what happens for odd
+  // lengths until we actually need to care about them.
+  if (!VecTy || VecTy->getNumElements() % 2 != 0)
     return nullptr;
   
   Type ArgElts[] = { VecTy, VecTy };
