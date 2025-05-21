@@ -104,12 +104,18 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
 }
 
-/// Whether funcType has a single argument (not including defaulted arguments)
-/// that is of type () -> ().
-static bool hasTrivialTrailingClosure(const FuncDecl *FD,
-                                      AnyFunctionType *funcType) {
-  ParameterListInfo paramInfo(funcType->getParams(), FD,
-                              /*skipCurriedSelf*/ FD->hasCurriedSelf());
+/// Whether the provided type has a single argument (not including defaulted
+/// arguments) that is of type () -> ().
+static bool hasTrivialTrailingClosure(const ValueDecl *VD, Type type) {
+  if (!VD->hasParameterList())
+    return false;
+
+  auto *funcType = type->getAs<AnyFunctionType>();
+  if (!funcType)
+    return false;
+
+  ParameterListInfo paramInfo(funcType->getParams(), VD,
+                              /*skipCurriedSelf*/ VD->hasCurriedSelf());
 
   if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
@@ -1947,7 +1953,8 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
 }
 
 void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
-                                             DeclVisibilityKind Reason) {
+                                             DeclVisibilityKind Reason,
+                                             bool forTrivialTrailingClosure) {
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(MD, Reason, DynamicLookupInfo()));
@@ -1955,11 +1962,12 @@ void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
 
   addValueBaseName(Builder, MD->getBaseIdentifier());
 
-  Type macroType = MD->getInterfaceType();
-  if (MD->parameterList && MD->parameterList->size() > 0) {
+  if (forTrivialTrailingClosure) {
+    Builder.addBraceStmtWithCursor(" { code }");
+  } else if (MD->parameterList && MD->parameterList->size() > 0) {
+    auto *macroTy = MD->getInterfaceType()->castTo<AnyFunctionType>();
     Builder.addLeftParen();
-    addCallArgumentPatterns(Builder, macroType->castTo<AnyFunctionType>(),
-                            MD->parameterList,
+    addCallArgumentPatterns(Builder, macroTy, MD->parameterList,
                             MD->getGenericSignature());
     Builder.addRightParen();
   }
@@ -1989,6 +1997,9 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
     if (!(roles & expectedRoles))
       return;
   }
+
+  if (hasTrivialTrailingClosure(MD, MD->getInterfaceType()))
+    addMacroCallArguments(MD, Reason, /*forTrivialTrailingClosure*/ true);
 
   addMacroCallArguments(MD, Reason);
 }
