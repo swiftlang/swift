@@ -1,4 +1,3 @@
-// REQUIRES: rdar151740742
 // This test ensures that the parent invocation's '-Xcc X' flags are inherited when building dependency modules
 // RUN: %empty-directory(%t)
 
@@ -9,8 +8,6 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -strict-implicit-module-context %s -o %t/deps.json -I %S/Inputs/macro-only-module -Xcc -DTANGERINE=1 -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck %s < %t/deps.json
-
-// REQUIRES: rdar151740686
 
 import ImportsMacroSpecificClangModule
 
@@ -54,7 +51,7 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-DAG:        "{{.*}}OnlyWithMacro.h"
 // CHECK-DAG:        "{{.*}}module.modulemap"
-// CHECK-NEXT:      ],
+// CHECK:           ],
 // CHECK-NEXT:      "directDependencies": [
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "linkLibraries": [
