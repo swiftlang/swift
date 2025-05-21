@@ -259,9 +259,6 @@ ImportedType importer::findOptionSetEnum(clang::QualType type,
   if (!clangEnum)
     return ImportedType();
 
-  // Only ASSERT() on assertions-enabled builds. This preserves existing
-  // behavior and de-risks existing builds, but should be removed after 6.2.
-#ifndef NDEBUG
   // Assert that the typedef has the same underlying integer representation as
   // the enum we think it assigns a type name to.
   //
@@ -275,7 +272,6 @@ ImportedType importer::findOptionSetEnum(clang::QualType type,
     ASSERT(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
            typedefType->getCanonicalTypeInternal());
   }
-#endif // !NDEBUG
 
   if (auto *swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion))
     return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
