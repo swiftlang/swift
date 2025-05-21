@@ -45,3 +45,7 @@ extension MutableSpan {
   mutating func mutatingNEInout(span: inout RawSpan) {} // expected-error{{a mutating method cannot have a ~Escapable 'self'}}
   // expected-error@-1{{a mutating method cannot have a ~Escapable 'inout' parameter 'span'}}
 }
+
+extension Span {
+  mutating func mutate() {} // expected-error{{a mutating method cannot have a ~Escapable 'self'}}
+}
