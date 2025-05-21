@@ -13,6 +13,17 @@ import SizedByLifetimeboundClang
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(copy _bytesized_param1)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan) -> MutableRawSpan
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(copy _charsized_param0)
+// CHECK-NEXT: @lifetime(_charsized_param0: copy _charsized_param0)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ _charsized_param0: inout MutableRawSpan) -> MutableRawSpan
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) -> RawSpan
 
@@ -92,4 +103,17 @@ public func callSimple(_ p: RawSpan) {
 @inlinable
 public func callNonsizedLifetime(_ p: UnsafeRawPointer) {
   let _: RawSpan = nonsizedLifetime(73, p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@inlinable
+public func callBytesized(_ p: RawSpan) {
+  let _: MutableRawSpan = bytesized(p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@inlinable
+@lifetime(p: copy p)
+public func callCharsized(_ p: inout MutableRawSpan) {
+  let _: MutableRawSpan = charsized(&p)
 }

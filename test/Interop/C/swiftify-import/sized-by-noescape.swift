@@ -12,6 +12,15 @@ import SizedByNoEscapeClang
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(_charsized_param0: copy _charsized_param0)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_  _charsized_param0: inout MutableRawSpan)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: RawSpan)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -92,4 +101,17 @@ public func callSimple(_ p: RawSpan) {
 @inlinable
 public func callSwiftAttr(_ p: RawSpan) {
   swiftAttr(p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@inlinable
+public func callBytesized(_ p: RawSpan) {
+  bytesized(p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@inlinable
+@lifetime(p: copy p)
+public func callCharsized(_ p: inout MutableRawSpan) {
+  charsized(&p)
 }
