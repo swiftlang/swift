@@ -1097,8 +1097,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
-  if (auto mdi = MarkDependenceInstruction(this)) {
-    if (mdi.getBase()->getType().isAddress())
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
+    if (mdi->getBase()->getType().isAddress())
       return MemoryBehavior::MayRead;
     return MemoryBehavior::None;
   }
