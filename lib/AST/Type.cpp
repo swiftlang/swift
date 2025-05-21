@@ -2176,8 +2176,10 @@ Identifier GenericTypeParamType::getName() const {
   if (!isCanonical())
     return Name;
 
-  // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
+  return getCanonicalName();
+}
 
+Identifier GenericTypeParamType::getCanonicalName() const {
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
