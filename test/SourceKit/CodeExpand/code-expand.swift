@@ -315,3 +315,23 @@ struct ExpandDeclMacro {
   // CHECK-NEXT:   <#code#>
   // CHECK-NEXT: }))
 }
+
+@Foo(<#Int#>)
+func testDeclAttr1() {}
+// CHECK: @Foo(<#Int#>)
+// CHECK-NEXT: func testDeclAttr1() {}
+
+@Foo(<#T##() -> ()#>)
+func testDeclAttr2() {}
+// CHECK:      @Foo({
+// CHECK-NEXT:   <#code#>
+// CHECK-NEXT: })
+// CHECK-NEXT: func testDeclAttr2() {}
+
+func testTypeAttr1(x: @Foo(<#Int#>) String) {}
+// CHECK: func testTypeAttr1(x: @Foo(<#Int#>) String) {}
+
+func testTypeAttr2(x: @Foo(<#T##() -> ()#>) Int) {}
+// CHECK: func testTypeAttr2(x: @Foo({
+// CHECK-NEXT:   <#code#>
+// CHECK-NEXT: }) Int) {}

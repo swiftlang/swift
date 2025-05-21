@@ -1592,6 +1592,10 @@ private:
       return MacroWalking::Arguments;
     }
 
+    bool shouldWalkIntoCustomAttrs() const override {
+      return true;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<EditorPlaceholderExpr>(E) && E->getStartLoc() == PlaceholderLoc) {
         Found = cast<EditorPlaceholderExpr>(E);
