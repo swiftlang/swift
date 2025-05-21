@@ -1823,7 +1823,6 @@ static void diagnoseRetroactiveConformances(
     return;
   }
 
-  Type extendedType = ext->getExtendedType();
   NominalTypeDecl *extendedNominalDecl = ext->getExtendedNominal();
   if (!extendedNominalDecl) {
     return;
@@ -1836,88 +1835,88 @@ static void diagnoseRetroactiveConformances(
     return;
   }
 
+  llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
+  for (auto *conformance : ext->getLocalConformances()) {
+    if (conformance->isRetroactive()) {
+      externalProtocols.insert(conformance->getProtocol());
+    }
+  }
+
   // At this point, we know we're extending a type declared outside this module.
   // We better only be conforming it to protocols declared within this module.
-  llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
   llvm::SmallSet<ProtocolDecl *, 8> protocolsWithRetroactiveAttr;
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
-    if (entry.getType().isNull() || !entry.getTypeRepr()) {
+    auto inheritedTy = entry.getType();
+    if (inheritedTy.isNull() || !entry.getTypeRepr()) {
       continue;
     }
 
-    auto proto =
-        dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
-    if (!proto) {  
-      continue;
-    }
-    
-    // As a fallback, to support previous language versions, also allow
-    // this through if the protocol has been explicitly module-qualified.
-    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
-    if (isModuleQualified(repr, proto->getParentModule())) {
-      continue;
-    }
+    SmallVector<ProtocolDecl *, 2> protos;
+    if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
+      auto *proto = protoTy->getDecl();
 
-    proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
-
-      // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = lookupConformance(extendedType, decl);
-      if (!conformanceRef.isConcrete()) {
-        return TypeWalker::Action::Continue;
-      }
-      auto conformance = conformanceRef.getConcrete();
-
-      // If that conformance came from this extension, then we warn. Otherwise
-      // we will have diagnosed it on the extension that actually declares this
-      // specific conformance.
-      if (conformance->getDeclContext() != ext) {
-        return TypeWalker::Action::Continue;
+      // As a fallback, to support previous language versions, also allow
+      // this through if the protocol has been explicitly module-qualified.
+      TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
+      if (isModuleQualified(repr, proto->getParentModule())) {
+        protocolsWithRetroactiveAttr.insert(proto);
+        continue;
       }
 
-      // If this isn't a retroactive conformance, skip it.
-      if (!conformance->isRetroactive()) {
-        // However, if this is the protocol in the inherited type entry,
-        // check to make sure it's not erroneously marked @retroactive when it's
-        // not actually retroactive.
-        if (decl == proto && entry.isRetroactive()) {
-          auto loc =
-              entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
-
-          bool typeInSamePackage = extTypeModule->inSamePackage(module);
-          bool typeIsSameModule =
-              extTypeModule->isSameModuleLookingThroughOverlays(module);
-
-          auto declForDiag = (typeIsSameModule || typeInSamePackage)
-                                 ? extendedNominalDecl
-                                 : proto;
-          bool isSameModule = declForDiag->getParentModule()
-                                  ->isSameModuleLookingThroughOverlays(module);
-
-          diags
-              .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
-                        isSameModule)
-              .warnUntilSwiftVersion(6)
-              .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
-          return TypeWalker::Action::Stop;
+      protos.push_back(proto);
+    } else if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
+      for (auto memberTy : compositionTy->getMembers()) {
+        if (auto *protoTy = memberTy->getAs<ProtocolType>()) {
+          protos.push_back(protoTy->getDecl());
         }
-        return TypeWalker::Action::Continue;
       }
+    } else {
+      continue;
+    }
 
-      // If it's marked @retroactive, no need to warn.
-      if (entry.isRetroactive()) {
-        // Note that we encountered this protocol through a conformance marked
-        // @retroactive in case multiple clauses cause the protocol to be
-        // inherited.
-        protocolsWithRetroactiveAttr.insert(decl);
+    for (auto *proto : protos) {
+      proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
+        // If this isn't a retroactive conformance, skip it.
+        if (!externalProtocols.count(proto)) {
+          // However, if this is the protocol in the inherited type entry,
+          // check to make sure it's not erroneously marked @retroactive when it's
+          // not actually retroactive.
+          if (decl == proto && entry.isRetroactive()) {
+            auto loc =
+                entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
+
+            bool typeInSamePackage = extTypeModule->inSamePackage(module);
+            bool typeIsSameModule =
+                extTypeModule->isSameModuleLookingThroughOverlays(module);
+
+            auto declForDiag = (typeIsSameModule || typeInSamePackage)
+                                   ? extendedNominalDecl
+                                   : proto;
+            bool isSameModule = declForDiag->getParentModule()
+                                    ->isSameModuleLookingThroughOverlays(module);
+
+            diags
+                .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
+                          isSameModule)
+                .warnUntilSwiftVersion(6)
+                .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
+            return TypeWalker::Action::Stop;
+          }
+          return TypeWalker::Action::Continue;
+        }
+
+        // If it's marked @retroactive, no need to warn.
+        if (entry.isRetroactive()) {
+          // Note that we encountered this protocol through a conformance marked
+          // @retroactive in case multiple clauses cause the protocol to be
+          // inherited.
+          protocolsWithRetroactiveAttr.insert(decl);
+          return TypeWalker::Action::Continue;
+        }
+
         return TypeWalker::Action::Continue;
-      }
-
-      // If we've come this far, we know this extension is the first declaration
-      // of the conformance of the extended type to this protocol.
-      externalProtocols.insert(decl);
-
-      return TypeWalker::Action::Continue;
-    });
+      });
+    }
   }
 
   // Remove protocols that are reachable through a @retroactive conformance.
