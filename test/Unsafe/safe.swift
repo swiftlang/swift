@@ -334,8 +334,8 @@ func testSwitch(se: SomeEnum) {
   switch unsafe se {
   case someEnumValue: break
     // expected-warning@-1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{8-8=unsafe }}
-    // expected-note@-2{{argument #0 in call to operator function '~=' has unsafe type 'T'}}
-    // expected-note@-3{{argument #1 in call to operator function '~=' has unsafe type 'T'}}
+    // expected-note@-2{{argument #0 in call to operator function '~=' has unsafe type 'SomeEnum'}}
+    // expected-note@-3{{argument #1 in call to operator function '~=' has unsafe type 'SomeEnum'}}
     // expected-note@-4{{reference to unsafe type 'SomeEnum'}}
     // expected-note@-5{{reference to unsafe var 'someEnumValue'}}
     // expected-note@-6{{reference to let '$match' involves unsafe type 'SomeEnum'}}
