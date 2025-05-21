@@ -325,8 +325,22 @@ do {
     // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{12-12=@concurrent }}{{none}}
     test { a, b async in                                          await asyncOnly(a, b) }
     test { @concurrent a, b async in                              await asyncOnly(a, b) }
-    // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{11-11= @concurrent in }}{{none}}
+
+    // No space after 'in' necessary.
+    // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{11-11= @concurrent in}}{{none}}
     test {                                                        try await asyncThrows($0, $1) }
+    // No space after 'in' necessary.
+    // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{11-11= @concurrent in}}{{none}}
+    test { try await asyncThrows($0, $1) }
+    // No space after 'in' necessary.
+    // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{11-11= @concurrent in}}{{none}}
+    test {
+      try await asyncThrows($0, $1)
+    }
+    // Add a space after in.
+    // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{11-11= @concurrent in }}{{none}}
+    test {try await asyncThrows($0, $1)}
+
     test { @concurrent in                                         try await asyncThrows($0, $1) }
     // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async closure to run on the caller's actor; use '@concurrent' to preserve behavior}}{{12-12=@concurrent }}{{none}}
     test { [x] in                                                 try await asyncThrows($0, $1 + x) }
