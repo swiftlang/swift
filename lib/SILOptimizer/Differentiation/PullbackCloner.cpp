@@ -3663,7 +3663,7 @@ void PullbackCloner::Implementation::
   //  function_ref _finalizeUninitializedArray<A>(_:)
   //  %25 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
   //  %26 = apply %25<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %27
-  // Note that %20 and %21 in some sense "aliases" each other. Here our `originalValue` is %20 in the code above.
+  // Note that %20 and %21 are in some sense "aliases" for each other. Here our `originalValue` is %20 in the code above.
   // We need to trace from %21 down to %23 and propagate (decomposed) adjoint of originalValue to adjoint of %23.
   // Then the generic adjoint propagation code would do its job to propagate %23' to %0'.
   // If we're initializing multiple values we're having additional `index_addr` instructions, but
