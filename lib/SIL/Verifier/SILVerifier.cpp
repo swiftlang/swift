@@ -2387,7 +2387,8 @@ public:
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
 
-    if (builtinKind == BuiltinValueKind::ZeroInitializer) {
+    if (builtinKind == BuiltinValueKind::ZeroInitializer ||
+        builtinKind == BuiltinValueKind::PrepareInitialization) {
       require(!BI->getSubstitutions(),
               "zeroInitializer has no generic arguments as a SIL builtin");
       if (arguments.size() == 0) {

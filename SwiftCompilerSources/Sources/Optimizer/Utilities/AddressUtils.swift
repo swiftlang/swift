@@ -159,7 +159,7 @@ extension AddressUseVisitor {
            .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
-           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer,
+           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer, .PrepareInitialization,
            .GetEnumTag, .InjectEnumTag:
         return leafAddressUse(of: operand)
       default:

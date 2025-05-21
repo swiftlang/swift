@@ -918,6 +918,10 @@ bool BridgedGlobalVar::isLet() const { return getGlobal()->isLet(); }
 
 void BridgedGlobalVar::setLet(bool value) const { getGlobal()->setLet(value); }
 
+BridgedType BridgedGlobalVar::getType() const {
+  return getGlobal()->getLoweredType();
+}
+
 BridgedLinkage BridgedGlobalVar::getLinkage() const {
   return (BridgedLinkage)getGlobal()->getLinkage();
 }
