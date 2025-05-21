@@ -129,7 +129,11 @@ struct EscapableNonTrivialSelf {
   @lifetime(borrow self)
   func methodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
-  func mutatingMethodNoParam() -> NEImmortal { NEImmortal() }
+  mutating func mutatingMethodNoParam() -> NEImmortal { NEImmortal() }
+
+  func methodInoutNonEscapableParam(_: inout NE) {}
+
+  mutating func mutatingMethodInoutNonEscapableParam(_: inout NE) {}
 
   @lifetime(self)
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
@@ -275,6 +279,10 @@ func neParamInout(ne: inout NE) -> NE { ne } // expected-error{{cannot infer the
 func neParamInoutLifetime(ne: inout NE) -> NE { ne }
 
 func neTwoParam(ne: NE, _:Int) -> NE { ne } // expected-error{{a function with a ~Escapable result requires '@lifetime(...)'}}
+
+func voidInoutOneParam(_: inout NE) {} // OK
+
+func voidInoutTwoParams(_: inout NE, _: Int) {} // OK
 
 // =============================================================================
 // Handle Accessors:
