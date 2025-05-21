@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #define __sized_by(x) __attribute__((__sized_by__(x)))
 
 void simple(int len, void * __sized_by(len) p);
@@ -21,3 +23,9 @@ void * __sized_by(len) returnPointer(int len);
 
 typedef struct foo opaque_t;
 void opaque(int len, opaque_t * __sized_by(len) p);
+
+void charsized(char *__sized_by(size), int size);
+
+uint8_t *__sized_by(size) bytesized(int size);
+
+void doublebytesized(uint16_t *__sized_by(size), int size);

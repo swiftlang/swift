@@ -3,14 +3,19 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=SizedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/SizedBy.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by parameters.
 import SizedByClang
 
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_  size: Int{{.*}}) -> UnsafeMutableRawBufferPointer
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_  _charsized_param0: UnsafeMutableRawBufferPointer)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: UnsafeMutableRawBufferPointer)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -81,4 +86,14 @@ public func callSimple(_ p: UnsafeMutableRawBufferPointer) {
 @inlinable
 public func callSwiftAttr(_ p: UnsafeMutableRawBufferPointer) {
   swiftAttr(p)
+}
+
+@inlinable
+public func callCharsized(_ p: UnsafeMutableRawBufferPointer) {
+  charsized(p)
+}
+
+@inlinable
+public func callBytesized() {
+  let _: UnsafeMutableRawBufferPointer = bytesized(37)
 }
