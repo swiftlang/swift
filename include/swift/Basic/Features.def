@@ -498,6 +498,9 @@ EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
+/// Allow declaration of compile-time values
+EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
+
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 

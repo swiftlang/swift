@@ -1354,7 +1354,7 @@ bool SILInstruction::isDeallocatingStack() const {
 }
 
 static bool typeOrLayoutInvolvesPack(SILType ty, SILFunction const &F) {
-  return ty.hasAnyPack() || ty.isOrContainsPack(F);
+  return ty.isOrContainsPack(F);
 }
 
 bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
