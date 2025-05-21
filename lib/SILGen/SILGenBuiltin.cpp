@@ -2165,11 +2165,13 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   
   auto buffer = dest->getAddressForInPlaceInitialization(SGF, loc);
   
-  // Zero-initialize the buffer.
-  // Aside from providing a modicum of predictability if the memory isn't
-  // actually initialized, this also serves to communicate to DI that the memory
+  // Mark the buffer as initializedto communicate to DI that the memory
   // is considered initialized from this point.
-  SGF.B.createZeroInitAddr(loc, buffer);
+  auto markInit = getBuiltinValueDecl(Ctx, Ctx.getIdentifier("prepareInitialization"));
+  SGF.B.createBuiltin(loc, markInit->getBaseIdentifier(),
+                       SILType::getEmptyTupleType(Ctx),
+                       SubstitutionMap(),
+                       buffer);
 
   SILValue bufferPtr = SGF.B.createAddressToPointer(loc, buffer,
         SILType::getPrimitiveObjectType(SGF.getASTContext().TheRawPointerType),

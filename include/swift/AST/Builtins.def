@@ -851,6 +851,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 /// own rules.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
 
+/// Like `zeroInitializer`, but does not actually initialize the memory.
+/// It only indicates to mandatory passes that the memory is going to be initialized.
+BUILTIN_MISC_OPERATION(PrepareInitialization, "prepareInitialization", "n", Special)
+
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
 // Retrieve the SerialExecutorRef on which the current asynchronous
