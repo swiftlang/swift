@@ -462,3 +462,14 @@ func testNoIsolationTransfer() {
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   testErasure { @concurrent in }
 }
+
+func testClosuresDontAssumeGlobalActorWithMarkedAsConcurrent() {
+  func test(_ fn: @MainActor () async -> Void) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]]
+  // CHECK: } // end sil function '$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_'
+  test { @Sendable @concurrent in
+  }
+}
