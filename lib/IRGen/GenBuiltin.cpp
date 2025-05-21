@@ -897,6 +897,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   
+  if (Builtin.ID == BuiltinValueKind::Select) {
+    using namespace llvm;
+    
+    auto pred = args.claimNext();
+    auto ifTrue = args.claimNext();
+    auto ifFalse = args.claimNext();
+    out.add(IGF.Builder.CreateSelect(pred, ifTrue, ifFalse));
+    return;
+  }
+  
   if (Builtin.ID == BuiltinValueKind::ShuffleVector) {
     using namespace llvm;
 
