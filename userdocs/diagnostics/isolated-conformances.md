@@ -1,5 +1,7 @@
 # Isolated conformances
 
+Using an isolated conformance from outside the actor can cause data races in your program. Resolve these errors by only using isolated conformances within the actor.
+
 A protocol conformance can be isolated to a specific global actor, meaning that the conformance can only be used by code running on that actor. Isolated conformances are expressed by specifying the global actor on the conformance itself:
 
 ```swift
