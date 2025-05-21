@@ -1950,7 +1950,7 @@ private:
           nullptr, PtrSize, 0,
           /* DWARFAddressSpace */ std::nullopt, MangledName);
 
-      return DBuilder.createObjectPointerType(PTy, /*Implicit=*/false);
+      return DBuilder.createObjectPointerType(PTy, /*Implicit=*/true);
     }
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
