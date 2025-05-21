@@ -9,6 +9,8 @@
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck %s < %t/deps.json
 
+// REQUIRES: rdar151740686
+
 import ImportsMacroSpecificClangModule
 
 // CHECK:      "directDependencies": [
