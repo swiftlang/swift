@@ -71,6 +71,10 @@ namespace swift {
     MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultWitnessTable *>>
     DefaultWitnessTables;
 
+    std::unique_ptr<SerializedFuncTable> DefaultOverrideTableList;
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultOverrideTable *>>
+        DefaultOverrideTables;
+
     MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
 
@@ -175,12 +179,17 @@ namespace swift {
     void readWitnessTableEntries(
            llvm::BitstreamEntry &entry,
            std::vector<SILWitnessTable::Entry> &witnessEntries,
-           std::vector<SILWitnessTable::ConditionalConformance>
-             &conditionalConformances);
+           std::vector<ProtocolConformanceRef> &conditionalConformances);
     SILProperty *readProperty(serialization::DeclID);
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
+    void readDefaultOverrideTableEntries(
+        llvm::BitstreamEntry &entry,
+        std::vector<SILDefaultOverrideTable::Entry> &entries);
+    SILDefaultOverrideTable *
+    readDefaultOverrideTable(serialization::DeclID,
+                             SILDefaultOverrideTable *existingOt);
     SILDifferentiabilityWitness *
         readDifferentiabilityWitness(serialization::DeclID);
 
@@ -197,6 +206,7 @@ namespace swift {
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
+    SILGlobalVariable *lookupSILGlobalVariable(StringRef Name);
     bool hasSILFunction(StringRef Name,
                         std::optional<SILLinkage> Linkage = std::nullopt);
     SILVTable *lookupVTable(StringRef MangledClassName);
@@ -204,6 +214,8 @@ namespace swift {
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    SILDefaultOverrideTable *
+    lookupDefaultOverrideTable(SILDefaultOverrideTable *ot);
     SILDifferentiabilityWitness *
     lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
 
@@ -276,6 +288,7 @@ namespace swift {
       getAllVTables();
       getAllWitnessTables();
       getAllDefaultWitnessTables();
+      getAllDefaultOverrideTables();
       getAllProperties();
       getAllDifferentiabilityWitnesses();
       getAllMoveOnlyDeinits();
@@ -301,6 +314,10 @@ namespace swift {
     /// Deserialize all DefaultWitnessTables inside the module and add them
     /// to SILMod.
     void getAllDefaultWitnessTables();
+
+    /// Deserialize all DefaultOverrideTables inside the module and add them to
+    /// SILMod.
+    void getAllDefaultOverrideTables();
 
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.

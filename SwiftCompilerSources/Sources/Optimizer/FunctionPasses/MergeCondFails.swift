@@ -39,10 +39,12 @@ private func runMergeCondFails(function: Function, context: FunctionPassContext)
 
     for inst in block.instructions {
       if let cfi = inst as? CondFailInst {
+        let messageIsSame = condFailToMerge.isEmpty || cfi.message == condFailToMerge.first!.message
+        let forceAllowMerge = context.options.enableMergeableTraps
+
         // Do not process arithmetic overflow checks. We typically generate more
         // efficient code with separate jump-on-overflow.
-        if !hasOverflowConditionOperand(cfi) &&
-           (condFailToMerge.isEmpty || cfi.message == condFailToMerge.first!.message) {
+        if !hasOverflowConditionOperand(cfi) && (messageIsSame || forceAllowMerge) {
           condFailToMerge.push(cfi)
         }
       } else if inst.mayHaveSideEffects || inst.mayReadFromMemory {

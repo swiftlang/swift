@@ -65,6 +65,12 @@ StdStringTestSuite.test("std::string <=> Swift.String") {
     }
     let swift7 = String(cxx7)
     expectEqual(swift7, "���")
+
+    let cxxLiteral: std.string = "Hello"
+    let cxx8: std.string = "\(cxxLiteral), World!"
+    expectEqual(cxx8.size(), 13)
+    let swift8 = String(cxx8)
+    expectEqual(swift8, "Hello, World!")
 }
 
 StdStringTestSuite.test("std::string operators") {
@@ -287,6 +293,12 @@ StdStringTestSuite.test("std::u16string <=> Swift.String") {
     expectEqual(cxx6.size(), 7)
     let swift6 = String(cxx6)
     expectEqual(swift6, "xyz\0abc")
+
+    let cxxLiteral: std.u16string = "Hello"
+    let cxx8: std.u16string = "\(cxxLiteral), World!"
+    expectEqual(cxx8.size(), 13)
+    let swift8 = String(cxx8)
+    expectEqual(swift8, "Hello, World!")
 }
 
 StdStringTestSuite.test("std::u32string <=> Swift.String") {
@@ -317,6 +329,12 @@ StdStringTestSuite.test("std::u32string <=> Swift.String") {
     expectEqual(cxx6.size(), 7)
     let swift6 = String(cxx6)
     expectEqual(swift6, "xyz\0abc")
+
+    let cxxLiteral: std.u32string = "Hello"
+    let cxx8: std.u32string = "\(cxxLiteral), World!"
+    expectEqual(cxx8.size(), 13)
+    let swift8 = String(cxx8)
+    expectEqual(swift8, "Hello, World!")
 }
 
 StdStringTestSuite.test("std::string as Swift.CustomDebugStringConvertible") {

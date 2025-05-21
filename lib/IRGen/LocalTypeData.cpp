@@ -408,26 +408,59 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   // functions that were inlined into transparent functions. Correct would be to
   // check which instruction requests the type metadata and see whether its
   // inlined function is transparent.
-  auto * DS = IGF.getDebugScope();
+  auto *DS = IGF.getDebugScope();
   if (DS && DS->getInlinedFunction() &&
       DS->getInlinedFunction()->isTransparent())
     return;
-  
-  // Only for formal type metadata.
-  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
+  // For formal type metadata and witness tables.
+  ProtocolDecl *proto = nullptr;
+
+  if (key.Kind.isAbstractProtocolConformance())
+    proto = key.Kind.getAbstractProtocolConformance();
+  else if (key.Kind.isConcreteProtocolConformance())
+    proto = key.Kind.getConcreteProtocolConformance()->getProtocol();
+  else if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;
 
   // Only for archetypes, and not for opened/opaque archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (!type->isRoot())
+  if (!type->isRoot() && !proto)
     return;
   if (!isa<PrimaryArchetypeType>(type) && !isa<PackArchetypeType>(type))
     return;
 
-  auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
-  auto name = typeParam->getName().str();
+  auto interfaceType = type->getInterfaceType();
+  llvm::SmallString<16> name;
+  llvm::SmallString<16> displayName;
+  if (auto DMT =
+          llvm::dyn_cast<DependentMemberType>(interfaceType.getPointer())) {
+    std::function<void(DependentMemberType *)> visitDependentMembers =
+        [&](DependentMemberType *member) {
+          if (member == nullptr)
+            return;
+          if (auto *parent =
+                  llvm::dyn_cast<DependentMemberType>(member->getBase())) {
+            visitDependentMembers(parent);
+            name.append("$");
+            displayName.append(".");
+          }
+          name.append(member->getName().str());
+          displayName.append(member->getName().str());
+        };
+    name.append(DMT->getRootGenericParam()->getCanonicalName().str());
+    name.append("$");
+    displayName.append(DMT->getRootGenericParam()->getName().str());
+    displayName.append(".");
+    visitDependentMembers(DMT);
+  } else if (auto GTPT = llvm::dyn_cast<GenericTypeParamType>(
+                 interfaceType.getPointer())) {
+    name = GTPT->getCanonicalName().str();
+    displayName = GTPT->getName().str();
+  } else {
+    return;
+  }
 
   llvm::Value *data = value.getMetadata();
 
@@ -438,7 +471,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   // though; see the comment in IRGenFunctionSIL::emitShadowCopyIfNeeded().
   if (!IGF.IGM.IRGen.Opts.shouldOptimize() && !IGF.isAsync()) {
     auto alloca =
-        IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(), name);
+        IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(), displayName);
     IGF.Builder.CreateStore(data, alloca);
     data = alloca.getAddress();
   }
@@ -447,10 +480,12 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (!IGF.IGM.DebugInfo)
     return;
 
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data,
-                                      typeParam->getDepth(),
-                                      typeParam->getIndex(),
-                                      name);
+  if (proto) {
+    IGF.IGM.DebugInfo->emitWitnessTable(IGF, data, name, proto);
+  } else {
+    auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
+    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam);
+  }
 }
 
 void
@@ -735,11 +770,20 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
-  if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
-                                       metadata.getStaticLowerBoundOnState(),
-                                       /*source*/ 0, MetadataPath(),
-                                       callbacks)) {
-    return;
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (!fulfillments.searchTupleTypeMetadata(IGF.IGM, tupleType, isExact,
+                                              metadata.getStaticLowerBoundOnState(),
+                                              /*source*/ 0, MetadataPath(),
+                                              callbacks)) {
+      return;
+    }
+  } else {
+    if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                         metadata.getStaticLowerBoundOnState(),
+                                         /*source*/ 0, MetadataPath(),
+                                         callbacks)) {
+      return;
+    }
   }
 
   addAbstractForFulfillments(IGF, std::move(fulfillments),

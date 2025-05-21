@@ -96,6 +96,7 @@
       ],
       "Lazy Views": [
         "Algorithm.swift",
+        "EnumeratedSequence.swift",
         "Flatten.swift",
         "FlatMap.swift",
         "Map.swift",
@@ -199,8 +200,19 @@
     "UnsafeRawBufferPointer.swift"
   ],
   "Span": [
+    "MutableRawSpan.swift",
+    "MutableSpan.swift",
     "RawSpan.swift",
     "Span.swift"
+  ],
+  "UTF8Span": [ 
+    "UTF8EncodingError.swift",
+    "UTF8Span.swift",
+    "UTF8SpanBits.swift",
+    "UTF8SpanComparisons.swift",
+    "UTF8SpanFundamentals.swift",
+    "UTF8SpanInternalHelpers.swift",
+    "UTF8SpanIterators.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -257,8 +269,7 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift",
-    "SwiftSettings.swift"
+    "InlineArray.swift"
   ],
   "Result": [
     "Result.swift"

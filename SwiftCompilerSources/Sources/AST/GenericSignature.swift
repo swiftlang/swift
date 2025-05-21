@@ -25,4 +25,12 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
   public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
+
+  public var genericParameters: TypeArray {
+    TypeArray(bridged: bridged.getGenericParams())
+  }
+
+  public func mapTypeIntoContext(_ type: Type) -> Type {
+    Type(bridged: bridged.mapTypeIntoContext(type.bridged))
+  }
 }

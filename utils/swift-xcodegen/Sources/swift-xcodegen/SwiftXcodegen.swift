@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import ArgumentParser
-import Darwin
+import Foundation
 import SwiftXcodeGen
 
 @main
@@ -204,7 +204,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       if self.addClangToolsExtra {
         spec.addClangTargets(
           below: "../clang-tools-extra", addingPrefix: "extra-",
-          mayHaveUnbuildableFiles: true
+          mayHaveUnbuildableFiles: true, excluding: ["test"]
         )
         if self.addTestFolders {
           spec.addReference(to: "../clang-tools-extra/test")
@@ -399,14 +399,27 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
         try lldbLLVMWorkspace.write("LLDB+LLVM", into: outputDir)
       }
     }
-    showCaveatsIfNeeded()
+  }
+
+  func printingTimeTaken<T>(_ fn: () async throws -> T) async rethrows -> T {
+    let start = Date()
+    let result = try await fn()
+
+    // Note we don't print the time taken when we fail.
+    let delta = Date().timeIntervalSince(start)
+    log.info("Successfully generated in \(Int((delta * 1000).rounded()))ms")
+
+    return result
   }
 
   func run() async {
     // Set the log level
     log.logLevel = .init(self.logLevel ?? (self.quiet ? .warning : .info))
     do {
-      try await generate()
+      try await printingTimeTaken {
+        try await generate()
+      }
+      showCaveatsIfNeeded()
     } catch {
       log.error("\(error)")
     }

@@ -124,6 +124,7 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Decls, core->Decls);
   allocateBuffer(LocalDeclContexts, core->LocalDeclContexts);
   allocateBuffer(Conformances, core->Conformances);
+  allocateBuffer(AbstractConformances, core->AbstractConformances);
   allocateBuffer(PackConformances, core->PackConformances);
   allocateBuffer(SILLayouts, core->SILLayouts);
   allocateBuffer(Types, core->Types);
@@ -164,15 +165,18 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     if (dependency.isHeader()) {
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
-      if (!dependency.Core.RawPath.empty() &&
-          !M->getASTContext().SearchPathOpts.BridgingHeaderChaining) {
+      if (!dependency.Core.RawPath.empty()) {
+        // If using bridging header chaining, just bind the entire bridging
+        // header pch to the module. Otherwise, import the header.
         bool hadError =
-            clangImporter->importHeader(dependency.Core.RawPath,
-                                        file->getParentModule(),
-                                        Core->importedHeaderInfo.fileSize,
-                                        Core->importedHeaderInfo.fileModTime,
-                                        Core->importedHeaderInfo.contents,
-                                        diagLoc);
+            M->getASTContext().SearchPathOpts.BridgingHeaderChaining
+                ? clangImporter->bindBridgingHeader(file->getParentModule(),
+                                                    diagLoc)
+                : clangImporter->importHeader(
+                      dependency.Core.RawPath, file->getParentModule(),
+                      Core->importedHeaderInfo.fileSize,
+                      Core->importedHeaderInfo.fileModTime,
+                      Core->importedHeaderInfo.contents, diagLoc);
         if (hadError)
           return error(Status::FailedToLoadBridgingHeader);
       }
@@ -1171,16 +1175,18 @@ void ModuleFile::collectBasicSourceFileInfo(
     auto fingerprintIncludingTypeMembers =
       Fingerprint::fromString(fpStrIncludingTypeMembers);
     if (!fingerprintIncludingTypeMembers) {
-      llvm::errs() << "Unconvertible fingerprint including type members'"
-                   << fpStrIncludingTypeMembers << "'\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unconvertible fingerprint including type members '"
+            << fpStrIncludingTypeMembers << "'";
+      });
     }
     auto fingerprintExcludingTypeMembers =
       Fingerprint::fromString(fpStrExcludingTypeMembers);
     if (!fingerprintExcludingTypeMembers) {
-      llvm::errs() << "Unconvertible fingerprint excluding type members'"
-                   << fpStrExcludingTypeMembers << "'\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unconvertible fingerprint excluding type members '"
+            << fpStrExcludingTypeMembers << "'";
+      });
     }
     callback(BasicSourceFileInfo(filePath,
                                  fingerprintIncludingTypeMembers.value(),

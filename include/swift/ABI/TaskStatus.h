@@ -133,10 +133,13 @@ public:
 /// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
-public:
-  AsyncTask *FirstChild;
+  // FirstChild may be read concurrently to check for the presence of children,
+  // so it needs to be atomic. The pointer is never dereferenced in that case,
+  // so we can universally use memory_order_relaxed on it.
+  std::atomic<AsyncTask *> FirstChild;
   AsyncTask *LastChild;
 
+public:
   TaskGroupTaskStatusRecord()
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
         FirstChild(nullptr),
@@ -155,7 +158,9 @@ public:
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy
   /// `isChildTask()`.
-  AsyncTask *getFirstChild() const { return FirstChild; }
+  AsyncTask *getFirstChild() const {
+    return FirstChild.load(std::memory_order_relaxed);
+  }
 
   /// Attach the passed in `child` task to this group.
   void attachChild(AsyncTask *child) {
@@ -165,9 +170,9 @@ public:
     auto oldLastChild = LastChild;
     LastChild = child;
 
-    if (!FirstChild) {
+    if (!getFirstChild()) {
       // This is the first child we ever attach, so store it as FirstChild.
-      FirstChild = child;
+      FirstChild.store(child, std::memory_order_relaxed);
       return;
     }
 
@@ -176,15 +181,18 @@ public:
 
   void detachChild(AsyncTask *child) {
     assert(child && "cannot remove a null child from group");
-    if (FirstChild == child) {
-      FirstChild = getNextChildTask(child);
-      if (FirstChild == nullptr) {
+
+    AsyncTask *prev = getFirstChild();
+
+    if (prev == child) {
+      AsyncTask *next = getNextChildTask(child);
+      FirstChild.store(next, std::memory_order_relaxed);
+      if (next == nullptr) {
         LastChild = nullptr;
       }
       return;
     }
 
-    AsyncTask *prev = FirstChild;
     // Remove the child from the linked list, i.e.:
     //     prev -> afterPrev -> afterChild
     //                 ==
@@ -261,7 +269,7 @@ public:
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = SWIFT_CC(swift) void(JobPriority, SWIFT_CONTEXT void *);
+  using FunctionType = SWIFT_CC(swift) void(JobPriority, JobPriority, SWIFT_CONTEXT void *);
 
 private:
   FunctionType *__ptrauth_swift_escalation_notification_function Function;
@@ -273,8 +281,8 @@ public:
         Function(fn), Argument(arg) {
   }
 
-  void run(JobPriority newPriority) {
-    Function(newPriority, Argument);
+  void run(JobPriority oldPriority, JobPriority newPriority) {
+    Function(oldPriority, newPriority, Argument);
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -439,7 +447,8 @@ public:
     DependentOn.Executor = executor;
   }
 
-  void performEscalationAction(JobPriority newPriority);
+  void performEscalationAction(
+      JobPriority oldPriority, JobPriority newPriority);
 };
 
 } // end namespace swift

@@ -885,7 +885,7 @@ bb0(%0 : $Builtin.FPIEEE32):
 // CHECK:       } // end sil function 'dont_fold_comparison_with_inf'
 }
 
-sil @dont_fold_comparison_with_inf2 : $@convention(thin) () -> Builtin.Int1 {
+sil @fold_comparison_with_inf : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %2 = float_literal $Builtin.FPIEEE32, 0x7F800000 // +Inf // user: %3
   %5 = integer_literal $Builtin.Int32, 2139095040
@@ -893,10 +893,10 @@ bb0:
   %9 = builtin "fcmp_olt_FPIEEE32"(%2 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.Int1
   return %9 : $Builtin.Int1
 
-// CHECK-LABEL: sil @dont_fold_comparison_with_inf2 :
-// CHECK:         [[R:%.*]] = builtin "fcmp_olt_FPIEEE32"
+// CHECK-LABEL: sil @fold_comparison_with_inf :
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         return [[R]]
-// CHECK:       } // end sil function 'dont_fold_comparison_with_inf2'
+// CHECK:       } // end sil function 'fold_comparison_with_inf'
 }
 
 // fold float comparison operations with Infinity/NaN when the other argument is not constant
@@ -904,10 +904,10 @@ sil @fold_float_comparison_with_non_constant_arg : $@convention(thin) (Float) ->
 bb0(%0: $Float):
   %1 = struct_extract %0 : $Float, #Float._value
   
-  %2 = integer_literal $Builtin.Int32, 2143289344 // user: %3   
+  %2 = integer_literal $Builtin.Int32, 2143289344
   %3 = builtin "bitcast_Int32_FPIEEE32"(%2 : $Builtin.Int32) : $Builtin.FPIEEE32 // NaN
   
-  %4 = integer_literal $Builtin.Int32, 2139095040 // user: %4
+  %4 = integer_literal $Builtin.Int32, 2139095040
   %5 = builtin "bitcast_Int32_FPIEEE32"(%4 : $Builtin.Int32) : $Builtin.FPIEEE32 // Inf
 
   %6 = builtin "fcmp_oge_FPIEEE32"(%3 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
@@ -917,20 +917,19 @@ bb0(%0: $Float):
   return %8 : $()  
 
 // CHECK-LABEL: sil @fold_float_comparison_with_non_constant_arg
-// CHECK: bb0(%0 : $Float):
-// CHECK-NEXT: %1 = struct_extract %0 : $Float, #Float._value  // user: %5
-// CHECK-NEXT: %2 = integer_literal $Builtin.Int32, 2139095040 // user: %3
-// CHECK-NEXT: %3 = builtin "bitcast_Int32_FPIEEE32"(%2 : $Builtin.Int32) : $Builtin.FPIEEE32 // user: %5
+// CHECK:       bb0(%0 : $Float):
+// CHECK-NEXT:    %1 = struct_extract %0 : $Float, #Float._value
+// CHECK-NEXT:    %2 = float_literal $Builtin.FPIEEE32, 0x7F800000 // +Inf
 
 // Comparison with NaN is always folded
-// CHECK-NEXT: %4 = integer_literal $Builtin.Int1, 0 
+// CHECK-NEXT:    %3 = integer_literal $Builtin.Int1, 0 
 
 // Comparison with Inf is not folded unless the other argument can be proven to be constant
-// CHECK-NEXT: %5 = builtin "fcmp_oge_FPIEEE32"(%3 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+// CHECK-NEXT:    %4 = builtin "fcmp_oge_FPIEEE32"(%2 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
 
-// CHECK-NEXT: %6 = tuple ()                                   // user: %7
-// CHECK-NEXT: return %6 : $()                                 // id: %7
-// CHECK-NEXT: } // end sil function 'fold_float_comparison_with_non_constant_arg'
+// CHECK-NEXT:    %5 = tuple ()
+// CHECK-NEXT:    return %5
+// CHECK-NEXT:  } // end sil function 'fold_float_comparison_with_non_constant_arg'
 }
 
 sil @fold_inf_comparisons_with_itself : $@convention(thin) () -> () {
@@ -985,6 +984,55 @@ sil @fold_inf_comparisons_with_itself : $@convention(thin) () -> () {
 // CHECK:   %24 = tuple ()                                  
 // CHECK:   return %24 : $()                                
 // CHECK: } // end sil function 'fold_inf_comparisons_with_itself'
+}
+
+
+// CHECK-LABEL: sil @fold_cast_to_fp :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
+// CHECK-NEXT:    return %0 : $Builtin.FPIEEE64
+// CHECK:       } // end sil function 'fold_cast_to_fp'
+sil @fold_cast_to_fp : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = builtin "sitofp_Int64_FPIEEE64"(%0) : $Builtin.FPIEEE64
+  return %1
+}
+
+// CHECK-LABEL: sil @fold_bitcast_to_fp :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'fold_bitcast_to_fp'
+sil @fold_bitcast_to_fp : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 4607182418800017408
+  %1 = builtin "bitcast_Int64_FPIEEE64"(%0) : $Builtin.FPIEEE64
+  return %1
+}
+
+// CHECK-LABEL: sil @fold_bitcast_to_int :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 4607182418800017408
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'fold_bitcast_to_int'
+sil @fold_bitcast_to_int : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %1 = builtin "bitcast_FPIEEE64_Int64"(%0) : $Builtin.Int64
+  return %1
+}
+
+// CHECK-LABEL: sil @fold_rint :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = float_literal $Builtin.FPIEEE64, 0x40F0000000000000 // 65536
+// CHECK-NEXT:    return %0 : $Builtin.FPIEEE64
+// CHECK:       } // end sil function 'fold_rint'
+sil @fold_rint : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %0 = float_literal $Builtin.FPIEEE64, 0x40F0000000000000 // 65536
+  %1 = builtin "int_rint_FPIEEE64"(%0) : $Builtin.FPIEEE64
+  return %1
 }
 
 // fold float comparison operations with opaque values, that may be constant
@@ -1425,6 +1473,33 @@ bb0(%0 : $*Error, %1 : $*E1):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @generic_to_existential_cast
+// CHECK:         init_existential_addr
+// CHECK:       } // end sil function 'generic_to_existential_cast'
+sil [ossa] @generic_to_existential_cast : $@convention(thin) <T where T : P> (@in_guaranteed T) -> @out any P {
+bb0(%0: $*any P, %1 : $*T):
+  %29 = alloc_stack $T
+  copy_addr %1 to [init] %29
+  unconditional_checked_cast_addr T in %29 to any P in %0
+  dealloc_stack %29
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @existential_generic_to_existential_cast
+// CHECK:         unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'existential_generic_to_existential_cast'
+sil [ossa] @existential_generic_to_existential_cast : $@convention(thin) <T where T : Error> (@in_guaranteed T) -> @owned any Error {
+bb0(%0 : $*T):
+  %29 = alloc_stack $T
+  copy_addr %0 to [init] %29
+  %31 = alloc_stack $any Error
+  unconditional_checked_cast_addr T in %29 to any Error in %31
+  %33 = load [take] %31
+  dealloc_stack %31
+  dealloc_stack %29
+  return %33
+}
 // Test constant folding of Builtin.globalStringTablePointer.
 
 // CHECK-LABEL: sil @replace_global_string_table_pointer

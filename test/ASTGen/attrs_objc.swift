@@ -17,14 +17,25 @@
   @objc(barWithX:Y:) func foo(x: Int, y: Int) {}
 }
 
-@objc @implementation extension ObjCClass {}
+@objc @implementation extension ObjCClass {
+    var theValue: String? {
+        get { "" }
+        set {}
+    }
+    @objc(methodWithX:Y:)
+    func methodWith(x: Int, y: Int) {}
+}
 @objc @implementation(Category1) extension ObjCClass {} // expected-error {{Objective-C category should be specified on '@objc', not '@implementation'}}
 @objc(Category2) @implementation extension ObjCClass {}
 
-// FIXME: @_objcImplementation inserts implicit @objc attribute in C++ parser.
-//@_objcImplementation extension ObjCClass2 {} // xpected-error {{cannot find type 'ObjCClass2' in scope}}
-//@_objcImplementation(Category) extension ObjCClass2 {} // xpected-error {{cannot find type 'ObjCClass2' in scope}}
+@_objcImplementation extension ObjCClass2 {} // expected-warning {{'@_objcImplementation' is deprecated; use '@implementation' instead}}
 
 @_objcRuntimeName(RenamedClass) class ThisWillBeRenamed {}
 
 @_swift_native_objc_runtime_base(NSMagicBase) class TestNativeObjCRuntimeBase {}
+
+func testPoundObjC() {
+  let _: String = #keyPath(ObjCClass.theValue)
+  let _: Selector = #selector(getter:ObjCClass.theValue)
+  let _: Selector = #selector(ObjCClass.methodWith(x:y:))
+}

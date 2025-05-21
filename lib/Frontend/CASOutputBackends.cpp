@@ -325,8 +325,30 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
                           << CAS.getID(*CacheKey).toString() << "\' => \'"
                           << CAS.getID(*Result).toString() << "\'\n";);
 
-  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result)))
-    return E;
+  if (auto E = Cache.put(CAS.getID(*CacheKey), CAS.getID(*Result))) {
+    // If `SWIFT_STRICT_CAS_ERRORS` environment is set, do not attempt to
+    // recover from error.
+    if (::getenv("SWIFT_STRICT_CAS_ERRORS"))
+      return E;
+    // Failed to update the action cache, this can happen when there is a
+    // non-deterministic output from compiler. Check that the cache entry is
+    // not missing, if so, then assume this is a cache poisoning that might
+    // be benign and the build might continue without problem.
+    auto Check = Cache.get(CAS.getID(*CacheKey));
+    if (!Check) {
+      // A real CAS error, return the original error.
+      consumeError(Check.takeError());
+      return E;
+    }
+    if (!*Check)
+      return E;
+    // Emit an error message to stderr but don't fail the job. Ideally this
+    // should be sent to a DiagnosticEngine but CASBackend lives longer than
+    // diagnostic engine and needs to capture all diagnostic outputs before
+    // sending this request.
+    llvm::errs() << "error: failed to update cache: " << toString(std::move(E))
+                 << "\n";
+  }
 
   return Error::success();
 }

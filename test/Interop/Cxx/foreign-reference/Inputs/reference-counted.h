@@ -14,7 +14,7 @@ namespace NS {
 
 struct __attribute__((swift_attr("import_as_ref")))
 __attribute__((swift_attr("retain:LCRetain")))
-__attribute__((swift_attr("release:LCRelease"))) LocalCount {
+__attribute__((swift_attr("release:LCRelease"))) LocalCount final {
   int value = 0;
 
   static LocalCount *create() {

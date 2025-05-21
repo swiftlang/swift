@@ -58,29 +58,29 @@ class WASILibc(product.Product):
 
         sysroot_build_dir = WASILibc.sysroot_build_path(
             build_root, host_target, target_triple)
-        # FIXME: Manually create an empty dir that is usually created during
-        # check-symbols. The directory is required during sysroot installation step.
-        os.makedirs(os.path.join(sysroot_build_dir, "share"), exist_ok=True)
 
+        sysroot_install_path = WASILibc.sysroot_install_path(build_root, target_triple)
         shell.call([
             'make', 'install',
             '-j', str(build_jobs),
-            # FIXME: wasi-libc's pre-defined macro list does not expect
-            # `__FPCLASS_XXX`, which is introduced by the LLVM 17, yet.
-            # So skip the symbol check step by treating the phony target
-            # as very old file.
-            # https://github.com/llvm/llvm-project/commit/7dd387d2971d7759cadfffeb2082439f6c7ddd49
-            '--old-file=check-symbols',
             '-C', self.source_dir,
             'OBJDIR=' + os.path.join(self.build_dir, 'obj-' + thread_model),
             'SYSROOT=' + sysroot_build_dir,
-            'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root, target_triple),
+            'INSTALL_DIR=' + sysroot_install_path,
             'CC=' + os.path.join(clang_tools_path, 'clang'),
             'AR=' + os.path.join(llvm_tools_path, 'llvm-ar'),
             'NM=' + os.path.join(llvm_tools_path, 'llvm-nm'),
             'THREAD_MODEL=' + thread_model,
             'TARGET_TRIPLE=' + target_triple,
         ])
+
+        if target_triple == "wasm32-wasi":
+            # Alias wasm32-wasip1 to wasm32-wasi as Embedded modules use
+            # wasm32-unknown-wasip1 as the target triple.
+            for subpath in ["lib", "include"]:
+                dest_path = os.path.join(sysroot_install_path, subpath, "wasm32-wasip1")
+                if not os.path.exists(dest_path):
+                    shell.symlink("wasm32-wasi", dest_path)
 
     @classmethod
     def get_dependencies(cls):

@@ -130,20 +130,41 @@ enum class ExternKind: uint8_t {
 enum : unsigned { NumExternKindBits =
   countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
 
-enum class ExecutionKind : uint8_t {
-  Concurrent = 0,
-  Caller,
-  Last_ExecutionKind = Caller
+enum class NonIsolatedModifier : uint8_t {
+  None = 0,
+  Unsafe,
+  NonSending,
+  Last_NonIsolatedModifier = NonSending
 };
 
-enum : unsigned { NumExecutionKindBits =
-  countBitsUsed(static_cast<unsigned>(ExecutionKind::Last_ExecutionKind)) };
+enum : unsigned {
+  NumNonIsolatedModifierBits = countBitsUsed(
+      static_cast<unsigned>(NonIsolatedModifier::Last_NonIsolatedModifier))
+};
+
+enum class InheritActorContextModifier : uint8_t {
+  /// Inherit the actor execution context if the isolated parameter was
+  /// captured by the closure, context is nonisolated or isolated to a
+  /// global actor.
+  None = 0,
+  /// Always inherit the actor context, even when the isolated parameter
+  /// for the context is not closed over explicitly.
+  Always,
+  Last_InheritActorContextKind = Always
+};
+
+enum : unsigned {
+  NumInheritActorContextKindBits = countBitsUsed(static_cast<unsigned>(
+      InheritActorContextModifier::Last_InheritActorContextKind))
+};
 
 enum class DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,
 #include "swift/AST/DeclAttr.def"
 };
+
+StringRef getDeclAttrKindID(DeclAttrKind kind);
 
 enum : unsigned {
   NumDeclAttrKinds = static_cast<unsigned>(DeclAttrKind::Last_DeclAttr) + 1,

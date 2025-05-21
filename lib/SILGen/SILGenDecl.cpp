@@ -818,7 +818,7 @@ public:
     DestroyCleanup = SGF.Cleanups.getTopCleanup();
 
     // If the binding has an addressable buffer forced, it should be cleaned
-    // up here.
+    // up at this scope.
     SGF.enterLocalVariableAddressableBufferScope(vd);
   }
 
@@ -1939,12 +1939,23 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       PoundAvailableInfo *availability = elt.getAvailability();
-      VersionRange OSVersion = availability->getAvailableRange();
+
+      // Creates a boolean literal for availability conditions that have been
+      // evaluated at compile time. Automatically inverts the value for
+      // `#unavailable` queries.
+      auto createBooleanTestLiteral = [&](bool value) {
+        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+        if (availability->isUnavailability())
+          value = !value;
+        return B.createIntegerLiteral(loc, i1, value);
+      };
+
+      auto versionRange = availability->getAvailableRange();
 
       // The OS version might be left empty if availability checking was
       // disabled. Treat it as always-true in that case.
-      assert(!OSVersion.isEmpty()
-             || getASTContext().LangOpts.DisableAvailabilityChecking);
+      assert(versionRange.has_value() ||
+             getASTContext().LangOpts.DisableAvailabilityChecking);
 
       if (getASTContext().LangOpts.TargetVariant &&
           !getASTContext().LangOpts.DisableAvailabilityChecking) {
@@ -1954,25 +1965,34 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
         // into. In a macOS process it will use the macOS version; in an
         // macCatalyst process it will use the iOS version.
 
-        VersionRange VariantOSVersion =
+        auto variantVersionRange =
             elt.getAvailability()->getVariantAvailableRange();
-        assert(!VariantOSVersion.isEmpty());
-        booleanTestValue =
-            emitZipperedOSVersionRangeCheck(loc, OSVersion, VariantOSVersion);
+        assert(variantVersionRange.has_value());
+
+        if (versionRange && variantVersionRange) {
+          booleanTestValue = emitZipperedOSVersionRangeCheck(
+              loc, *versionRange, *variantVersionRange);
+        } else {
+          // Type checking did not fill in versions so as a fallback treat this
+          // condition as trivially true.
+          booleanTestValue = createBooleanTestLiteral(true);
+        }
         break;
       }
 
-      if (OSVersion.isEmpty() || OSVersion.isAll()) {
-        // If there's no check for the current platform, this condition is
-        // trivially true  (or false, for unavailability).
-        SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
-        bool value = !availability->isUnavailability();
-        booleanTestValue = B.createIntegerLiteral(loc, i1, value);
+      if (!versionRange) {
+        // Type checking did not fill in version so as a fallback treat this
+        // condition as trivially true.
+        booleanTestValue = createBooleanTestLiteral(true);
+      } else if (versionRange->isAll()) {
+        booleanTestValue = createBooleanTestLiteral(true);
+      } else if (versionRange->isEmpty()) {
+        booleanTestValue = createBooleanTestLiteral(false);
       } else {
         bool isMacCatalyst =
             tripleIsMacCatalystEnvironment(getASTContext().LangOpts.Target);
-        booleanTestValue = emitOSVersionRangeCheck(loc, OSVersion,
-                                                   isMacCatalyst);
+        booleanTestValue =
+            emitOSVersionRangeCheck(loc, versionRange.value(), isMacCatalyst);
         if (availability->isUnavailability()) {
           // If this is an unavailability check, invert the result
           // by emitting a call to Builtin.xor_Int1(lhs, -1).
@@ -2461,6 +2481,8 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
 void
 SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl) {
+  auto marker = B.createTuple(decl, {});
+  AddressableBuffers[decl] = marker;
   Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl);
 }
 
@@ -2513,7 +2535,28 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
-    B.setInsertionPoint(value->getNextInstruction());
+    auto insertPoint = AddressableBuffers[decl].insertPoint;
+    B.setInsertionPoint(insertPoint);
+    auto allocStackTy = fullyAbstractedTy;
+    if (value->getType().isMoveOnlyWrapped()) {
+      allocStackTy = allocStackTy.addingMoveOnlyWrapper();
+    }
+    allocStack = B.createAllocStack(decl,
+                                allocStackTy,
+                                std::nullopt,
+                                DoesNotHaveDynamicLifetime,
+                                IsNotLexical,
+                                IsNotFromVarDecl,
+                                DoesNotUseMoveableValueDebugInfo,
+                                /*skipVarDeclAssert*/ true);
+  }
+  {
+    SavedInsertionPointRAII save(B);
+    if (isa<ParamDecl>(decl)) {
+      B.setInsertionPoint(allocStack->getNextInstruction());
+    } else {
+      B.setInsertionPoint(value->getNextInstruction());
+    }
     auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
     
     // Reabstract if necessary.
@@ -2528,14 +2571,6 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
       reabstraction = reabstracted.forward(*this);
       newValue = reabstraction;
     }
-    // TODO: reabstract
-    allocStack = B.createAllocStack(declarationLoc, newValue->getType(),
-                                    std::nullopt,
-                                    DoesNotHaveDynamicLifetime,
-                                    IsNotLexical,
-                                    IsNotFromVarDecl,
-                                    DoesNotUseMoveableValueDebugInfo,
-                                    /*skipVarDeclAssert*/ true);
     storeBorrow = B.createStoreBorrow(declarationLoc, newValue, allocStack);
   }
   

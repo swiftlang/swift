@@ -254,13 +254,13 @@ bb0(%0 : $*T, %1 : $*T):
 
 // CHECK-LABEL: sil @optimize_builtin_zeroInitialize : {{.*}} {
 // CHECK:       bb0([[RET_ADDR:%[^,]+]] :
-// CHECK:         builtin "zeroInitializer"<T>([[RET_ADDR]] : $*T) : $()
+// CHECK:         builtin "zeroInitializer"([[RET_ADDR]] : $*T) : $()
 // CHECK:         apply undef<T>([[RET_ADDR]])
 // CHECK-LABEL: } // end sil function 'optimize_builtin_zeroInitialize'
 sil @optimize_builtin_zeroInitialize : $@convention(thin) <T> () -> @out T {
 bb0(%ret_addr : $*T):
   %temporary = alloc_stack [lexical] $T
-  builtin "zeroInitializer"<T>(%temporary : $*T) : $()
+  builtin "zeroInitializer"(%temporary : $*T) : $()
   apply undef<T>(%temporary) : $@convention(thin) <T> () -> @out T
   copy_addr [take] %temporary to [init] %ret_addr : $*T
   dealloc_stack %temporary : $*T

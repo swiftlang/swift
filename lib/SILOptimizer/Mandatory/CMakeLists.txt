@@ -14,7 +14,6 @@ target_sources(swiftSILOptimizer PRIVATE
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
-  DiagnoseInfiniteRecursion.cpp
   DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseLifetimeIssues.cpp
   DiagnoseStaticExclusivity.cpp

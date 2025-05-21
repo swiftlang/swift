@@ -205,12 +205,14 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   if (Triple.isOSOpenBSD() && Triple.getArch() == llvm::Triple::aarch64) {
+#ifdef SWIFT_OPENBSD_BTCFI
     arguments.push_back("-Xcc");
     arguments.push_back("-Xclang=-mbranch-target-enforce");
     arguments.push_back("-Xcc");
     arguments.push_back("-Xclang=-msign-return-address=non-leaf");
     arguments.push_back("-Xcc");
     arguments.push_back("-Xclang=-msign-return-address-key=a_key");
+#endif
   }
 
   if (inputArgs.getLastArg(options::OPT_experimental_serialize_debug_info)) {
@@ -752,8 +754,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-imported-modules";
   case file_types::TY_JSONDependencies:
     return "-scan-dependencies";
-  case file_types::TY_JSONFeatures:
-    return "-emit-supported-features";
+  case file_types::TY_JSONArguments:
+    return "-emit-supported-arguments";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -1039,7 +1041,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
-    case file_types::TY_JSONFeatures:
+    case file_types::TY_JSONArguments:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

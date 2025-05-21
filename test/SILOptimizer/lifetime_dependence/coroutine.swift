@@ -13,6 +13,7 @@ struct View : ~Escapable {
     self.ptr = ptr
     self.c = c
   }
+  @lifetime(copy otherBV)
   init(_ otherBV: borrowing View) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -23,6 +24,7 @@ struct View : ~Escapable {
   }
   // This overload requires a separate label because overloading
   // on borrowing/consuming attributes is not allowed
+  @lifetime(copy k)
   init(consumingView k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
@@ -34,13 +36,16 @@ struct Wrapper : ~Escapable {
 
   // Nested coroutine access.
   var view: View {
+    @lifetime(copy self)
     _read {
       yield _view
     }
+    @lifetime(borrow self)
     _modify {
       yield &_view
     }
   }
+  @lifetime(copy view)
   init(_ view: consuming View) {
     self._view = view
   }

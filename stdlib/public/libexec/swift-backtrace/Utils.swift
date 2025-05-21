@@ -211,7 +211,7 @@ extension Sequence {
   /// This is not, in general, a safe thing to do, because the sequence might
   /// not be restartable.  For the cases where we're using it here, it's OK
   /// though.
-  public var unsafeFirst: Element? {
+  var consumingFirst: Element? {
     var iterator = makeIterator()
     return iterator.next()
   }

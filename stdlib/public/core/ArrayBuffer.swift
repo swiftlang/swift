@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -135,7 +135,22 @@ extension _ArrayBuffer {
 #endif
     return isUnique
   }
-  
+
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+   @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutationUnchecked() -> Bool {
+    let isUnique: Bool
+    if !_isClassOrObjCExistential(Element.self) {
+      isUnique = _storage.beginCOWMutationUnflaggedNative()
+    } else if !_storage.beginCOWMutationNative() {
+      return false
+    } else {
+      isUnique = _isNative
+    }
+    return isUnique
+  }
+#endif
+
   /// Puts the buffer in an immutable state.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.
@@ -330,7 +345,7 @@ extension _ArrayBuffer {
       .assumingMemoryBound(to: AnyObject.self)
     let (_, c) = unsafe _nonNative._copyContents(
       initializing: UnsafeMutableBufferPointer(start: ptr, count: buffer.count))
-    return unsafe (IndexingIterator(_elements: self, _position: c), c)
+    return (IndexingIterator(_elements: self, _position: c), c)
   }
 
   /// Returns a `_SliceBuffer` containing the given sub-range of elements in
@@ -608,11 +623,10 @@ extension _ArrayBuffer {
       1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
   }
-  
-  @_alwaysEmitIntoClient @inline(never)
-  internal func withUnsafeBufferPointer_nonNative<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
-  ) throws(E) -> R {
+
+  @_alwaysEmitIntoClient
+  internal func getOrAllocateAssociatedObjectBuffer(
+  ) -> _ContiguousArrayBuffer<Element> {
     let unwrapped: _ContiguousArrayBuffer<Element>
     // libobjc already provides the necessary memory barriers for
     // double checked locking to be safe, per comments on
@@ -633,12 +647,16 @@ extension _ArrayBuffer {
       defer { _fixLifetime(unwrapped) }
       objc_sync_exit(lock)
     }
-    return try unsafe body(
-      UnsafeBufferPointer(
-        start: unwrapped.firstElementAddress,
-        count: unwrapped.count
-      )
-    )
+    return unwrapped
+  }
+
+  @_alwaysEmitIntoClient @inline(never)
+  internal func withUnsafeBufferPointer_nonNative<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let buffer = getOrAllocateAssociatedObjectBuffer()
+    let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
+    return try unsafe body(UnsafeBufferPointer(start: pointer,  count: count))
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
@@ -656,7 +674,7 @@ extension _ArrayBuffer {
       return try unsafe body(
         UnsafeBufferPointer(start: firstElementAddress, count: count))
     }
-    return try ContiguousArray(self).withUnsafeBufferPointer(body)
+    return try unsafe ContiguousArray(self).withUnsafeBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the

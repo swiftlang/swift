@@ -8,6 +8,7 @@
 public struct Span<Element> : ~Escapable {
   private var baseAddress: UnsafeRawPointer
   public let count: Int
+  @lifetime(copy owner)
   public init<Owner: ~Copyable & ~Escapable>(
       baseAddress: UnsafeRawPointer,
       count: Int,

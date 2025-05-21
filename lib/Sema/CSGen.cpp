@@ -194,7 +194,7 @@ namespace {
       }
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (isa<VarDecl>(DRE->getDecl())) {
           if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
@@ -972,7 +972,7 @@ namespace {
           ty = ty->getInOutObjectType();
           flags = flags.withInOut(true);
         }
-        if (arg.isConst()) {
+        if (arg.isCompileTimeLiteral()) {
           flags = flags.withCompileTimeLiteral(true);
         }
         result.emplace_back(ty, arg.getLabel(), flags);
@@ -1085,7 +1085,12 @@ namespace {
           baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
 
-        if (auto elementTy = baseObjTy->isArrayType()) {
+        auto elementTy = baseObjTy->getArrayElementType();
+
+        if (!elementTy)
+          elementTy = baseObjTy->getInlineArrayElementType();
+
+        if (elementTy) {
 
           if (auto arraySliceTy = 
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
@@ -1170,6 +1175,48 @@ namespace {
         outputTy = fixedOutputType;
       }
 
+      return outputTy;
+    }
+
+    /// Add constraints for argument resolution for `UnresolvedApply` key path
+    /// component kind.
+    Type addApplyConstraints(
+        Expr *anchor, Type memberTy, ArgumentList *argList,
+        ConstraintLocator *memberComponentLoc,
+        ConstraintLocator *applyComponentLoc,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
+      // Locators used in this expression.
+      assert(applyComponentLoc != nullptr && "applyComponentLoc should not be null");
+
+      auto fnLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::ApplyFunction);
+
+      auto fnResultLocator = CS.getConstraintLocator(
+          applyComponentLoc, ConstraintLocator::FunctionResult);
+
+      CS.associateArgumentList(applyComponentLoc, argList);
+
+      Type outputTy = CS.createTypeVariable(
+          fnResultLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
+
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      SourceLoc loc =
+          CurDC->getAsDecl() ? CurDC->getAsDecl()->getLoc() : SourceLoc();
+      for (auto index : indices(params)) {
+        const auto &param = params[index];
+        CS.verifyThatArgumentIsHashable(index, param.getParameterType(),
+                                        memberComponentLoc, loc);
+      }
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
+                                  /*trailingClosureMatching=*/std::nullopt,
+                                  CurDC, fnLocator);
       return outputTy;
     }
 
@@ -1681,9 +1728,6 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
-      auto paramType = CS.DC->mapTypeIntoContext(ty);
-      E->setParamType(paramType);
       return E->getParamDecl()->getValueType();
     }
 
@@ -2112,18 +2156,28 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && contextualType->isArrayType()) {
+      if (contextualType &&
+          (contextualType->getArrayElementType() ||
+           contextualType->getInlineArrayElementType())) {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         // FIXME: This is the wrong place to be opening the opaque type.
         contextualType = CS.openOpaqueType(
             contextualType, contextualPurpose, locator, /*ownerDecl=*/nullptr);
-        Type arrayElementType = contextualType->isArrayType();
+
+        Type eltType;
+
+        if (contextualType->isArray())
+          eltType = contextualType->getArrayElementType();
+
+        if (contextualType->isInlineArray())
+          eltType = contextualType->getInlineArrayElementType();
+
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
-        joinElementTypes(arrayElementType);
+        joinElementTypes(eltType);
         return contextualType;
       }
 
@@ -2540,6 +2594,10 @@ namespace {
         if (!extInfo.isAsync()) {
           if (auto actorType = getExplicitGlobalActor(closure))
             return FunctionTypeIsolation::forGlobalActor(actorType);
+        }
+
+        if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
+          return FunctionTypeIsolation::forNonIsolated();
         }
 
         return FunctionTypeIsolation::forNonIsolated();
@@ -3756,30 +3814,34 @@ namespace {
               resultLocator,
               TVO_CanBindToLValue | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           break;
-        case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        case KeyPathExpr::Component::Kind::UnresolvedMember:
         // This should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
-        case KeyPathExpr::Component::Kind::Property: {
+        case KeyPathExpr::Component::Kind::Member: {
           auto memberTy = CS.createTypeVariable(resultLocator,
                                                 TVO_CanBindToLValue |
                                                 TVO_CanBindToNoEscape);
           componentTypeVars.push_back(memberTy);
-          auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
-            ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
-            : component.getDeclRef().getDecl()->createNameRef();
+          auto lookupName =
+              kind == KeyPathExpr::Component::Kind::UnresolvedMember
+                  ? DeclNameRef(
+                        component.getUnresolvedDeclName()) // FIXME: type change
+                                                           // needed
+                  : component.getDeclRef().getDecl()->createNameRef();
 
+          auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
-                                      FunctionRefInfo::unapplied(lookupName),
+                                      refKind,
                                       /*outerAlternatives=*/{}, memberLocator);
           base = memberTy;
           break;
         }
-          
+
         case KeyPathExpr::Component::Kind::UnresolvedSubscript:
         // Subscript should only appear in resolved ASTs, but we may need to
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
-          auto *args = component.getSubscriptArgs();
+          auto *args = component.getArgs();
           base = addSubscriptConstraints(E, base, /*decl*/ nullptr, args,
                                          memberLocator, &componentTypeVars);
 
@@ -3799,6 +3861,16 @@ namespace {
             componentTypeVars.append(referencedVars.begin(),
                                      referencedVars.end());
           }
+          break;
+        }
+
+        case KeyPathExpr::Component::Kind::UnresolvedApply:
+        case KeyPathExpr::Component::Kind::Apply: {
+          auto prevMemberLocator = CS.getConstraintLocator(
+              locator, LocatorPathElt::KeyPathComponent(i - 1));
+          base = addApplyConstraints(E, base, component.getArgs(),
+                                     prevMemberLocator, memberLocator,
+                                     &componentTypeVars);
           break;
         }
 
@@ -4525,8 +4597,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // non-`Sendable` state across the isolation boundary. `next()` should
   // inherit the isolation of the caller, but for now, use the opt out.
   if (isAsync) {
-    auto *nonisolated = new (ctx)
-        NonisolatedAttr(/*unsafe=*/true, /*implicit=*/true);
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
     makeIteratorVar->getAttrs().add(nonisolated);
   }
 
@@ -4536,8 +4608,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
                                      : ctx.getSequenceMakeIterator();
 
-    auto *makeIteratorRef = UnresolvedDotExpr::createImplicit(
-        ctx, sequenceExpr, makeIterator->getName());
+    auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
+        sequenceExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     Expr *makeIteratorCall =
@@ -4600,11 +4673,13 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
-    auto *nextRef = UnresolvedDotExpr::createImplicit(
-        ctx,
+    auto *makeIteratorVarRef =
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                              /*Implicit=*/true),
-        nextId, labels);
+                              /*Implicit=*/true);
+    auto *nextRef = new (ctx)
+        UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
+                          DeclNameRef(DeclName(ctx, nextId, labels)),
+                          DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
     nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
     ArgumentList *nextArgs;

@@ -949,8 +949,9 @@ public:
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
-        loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
-        tanDest->getType().getASTType());
+       loc, uccai->getIsolatedConformances(),
+        tanSrc, tanSrc->getType().getASTType(),
+        tanDest, tanDest->getType().getASTType());
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).

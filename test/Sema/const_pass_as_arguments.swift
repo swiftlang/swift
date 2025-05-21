@@ -54,13 +54,14 @@ class ConstFanClassCorrect: ConstFan {
 }
 
 class ConstFanClassWrong1: ConstFan {
-	static _const let v: String // expected-error {{_const let should be initialized with a compile-time literal}}
+
+	static _const let v: String // expected-error {{_const let should be initialized with a literal value}}
 	// expected-error@-1 {{'static let' declaration requires an initializer expression or an explicitly stated getter}}
 	// expected-note@-2 {{add an initializer to silence this error}}
 }
 
 class ConstFanClassWrong2: ConstFan {
-	static _const let v: String = "\(v)" // expected-error {{_const let should be initialized with a compile-time literal}}
+	static _const let v: String = "\(v)" // expected-error {{_const let should be initialized with a literal value}}
 }
 
 class ConstFanClassWrong3: ConstFan {
@@ -69,7 +70,7 @@ class ConstFanClassWrong3: ConstFan {
 
 class ConstFanClassWrong4: ConstFan {
 	static func giveMeString() -> String { return "" }
-	static _const let v: String = giveMeString() // expected-error {{_const let should be initialized with a compile-time literal}}
+	static _const let v: String = giveMeString() // expected-error {{_const let should be initialized with a literal value}}
 }
 
 _const let globalConst = 3

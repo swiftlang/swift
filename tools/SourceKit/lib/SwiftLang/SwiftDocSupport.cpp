@@ -431,7 +431,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
       llvm::raw_svector_ostream OS(Info.USR);
-      SwiftLangSupport::printUSR(VD, OS);
+      SwiftLangSupport::printUSR(VD, OS, /*distinguishSynthesizedDecls*/ true);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);
@@ -451,11 +451,8 @@ static bool initDocEntityInfo(const Decl *D,
   Info.IsUnavailable = D->isUnavailable();
   Info.IsDeprecated = D->isDeprecated();
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    Info.IsAsync = AFD->hasAsync();
-  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
-    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
-      Info.IsAsync = Getter->hasAsync();
+  if (auto *valueDecl = dyn_cast<ValueDecl>(D)) {
+    Info.IsAsync = valueDecl->isAsync();
   }
 
   if (!IsRef) {
@@ -1425,7 +1422,8 @@ SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
   using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
@@ -1472,8 +1470,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
-                                   CancellationToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 

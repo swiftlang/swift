@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen                            \
 // RUN:     %s                                               \
+// RUN:     -enable-callee-allocated-coro-abi                \
 // RUN:     -experimental-skip-non-inlinable-function-bodies \
 // RUN:     -enable-library-evolution                        \
 // RUN:     -enable-experimental-feature CoroutineAccessors  \
@@ -7,6 +8,7 @@
 
 // RUN: %target-swift-emit-silgen                                              \
 // RUN:     %s                                                                 \
+// RUN:     -enable-callee-allocated-coro-abi                                  \
 // RUN:     -experimental-skip-non-inlinable-function-bodies                   \
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \

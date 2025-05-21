@@ -323,23 +323,16 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
-      overridden.insert(overrides);
-
-      // Because initializers from Objective-C base classes have greater
-      // visibility than initializers written in Swift classes, we can
-      // have a "break" in the set of declarations we found, where
-      // C.init overrides B.init overrides A.init, but only C.init and
-      // A.init are in the chain. Make sure we still remove A.init from the
-      // set in this case.
-      if (decl->getBaseName().isConstructor()) {
-        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
-        ///        cause instead (incomplete circularity detection).
-        assert(decl != overrides && "Circular class inheritance?");
-        decl = overrides;
-        continue;
+      if (!overridden.insert(overrides).second) {
+        // If we've already seen a decl then there's no need to visit the decls
+        // that it overrides since they should already be in the set. This also
+        // prevents infinite loops in the case that the AST contains an
+        // override chain with a cycle due to circular inheritance.
+        break;
       }
 
-      break;
+      DEBUG_ASSERT(decl != overrides && "Circular class inheritance?");
+      decl = overrides;
     }
   }
 
@@ -1546,7 +1539,7 @@ void MemberLookupTable::addMember(Decl *member) {
     A->getMemberName().addToLookupTable(Lookup, vd);
 
   auto abiRole = ABIRoleInfo(vd);
-  if (!abiRole.providesABI())
+  if (!abiRole.providesABI() && abiRole.getCounterpart())
     addMember(abiRole.getCounterpart());
 }
 
@@ -2317,6 +2310,13 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (!ObjCMethodLookup && !createObjCMethodLookup())
     return;
 
+  // Only record API decls.
+  Decl *abiRoleDecl = method;
+  if (auto accessor = dyn_cast<AccessorDecl>(method))
+    abiRoleDecl = accessor->getStorage();
+  if (!ABIRoleInfo(abiRoleDecl).providesAPI())
+    return;
+
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
@@ -2388,6 +2388,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
                                      ValueDecl *decl,
                                      bool onlyCompleteObjectInits,
                                      bool requireImport) {
+  auto &ctx = dc->getASTContext();
+
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -2405,19 +2407,43 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl) &&
-      !dc->getASTContext().isAccessControlDisabled()) {
+  if (!(options & NL_IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
     bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
   }
 
-  // Check that there is some import in the originating context that makes this
-  // decl visible.
-  if (requireImport && !(options & NL_IgnoreMissingImports))
-    if (!dc->isDeclImported(decl))
-      return false;
+  if (requireImport) {
+    // Check that there is some import in the originating context that makes
+    // this decl visible.
+    if (!(options & NL_IgnoreMissingImports)) {
+      if (!dc->isDeclImported(decl))
+        return false;
+    }
+
+    // Unlike in Swift, Obj-C allows method overrides to be declared in
+    // extensions (categories), even outside of the module that defines the
+    // type that is being extended. When MemberImportVisibility is enabled,
+    // if these overrides are not filtered out they can hijack name
+    // lookup and cause the compiler to insist that the module that defines
+    // the extension be imported, contrary to developer expectations.
+    //
+    // Filter results belonging to these extensions out, even when ignoring
+    // missing imports, if we're in a context that requires imports to access
+    // member declarations.
+    if (decl->getOverriddenDecl()) {
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+        if (auto *nominal = extension->getExtendedNominal()) {
+          auto extensionMod = extension->getModuleContext();
+          auto nominalMod = nominal->getModuleContext();
+          if (!extensionMod->isSameModuleLookingThroughOverlays(nominalMod) &&
+              !dc->isDeclImported(extension))
+            return false;
+        }
+      }
+    }
+  }
 
   // Check that it has the appropriate ABI role.
   if (!ABIRoleInfo(decl).matchesOptions(options))
@@ -2713,6 +2739,18 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       }
     }
 
+    // Qualified name lookup can find generic value parameters.
+    auto gpList = current->getGenericParams();
+
+    // .. But not in type contexts (yet)
+    if (!(options & NL_OnlyTypes) && gpList && !member.isSpecial()) {
+      auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
+
+      if (gp && gp->isValue()) {
+        decls.push_back(gp);
+      }
+    }
+
     // If we're not looking at a protocol and we're not supposed to
     // visit the protocols that this type conforms to, skip the next
     // step.
@@ -2891,6 +2929,21 @@ void DeclContext::lookupAllObjCMethods(
                      return !visited.insert(func).second;
                    }),
     results.end());
+}
+
+void DeclContext::lookupAvailabilityDomains(
+    Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
+  if (auto builtinDomain =
+          AvailabilityDomain::builtinDomainForString(identifier.str(), this)) {
+    results.push_back(*builtinDomain);
+    return;
+  }
+
+  // FIXME: [availability] Find the file/module scope decl context and look up
+  // the domain in that context using a request to cache the results.
+  for (auto import : namelookup::getAllImports(this)) {
+    import.importedModule->lookupAvailabilityDomains(identifier, results);
+  }
 }
 
 /// Given a set of type declarations, find all of the nominal type declarations
@@ -3152,6 +3205,10 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     result.first.push_back(ctx.getArrayDecl());
     return result;
 
+  case TypeReprKind::InlineArray:
+    result.first.push_back(ctx.getInlineArrayDecl());
+    return result;
+
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
@@ -3162,6 +3219,12 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     auto isolated = cast<IsolatedTypeRepr>(typeRepr);
     return directReferencesForTypeRepr(evaluator, ctx,
                                        isolated->getBase(), dc, options);
+  }
+
+  case TypeReprKind::CallerIsolated: {
+    auto callerIsolated = cast<CallerIsolatedTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       callerIsolated->getBase(), dc, options);
   }
 
   case TypeReprKind::Composition: {
@@ -3238,6 +3301,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
   case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
@@ -3695,13 +3759,14 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     return { };
 
   // Functions, initializers, and subscripts can contain opaque parameters.
-  ParameterList *params = nullptr;
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    params = func->getParameters();
-  else if (auto subscript = dyn_cast<SubscriptDecl>(value))
-    params = subscript->getIndices();
-  else
+  // FIXME: What's wrong with allowing them in macro decls?
+  if (isa<MacroDecl>(value)) {
     return { };
+  }
+  auto *params = value->getParameterList();
+  if (!params) {
+    return {};
+  }
 
   // Look for parameters that have "some" types in them.
   unsigned index = parsedGenericParams ? parsedGenericParams->size() : 0;
@@ -3932,9 +3997,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                 .diagnose(loc, diag::warn_property_wrapper_module_scope, name,
                           moduleName)
                 .fixItInsert(loc, moduleName.str().str() + ".");
-            ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                               assocType->getDescriptiveKind(),
-                               assocType->getName());
+            ctx.Diags.diagnose(assocType, diag::decl_declared_here_with_kind,
+                               assocType);
 
             auto *baseTR = UnqualifiedIdentTypeRepr::create(
                 ctx, nameLoc, DeclNameRef(moduleName));
@@ -3950,21 +4014,6 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   }
 
   return nullptr;
-}
-
-/// Find the location of 'isolated' within this type representation.
-static SourceLoc findIsolatedLoc(TypeRepr *typeRepr) {
-  do {
-    if (auto isolatedTypeRepr = dyn_cast<IsolatedTypeRepr>(typeRepr))
-      return isolatedTypeRepr->getLoc();
-
-    if (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-      typeRepr = attrTypeRepr->getTypeRepr();
-      continue;
-    }
-        
-    return SourceLoc();
-  } while (true);
 }
 
 /// Decompose the ith inheritance clause entry to a list of type declarations,
@@ -4005,9 +4054,17 @@ void swift::getDirectlyInheritedNominalTypeDecls(
     attributes.uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
     attributes.preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
     attributes.unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
-    
-    // Look for an IsolatedTypeRepr.
-    attributes.isolatedLoc = findIsolatedLoc(typeRepr);
+    attributes.nonisolatedLoc = typeRepr->findAttrLoc(TypeAttrKind::Nonisolated);
+
+    // Dig out the custom attribute that should be the global actor isolation.
+    if (auto customAttr = typeRepr->findCustomAttr()) {
+      if (!customAttr->hasArgs()) {
+        if (auto customAttrTypeExpr = customAttr->getTypeExpr()) {
+          attributes.globalActorAtLoc = customAttr->AtLoc;
+          attributes.globalActorType = customAttrTypeExpr;
+        }
+      }
+    }
   }
 
   // Form the result.

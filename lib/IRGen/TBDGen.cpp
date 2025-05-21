@@ -88,15 +88,18 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
 getAllMovedPlatformVersions(Decl *D) {
+  StringRef Name = D->getDeclContext()->getParentModule()->getName().str();
+
   std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.has_value()) {
+      if (Active.has_value() && Active->LinkerModuleName != Name) {
         Results.push_back(*Active);
       }
     }
   }
+
   return Results;
 }
 
@@ -326,16 +329,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     if (*IntroVer >= Ver.Version)
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
-    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
+    auto It = previousInstallNameMap->find(Ver.LinkerModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
@@ -707,6 +710,9 @@ public:
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (isSPI(decl))
         access = apigen::APIAccess::Private;
@@ -732,6 +738,9 @@ public:
     auto access = apigen::APIAccess::Public;
     auto decl = method.hasDecl() ? method.getDecl() : nullptr;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
@@ -751,7 +760,7 @@ public:
   }
 
 private:
-  apigen::APILoc getAPILocForDecl(const Decl *decl) {
+  apigen::APILoc getAPILocForDecl(const Decl *decl) const {
     if (!decl)
       return defaultLoc;
 
@@ -765,6 +774,15 @@ private:
     auto displayName = SM.getDisplayNameForLoc(loc);
 
     return apigen::APILoc(std::string(displayName), line, col);
+  }
+
+  bool shouldRecordDecl(const Decl *decl) const {
+    // We cannot reason about API access for Clang declarations from header
+    // files as we don't know the header group. API records for header
+    // declarations should be deferred to Clang tools.
+    if (getAPILocForDecl(decl).getFilename().ends_with_insensitive(".h"))
+      return false;
+    return true;
   }
 
   /// Follow the naming schema that IRGen uses for Categories (see
@@ -808,6 +826,9 @@ private:
   }
 
   apigen::ObjCInterfaceRecord *addOrGetObjCInterface(const ClassDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = classMap.find(decl);
     if (entry != classMap.end())
       return entry->second;
@@ -846,6 +867,9 @@ private:
   }
 
   apigen::ObjCCategoryRecord *addOrGetObjCCategory(const ExtensionDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = categoryMap.find(decl);
     if (entry != categoryMap.end())
       return entry->second;

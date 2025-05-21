@@ -281,7 +281,6 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
-  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
@@ -290,16 +289,14 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
-      Plugins, SwiftExecutablePath, RuntimeResourcePath,
-      DiagnosticDocumentationPath);
+      Plugins, SwiftExecutablePath, RuntimeResourcePath);
 
   IDEInspectionInst = std::make_shared<IDEInspectionInstance>(Plugins);
   configureIDEInspectionInstance(IDEInspectionInst,
                                  SKCtx.getGlobalConfiguration());
 
   CompileManager = std::make_shared<compile::SessionManager>(
-      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath,
-      Plugins);
+      SwiftExecutablePath, RuntimeResourcePath, Plugins);
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
@@ -898,8 +895,9 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   return false;
 }
 
-bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printValueDeclUSR(D, OS);
+bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS,
+                                bool distinguishSynthesizedDecls) {
+  return ide::printValueDeclUSR(D, OS, distinguishSynthesizedDecls);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
@@ -966,7 +964,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     OS << ')';
   };
   if (isa<EnumElementDecl>(VD) || isa<FuncDecl>(VD)) {
-    if (const auto ParamList = getParameterList(const_cast<ValueDecl *>(VD))) {
+    if (const auto ParamList = VD->getParameterList()) {
       printParams(ParamList);
     }
   } else if (isa<VarDecl>(VD)) {

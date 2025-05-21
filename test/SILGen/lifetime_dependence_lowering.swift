@@ -90,21 +90,21 @@ struct Butt {
 @_addressableForDependencies
 struct AddressableForDeps {
     // CHECK-LABEL: sil{{.*}} @$s{{.*}}6test16{{.*}} : $
-    // CHECK-SAME: -> @lifetime(borrow address 3) @owned Foo
+    // CHECK-SAME: -> @lifetime(borrow address_for_deps 3) @owned Foo
     @lifetime(borrow self)
     func test16(tuple: (AddressableForDeps, AddressableForDeps),
                 other: AddressableForDeps) -> Foo {}
 
     // The dependency makes the tuple pass as a single indirect argument.
     // CHECK-LABEL: sil{{.*}} @$s{{.*}}6test17{{.*}} : $
-    // CHECK-SAME: -> @lifetime(borrow address 0) @owned Foo
+    // CHECK-SAME: -> @lifetime(borrow address_for_deps 0) @owned Foo
     @lifetime(borrow tuple)
     func test17(tuple: (AddressableForDeps, AddressableForDeps),
                 other: AddressableForDeps) -> Foo {}
 
     // The tuple destructures as usual, but `other` is passed indirectly.
     // CHECK-LABEL: sil{{.*}} @$s{{.*}}6test18{{.*}} : $
-    // CHECK-SAME: -> @lifetime(borrow address 2) @owned Foo
+    // CHECK-SAME: -> @lifetime(borrow address_for_deps 2) @owned Foo
     @lifetime(borrow other)
     func test18(tuple: (AddressableForDeps, AddressableForDeps),
                 other: AddressableForDeps) -> Foo {}

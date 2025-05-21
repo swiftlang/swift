@@ -17,26 +17,59 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
-std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
-    return std::nullopt;
+CustomAvailabilityDomain::Kind
+getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
+  switch (featureAvailKind) {
+  case clang::FeatureAvailKind::None:
+    llvm_unreachable("unexpected kind");
+  case clang::FeatureAvailKind::Available:
+    return CustomAvailabilityDomain::Kind::Enabled;
+  case clang::FeatureAvailKind::Unavailable:
+    return CustomAvailabilityDomain::Kind::Disabled;
+  case clang::FeatureAvailKind::Dynamic:
+    return CustomAvailabilityDomain::Kind::Dynamic;
+  }
+}
 
-  return forPlatform(platform);
+static const CustomAvailabilityDomain *
+customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
+  auto *clangDecl = decl->getClangDecl();
+  ASSERT(clangDecl);
+
+  auto featureInfo = clangDecl->getASTContext().getFeatureAvailInfo(
+      const_cast<clang::Decl *>(clangDecl));
+
+  // Ensure the decl actually represents an availability domain.
+  if (featureInfo.first.empty())
+    return nullptr;
+
+  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+    return nullptr;
+
+  return CustomAvailabilityDomain::get(
+      featureInfo.first, getCustomDomainKind(featureInfo.second.Kind),
+      decl->getModuleContext(), decl, ctx);
 }
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forTargetVariantPlatform(const ASTContext &ctx) {
-  auto platform = swift::targetVariantPlatform(ctx.LangOpts);
-  if (platform == PlatformKind::none)
+AvailabilityDomain::forCustom(Decl *decl, const ASTContext &ctx) {
+  if (!decl)
     return std::nullopt;
 
-  return forPlatform(platform);
+  if (decl->hasClangNode()) {
+    if (auto *customDomain = customDomainForClangDecl(decl, ctx))
+      return AvailabilityDomain::forCustom(customDomain);
+  } else {
+    // FIXME: [availability] Handle Swift availability domains decls.
+  }
+
+  return std::nullopt;
 }
 
 std::optional<AvailabilityDomain>
@@ -118,15 +151,11 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
-bool AvailabilityDomain::isActiveForTargetPlatform(
-    const ASTContext &ctx) const {
-  if (isPlatform()) {
-    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx)) {
-      auto compatibleDomain = targetDomain->getABICompatibilityDomain();
-      return compatibleDomain.contains(*this);
-    }
-  }
-  return false;
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+  if (!isPlatform())
+    return false;
+
+  return isActive(ctx);
 }
 
 static std::optional<llvm::VersionTuple>
@@ -188,6 +217,13 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   }
 }
 
+Decl *AvailabilityDomain::getDecl() const {
+  if (auto *customDomain = getCustomDomain())
+    return customDomain->getDecl();
+
+  return nullptr;
+}
+
 ModuleDecl *AvailabilityDomain::getModule() const {
   if (auto customDomain = getCustomDomain())
     return customDomain->getModule();
@@ -212,14 +248,31 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   }
 }
 
-AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
+bool AvailabilityDomain::isRoot() const {
+  switch (getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::Platform:
+    return getRootDomain() == *this;
+  case AvailabilityDomain::Kind::Custom:
+    // For now, all custom domains are their own root.
+    return true;
+  }
+}
+
+AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   if (!isPlatform())
     return *this;
 
+  // iOS specifically contains a few other platforms.
   auto iOSDomain = AvailabilityDomain::forPlatform(PlatformKind::iOS);
   if (iOSDomain.contains(*this))
     return iOSDomain;
 
+  // App Extension domains are contained by their base platform domain.
   if (auto basePlatform = basePlatformForExtensionPlatform(getPlatformKind()))
     return AvailabilityDomain::forPlatform(*basePlatform);
 
@@ -273,32 +326,17 @@ bool StableAvailabilityDomainComparator::operator()(
   }
 }
 
-CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
-                                                   ModuleDecl *mod, Kind kind)
-    : name(name), kind(kind), mod(mod) {
+CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
+                                                   ModuleDecl *mod, Decl *decl)
+    : name(name), kind(kind), mod(mod), decl(decl) {
   ASSERT(!name.empty());
   ASSERT(mod);
 }
 
-CustomAvailabilityDomain *
-CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
-                                 ModuleDecl *mod, Kind kind) {
-  return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
-}
-
-static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(Identifier identifier,
-                             const DeclContext *declContext) {
-  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
-          identifier.str(), declContext))
-    return builtinDomain;
-
-  auto &ctx = declContext->getASTContext();
-  if (auto customDomain =
-          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
-    return customDomain;
-
-  return std::nullopt;
+void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
+                                       Identifier name, ModuleDecl *mod) {
+  ID.AddPointer(name.getAsOpaquePointer());
+  ID.AddPointer(mod);
 }
 
 std::optional<AvailabilityDomain>
@@ -310,7 +348,13 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
   auto &diags = ctx.Diags;
   std::optional<AvailabilityDomain> domain;
   auto identifier = getAsIdentifier().value();
-  domain = getAvailabilityDomainForName(identifier, declContext);
+
+  llvm::SmallVector<AvailabilityDomain> results;
+  declContext->lookupAvailabilityDomains(identifier, results);
+  if (results.size() > 0) {
+    // FIXME: [availability] Diagnose ambiguity if necessary.
+    domain = results.front();
+  }
 
   if (!domain) {
     auto domainString = identifier.str();

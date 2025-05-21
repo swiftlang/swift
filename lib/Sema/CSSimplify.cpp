@@ -1703,7 +1703,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     if (parameterBindings[paramIdx].empty() && callee) {
       // Type inference from default value expressions.
       {
-        auto *paramList = getParameterList(callee);
+        auto *paramList = callee->getParameterList();
         if (!paramList)
           continue;
 
@@ -3182,8 +3182,44 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (!matchFunctionIsolations(func1, func2, kind, flags, locator))
     return getTypeMatchFailure(locator);
 
+  // A function with a lifetime dependency in a generic context is equivalent to
+  // one without that lifetime dependency when the substituted type is
+  // Escapable.
+  //
+  // TODO: There should also be a subtype relationship from less-constrained to
+  // more-constrained lifetime dependencies.
   if (func1->getLifetimeDependencies() != func2->getLifetimeDependencies()) {
-    return getTypeMatchFailure(locator);
+    auto escapable = getASTContext().getProtocol(KnownProtocolKind::Escapable)
+      ->getDeclaredType();
+
+    for (auto &fromDep : func1->getLifetimeDependencies()) {
+      auto toDep = func2->getLifetimeDependenceFor(fromDep.getTargetIndex());
+      if (toDep) {
+        // If a dependency is present for the same target in both types, then
+        // the dependency must match.
+        if (fromDep != *toDep) {
+          return getTypeMatchFailure(locator);
+        }
+        
+        continue;
+      }
+      
+      // If the dependency is absent from the destination type, constrain the
+      // corresponding parameter or result in the source type to be Escapable.
+      if (fromDep.getTargetIndex() == func1->getParams().size()) {
+        // Result dependency.
+        addConstraint(ConstraintKind::ConformsTo,
+                      func1->getResult(),
+                      escapable,
+                      locator);
+      } else {
+        // Parameter dependency.
+        addConstraint(ConstraintKind::ConformsTo,
+                    func1->getParams()[fromDep.getTargetIndex()].getPlainType(),
+                    escapable,
+                    locator);
+      }
+    }
   }
 
   // To contextual type increase the score to avoid ambiguity when solver can
@@ -3266,6 +3302,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   SmallVector<AnyFunctionType::Param, 8> func2Params;
   func2Params.append(func2->getParams().begin(), func2->getParams().end());
+
+  // Support conversion from `nonisolated(nonsending)` to a function type
+  // with an isolated parameter.
+  if (subKind == ConstraintKind::Subtype &&
+      func1->getIsolation().isNonIsolatedCaller() &&
+      func2->getIsolation().isParameter()) {
+    // `nonisolated(nonsending)` function gets an implicit isolation parameter
+    // introduced during SILGen and thunk is going to forward an isolation from
+    // the caller to it.
+    // Let's remove the isolated parameter from consideration, function
+    // types have to match on everything else.
+    llvm::erase_if(func2Params, [](const AnyFunctionType::Param &param) {
+      return param.isIsolated();
+    });
+  }
 
   // Add a very narrow exception to SE-0110 by allowing functions that
   // take multiple arguments to be passed as an argument in places
@@ -4675,6 +4726,12 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    return resolveKeyPath(typeVar, type, flags, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -5758,7 +5815,7 @@ bool ConstraintSystem::repairFailures(
 
           // Ignore decls that don't have meaningful parameter lists - this
           // matches variables and parameters with function types.
-          auto *paramList = getParameterList(overload->choice.getDecl());
+          auto *paramList = overload->choice.getDecl()->getParameterList();
           if (!paramList)
             return true;
 
@@ -5961,7 +6018,7 @@ bool ConstraintSystem::repairFailures(
     // ```
     if (rhs->isKnownStdlibCollectionType()) {
       std::function<Type(Type)> getArrayOrSetType = [&](Type type) -> Type {
-        if (auto eltTy = type->isArrayType())
+        if (auto eltTy = type->getArrayElementType())
           return getArrayOrSetType(eltTy);
 
         if (auto eltTy = isSetType(type))
@@ -6052,7 +6109,7 @@ bool ConstraintSystem::repairFailures(
 
       if (auto overload = findSelectedOverloadFor(calleeLocator)) {
         if (auto *decl = overload->choice.getDeclOrNull()) {
-          if (auto paramList = getParameterList(decl)) {
+          if (auto paramList = decl->getParameterList()) {
             if (paramList->get(paramIdx)->getTypeOfDefaultExpr()) {
               conversionsOrFixes.push_back(
                   IgnoreDefaultExprTypeMismatch::create(*this, lhs, rhs, loc));
@@ -7468,18 +7525,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
         // T -> Optional<T>
-        if (location.endsWith<LocatorPathElt::OptionalInjection>() ||
-            location.endsWith<LocatorPathElt::GenericArgument>()) {
+        if (location.endsWith<LocatorPathElt::OptionalInjection>()) {
           SmallVector<LocatorPathElt, 4> path;
           auto anchor = location.getLocatorParts(path);
 
-          // Drop all of the applied `value-to-optional` and
-          // `optional-to-optional` conversions.
+          // An attempt at Double/CGFloat conversion through
+          // optional chaining. This is not supported at the
+          // moment because solution application doesn't know
+          // how to map Double to/from CGFloat through optionals.
+          if (isExpr<OptionalEvaluationExpr>(anchor)) {
+            if (!shouldAttemptFixes())
+              return getTypeMatchFailure(locator);
+
+            conversionsOrFixes.push_back(ContextualMismatch::create(
+                *this, nominal1, nominal2, getConstraintLocator(locator)));
+            break;
+          }
+
+          // Drop all of the applied `value-to-optional` promotions.
           path.erase(llvm::remove_if(
                          path,
                          [](const LocatorPathElt &elt) {
-                           return elt.is<LocatorPathElt::OptionalInjection>() ||
-                                  elt.is<LocatorPathElt::GenericArgument>();
+                           return elt.is<LocatorPathElt::OptionalInjection>();
                          }),
                      path.end());
 
@@ -7925,7 +7992,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               if (inoutBaseType->isTypeVariableOrMember())
                 return formUnsolvedResult();
 
-              auto baseIsArray = inoutBaseType->isArrayType();
+              auto baseIsArray = inoutBaseType->isArray();
 
               if (baseIsArray)
                 conversionsOrFixes.push_back(
@@ -7994,7 +8061,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             if (pointerKind == PTK_UnsafePointer
                 || pointerKind == PTK_UnsafeRawPointer) {
               if (!isAutoClosureArgument) {
-                if (type1->isArrayType()) {
+                if (type1->isArray()) {
                   conversionsOrFixes.push_back(
                       ConversionRestrictionKind::ArrayToPointer);
 
@@ -8704,18 +8771,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If we aren't allowed to have an isolated conformance, check for any
     // isolated conformances here.
     if (kind == ConstraintKind::NonisolatedConformsTo &&
-        !conformance.getRequirement()->isMarkerProtocol()) {
+        !conformance.getProtocol()->isMarkerProtocol()) {
       // Grab the first isolated conformance, if there is one.
-      ProtocolConformance *isolatedConformance = nullptr;
-      conformance.forEachIsolatedConformance([&](ProtocolConformance *conf) {
+      ProtocolConformanceRef isolatedConformance;
+      conformance.forEachIsolatedConformance([&](ProtocolConformanceRef conf) {
         if (!isolatedConformance)
           isolatedConformance = conf;
         return true;
       });
 
-      if (isolatedConformance) {
+      if (isolatedConformance && isolatedConformance.isConcrete()) {
         auto fix = IgnoreIsolatedConformance::create(
-            *this, getConstraintLocator(locator), isolatedConformance);
+            *this, getConstraintLocator(locator),
+            isolatedConformance.getConcrete());
         if (recordFix(fix)) {
           return SolutionKind::Error;
         }
@@ -8747,11 +8815,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::Subtype: {
-    auto conformance = TypeChecker::containsProtocol(
+    auto pair = TypeChecker::containsProtocol(
         type, protocol, /*allowMissing=*/true);
-    if (conformance) {
-      return recordConformance(conformance);
-    }
+    if (pair.first)
+      return SolutionKind::Solved;
+    if (pair.second)
+      return recordConformance(pair.second);
   } break;
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
@@ -9073,8 +9142,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
-        loc->isKeyPathSubscriptComponent()) {
+    if ((loc->isResultOfKeyPathDynamicMemberLookup() ||
+         loc->isKeyPathSubscriptComponent()) ||
+        loc->isKeyPathMemberComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
         auto *fix =
@@ -9193,7 +9263,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     }
 
     // Array<T> -> Unsafe{Raw}Pointer<T>
-    if (auto elt = resolvedTy->isArrayType()) {
+    if (auto elt = resolvedTy->getArrayElementType()) {
       typesToCheck.push_back(getPointerFor(PTK_UnsafePointer, elt));
       typesToCheck.push_back(getPointerFor(PTK_UnsafeRawPointer, elt));
     }
@@ -9224,7 +9294,7 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
                                           Type fromType,
                                           Type toType) {
   // Array downcasts are handled specially.
-  if (fromType->isArrayType() && toType->isArrayType()) {
+  if (fromType->isArray() && toType->isArray()) {
     return CheckedCastKind::ArrayDowncast;
   }
 
@@ -9488,8 +9558,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
-    auto fromBaseType = fromType->isArrayType();
-    auto toBaseType = toType->isArrayType();
+    auto fromBaseType = fromType->getArrayElementType();
+    auto toBaseType = toType->getArrayElementType();
 
     auto elementLocator =
         locator.withPathElement(LocatorPathElt::GenericArgument(0));
@@ -10495,26 +10565,34 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
     auto shouldCheckSendabilityOfBase = [&]() {
       if (!Context.getProtocol(KnownProtocolKind::Sendable))
-        return false;
+        return Type();
 
-      return llvm::any_of(lookup, [&](const auto &result) {
+      for (const auto &result : lookup) {
         auto decl = result.getValueDecl();
         if (!isa_and_nonnull<FuncDecl>(decl))
-          return false;
+          continue;
 
-        if (!decl->isInstanceMember())
-          return false;
+        if (!decl->isInstanceMember() &&
+            !decl->getDeclContext()->getSelfProtocolDecl())
+          continue;
 
         auto hasAppliedSelf = decl->hasCurriedSelf() &&
                               doesMemberRefApplyCurriedSelf(baseObjTy, decl);
         auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-        return numApplies < decl->getNumCurryLevels();
-      });
+        if (numApplies >= decl->getNumCurryLevels())
+          continue;
+
+        return decl->isInstanceMember()
+          ? instanceTy
+          : MetatypeType::get(instanceTy);
+      }
+
+      return Type();
     };
 
-    if (shouldCheckSendabilityOfBase()) {
+    if (Type baseTyToCheck = shouldCheckSendabilityOfBase()) {
       auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-      auto baseConformance = lookupConformance(instanceTy, sendableProtocol);
+      auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
 
       if (llvm::any_of(
               baseConformance.getConditionalRequirements(),
@@ -10523,8 +10601,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                   return false;
 
                 return (req.getFirstType()->hasTypeVariable() &&
-                        req.getProtocolDecl()->isSpecificProtocol(
-                            KnownProtocolKind::Sendable));
+                        (req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::Sendable) ||
+                         req.getProtocolDecl()->isSpecificProtocol(
+                            KnownProtocolKind::SendableMetatype)));
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
@@ -10825,7 +10905,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
-  } else if (isExpr<KeyPathExpr>(anchor)) {
+  } else if (getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
     return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
@@ -11656,7 +11736,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     return formUnsolved();
 
   auto witness =
-      conformance.getWitnessByName(baseObjectType, requirement->getName());
+      conformance.getWitnessByName(requirement->getName());
   if (!witness)
     return fail();
 
@@ -12039,8 +12119,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (!shouldAttemptFixes())
       return false;
 
-    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar),
-                    closureLocator);
+    assignFixedType(typeVar, PlaceholderType::get(getASTContext(), typeVar));
     recordTypeVariablesAsHoles(inferredClosureType);
 
     return !recordFix(
@@ -12208,7 +12287,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
                         closureExtInfo);
-  assignFixedType(typeVar, closureType, closureLocator);
+  assignFixedType(typeVar, closureType);
 
   // If there is a result builder to apply, do so now.
   if (resultBuilderType) {
@@ -12236,7 +12315,7 @@ bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
       locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
           .getOpenedType();
 
-  assignFixedType(typeVar, openedExpansionType, locator);
+  assignFixedType(typeVar, openedExpansionType);
   return true;
 }
 
@@ -12247,7 +12326,7 @@ bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
   auto *tapExpr = castToExpr<TapExpr>(tapLoc->getAnchor());
 
   // Assign a type to tap expression itself.
-  assignFixedType(typeVar, contextualType, getConstraintLocator(locator));
+  assignFixedType(typeVar, contextualType);
   // Set type to `$interpolation` variable declared in the body of tap
   // expression.
   setType(tapExpr->getVar(), contextualType);
@@ -12255,6 +12334,30 @@ bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
   // With all of the contextual information recorded in the constraint system,
   // it's time to generate constraints for the body of this tap expression.
   return !generateConstraints(tapExpr);
+}
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator) {
+  // Key path types recently gained Copyable, Escapable requirements.
+  // The solver cannot account for that during inference because Root
+  // and Value types are required to be only resolved enough to infer
+  // a capability of a key path itself.
+  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
+    auto keyPathTy = openUnboundGenericType(
+        BGT->getDecl(), BGT->getParent(), locator, /*isTypeResolution=*/false);
+
+    assignFixedType(
+        typeVar, keyPathTy, /*updateState=*/true,
+        /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+    addConstraint(ConstraintKind::Equal, keyPathTy, contextualType, locator);
+    return true;
+  }
+
+  assignFixedType(typeVar, contextualType, /*updateState=*/true,
+                  /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+  return true;
 }
 
 ConstraintSystem::SolutionKind
@@ -12455,8 +12558,8 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   };
 
   // Bridging the elements of an array.
-  if (auto fromElement = unwrappedFromType->isArrayType()) {
-    if (auto toElement = unwrappedToType->isArrayType()) {
+  if (auto fromElement = unwrappedFromType->getArrayElementType()) {
+    if (auto toElement = unwrappedToType->getArrayElementType()) {
       countOptionalInjections();
       auto result = simplifyBridgingConstraint(
           fromElement, toElement, subflags,
@@ -14735,7 +14838,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     auto t2 = type2->getDesugaredType();
 
-    auto baseType1 = getFixedTypeRecursive(obj1->isArrayType(), false);
+    auto baseType1 = getFixedTypeRecursive(obj1->getArrayElementType(), false);
     auto ptr2 = getBaseTypeForPointer(t2);
 
     increaseScore(SK_ValueToOptional, locator, ptr2.getInt());
@@ -14838,7 +14941,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     increaseScore(SK_ValueToPointerConversion, locator);
 
-    type1 = getFixedTypeRecursive(type1->getInOutObjectType()->isArrayType(),
+    type1 = getFixedTypeRecursive(type1->getInOutObjectType()->getArrayElementType(),
                                   /*wantRValue=*/false);
     LLVM_FALLTHROUGH;
   }
@@ -14874,8 +14977,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
-    Type baseType1 = type1->isArrayType();
-    Type baseType2 = type2->isArrayType();
+    Type baseType1 = type1->getArrayElementType();
+    Type baseType2 = type2->getArrayElementType();
 
     increaseScore(SK_CollectionUpcastConversion, locator);
     return matchTypes(baseType1,
@@ -15671,7 +15774,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     auto dictionaryKeyTy = DependentMemberType::get(valueBaseTy, keyAssocTy);
 
     // Extract the array element type.
-    auto elemTy = type1->isArrayType();
+    auto elemTy = type1->getArrayElementType();
 
     ConstraintLocator *elemLoc = getConstraintLocator(AE->getElement(0));
     ConstraintKind kind = isDictionaryType(dictTy)

@@ -23,7 +23,9 @@ public struct SequenceWithUnsafeIterator: Sequence {
   // CHECK-NOT: unsafe
   print( unsafe getIntUnsafely())
 
-  for unsafe _ in SequenceWithUnsafeIterator() { }
+  for unsafe _ in SequenceWithUnsafeIterator() {
+    _ = unsafe getIntUnsafely()
+  }
 }
 
 // CHECK: public protocol P

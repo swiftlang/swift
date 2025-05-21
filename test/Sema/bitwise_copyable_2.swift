@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift                          \
 // RUN:     -enable-builtin-module                              \
+// RUN:     -enable-experimental-feature LifetimeDependence     \
 // RUN:     -debug-diagnostic-names
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 // This test file only exists in order to test without noncopyable_generics and can be deleted once that is always enabled.
 

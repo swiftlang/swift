@@ -22,6 +22,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include <type_traits>
@@ -563,7 +564,7 @@ public:
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
-          SILFunctionTypeIsolation::Unknown,
+          SILFunctionTypeIsolation::forUnknown(),
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
@@ -1239,13 +1240,6 @@ public:
     return createThunk(Loc, Op, ThunkInst::Kind::Identity, substitutionMap);
   }
 
-  ThunkInst *
-  createHopToMainActorIfNeededThunk(SILLocation Loc, SILValue Op,
-                                    SubstitutionMap substitutionMap = {}) {
-    return createThunk(Loc, Op, ThunkInst::Kind::HopToMainActorIfNeeded,
-                       substitutionMap);
-  }
-
   ConvertEscapeToNoEscapeInst *
   createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty,
                                 bool lifetimeGuaranteed) {
@@ -1559,28 +1553,34 @@ public:
   }
 
   UnconditionalCheckedCastInst *
-  createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
+  createUnconditionalCheckedCast(SILLocation Loc,
+                                 CastingIsolatedConformances isolatedConformances,
+                                 SILValue op,
                                  SILType destLoweredTy,
                                  CanType destFormalTy) {
-    return createUnconditionalCheckedCast(Loc, op, destLoweredTy, destFormalTy,
+    return createUnconditionalCheckedCast(Loc, isolatedConformances, op,
+                                          destLoweredTy, destFormalTy,
                                           op->getOwnershipKind());
   }
 
   UnconditionalCheckedCastInst *
-  createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
+  createUnconditionalCheckedCast(SILLocation Loc,
+                                 CastingIsolatedConformances isolatedConformances,
+                                 SILValue op,
                                  SILType destLoweredTy, CanType destFormalTy,
                                  ValueOwnershipKind forwardingOwnershipKind) {
     return insert(UnconditionalCheckedCastInst::create(
-        getSILDebugLocation(Loc), op, destLoweredTy, destFormalTy,
-        getFunction(), forwardingOwnershipKind));
+        getSILDebugLocation(Loc), isolatedConformances, op, destLoweredTy,
+        destFormalTy, getFunction(), forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastAddrInst *
   createUnconditionalCheckedCastAddr(SILLocation Loc,
+                                     CastingIsolatedConformances isolatedConformances,
                                      SILValue src, CanType sourceFormalType,
                                      SILValue dest, CanType targetFormalType) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), src, sourceFormalType,
+        getSILDebugLocation(Loc), isolatedConformances, src, sourceFormalType,
         dest, targetFormalType, getFunction()));
   }
 
@@ -1729,6 +1729,9 @@ public:
                        EnumElementDecl *Element, SILType Ty,
                        ValueOwnershipKind forwardingOwnershipKind) {
     ASSERT(isLoadableOrOpaque(Ty));
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule())
                       EnumInst(getSILDebugLocation(Loc), Operand, Element, Ty,
                                forwardingOwnershipKind));
@@ -1752,6 +1755,9 @@ public:
                                                SILValue Operand,
                                                EnumElementDecl *Element,
                                                SILType Ty) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) InitEnumDataAddrInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1777,6 +1783,9 @@ public:
                           EnumElementDecl *Element, SILType Ty,
                           ValueOwnershipKind forwardingOwnershipKind) {
     ASSERT(isLoadableOrOpaque(Ty));
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) UncheckedEnumDataInst(
         getSILDebugLocation(Loc), Operand, Element, Ty,
         forwardingOwnershipKind));
@@ -1792,6 +1801,9 @@ public:
   UncheckedTakeEnumDataAddrInst *
   createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
                                   EnumElementDecl *Element, SILType Ty) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) UncheckedTakeEnumDataAddrInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1806,6 +1818,9 @@ public:
 
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,
                                            EnumElementDecl *Element) {
+    // Assert that this works and does not crash.
+    (void)getModule().getCaseIndex(Element);
+
     return insert(new (getModule()) InjectEnumAddrInst(
         getSILDebugLocation(Loc), Operand, Element));
   }
@@ -1907,6 +1922,15 @@ public:
     auto ResultTy = Operand->getType().getFieldType(Field, getModule(),
                                                     getTypeExpansionContext());
     return createStructElementAddr(Loc, Operand, Field, ResultTy);
+  }
+
+  VectorBaseAddrInst *
+  createVectorBaseAddr(SILLocation loc, SILValue vector) {
+    auto arrayTy = vector->getType().getAs<BuiltinFixedArrayType>();
+    ASSERT(arrayTy && "operand of vector_extract must be a builtin array type");
+    auto elemtTy = getFunction().getLoweredType(Lowering::AbstractionPattern::getOpaque(), arrayTy->getElementType());
+    return insert(new (getModule()) VectorBaseAddrInst(
+        getSILDebugLocation(loc), vector, elemtTy.getAddressType()));
   }
 
   RefElementAddrInst *createRefElementAddr(SILLocation Loc, SILValue Operand,
@@ -2345,6 +2369,14 @@ public:
                     forwardingOwnershipKind, dependenceKind));
   }
 
+  MarkDependenceAddrInst *
+  createMarkDependenceAddr(SILLocation Loc, SILValue address, SILValue base,
+                           MarkDependenceKind dependenceKind) {
+    return insert(new (getModule()) MarkDependenceAddrInst(
+                    getSILDebugLocation(Loc), address, base,
+                    dependenceKind));
+  }
+
   IsUniqueInst *createIsUnique(SILLocation Loc, SILValue operand) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
@@ -2360,6 +2392,11 @@ public:
                                            bool keepUnique) {
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
+  }
+  EndCOWMutationAddrInst *createEndCOWMutationAddr(SILLocation Loc,
+                                                   SILValue operand) {
+    return insert(new (getModule()) EndCOWMutationAddrInst(
+        getSILDebugLocation(Loc), operand));
   }
   DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
@@ -2428,6 +2465,16 @@ public:
                               getSILDebugLocation(loc),
                               valueType, paramType));
   }
+
+  /// Create a zero-initialized value of the given (loadable) type.
+  ///
+  /// This is currently only expected to be used in narrow situations
+  /// involving bridging and only makes a best effort attempt.
+  SILValue createZeroInitValue(SILLocation loc, SILType loweredTy);
+
+  /// Zero-initialize an object in memory of the given type (which may
+  /// or may not be loadable).
+  BuiltinInst *createZeroInitAddr(SILLocation loc, SILValue addr);
 
   //===--------------------------------------------------------------------===//
   // Unchecked cast helpers
@@ -2731,16 +2778,20 @@ public:
   }
 
   CheckedCastBranchInst *
-  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op, 
-                          CanType srcFormalTy, SILType destLoweredTy, 
+  createCheckedCastBranch(SILLocation Loc, bool isExact,
+                          CastingIsolatedConformances isolatedConformances,
+                          SILValue op,
+                          CanType srcFormalTy, SILType destLoweredTy,
                           CanType destFormalTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastBranchInst *
-  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op, 
-                          CanType srcFormalTy, SILType destLoweredTy, 
+  createCheckedCastBranch(SILLocation Loc, bool isExact,
+                          CastingIsolatedConformances isolatedConformances,
+                          SILValue op,
+                          CanType srcFormalTy, SILType destLoweredTy,
                           CanType destFormalTy, SILBasicBlock *successBB, 
                           SILBasicBlock *failureBB,
                           ValueOwnershipKind forwardingOwnershipKind,
@@ -2748,7 +2799,9 @@ public:
                           ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastAddrBranchInst *
-  createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
+  createCheckedCastAddrBranch(SILLocation Loc,
+                              CastingIsolatedConformances isolatedConformances,
+                              CastConsumptionKind consumption,
                               SILValue src, CanType sourceFormalType,
                               SILValue dest, CanType targetFormalType,
                               SILBasicBlock *successBB,
@@ -2756,9 +2809,9 @@ public:
                               ProfileCounter Target1Count = ProfileCounter(),
                               ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(CheckedCastAddrBranchInst::create(
-        getSILDebugLocation(Loc), consumption, src, sourceFormalType, dest,
-        targetFormalType, successBB, failureBB, Target1Count, Target2Count,
-        getFunction()));
+        getSILDebugLocation(Loc), isolatedConformances, consumption, src,
+        sourceFormalType, dest, targetFormalType, successBB, failureBB,
+        Target1Count, Target2Count, getFunction()));
   }
 
   //===--------------------------------------------------------------------===//

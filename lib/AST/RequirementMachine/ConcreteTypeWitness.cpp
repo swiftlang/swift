@@ -249,12 +249,13 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   } else if (conformance.isAbstract()) {
     auto archetype = concreteType->getAs<OpaqueTypeArchetypeType>();
     if (archetype == nullptr) {
-      llvm::errs() << "Should only have an abstract conformance with an "
-                   << "opaque archetype type\n";
-      llvm::errs() << "Symbol: " << concreteConformanceSymbol << "\n";
-      llvm::errs() << "Term: " << key << "\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Should only have an abstract conformance with an opaque "
+            << "archetype type\n";
+        out << "Symbol: " << concreteConformanceSymbol << "\n";
+        out << "Term: " << key << "\n";
+        dump(out);
+      });
     }
 
     typeWitness = archetype->getNestedType(assocType)->getCanonicalType();

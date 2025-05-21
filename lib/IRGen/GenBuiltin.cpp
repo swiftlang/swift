@@ -588,9 +588,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   
   if (Builtin.ID == BuiltinValueKind::FNeg) {
-    llvm::Value *rhs = args.claimNext();
-    llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
-    llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
+    llvm::Value *v = IGF.Builder.CreateFNeg(args.claimNext());
     return out.add(v);
   }
   if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
@@ -896,6 +894,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto newValue = args.claimNext();
     auto index = args.claimNext();
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::Select) {
+    using namespace llvm;
+    
+    auto pred = args.claimNext();
+    auto ifTrue = args.claimNext();
+    auto ifFalse = args.claimNext();
+    out.add(IGF.Builder.CreateSelect(pred, ifTrue, ifFalse));
     return;
   }
   
@@ -1327,25 +1335,31 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
-    // Build a zero initializer of the result type.
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
-    
     if (args.size() > 0) {
+      auto valueType = argTypes[0];
+      auto &valueTI = IGF.IGM.getTypeInfo(valueType);
+
       // `memset` the memory addressed by the argument.
       auto address = args.claimNext();
-      IGF.Builder.CreateMemSet(valueTy.second.getAddressForPointer(address),
+      IGF.Builder.CreateMemSet(valueTI.getAddressForPointer(address),
                                llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
-                               valueTy.second.getSize(IGF, argTypes[0]));
+                               valueTI.getSize(IGF, valueType));
     } else {
-      auto schema = valueTy.second.getSchema();
+      auto &resultTI = cast<LoadableTypeInfo>(IGF.IGM.getTypeInfo(resultType));
+      auto schema = resultTI.getSchema();
       for (auto &elt : schema) {
         out.add(llvm::Constant::getNullValue(elt.getScalarType()));
       }
     }
     return;
   }
-  
+
+  if (Builtin.ID == BuiltinValueKind::PrepareInitialization) {
+    ASSERT(args.size() > 0 && "only address-variant of prepareInitialization is supported");
+    (void)args.claimNext();
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
     (void)args.claimAll();
     Type valueTy = substitutions.getReplacementTypes()[0];

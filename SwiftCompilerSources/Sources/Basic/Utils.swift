@@ -96,6 +96,16 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
     return buffer[index]
   }
 
+  public func startsWith(_ prefix: StaticString) -> Bool {
+    return prefix.withUTF8Buffer { (prefixBuffer: UnsafeBufferPointer<UInt8>) in
+      if count < prefixBuffer.count {
+        return false
+      }
+      let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: prefixBuffer.count)
+      return buffer.elementsEqual(prefixBuffer, by: ==)
+    }
+  }
+
   public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
     let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)

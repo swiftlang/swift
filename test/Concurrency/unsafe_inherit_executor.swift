@@ -11,7 +11,7 @@ func testNonAsync() {}
 
 @_unsafeInheritExecutor
 func testAsync() async {}
-// expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+// expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
 struct A {
   // expected-error @+1 {{@_unsafeInheritExecutor may only be used on 'func' declarations}}
@@ -24,7 +24,7 @@ struct A {
 
   @_unsafeInheritExecutor
   func testAsync() async {}
-  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+  // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 }
 
 
@@ -34,7 +34,7 @@ class NonSendableObject {
 
 @_unsafeInheritExecutor
 func useNonSendable(object: NonSendableObject) async {}
-// expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead; this is an error in the Swift 6 language mode}}{{35:1-24=}}{{36:46-46=, isolation: isolated (any Actor)? = #isolation}}
+// expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead; this is an error in the Swift 6 language mode}}{{35:1-24=}}{{36:46-46=, isolation: isolated (any Actor)? = #isolation}}
 
 actor MyActor {
   var object = NonSendableObject()
@@ -49,7 +49,7 @@ func inheritsIsolationProperly(isolation: isolated (any Actor)? = #isolation) as
 // @_unsafeInheritExecutor does not work with #isolation
 @_unsafeInheritExecutor
 func unsafeCallerA(x: Int) async {
-  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+  // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   await inheritsIsolationProperly()
   // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{50:1-24=}}{{51:26-26=, isolation: isolated (any Actor)? = #isolation}}
@@ -57,7 +57,7 @@ func unsafeCallerA(x: Int) async {
 
 @_unsafeInheritExecutor
 func unsafeCallerB() async {
-  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+  // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   await inheritsIsolationProperly(isolation: #isolation)
   // expected-error@-1{{#isolation cannot be used within an '@_unsafeInheritExecutor' function}}{{58:1-24=}}{{59:20-20=isolation: isolated (any Actor)? = #isolation}}
@@ -65,7 +65,7 @@ func unsafeCallerB() async {
 
 @_unsafeInheritExecutor
 func unsafeCallerC(x: Int, fn: () -> Void, fn2: () -> Void) async {
-  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+  // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   await inheritsIsolationProperly()
   // expected-error@-1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}{{66:1-24=}}{{67:28-28=, isolation: isolated (any Actor)? = #isolation, }}
@@ -73,7 +73,7 @@ func unsafeCallerC(x: Int, fn: () -> Void, fn2: () -> Void) async {
 
 @_unsafeInheritExecutor
 func unsafeCallerAvoidsNewLoop(x: some AsyncSequence<Int, Never>) async throws {
-  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+  // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   for try await _ in x { }
 }
@@ -92,9 +92,11 @@ enum MyError: Error {
 case fail
 }
 
+protocol P {}
+
 @_unsafeInheritExecutor
-func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
-  // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+func unsafeCallerAvoidsNewLoop() async throws {
+  // expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
 
   _ = await withUnsafeContinuation { (continuation: UnsafeContinuation<Int, Never>) in
     continuation.resume(returning: 5)
@@ -128,13 +130,6 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
 
   func operation() async throws -> Int { 7 }
   try await TL.$string.withValue("hello", operation: operation)
-
-  // FIXME: Clock.measure does not currently support this hack.
-  // expected-error@+1{{#isolation (introduced by a default argument) cannot be used within an '@_unsafeInheritExecutor' function}}
-  _ = try! await clock.measure {
-    print("so very slow")
-    try await Task.sleep(nanoseconds: 500)
-  }
 
   _ = await withDiscardingTaskGroup(returning: Int.self) { group in
     group.addTask {
@@ -174,5 +169,31 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
 }
 
 @_unsafeInheritExecutor
+func unsafeClockCaller(
+  specificClock: ContinuousClock,
+  genericClock: some Clock,
+  existentialClock: any Clock,
+  existentialCompositionClock: any P & Clock,
+) async throws {
+  // expected-warning@-6{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+
+  _ = try! await specificClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = try! await genericClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = try! await existentialClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+
+  _ = try! await existentialCompositionClock.measure {
+    try await Task.sleep(nanoseconds: 500)
+  }
+}
+
+@_unsafeInheritExecutor
 func _unsafeInheritExecutor_hacky() async { }
-// expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+// expected-warning@-1{{'@_unsafeInheritExecutor' is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}

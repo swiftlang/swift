@@ -308,8 +308,9 @@ getRequirementForDiagnostics(Type subject, Symbol property,
                        property.getLayoutConstraint());
 
   default:
-    llvm::errs() << "Bad property symbol: " << property << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Bad property symbol: " << property;
+    });
   }
 }
 

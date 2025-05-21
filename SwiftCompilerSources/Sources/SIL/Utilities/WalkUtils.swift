@@ -39,10 +39,11 @@ public enum WalkResult {
 }
 
 extension Sequence {
+  // Walk each element until the walk aborts.
   public func walk(
-    _ predicate: (Element) throws -> WalkResult
+    _ walker: (Element) throws -> WalkResult
   ) rethrows -> WalkResult {
-    return try contains { try predicate($0) == .abortWalk } ? .abortWalk : .continueWalk
+    return try contains { try walker($0) == .abortWalk } ? .abortWalk : .continueWalk
   }
 }
 
@@ -508,6 +509,12 @@ extension AddressDefUseWalker {
       } else {
         return unmatchedPath(address: operand, path: path)
       }
+    case let vba as VectorBaseAddrInst:
+      if let path = path.popIfMatches(.vectorBase, index: 0) {
+        return walkDownUses(ofAddress: vba, path: path)
+      } else {
+        return unmatchedPath(address: operand, path: path)
+      }
     case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
       let ei = instruction as! SingleValueInstruction
       if let path = path.popIfMatches(.enumCase, index: (instruction as! EnumInstruction).caseIndex) {
@@ -538,6 +545,12 @@ extension AddressDefUseWalker {
     case let mdi as MarkDependenceInst:
       if operand.index == 0 {
         return walkDownUses(ofAddress: mdi, path: path)
+      } else {
+        return unmatchedPath(address: operand, path: path)
+      }
+    case is MarkDependenceAddrInst:
+      if operand.index == 0 {
+        return leafUse(address: operand, path: path)
       } else {
         return unmatchedPath(address: operand, path: path)
       }
@@ -807,6 +820,8 @@ extension AddressUseDefWalker {
       return walkUp(address: sea.struct, path: path.push(.structField, index: sea.fieldIndex))
     case let tea as TupleElementAddrInst:
       return walkUp(address: tea.tuple, path: path.push(.tupleField, index: tea.fieldIndex))
+    case let vba as VectorBaseAddrInst:
+      return walkUp(address: vba.vector, path: path.push(.vectorBase, index: 0))
     case let ida as InitEnumDataAddrInst:
       return walkUp(address: ida.operand.value, path: path.push(.enumCase, index: ida.caseIndex))
     case let uteda as UncheckedTakeEnumDataAddrInst:

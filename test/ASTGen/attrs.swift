@@ -1,23 +1,21 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
@@ -26,19 +24,17 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
+// REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_ABIAttribute
-// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_RawLayout
@@ -90,7 +86,7 @@ struct S4 {}
 @implementation extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 @implementation(Category) extension ObjCClass1 {} // expected-error {{cannot find type 'ObjCClass1' in scope}}
 
-@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of low-level parameters}}
+@abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of parameters}}
 func fn(_: Int) {}
 
 @_alignment(8) struct AnyAlignment {}
@@ -191,19 +187,19 @@ struct StorageRestrctionTest {
 @_unavailableFromAsync struct UnavailFromAsyncStruct { } // expected-error {{'@_unavailableFromAsync' attribute cannot be applied to this declaration}}
 @_unavailableFromAsync(message: "foo bar") func UnavailFromAsyncFn() {}
 
-@execution(concurrent) func testGlobal() async { // Ok
+@concurrent func testGlobal() async { // Ok
 }
 
 do {
-  @execution(caller) func testLocal() async {} // Ok
+  nonisolated(nonsending) func testLocal() async {} // Ok
 
   struct Test {
-    @execution(concurrent) func testMember() async {} // Ok
+    @concurrent func testMember() async {} // Ok
   }
 }
 
 typealias testConvention = @convention(c) (Int) -> Int
-typealias testExecution = @execution(concurrent) () async -> Void
+typealias testExecution = @concurrent () async -> Void
 typealias testIsolated = @isolated(any) () -> Void
 
 protocol OpProto {}
@@ -215,13 +211,13 @@ struct OpTest {
 
 struct E {}
 struct NE : ~Escapable {}
-@lifetime(ne) func derive(_ ne: NE) -> NE { ne }
-@lifetime(borrow ne1, ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+@lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
+@lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
   if (Int.random(in: 1..<100) < 50) { return ne1 }
   return ne2
 }
 @lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
-@lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+@lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
 
 actor MyActor {
   nonisolated let constFlag: Bool = false
@@ -250,3 +246,16 @@ struct LayoutOuter {
   }
 }
 @_rawLayout(like: LayoutOuter.Nested<Int>) struct TypeExprTest: ~Copyable {}
+
+@reasync protocol ReasyncProtocol {}
+@rethrows protocol RethrowingProtocol {
+  func source() throws
+}
+
+@_typeEraser(AnyEraser) protocol EraserProto {}
+struct AnyEraser: EraserProto {
+  init<T: EraserProto>(erasing: T) {}
+}
+
+func takeNone(@_inheritActorContext param: @Sendable () async -> ()) { }
+func takeAlways(@_inheritActorContext(always) param: sending @isolated(any) () -> ()) { }

@@ -61,6 +61,10 @@ namespace irgen {
       CanSILFunctionType outType, Explosion &out, bool isOutlined);
   CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
                                   bool isNoEscape);
+
+  /// Stub function that weakly links againt the swift_coroFrameAlloc
+  /// function. This is required for back-deployment.
+  llvm::Constant *getCoroFrameAllocStubFn(IRGenModule &IGM);
 } // end namespace irgen
 } // end namespace swift
 

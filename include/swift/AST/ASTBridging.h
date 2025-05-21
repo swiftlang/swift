@@ -176,7 +176,7 @@ BridgedDeclBaseName
 BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier);
 
 class BridgedDeclNameRef {
-  void *_Nonnull opaque;
+  void *_Nullable opaque;
 
 public:
   BRIDGED_INLINE BridgedDeclNameRef();
@@ -215,9 +215,22 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
     BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
     BridgedSourceLoc cRParenLoc);
 
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:"
+           "lParenLoc:argumentLabelLocs:rParenLoc:)")
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cLabelLocs, BridgedSourceLoc cRParenLoc);
+
 SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:)")
 BridgedDeclNameLoc
 BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc);
+
+SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:)")
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
@@ -317,6 +330,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
   EndianBig,
 };
 
+SWIFT_NAME("getter:BridgedASTContext.langOptsAttachCommentsToDecls(self:)")
+bool BridgedASTContext_langOptsAttachCommentsToDecls(
+    BridgedASTContext cContext);
+
 SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
 BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
 
@@ -374,21 +391,27 @@ struct BridgedDeclObj {
   BridgedDeclObj(SwiftObject obj) : obj(obj) {}
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE BridgedSourceLoc getLoc() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParent() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc Value_getNameLoc() const;
   BRIDGED_INLINE bool hasClangNode() const;
   BRIDGED_INLINE bool Value_isObjC() const;
+  BRIDGED_INLINE bool AbstractStorage_isConst() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
+  BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef AccessorDecl_getKindName() const;
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedASTNodeKind : uint8_t {
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedASTNodeKind : uint8_t {
   BridgedASTNodeKindExpr,
   BridgedASTNodeKindStmt,
   BridgedASTNodeKindDecl
@@ -538,6 +561,12 @@ public:
   BridgedDiagnosticArgument(BridgedStringRef s);
 };
 
+class BridgedFixIt {
+public:
+  BridgedCharSourceRange replacementRange;
+  BridgedStringRef replacementText;
+};
+
 class BridgedDiagnosticFixIt {
 public:
   int64_t storage[7];
@@ -575,6 +604,11 @@ void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine, BridgedSourceLoc loc, BridgedDiagID diagID,
     BridgedArrayRef arguments, BridgedSourceLoc highlightStart,
     uint32_t hightlightLength, BridgedArrayRef fixIts);
+
+SWIFT_NAME("BridgedDiagnosticEngine.getLocationFromExternalSource(self:path:line:column:)")
+BridgedSourceLoc BridgedDiagnostic_getLocationFromExternalSource(
+    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path,
+    SwiftInt line, SwiftInt column);
 
 SWIFT_NAME("getter:BridgedDiagnosticEngine.hadAnyError(self:)")
 bool BridgedDiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
@@ -843,6 +877,9 @@ struct BridgedDeclAttributes {
   BRIDGED_INLINE swift::DeclAttributes unbridged() const;
 };
 
+SWIFT_NAME("BridgedDeclAttribute.shouldBeRejectedByParser(_:)")
+bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind);
+
 SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
 bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind);
 
@@ -870,7 +907,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAvailableAttrKind {
 
 SWIFT_NAME("BridgedAvailableAttr.createParsed(_:atLoc:range:domainIdentifier:"
            "domainLoc:kind:message:renamed:introduced:introducedRange:"
-           "deprecated:deprecatedRange:obsoleted:obsoletedRange:)")
+           "deprecated:deprecatedRange:obsoleted:obsoletedRange:isSPI:)")
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
@@ -878,7 +915,8 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange);
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange,
+    bool isSPI);
 
 SWIFT_NAME("BridgedAvailableAttr.createUnavailableInEmbedded(_:atLoc:range:)")
 BridgedAvailableAttr
@@ -892,16 +930,6 @@ SWIFT_NAME("BridgedAvailableAttr.setIsGroupedWithWildcard(self:)")
 void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr);
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupTerminator(self:)")
 void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr);
-
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionKind {
-  BridgedExecutionKindConcurrent,
-  BridgedExecutionKindCaller,
-};
-
-SWIFT_NAME("BridgedExecutionAttr.createParsed(_:atLoc:range:behavior:)")
-BridgedExecutionAttr BridgedExecutionAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc atLoc,
-    BridgedSourceRange range, BridgedExecutionKind behavior);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
   BridgedAccessLevelPrivate,
@@ -1069,8 +1097,9 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
   BridgedParsedLifetimeDependenceKindDefault,
-  BridgedParsedLifetimeDependenceKindScope,
+  BridgedParsedLifetimeDependenceKindBorrow,
   BridgedParsedLifetimeDependenceKindInherit,
+  BridgedParsedLifetimeDependenceKindInout
 };
 
 class BridgedLifetimeDescriptor {
@@ -1217,11 +1246,30 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNonSendableKind cKind);
 
-SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:isUnsafe:)")
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonIsolatedModifier {
+  BridgedNonIsolatedModifierNone,
+  BridgedNonIsolatedModifierUnsafe,
+  BridgedNonIsolatedModifierNonSending
+};
+
+SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:modifier:)")
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange, bool isUnsafe);
+                                    BridgedSourceRange cRange,
+                                    BridgedNonIsolatedModifier modifier);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedInheritActorContextModifier {
+  BridgedInheritActorContextModifierNone,
+  BridgedInheritActorContextModifierAlways,
+};
+
+SWIFT_NAME("BridgedInheritActorContextAttr.createParsed(_:atLoc:range:modifier:)")
+BridgedInheritActorContextAttr
+BridgedInheritActorContextAttr_createParsed(BridgedASTContext cContext,
+                                            BridgedSourceLoc cAtLoc,
+                                            BridgedSourceRange cRange,
+                                            BridgedInheritActorContextModifier modifier);
 
 SWIFT_NAME("BridgedObjCAttr.createParsedUnnamed(_:atLoc:attrNameLoc:)")
 BridgedObjCAttr
@@ -1367,6 +1415,11 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
     BridgedArrayRef cParams);
+
+SWIFT_NAME("BridgedTypeEraserAttr.createParsed(_:atLoc:range:typeExpr:)")
+BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeExpr cTypeExpr);
 
 SWIFT_NAME(
     "BridgedUnavailableFromAsyncAttr.createParsed(_:atLoc:range:message:)")
@@ -1590,13 +1643,15 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
 
 SWIFT_NAME(
     "BridgedMacroDecl.createParsed(_:declContext:macroKeywordLoc:name:nameLoc:"
-    "genericParamList:paramList:arrowLoc:resultType:definition:)")
+    "genericParamList:paramList:arrowLoc:resultType:definition:"
+    "genericWhereClause:)")
 BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
-    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition);
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
+    BridgedNullableTrailingWhereClause genericWhereClause);
 
 SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
@@ -1745,10 +1800,6 @@ bool BridgedNominalTypeDecl_hasValueDeinit(BridgedNominalTypeDecl decl);
 SWIFT_NAME("BridgedNominalTypeDecl.isClass(self:)")
 BRIDGED_INLINE
 bool BridgedNominalTypeDecl_isClass(BridgedNominalTypeDecl decl);
-
-SWIFT_NAME("BridgedNominalTypeDecl.isGenericAtAnyLevel(self:)")
-BRIDGED_INLINE
-bool BridgedNominalTypeDecl_isGenericAtAnyLevel(BridgedNominalTypeDecl decl);
 
 SWIFT_NAME("BridgedNominalTypeDecl.setParsedMembers(self:_:fingerprint:)")
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
@@ -2046,6 +2097,13 @@ BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
     BridgedNullableExpr cParsedRoot, BridgedNullableExpr cParsedPath,
     bool hasLeadingDot);
 
+SWIFT_NAME("BridgedKeyPathExpr.createParsedPoundKeyPath(_:poundLoc:lParenLoc:"
+           "names:nameLocs:rParenLoc:)")
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsedPoundKeyPath(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cNames,
+    BridgedArrayRef cNameLocs, BridgedSourceLoc cRParenLoc);
+
 SWIFT_NAME("BridgedMacroExpansionExpr.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
 BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
@@ -2075,6 +2133,20 @@ SWIFT_NAME("BridgedNilLiteralExpr.createParsed(_:nilKeywordLoc:)")
 BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedObjCSelectorKind {
+  BridgedObjCSelectorKindMethod,
+  BridgedObjCSelectorKindGetter,
+  BridgedObjCSelectorKindSetter,
+};
+
+SWIFT_NAME("BridgedObjCSelectorExpr.createParsed(_:kind:keywordLoc:lParenLoc:"
+           "modifierLoc:subExpr:rParenLoc:)")
+BridgedObjCSelectorExpr BridgedObjCSelectorExpr_createParsed(
+    BridgedASTContext cContext, BridgedObjCSelectorKind cKind,
+    BridgedSourceLoc cKeywordLoc, BridgedSourceLoc cLParenLoc,
+    BridgedSourceLoc cModifierLoc, BridgedExpr cSubExpr,
+    BridgedSourceLoc cRParenLoc);
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedObjectLiteralKind : size_t {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) BridgedObjectLiteralKind_##Name,
@@ -2323,6 +2395,13 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
     BridgedSourceLoc cLParenLoc, BridgedArrayRef cSpecs,
     BridgedSourceLoc cRParenLoc, bool isUnavailability);
 
+SWIFT_NAME("BridgedStmtConditionElement.createHasSymbol(_:poundLoc:lParenLoc:"
+           "symbol:rParenLoc:)")
+BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedNullableExpr cSymbolExpr,
+    BridgedSourceLoc cRParenLoc);
+
 struct BridgedCaseLabelItemInfo {
   SWIFT_NAME("isDefault")
   bool IsDefault;
@@ -2424,6 +2503,11 @@ BridgedIfStmt BridgedIfStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
     BridgedSourceLoc cIfLoc, BridgedArrayRef cConds, BridgedBraceStmt cThen,
     BridgedSourceLoc cElseLoc, BridgedNullableStmt cElse);
+
+SWIFT_NAME("BridgedPoundAssertStmt.createParsed(_:range:condition:message:)")
+BridgedPoundAssertStmt BridgedPoundAssertStmt_createParsed(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedExpr cConditionExpr, BridgedStringRef cMessage);
 
 SWIFT_NAME("BridgedRepeatWhileStmt.createParsed(_:labelInfo:repeatLoc:cond:"
            "whileLoc:body:)")
@@ -2536,25 +2620,12 @@ BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
     BridgedSourceLoc cNameLoc, BridgedDeclNameRef cWitnessMethodProtocol,
     BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionTypeAttrExecutionKind {
-  BridgedExecutionTypeAttrExecutionKind_Concurrent,
-  BridgedExecutionTypeAttrExecutionKind_Caller
-};
-
 SWIFT_NAME("BridgedDifferentiableTypeAttr.createParsed(_:atLoc:nameLoc:"
            "parensRange:kind:kindLoc:)")
 BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
     BridgedDifferentiabilityKind cKind, BridgedSourceLoc cKindLoc);
-
-SWIFT_NAME("BridgedExecutionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
-           "behavior:behaviorLoc:)")
-BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
-    BridgedExecutionTypeAttrExecutionKind behavior,
-    BridgedSourceLoc cBehaviorLoc);
 
 SWIFT_NAME("BridgedIsolatedTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
            "isolationKind:isolationKindLoc:)")
@@ -2658,6 +2729,11 @@ BridgedImplicitlyUnwrappedOptionalTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cExclamationLoc);
 
+SWIFT_NAME("BridgedInlineArrayTypeRepr.createParsed(_:count:element:brackets:)")
+BridgedInlineArrayTypeRepr BridgedInlineArrayTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr cCountType,
+    BridgedTypeRepr cElementType, BridgedSourceRange cBracketsRange);
+
 SWIFT_NAME("BridgedInverseTypeRepr.createParsed(_:tildeLoc:constraint:)")
 BridgedInverseTypeRepr
 BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
@@ -2688,6 +2764,11 @@ BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedParamSpecifier cSpecifier, BridgedSourceLoc cSpecifierLoc);
 
+SWIFT_NAME("BridgedPlaceholderTypeRepr.createParsed(_:loc:)")
+BridgedPlaceholderTypeRepr
+BridgedPlaceholderTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedSourceLoc cLoc);
+
 SWIFT_NAME("BridgedProtocolTypeRepr.createParsed(_:base:protocolKeywordLoc:)")
 BridgedProtocolTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
@@ -2713,16 +2794,23 @@ BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedTypeRepr base,
                                     BridgedSourceLoc cSpecifierLoc);
 
+SWIFT_NAME("BridgedCallerIsolatedTypeRepr.createParsed(_:base:specifierLoc:)")
+BridgedCallerIsolatedTypeRepr
+BridgedCallerIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+                                           BridgedTypeRepr base,
+                                           BridgedSourceLoc cSpecifierLoc);
+
 SWIFT_NAME(
     "BridgedTupleTypeRepr.createParsed(_:elements:leftParenLoc:rightParenLoc:)")
 BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedArrayRef elements,
     BridgedSourceLoc cLParenLoc, BridgedSourceLoc cRParenLoc);
 
-SWIFT_NAME("BridgedNamedOpaqueReturnTypeRepr.createParsed(_:base:)")
-BridgedNamedOpaqueReturnTypeRepr
-BridgedNamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
-                                              BridgedTypeRepr baseTy);
+SWIFT_NAME(
+    "BridgedNamedOpaqueReturnTypeRepr.createParsed(_:base:genericParamList:)")
+BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr baseTy,
+    BridgedGenericParamList genericParams);
 
 SWIFT_NAME("BridgedOpaqueReturnTypeRepr.createParsed(_:someKeywordLoc:base:)")
 BridgedOpaqueReturnTypeRepr
@@ -2761,6 +2849,9 @@ BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedAnyPattern.createImplicit(_:)")
+BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext);
 
 SWIFT_NAME("BridgedBindingPattern.createParsed(_:keywordLoc:isLet:subPattern:)")
 BridgedBindingPattern
@@ -2990,8 +3081,6 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinExternalMacro,
   /// The builtin definition for the "isolation" macro.
   BridgedBuiltinIsolationMacro,
-  /// The builtin definition for the "SwiftSetting" macro.
-  BridgedBuiltinSwiftSettingsMacro,
 };
 
 struct BridgedASTType {
@@ -3012,25 +3101,55 @@ struct BridgedASTType {
   BRIDGED_INLINE swift::Type unbridged() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
+  BRIDGED_INLINE bool hasArchetype() const;
   BRIDGED_INLINE bool isLegalFormalType() const;
+  BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool hasDynamicSelf() const;
+  BRIDGED_INLINE bool isArchetype() const;
+  BRIDGED_INLINE bool archetypeRequiresClass() const;
   BRIDGED_INLINE bool isExistentialArchetype() const;
   BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
   BRIDGED_INLINE bool isExistential() const;
+  BRIDGED_INLINE bool isDynamicSelf() const;
+  BRIDGED_INLINE bool isClassExistential() const;
+  BRIDGED_INLINE bool isGenericTypeParam() const;
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
+  BRIDGED_INLINE bool isUnownedStorageType() const;
   BRIDGED_INLINE bool isMetatypeType() const;
   BRIDGED_INLINE bool isExistentialMetatypeType() const;
+  BRIDGED_INLINE bool isTuple() const;
+  BRIDGED_INLINE bool isFunction() const;
+  BRIDGED_INLINE bool isLoweredFunction() const;
+  BRIDGED_INLINE bool isNoEscapeFunction() const;
+  BRIDGED_INLINE bool isThickFunction() const;
+  BRIDGED_INLINE bool isAsyncFunction() const;
+  BRIDGED_INLINE bool isCalleeConsumedFunction() const;
+  BRIDGED_INLINE bool isBuiltinInteger() const;
+  BRIDGED_INLINE bool isBuiltinFloat() const;
+  BRIDGED_INLINE bool isBuiltinVector() const;
+  BRIDGED_INLINE bool isBuiltinFixedArray() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;
+  BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isOptional() const;
+  BRIDGED_INLINE bool isBuiltinType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getStaticTypeOfDynamicSelf() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getSuperClassType() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
+  BRIDGED_INLINE BridgedOptionalInt getValueOfIntegerType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedASTType fromType, BridgedASTType toType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
 };
 
@@ -3038,9 +3157,10 @@ class BridgedCanType {
   swift::TypeBase * _Nullable type;
 
 public:
+  BRIDGED_INLINE BridgedCanType();
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;
 };
 
 struct BridgedASTTypeArray {
@@ -3064,6 +3184,7 @@ struct BridgedConformance {
   BRIDGED_INLINE bool isSpecializedConformance() const;
   BRIDGED_INLINE bool isInheritedConformance() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getRequirement() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getGenericConformance() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getInheritedConformance() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getSpecializedSubstitutions() const;
@@ -3090,6 +3211,7 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE BridgedSubstitutionMap();
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isEmpty() const;
+  BRIDGED_INLINE bool isEqualTo(BridgedSubstitutionMap rhs) const;
   BRIDGED_INLINE bool hasAnySubstitutableParams() const;
   BRIDGED_INLINE SwiftInt getNumConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
@@ -3101,6 +3223,8 @@ struct BridgedGenericSignature {
 
   BRIDGED_INLINE swift::GenericSignature unbridged() const;
   BridgedOwnedString getDebugDescription() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoContext(BridgedASTType type) const;
 };
 
 struct BridgedFingerprint {
@@ -3109,6 +3233,15 @@ struct BridgedFingerprint {
 
   BRIDGED_INLINE swift::Fingerprint unbridged() const;
 };
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPoundKeyword : uint8_t {
+#define POUND_KEYWORD(NAME) BridgedPoundKeyword_##NAME,
+#include "swift/AST/TokenKinds.def"
+  BridgedPoundKeyword_None,
+};
+
+SWIFT_NAME("BridgedPoundKeyword.init(from:)")
+BridgedPoundKeyword BridgedPoundKeyword_fromString(BridgedStringRef cStr);
 
 //===----------------------------------------------------------------------===//
 // MARK: #if handling

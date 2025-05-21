@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend -enable-experimental-feature ABIAttribute %s -emit-ir > %t.ir
+// RUN: %target-swift-frontend %s -emit-ir > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
 // RUN: %FileCheck --check-prefix NEGATIVE --input-file %t.ir %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64 || CPU=arm64
-// REQUIRES: swift_feature_ABIAttribute
 
 // Non-Swift _silgen_name definitions
 
@@ -88,18 +87,23 @@ extension X {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname21abi_ABIAttrPublic_vars5Int64Vvs"
 // CHECK: define hidden swiftcc i64 @"$s7asmname23abi_ABIAttrInternal_vars5Int64Vvg"
 // CHECK: define hidden swiftcc void @"$s7asmname23abi_ABIAttrInternal_vars5Int64Vvs"
-// CHECK: define internal swiftcc i64 @"$s7asmname22abi_ABIAttrPrivate_vars5Int64Vvg"
-// CHECK: define internal swiftcc void @"$s7asmname22abi_ABIAttrPrivate_vars5Int64Vvs"
+// CHECK: define internal swiftcc i64 @"$s7asmname22abi_ABIAttrPrivate_var33_{{[0-9A-F]+}}LLs5Int64Vvg"
+// CHECK: define internal swiftcc void @"$s7asmname22abi_ABIAttrPrivate_var33_{{[0-9A-F]+}}LLs5Int64Vvs"
 
-@abi(public func abi_ABIAttrGenericNonSendableToSendable<T>(_ value: T) -> T)
+@abi(func abi_ABIAttrGenericNonSendableToSendable<T>(_ value: T) -> T)
 public func api_ABIAttrGenericNonSendableToSendable<T: Sendable>(_ value: T) -> T { return value }
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname031abi_ABIAttrGenericNonSendableToF0yxxlF"
 // NEGATIVE-NOT: @"$s7asmname031abi_ABIAttrGenericNonSendableToF0yxxs0F0RzlF"
 
 // Similar to hack applied to `AsyncStream.init(unfolding:onCancel:)`
-@abi(public func abi_ABIAttrPreconcurrencyToNotPreconcurrency(_ c1: () -> Void, _ c2: @Sendable () -> Void))
+@abi(func abi_ABIAttrPreconcurrencyToNotPreconcurrency(_ c1: () -> Void, _ c2: @Sendable () -> Void))
 @preconcurrency public func api_ABIAttrPreconcurrencyToNotPreconcurrency(_ c1: () -> Void, _ c2: @Sendable () -> Void) {}
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname030abi_ABIAttrPreconcurrencyToNotD0yyyyXE_yyYbXEtF"
+
+@abi(var abi_ABIAttrVarEffects: Int)
+public var api_ABIAttrVarEffects: Int { get async throws { fatalError() } }
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swifttailcc void @"$s7asmname21abi_ABIAttrVarEffectsSivg"
+// CHECK: define internal swifttailcc void @"$s7asmname21abi_ABIAttrVarEffectsSivgTY0_"
 
 extension X {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i8 } @"$s7asmname1XO8abi_blahACs5Int64V_tcfC"

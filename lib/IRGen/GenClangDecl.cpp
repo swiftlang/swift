@@ -390,8 +390,12 @@ irgen::getBasesAndOffsets(const clang::CXXRecordDecl *decl) {
       continue;
 
     auto offset = Size(layout.getBaseClassOffset(baseRecord).getQuantity());
-    auto size =
-        Size(decl->getASTContext().getTypeSizeInChars(baseType).getQuantity());
+    // A base type might have different size and data size (sizeof != dsize).
+    // Make sure we are using data size here, since fields of the derived type
+    // might be packed into the base's tail padding.
+    auto size = Size(decl->getASTContext()
+                         .getTypeInfoDataSizeInChars(baseType)
+                         .Width.getQuantity());
 
     baseOffsetsAndSizes.push_back({baseRecord, offset, size});
   }

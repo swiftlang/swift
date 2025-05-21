@@ -39,8 +39,13 @@ private:
 
   InterfaceSubContextDelegate &astDelegate;
 
-  /// Location where pre-built moduels are to be built into.
+  /// Location where pre-built modules are to be built into.
   std::string moduleOutputPath;
+  /// Location where pre-built SDK modules are to be built into.
+  std::string sdkModuleOutputPath;
+  /// Clang-specific (-Xcc) command-line flags to include on
+  /// Swift module compilation commands
+  std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
 
 public:
   std::optional<ModuleDependencyInfo> dependencies;
@@ -48,11 +53,15 @@ public:
   SwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
                      Identifier moduleName,
                      InterfaceSubContextDelegate &astDelegate,
-                     StringRef moduleOutputPath, ScannerKind kind = MDS_plain)
+                     StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
+                     std::vector<std::string> swiftModuleClangCC1CommandLineArgs,
+                     ScannerKind kind = MDS_plain)
       : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
                                    /*IgnoreSwiftSourceInfoFile=*/true),
         kind(kind), moduleName(moduleName), astDelegate(astDelegate),
-        moduleOutputPath(moduleOutputPath) {}
+        moduleOutputPath(moduleOutputPath),
+        sdkModuleOutputPath(sdkModuleOutputPath),
+        swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs)  {}
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -93,10 +102,11 @@ public:
                                 Identifier moduleName,
                                 StringRef PlaceholderDependencyModuleMap,
                                 InterfaceSubContextDelegate &astDelegate,
-                                StringRef moduleOutputPath)
+                                StringRef moduleOutputPath,
+                                StringRef sdkModuleOutputPath)
       : SwiftModuleScanner(ctx, LoadMode, moduleName, astDelegate,
-                           moduleOutputPath, MDS_placeholder) {
-
+                           moduleOutputPath, sdkModuleOutputPath, {},
+                           MDS_placeholder) {
     // FIXME: Find a better place for this map to live, to avoid
     // doing the parsing on every module.
     if (!PlaceholderDependencyModuleMap.empty()) {

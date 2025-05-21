@@ -136,7 +136,7 @@ private func constructLetInitRegion(
   // root-class initializer).
   initRegion.insert(markUninitialized)
 
-  var borrows = Stack<BorrowIntroducingInstruction>(context)
+  var borrows = Stack<BeginBorrowInstruction>(context)
   defer { borrows.deinitialize() }
 
   for inst in markUninitialized.parentFunction.instructions {
@@ -153,7 +153,7 @@ private func constructLetInitRegion(
 
     case let copy as CopyAddrInst
          where copy.destination.isLetFieldAddress(of: markUninitialized):
-      assert(copy.isInitializationOfDest)
+      assert(copy.isInitializationOfDestination)
       initRegion.insert(inst)
 
     case let beginAccess as BeginAccessInst

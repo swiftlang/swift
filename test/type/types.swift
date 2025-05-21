@@ -196,7 +196,7 @@ typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'i
 
 // rdar://94888357 - failed to produce a diagnostic when type is used incorrectly
 func rdar94888357() {
-  struct S<T> { // expected-note {{generic type 'S' declared here}}
+  struct S<T> { // expected-note {{generic struct 'S' declared here}}
     init(_ str: String) {}
   }
 

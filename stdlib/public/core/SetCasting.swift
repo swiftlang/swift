@@ -29,7 +29,7 @@ extension Set {
     } else {
       for m in source {
         guard let member = transform(m) else { return nil }
-        target._unsafeInsertNew(member)
+        unsafe target._unsafeInsertNew(member)
       }
     }
     self.init(_native: target)

@@ -7,4 +7,5 @@
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
 
-// RUN: %{python} %utils/swift_build_support/run_tests.py
+// RUN: %empty-directory(%t)
+// RUN: env SWIFT_BUILD_ROOT=%t %{python} %utils/swift_build_support/run_tests.py

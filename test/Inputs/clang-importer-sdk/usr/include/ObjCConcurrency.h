@@ -123,6 +123,16 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
     __attribute__((swift_async_error(zero_argument, 3)));
 - (void)getIceCreamFlavorWithCompletionHandler:
     (void (^)(Flavor flavor, NSError *__nullable error))completionHandler;
+
+@property(class, strong, readonly) SlowServer *standardServer;
+- (void)getValueWithKey:(NSString *)valueIdentifier
+             completion:(void (^)(NSString *__nullable value,
+                                  NSError *__nullable error))completionHandler;
+- (void)getMainActorValueWithKey:(NSString *)valueIdentifier
+                      completion:
+                          (void (^)(NSString *__nullable value,
+                                    NSError *__nullable error))completionHandler
+    MAIN_ACTOR;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -362,6 +372,10 @@ MAIN_ACTOR
 @protocol FloatLoader
 @optional
 - (void)loadFloatWithCompletionHandler:(void (^)(float))completionHandler;
+@end
+
+@protocol FailableFloatLoader
+- (void)loadFloatOrThrowWithCompletionHandler:(void (^)(float, NSError* __nullable)) completionHandler;
 @end
 
 #pragma clang assume_nonnull end

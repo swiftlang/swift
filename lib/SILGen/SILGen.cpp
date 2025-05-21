@@ -458,6 +458,10 @@ FuncDecl *SILGenModule::getDeinitOnExecutor() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_deinitOnExecutor");
 }
 
+FuncDecl *SILGenModule::getCreateExecutors() {
+  return lookupConcurrencyIntrinsic(getASTContext(), "_createExecutors");
+}
+
 FuncDecl *SILGenModule::getExit() {
   ASTContext &C = getASTContext();
 
@@ -505,6 +509,29 @@ FuncDecl *SILGenModule::getExit() {
   }
 
   return exitFunction;
+}
+
+Type SILGenModule::getConfiguredExecutorFactory() {
+  auto &ctx = getASTContext();
+
+  // Look in the main module for a typealias
+  Type factory = ctx.getNamedSwiftType(ctx.MainModule, "_DefaultExecutorFactory");
+
+  // If we don't find it, fall back to _Concurrency.PlatformExecutorFactory
+  if (!factory)
+    factory = getDefaultExecutorFactory();
+
+  return factory;
+}
+
+Type SILGenModule::getDefaultExecutorFactory() {
+  auto &ctx = getASTContext();
+
+  ModuleDecl *module = ctx.getModuleByIdentifier(ctx.Id_Concurrency);
+  if (!module)
+    return Type();
+
+  return ctx.getNamedSwiftType(module, "_DefaultExecutorFactory");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -662,9 +689,11 @@ static bool shouldEmitFunctionBody(const AbstractFunctionDecl *AFD) {
     return false;
 
   auto &ctx = AFD->getASTContext();
-  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck || AFD->isInMacroExpansionFromClangHeader()) {
     // Force the function body to be type-checked and then skip it if there
-    // have been any errors.
+    // have been any errors. Normally macro expansions are type checked in the module they
+    // expand in - this does not apply to swift macros applied to nodes imported from clang,
+    // so force type checking of them here if they haven't already, to prevent crashing.
     (void)AFD->getTypecheckedBody();
 
     // FIXME: Only skip bodies that contain type checking errors.
@@ -736,6 +765,13 @@ static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
       // Deallocating destructor is always nonisolated. Isolation of the deinit
       // applies only to isolated deallocator and destroyer.
       return ActorIsolation::forNonisolated(false);
+    }
+
+    // If we have a closure expr, check if our type is
+    // nonisolated(nonsending). In that case, we use that instead.
+    if (auto *closureExpr = constant.getAbstractClosureExpr()) {
+      if (auto actorIsolation = closureExpr->getActorIsolation())
+        return actorIsolation;
     }
 
     // If we have actor isolation for our constant, put the isolation onto the
@@ -1439,6 +1475,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit default arguments and property wrapper initializers.
   emitArgumentGenerators(AFD, AFD->getParameters());
 
+  ASSERT(ABIRoleInfo(AFD).providesAPI()
+            && "emitAbstractFuncDecl() on ABI-only decl?");
+
   // If the declaration is exported as a C function, emit its native-to-foreign
   // thunk too, if it wasn't already forced.
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
@@ -1933,7 +1972,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   auto strategy = decl->getAccessStrategy(
       AccessSemantics::Ordinary,
       decl->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
-      M.getSwiftModule(), expansion,
+      M.getSwiftModule(), expansion, std::nullopt,
       /*useOldABI=*/false);
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {

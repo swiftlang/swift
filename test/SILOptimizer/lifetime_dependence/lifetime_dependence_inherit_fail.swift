@@ -11,7 +11,7 @@
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
-@lifetime(source)
+@lifetime(copy source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, dependsOn source: borrowing U)
   -> T {
@@ -46,7 +46,7 @@ struct BV : ~Escapable {
 struct NE : ~Escapable {
   var bv: BV
 
-  @lifetime(bv)
+  @lifetime(copy bv)
   init(_ bv: consuming BV) {
     self.bv = bv
   }

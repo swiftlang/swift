@@ -435,6 +435,9 @@ public:
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
 
+  Type getTypeAliasType(const TypeAliasDecl *TAD,
+                        DynamicLookupInfo dynamicLookupInfo);
+
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo);
 
@@ -612,7 +615,7 @@ public:
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
 
   void getTypeAttributeKeywordCompletions(CompletionKind completionKind);

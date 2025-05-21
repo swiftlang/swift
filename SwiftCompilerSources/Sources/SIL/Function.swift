@@ -36,6 +36,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     hasher.combine(ObjectIdentifier(self))
   }
 
+  public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
@@ -43,7 +45,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
-  
+
+  public var isSpecialization: Bool { bridged.isSpecialization() }
+
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
@@ -59,6 +63,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
   public var loweredFunctionType: CanonicalType {
     CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
+  }
+
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
+  }
+
+  public var forwardingSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getForwardingSubstitutionMap())
+  }
+
+  public func mapTypeIntoContext(_ type: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: bridged.mapTypeIntoContext(type.bridged))
   }
 
   /// Returns true if the function is a definition and not only an external declaration.
@@ -205,6 +221,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  public var accessorKindName: String? {
+    guard bridged.isAccessor() else {
+      return nil
+    }
+    return StringRef(bridged: bridged.getAccessorName()).string
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
@@ -320,10 +343,15 @@ extension Function {
 
   public var hasSelfArgument: Bool { argumentConventions.selfIndex != nil }
 
-  public var selfArgumentIndex: Int { argumentConventions.selfIndex! }
+  public var selfArgumentIndex: Int? { argumentConventions.selfIndex }
 
-  public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
-  
+  public var selfArgument: FunctionArgument? {
+    if let selfArgIdx = selfArgumentIndex {
+      return arguments[selfArgIdx]
+    }
+    return nil
+  }
+
   public var dynamicSelfMetadata: FunctionArgument? {
     if bridged.hasDynamicSelfMetadata() {
       return arguments.last!
@@ -555,6 +583,10 @@ extension Function {
                                                 atIndex: calleeArgIdx,
                                                 withConvention: convention)
         return effects.memory.read
+      },
+      // isDeinitBarrier
+      { (f: BridgedFunction) -> Bool in
+        return f.function.getSideEffects().isDeinitBarrier
       }
     )
   }

@@ -60,6 +60,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     # using C++ symbols in resilient overlays (see f4204568).
     -enable-experimental-feature AssumeResilientCxxTypes
 
+    -enable-experimental-feature AllowUnsafeAttribute
     -strict-memory-safety
 
     # The varying modularization of the C++ standard library on different
@@ -77,8 +78,9 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     DEPLOYMENT_VERSION_XROS ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_XROS}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX WINDOWS ANDROID FREEBSD
+    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX LINUX_STATIC WINDOWS ANDROID FREEBSD
     MACCATALYST_BUILD_FLAVOR zippered
     INSTALL_IN_COMPONENT compiler
+    INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY
     INSTALL_WITH_SHARED
     DEPENDS libstdcxx-modulemap libcxxshim_modulemap CxxStdlib-apinotes)

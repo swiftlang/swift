@@ -17,11 +17,12 @@
 #include "TypeCheckAccess.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
-#include "TypeChecker.h"
 #include "TypeCheckUnsafe.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Import.h"
@@ -498,7 +499,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     if (downgradeToWarning == DowngradeToWarning::Yes)
       diagID = diag::generic_param_usable_from_inline_warn;
     auto diag =
-        Context.Diags.diagnose(ownerDecl, diagID, ownerDecl->getDescriptiveKind(),
+        Context.Diags.diagnose(ownerDecl, diagID, ownerDecl,
                                accessControlErrorKind == ACEK::Requirement);
     highlightOffendingType(diag, complainRepr);
     noteLimitingImport(/*userDecl*/nullptr, Context, minImportLimit, complainRepr);
@@ -514,9 +515,8 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::generic_param_access_warn;
   auto diag = Context.Diags.diagnose(
-      ownerDecl, diagID, ownerDecl->getDescriptiveKind(), isExplicit,
-      contextAccess, minAccess, isa<FileUnit>(DC),
-      accessControlErrorKind == ACEK::Requirement);
+      ownerDecl, diagID, ownerDecl, isExplicit, contextAccess, minAccess,
+      isa<FileUnit>(DC), accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(diag, complainRepr);
   noteLimitingImport(/*userDecl*/nullptr, Context, minImportLimit, complainRepr);
 }

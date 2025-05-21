@@ -84,7 +84,8 @@ class ReabstractionInfo {
   /// specializer.
   bool ConvertIndirectToDirect = true;
 
-  /// If true, drop unused arguments.
+  /// If true, drop unused arguments. Dropping unused arguments is a
+  /// prerequisite before promoting an indirect argument to a direct argument.
   /// See `droppedArguments`.
   bool dropUnusedArguments = false;
 
@@ -204,7 +205,7 @@ public:
   ReabstractionInfo(ModuleDecl *targetModule, bool isModuleWholeModule,
                     ApplySite Apply, SILFunction *Callee,
                     SubstitutionMap ParamSubs, SerializedKind_t Serialized,
-                    bool ConvertIndirectToDirect, bool dropMetatypeArgs,
+                    bool ConvertIndirectToDirect, bool dropUnusedArguments,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with

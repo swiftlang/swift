@@ -293,13 +293,6 @@ private extension Value {
       return self
     }
   }
-
-  var lookThroughTruncOrBitCast: Value {
-    if let truncOrBitCast = self as? BuiltinInst, truncOrBitCast.id == .TruncOrBitCast {
-      return truncOrBitCast.arguments[0]
-    }
-    return self
-  }
 }
 
 private extension BuiltinInst {

@@ -17,6 +17,8 @@
 
 namespace swift {
 
+class TypeExpr;
+
 /// Describes all of the attributes that can occur on a conformance.
 struct ConformanceAttributes {
   /// The location of the "unchecked" attribute, if present.
@@ -28,9 +30,15 @@ struct ConformanceAttributes {
   /// The location of the "unsafe" attribute if present.
   SourceLoc unsafeLoc;
 
-  /// The location of the "@isolated" attribute if present.
-  SourceLoc isolatedLoc;
-  
+  /// The location of the "nonisolated" modifier, if present.
+  SourceLoc nonisolatedLoc;
+
+  /// The location of the '@' prior to the global actor type.
+  SourceLoc globalActorAtLoc;
+
+  /// The global actor type to which this conformance is isolated.
+  TypeExpr *globalActorType = nullptr;
+
   /// Merge other conformance attributes into this set.
   ConformanceAttributes &
   operator |=(const ConformanceAttributes &other) {
@@ -40,8 +48,12 @@ struct ConformanceAttributes {
       preconcurrencyLoc = other.preconcurrencyLoc;
     if (other.unsafeLoc.isValid())
       unsafeLoc = other.unsafeLoc;
-    if (other.isolatedLoc.isValid())
-      isolatedLoc = other.isolatedLoc;
+    if (other.nonisolatedLoc.isValid())
+      nonisolatedLoc = other.nonisolatedLoc;
+    if (other.globalActorType && !globalActorType) {
+      globalActorAtLoc = other.globalActorAtLoc;
+      globalActorType = other.globalActorType;
+    }
     return *this;
   }
 };

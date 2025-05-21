@@ -579,8 +579,9 @@ public:
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
-        else if (isa<ClassDecl>(TD) && TD->isObjC()) 
-          emitReferencedClangTypeMetadata(NTD);
+        else if (const auto *cd = dyn_cast<ClassDecl>(TD))
+          if (cd->isObjC() || cd->isForeignReferenceType())
+            emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
         if (TAD->hasClangNode())
           emitReferencedClangTypeMetadata(TAD);
@@ -1086,7 +1087,7 @@ public:
         // Emit a specific unavailable message when we know why a decl can't be
         // exposed, or a generic message otherwise.
         auto diagString =
-            M.getASTContext().Diags.diagnosticStringFor(diag.getID());
+            M.getASTContext().Diags.getFormatStringForDiagnostic(diag.getID());
         DiagnosticEngine::formatDiagnosticText(os, diagString, diag.getArgs(),
                                                DiagnosticFormatOptions());
         os << "\");\n";
@@ -1114,6 +1115,17 @@ void swift::printModuleContentsAsObjC(
   ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
                /*requiresExposedAttribute=*/false, exposedModules,
                OutputLanguageMode::ObjC)
+      .write();
+}
+
+void swift::printModuleContentsAsC(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+  llvm::raw_null_ostream prologueOS;
+  llvm::StringSet<> exposedModules;
+  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+               /*requiresExposedAttribute=*/false, exposedModules,
+               OutputLanguageMode::C)
       .write();
 }
 

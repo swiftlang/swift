@@ -37,30 +37,6 @@ using namespace swift;
 using namespace clang::tooling;
 using namespace clang::tooling::dependencies;
 
-static std::string
-moduleCacheRelativeLookupModuleOutput(const ModuleID &MID, ModuleOutputKind MOK,
-                                      const StringRef moduleCachePath) {
-  llvm::SmallString<128> outputPath(moduleCachePath);
-  llvm::sys::path::append(outputPath, MID.ModuleName + "-" + MID.ContextHash);
-  switch (MOK) {
-  case ModuleOutputKind::ModuleFile:
-    llvm::sys::path::replace_extension(
-        outputPath, getExtension(swift::file_types::TY_ClangModuleFile));
-    break;
-  case ModuleOutputKind::DependencyFile:
-    llvm::sys::path::replace_extension(
-        outputPath, getExtension(swift::file_types::TY_Dependencies));
-    break;
-  case ModuleOutputKind::DependencyTargets:
-    return MID.ModuleName + "-" + MID.ContextHash;
-  case ModuleOutputKind::DiagnosticSerializationFile:
-    llvm::sys::path::replace_extension(
-        outputPath, getExtension(swift::file_types::TY_SerializedDiagnostics));
-    break;
-  }
-  return outputPath.str().str();
-}
-
 static void addScannerPrefixMapperInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
   for (const auto &arg : ctx.SearchPathOpts.ScannerPrefixMapper) {
@@ -70,20 +46,10 @@ static void addScannerPrefixMapperInvocationArguments(
 }
 
 /// Create the command line for Clang dependency scanning.
-static std::vector<std::string> getClangDepScanningInvocationArguments(
-    ASTContext &ctx, std::optional<StringRef> sourceFileName = std::nullopt) {
-  std::vector<std::string> commandLineArgs =
-      ClangImporter::getClangDriverArguments(ctx);
+std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
+    ASTContext &ctx) {
+  std::vector<std::string> commandLineArgs = getClangDriverArguments(ctx);
   addScannerPrefixMapperInvocationArguments(commandLineArgs, ctx);
-
-  auto sourceFilePos = std::find(
-      commandLineArgs.begin(), commandLineArgs.end(),
-      "<swift-imported-modules>");
-  assert(sourceFilePos != commandLineArgs.end());
-  if (sourceFileName.has_value())
-    *sourceFilePos = sourceFileName->str();
-  else
-    commandLineArgs.erase(sourceFilePos);
 
   // HACK! Drop the -fmodule-format= argument and the one that
   // precedes it.
@@ -135,10 +101,12 @@ getClangPrefixMapper(DependencyScanningTool &clangScanningTool,
 }
 
 ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
+    const ASTContext &ctx,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-    StringRef moduleOutputPath, RemapPathCallback callback) {
-  const auto &ctx = Impl.SwiftContext;
+    StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+    LookupModuleOutputCallback lookupModuleOutput,
+    RemapPathCallback callback) {
   ModuleDependencyVector result;
 
   auto remapPath = [&](StringRef path) {
@@ -167,8 +135,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     swiftArgs.push_back("-module-name");
     swiftArgs.push_back(clangModuleDep.ID.ModuleName);
 
-    auto pcmPath = moduleCacheRelativeLookupModuleOutput(
-        clangModuleDep.ID, ModuleOutputKind::ModuleFile, moduleOutputPath);
+    auto pcmPath = lookupModuleOutput(clangModuleDep,
+                                      ModuleOutputKind::ModuleFile);
     swiftArgs.push_back("-o");
     swiftArgs.push_back(pcmPath);
 
@@ -179,8 +147,8 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // Swift frontend option for input file path (Foo.modulemap).
     swiftArgs.push_back(remapPath(clangModuleDep.ClangModuleMapFile));
 
-    // Handle VFSOverlay. If include tree is used, there is no need for overlay.
-    if (!ctx.ClangImporterOpts.UseClangIncludeTree) {
+    // Handle VFSOverlay. If caching is enabled, there is no need for overlay.
+    if (!ctx.CASOpts.EnableCaching) {
       for (auto &overlay : ctx.SearchPathOpts.VFSOverlayFiles) {
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(remapPath(overlay));
@@ -249,12 +217,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     ctx.CASOpts.enumerateCASConfigurationFlags(
         [&](StringRef Arg) { swiftArgs.push_back(Arg.str()); });
 
-    if (!RootID.empty()) {
-      swiftArgs.push_back("-no-clang-include-tree");
-      swiftArgs.push_back("-cas-fs");
-      swiftArgs.push_back(RootID);
-    }
-
     if (!IncludeTree.empty()) {
       swiftArgs.push_back("-clang-include-tree-root");
       swiftArgs.push_back(IncludeTree);
@@ -280,13 +242,11 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
         clangModuleDep.IsSystem);
 
     std::vector<ModuleDependencyID> directDependencyIDs;
-    for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
-      // FIXME: This assumes, conservatively, that all Clang module imports
-      // are exported. We need to fix this once the clang scanner gains the appropriate
-      // API to query this.
-      dependencies.addModuleImport(moduleName.ModuleName, /* isExported */ true, &alreadyAddedModules);
+    for (const auto &DepInfo : clangModuleDep.ClangModuleDeps) {
+      auto moduleName = DepInfo.ID.ModuleName;
+      dependencies.addModuleImport(moduleName, DepInfo.Exported, &alreadyAddedModules);
       // It is safe to assume that all dependencies of a Clang module are Clang modules.
-      directDependencyIDs.push_back({moduleName.ModuleName, ModuleDependencyKind::Clang});
+      directDependencyIDs.push_back({moduleName, ModuleDependencyKind::Clang});
     }
     dependencies.setImportedClangDependencies(directDependencyIDs);
     result.push_back(std::make_pair(ModuleDependencyID{clangModuleDep.ID.ModuleName,
@@ -296,19 +256,10 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
   return result;
 }
 
-void ClangImporter::recordBridgingHeaderOptions(
-    ModuleDependencyInfo &MDI,
-    const clang::tooling::dependencies::TranslationUnitDeps &deps) {
-  std::vector<std::string> swiftArgs;
-  getBridgingHeaderOptions(deps, swiftArgs);
-  MDI.updateBridgingHeaderCommandLine(swiftArgs);
-}
-
 void ClangImporter::getBridgingHeaderOptions(
+    const ASTContext &ctx,
     const clang::tooling::dependencies::TranslationUnitDeps &deps,
     std::vector<std::string> &swiftArgs) {
-  auto &ctx = Impl.SwiftContext;
-
   auto addClangArg = [&](Twine arg) {
     swiftArgs.push_back("-Xcc");
     swiftArgs.push_back(arg.str());
@@ -367,165 +318,16 @@ void ClangImporter::getBridgingHeaderOptions(
     swiftArgs.push_back("-clang-include-tree-root");
     swiftArgs.push_back(*Tree);
   }
-  if (auto CASFS = deps.CASFileSystemRootID) {
-    swiftArgs.push_back("-no-clang-include-tree");
-    swiftArgs.push_back("-cas-fs");
-    swiftArgs.push_back(*CASFS);
-  }
-}
-
-// The Swift compiler does not have a concept of a working directory.
-// It is instead handled by the Swift driver by resolving relative paths
-// according to the driver's notion of a working directory. On the other hand,
-// Clang does have a concept working directory which may be specified on this
-// Clang invocation with '-working-directory'. If so, it is crucial that we
-// use this directory as an argument to the Clang scanner invocation below.
-static std::optional<std::string>
-computeClangWorkingDirectory(const std::vector<std::string> &commandLineArgs,
-                             const ASTContext &ctx) {
-  std::string workingDir;
-  auto clangWorkingDirPos = std::find(
-      commandLineArgs.rbegin(), commandLineArgs.rend(), "-working-directory");
-  if (clangWorkingDirPos == commandLineArgs.rend())
-    workingDir =
-        ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
-  else {
-    if (clangWorkingDirPos - 1 == commandLineArgs.rend()) {
-      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                         "Missing '-working-directory' argument");
-      return std::nullopt;
-    }
-    workingDir = *(clangWorkingDirPos - 1);
-  }
-  return workingDir;
 }
 
 ModuleDependencyVector
 ClangImporter::getModuleDependencies(Identifier moduleName,
                                      StringRef moduleOutputPath,
+                                     StringRef sdkModuleOutputPath,
                                      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                                     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                                     const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
                                      InterfaceSubContextDelegate &delegate,
                                      llvm::PrefixMapper *mapper,
                                      bool isTestableImport) {
-  auto &ctx = Impl.SwiftContext;
-  // Determine the command-line arguments for dependency scanning.
-  std::vector<std::string> commandLineArgs =
-      getClangDepScanningInvocationArguments(ctx);
-  auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
-  if (!optionalWorkingDir) {
-    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                       "Missing '-working-directory' argument");
-    return {};
-  }
-  std::string workingDir = *optionalWorkingDir;
-
-  auto lookupModuleOutput =
-      [moduleOutputPath](const ModuleID &MID,
-                        ModuleOutputKind MOK) -> std::string {
-    return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleOutputPath);
-  };
-
-  auto clangModuleDependencies =
-      clangScanningTool.getModuleDependencies(
-          moduleName.str(), commandLineArgs, workingDir,
-          alreadySeenClangModules, lookupModuleOutput);
-  if (!clangModuleDependencies) {
-    auto errorStr = toString(clangModuleDependencies.takeError());
-    // We ignore the "module 'foo' not found" error, the Swift dependency
-    // scanner will report such an error only if all of the module loaders
-    // fail as well.
-    if (errorStr.find("fatal error: module '" + moduleName.str().str() +
-                      "' not found") == std::string::npos)
-      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                         errorStr);
-    return {};
-  }
-
-  return bridgeClangModuleDependencies(clangScanningTool,
-                                       *clangModuleDependencies,
-                                       moduleOutputPath, [&](StringRef path) {
-                                         if (mapper)
-                                           return mapper->mapToString(path);
-                                         return path.str();
-                                       });
-}
-
-bool ClangImporter::getHeaderDependencies(
-    ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
-    std::optional<llvm::MemoryBufferRef> sourceBuffer,
-    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-    ModuleDependenciesCache &cache,
-    ModuleDependencyIDSetVector &headerClangModuleDependencies,
-    std::vector<std::string> &headerFileInputs,
-    std::vector<std::string> &bridgingHeaderCommandLine,
-    std::optional<std::string> &includeTreeID) {
-  // Scan the specified textual header file and collect its dependencies
-  auto scanHeaderDependencies = [&]() -> llvm::Expected<TranslationUnitDeps> {
-    auto &ctx = Impl.SwiftContext;
-    std::vector<std::string> commandLineArgs =
-        getClangDepScanningInvocationArguments(ctx, headerPath);
-    auto optionalWorkingDir =
-        computeClangWorkingDirectory(commandLineArgs, ctx);
-    if (!optionalWorkingDir) {
-      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                         "Missing '-working-directory' argument");
-      return llvm::errorCodeToError(
-          std::error_code(errno, std::generic_category()));
-    }
-    std::string workingDir = *optionalWorkingDir;
-    auto moduleOutputPath = cache.getModuleOutputPath();
-    auto lookupModuleOutput =
-        [moduleOutputPath](const ModuleID &MID,
-                           ModuleOutputKind MOK) -> std::string {
-      return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleOutputPath);
-    };
-    auto dependencies = clangScanningTool.getTranslationUnitDependencies(
-        commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
-        lookupModuleOutput, sourceBuffer);
-    if (!dependencies)
-      return dependencies.takeError();
-
-    // Record module dependencies for each new module we found.
-    auto bridgedDeps = bridgeClangModuleDependencies(
-        clangScanningTool, dependencies->ModuleGraph,
-        cache.getModuleOutputPath(),
-        [&cache](StringRef path) {
-          return cache.getScanService().remapPath(path);
-        });
-    cache.recordDependencies(bridgedDeps);
-
-    llvm::copy(dependencies->FileDeps, std::back_inserter(headerFileInputs));
-    auto bridgedDependencyIDs =
-        llvm::map_range(dependencies->ClangModuleDeps, [](auto &input) {
-          return ModuleDependencyID{input.ModuleName, ModuleDependencyKind::Clang};
-        });
-    headerClangModuleDependencies.insert(bridgedDependencyIDs.begin(),
-                                         bridgedDependencyIDs.end());
-    return dependencies;
-  };
-
-  // - If a generated header is provided, scan the generated header.
-  // - Textual module dependencies require us to process their bridging header.
-  // - Binary module dependnecies may have arbitrary header inputs.
-  auto clangModuleDependencies = scanHeaderDependencies();
-  if (!clangModuleDependencies) {
-    // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
-                                llvm::errs());
-    Impl.SwiftContext.Diags.diagnose(
-        SourceLoc(), diag::clang_dependency_scan_error,
-        "failed to scan bridging header dependencies");
-    return true;
-  }
-
-  auto targetModuleInfo = cache.findKnownDependency(moduleID);
-  if (!targetModuleInfo.isTextualSwiftModule())
-    return false;
-
-  if (auto TreeID = clangModuleDependencies->IncludeTreeID)
-    includeTreeID = TreeID;
-  getBridgingHeaderOptions(*clangModuleDependencies, bridgingHeaderCommandLine);
-
-  return false;
+  return {};
 }

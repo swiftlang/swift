@@ -78,6 +78,9 @@ public:
   OptimizationMode OptMode;
   bool isPerformanceConstraint;
 
+  // Destination basic blocks for condfail traps.
+  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
+
   llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
@@ -196,6 +199,7 @@ public:
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
   llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *popAsyncContext(llvm::Value *calleeContext);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -473,6 +477,9 @@ public:
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
   void emitTrap(StringRef failureMessage, bool EmitUnreachable);
+
+  void emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                           const SILDebugScope *debugScope = nullptr);
 
   /// Given at least a src address to a list of elements, runs body over each
   /// element passing its address. An optional destination address can be

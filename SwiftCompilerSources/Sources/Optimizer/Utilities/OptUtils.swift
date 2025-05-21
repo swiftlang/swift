@@ -45,6 +45,13 @@ extension Value {
     }
   }
 
+  var lookThroughTruncOrBitCast: Value {
+    if let truncOrBitCast = self as? BuiltinInst, truncOrBitCast.id == .TruncOrBitCast {
+      return truncOrBitCast.arguments[0]
+    }
+    return self
+  }
+
   func isInLexicalLiverange(_ context: some Context) -> Bool {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
@@ -184,6 +191,24 @@ extension Value {
       }
     }
     return true
+  }
+
+  /// Performs a simple dominance check without using the dominator tree.
+  /// Returns true if `instruction` is in the same block as this value, but "after" this value,
+  /// or if this value is a function argument.
+  func triviallyDominates(_ instruction: Instruction) -> Bool {
+    switch self {
+    case is FunctionArgument:
+      return true
+    case let arg as Argument:
+      return arg.parentBlock == instruction.parentBlock
+    case let svi as SingleValueInstruction:
+      return svi.dominatesInSameBlock(instruction)
+    case let mvi as MultipleValueInstructionResult:
+      return mvi.parentInstruction.dominatesInSameBlock(instruction)
+    default:
+      return false
+    }
   }
 }
 
@@ -369,7 +394,7 @@ extension Instruction {
     case let bi as BuiltinInst:
       switch bi.id {
       case .ZeroInitializer:
-        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType : bi.type
+        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType(in: parentFunction) : bi.type
         return type.isBuiltinInteger || type.isBuiltinFloat
       case .PtrToInt:
         return bi.operands[0].value is StringLiteralInst
@@ -438,7 +463,7 @@ extension Instruction {
     }
   }
 
-  /// Returns true if `otherInst` is in the same block and dominated by this instruction.
+  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction.
   /// To be used as simple dominance check if both instructions are most likely located in the same block
   /// and no DominatorTree is available (like in instruction simplification).
   func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {
@@ -478,7 +503,7 @@ extension Instruction {
        let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
        let mt = iemt.metatype as? MetatypeInst
     {
-      return mt.type.astType.instanceTypeOfMetatype
+      return mt.type.canonicalType.instanceTypeOfMetatype
     }
     // TODO: also handle open_existential_addr and open_existential_ref.
     // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
@@ -808,7 +833,7 @@ extension GlobalVariable {
 
 extension InstructionRange {
   /// Adds the instruction range of a borrow-scope by transitively visiting all (potential) re-borrows.
-  mutating func insert(borrowScopeOf borrow: BorrowIntroducingInstruction, _ context: some Context) {
+  mutating func insert(borrowScopeOf borrow: BeginBorrowInstruction, _ context: some Context) {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -828,78 +853,9 @@ extension InstructionRange {
   }
 }
 
-/// Analyses the global initializer function and returns the `alloc_global` and `store`
-/// instructions which initialize the global.
-/// Returns nil if `function` has any side-effects beside initializing the global.
-///
-/// The function's single basic block must contain following code pattern:
-/// ```
-///   alloc_global @the_global
-///   %a = global_addr @the_global
-///   %i = some_const_initializer_insts
-///   store %i to %a
-/// ```
-/// 
-/// For all other instructions `handleUnknownInstruction` is called and such an instruction
-/// is accepted if `handleUnknownInstruction` returns true.
-func getGlobalInitialization(
-  of function: Function,
-  _ context: some Context,
-  handleUnknownInstruction: (Instruction) -> Bool
-) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
-  guard let block = function.blocks.singleElement else {
-    return nil
-  }
-
-  var allocInst: AllocGlobalInst? = nil
-  var globalAddr: GlobalAddrInst? = nil
-  var store: StoreInst? = nil
-
-  for inst in block.instructions {
-    switch inst {
-    case is ReturnInst,
-         is DebugValueInst,
-         is DebugStepInst,
-         is BeginAccessInst,
-         is EndAccessInst:
-      continue
-    case let agi as AllocGlobalInst:
-      if allocInst == nil {
-        allocInst = agi
-        continue
-      }
-    case let ga as GlobalAddrInst:
-      if let agi = allocInst, agi.global == ga.global {
-        globalAddr = ga
-      }
-      continue
-    case let si as StoreInst:
-      if store == nil,
-         let ga = globalAddr,
-         si.destination == ga
-      {
-        store = si
-        continue
-      }
-    // Note that the initializer must not contain a `global_value` because `global_value` needs to
-    // initialize the class metadata at runtime.
-    default:
-      if inst.isValidInStaticInitializerOfGlobal(context) {
-        continue
-      }
-    }
-    if handleUnknownInstruction(inst) {
-      continue
-    }
-    return nil
-  }
-  if let store = store {
-    return (allocInst: allocInst!, storeToGlobal: store)
-  }
-  return nil
-}
-
-func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
+                        in function: Function, sourceTypeIsExact: Bool
+) -> Bool? {
   switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
     case .willSucceed: return true
     case .maySucceed:  return nil
@@ -921,27 +877,74 @@ extension CheckedCastAddrBranchInst {
 
 extension CopyAddrInst {
   @discardableResult
-  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
-    let loadOwnership: LoadInst.LoadOwnership
-    let storeOwnership: StoreInst.StoreOwnership
-    if parentFunction.hasOwnership {
-      if source.type.isTrivial(in: parentFunction) {
-        loadOwnership = .trivial
-        storeOwnership = .trivial
-      } else {
-        loadOwnership = isTakeOfSrc ? .take : .copy
-        storeOwnership = isInitializationOfDest ? .initialize : .assign
-      }
-    } else {
-      loadOwnership = .unqualified
-      storeOwnership = .unqualified
-    }
-    
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     let builder = Builder(before: self, context)
-    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
-    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    if source.type.isStruct {
+      if (source.type.nominal as! StructDecl).hasUnreferenceableStorage {
+        return false
+      }
+      guard let fields = source.type.getNominalFields(in: parentFunction) else {
+        return false
+      }
+      for idx in 0..<fields.count {
+        let srcFieldAddr = builder.createStructElementAddr(structAddress: source, fieldIndex: idx)
+        let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: idx)
+        builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDestination)
+      }
+      context.erase(instruction: self)
+      return true
+    } else if source.type.isTuple {
+      let builder = Builder(before: self, context)
+      for idx in 0..<source.type.tupleElements.count {
+        let srcFieldAddr = builder.createTupleElementAddr(tupleAddress: source, elementIndex: idx)
+        let destFieldAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: idx)
+        builder.createCopyAddr(from: srcFieldAddr, to: destFieldAddr,
+                               takeSource: isTake(for: srcFieldAddr), initializeDest: isInitializationOfDestination)
+      }
+      context.erase(instruction: self)
+      return true
+    }
+    return false
+  }
+
+  private func isTake(for fieldValue: Value) -> Bool {
+    return isTakeOfSource && !fieldValue.type.objectType.isTrivial(in: parentFunction)
+  }
+
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> (load: LoadInst, store: StoreInst) {
+    let builder = Builder(before: self, context)
+    let load = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: load, destination: destination, ownership: storeOwnership)
     context.erase(instruction: self)
-    return store
+    return (load, store)
+  }
+
+  var loadOwnership: LoadInst.LoadOwnership {
+    if !parentFunction.hasOwnership {
+      return .unqualified
+    }
+    if type.isTrivial(in: parentFunction) {
+      return .trivial
+    }
+    if isTakeOfSource {
+      return .take
+    }
+    return .copy
+  }
+
+  var storeOwnership: StoreInst.StoreOwnership {
+    if !parentFunction.hasOwnership {
+      return .unqualified
+    }
+    if type.isTrivial(in: parentFunction) {
+      return .trivial
+    }
+    if isInitializationOfDestination {
+      return .initialize
+    }
+    return .assign
   }
 }
 

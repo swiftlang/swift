@@ -4,9 +4,9 @@
 
 // GENERICPARAM: Decl[GenericTypeParam]/Local: Self[#Self#];
 
-// STATICSELF: Keyword[Self]/CurrNominal: Self[#S#];
+// STATICSELF: Keyword[Self]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: Self[#S#];
 
-// DYNAMICSELF: Keyword[Self]/CurrNominal: Self[#Self#];
+// DYNAMICSELF: Keyword[Self]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: Self[#Self#];
 
 func freeFunc() {
   #^GLOBAL_BODY_EXPR?check=NOSELF^#

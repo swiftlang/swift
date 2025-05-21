@@ -368,7 +368,7 @@ public:
     unsigned appliedArgIndex = getAppliedArgIndex(oper);
     if (auto *pai = dyn_cast<PartialApplyInst>(Inst)) {
       if (pai->getFunctionType()->getIsolation() ==
-          SILFunctionTypeIsolation::Erased) {
+          SILFunctionTypeIsolation::forErased()) {
         assert(appliedArgIndex != 0 &&
                "isolation(any) does not correspond to an AST argument");
         appliedArgIndex -= 1;
@@ -640,6 +640,10 @@ public:
       return getSubstCalleeType()->hasSendingResult();
     return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
   }
+
+  /// Return true if 'operand' is addressable after type substitution in the
+  /// caller's context.
+  bool isAddressable(const Operand &operand) const;
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 

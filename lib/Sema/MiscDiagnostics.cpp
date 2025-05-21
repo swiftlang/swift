@@ -343,8 +343,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
             if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
-                                 diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind());
+                                 diag::effectful_keypath_component, asd,
+                                 /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
@@ -806,9 +806,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         declParent = VD->getDeclContext()->getParentModule();
       }
 
-      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                         VD->getBaseIdentifier(),
-                         VD->getDescriptiveKind(),
+      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access, VD,
                          declParent);
       Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD);
 
@@ -846,14 +844,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
       for (const ModuleValuePair &pair : sortedResults) {
-        DescriptiveDeclKind k = pair.second->getDescriptiveKind();
-
         SmallString<32> namePlusDot = pair.first->getName().str();
         namePlusDot.push_back('.');
 
-        Ctx.Diags.diagnose(DRE->getLoc(), topLevelDiag,
-                           namePlusDot, k, pair.first->getName())
-          .fixItInsert(DRE->getStartLoc(), namePlusDot);
+        Ctx.Diags
+            .diagnose(DRE->getLoc(), topLevelDiag, namePlusDot, pair.second,
+                      pair.first)
+            .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
     
@@ -1507,11 +1504,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy =
-          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
-                                module, ResilienceExpansion::Minimal,
-                                /*useOldABI=*/false);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),
@@ -2243,11 +2239,12 @@ public:
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
-    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
-    // compatibility with the Swift 6 diagnostic behavior where we previously
-    // skipped diagnosing.
-    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
-      warnUntilVersion.emplace(7);
+    // Prior to the next language mode, downgrade to a warning if we're in a
+    // macro to preserve compatibility with the Swift 6 diagnostic behavior
+    // where we previously skipped diagnosing.
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+      warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
@@ -3655,9 +3652,18 @@ public:
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
+
+        // Type checking did not set a range for this query (it may be invalid).
+        // Treat the condition as if it were always true.
+        if (!availabilityRange.has_value()) {
+          alwaysAvailableCount++;
+          continue;
+        }
+
         // If there is no lower endpoint it means that the condition has no
         // OS version specification that matches the target platform.
-        if (!availabilityRange.hasLowerEndpoint()) {
+        // FIXME: [availability] Handle empty ranges (never available).
+        if (!availabilityRange->hasLowerEndpoint()) {
           // An inactive #unavailable condition trivially evaluates to false.
           if (condition->isUnavailability()) {
             neverAvailableCount++;
@@ -3670,7 +3676,7 @@ public:
         }
 
         conditions.push_back(
-            {availabilityRange, condition->isUnavailability()});
+            {*availabilityRange, condition->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this
@@ -5594,7 +5600,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
               segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
                 getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
-          diagnoseUnintendedInterpolation(firstArg, kind);
+          diagnoseUnintendedInterpolation(segment, firstArg, kind);
     }
 
     bool interpolationWouldBeUnintended(ConcreteDeclRef appendMethod,
@@ -5660,12 +5666,39 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return firstArg;
     }
 
-    void diagnoseUnintendedInterpolation(Expr * arg, UnintendedInterpolationKind kind) {
+    std::string baseInterpolationTypeName(CallExpr *segment) {
+      if (auto selfApplyExpr = dyn_cast<SelfApplyExpr>(segment->getFn())) {
+        auto baseType = selfApplyExpr->getBase()->getType();
+        return baseType->getWithoutSpecifierType()->getString();
+      }
+      return "unknown";
+    }
+    
+    void diagnoseUnintendedInterpolation(CallExpr *segment,
+                                         Expr * arg,
+                                         UnintendedInterpolationKind kind) {
       Ctx.Diags
           .diagnose(arg->getStartLoc(),
                     diag::debug_description_in_string_interpolation_segment,
                     (bool)kind)
           .highlight(arg->getSourceRange());
+
+      if (kind == UnintendedInterpolationKind::Optional) {
+        auto wrappedArgType = arg->getType()->getRValueType()->getOptionalObjectType();
+        auto baseTypeName = baseInterpolationTypeName(segment);
+        
+        // Suggest using a default value parameter, but only for non-string values
+        // when the base interpolation type is the default.
+        if (!wrappedArgType->isString() && baseTypeName == "DefaultStringInterpolation")
+          Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_parameter)
+            .highlight(arg->getSourceRange())
+            .fixItInsertAfter(arg->getEndLoc(), ", default: <#default value#>");
+
+        // Suggest providing a default value using the nil-coalescing operator.
+        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
+          .highlight(arg->getSourceRange())
+          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
+      }
 
       // Suggest 'String(describing: <expr>)'.
       auto argStart = arg->getStartLoc();
@@ -5676,13 +5709,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
           .highlight(arg->getSourceRange())
           .fixItInsert(argStart, "String(describing: ")
           .fixItInsertAfter(arg->getEndLoc(), ")");
-
-      if (kind == UnintendedInterpolationKind::Optional) {
-        // Suggest inserting a default value.
-        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
-          .highlight(arg->getSourceRange())
-          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
-      }
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5741,7 +5767,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
         assert(keyPathExpr->getComponents().size() > 0);
         auto &component = keyPathExpr->getComponents().back();
-        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+        if (component.getKind() == KeyPathExpr::Component::Kind::Member) {
           auto *storage =
             cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
           if (!storage->isSettable(nullptr) ||
@@ -5817,7 +5843,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
       for (auto *keyPathArg : keyPathArgs) {
         auto lastComponent = keyPathArg->getComponents().back();
-        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Member)
           continue;
         auto property = lastComponent.getDeclRef().getDecl();
         if (!property)
@@ -6310,7 +6336,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
-                                            bool isExprStmt) {
+                                            bool isExprStmt,
+                                            bool isConstInitExpr) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6327,6 +6354,9 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
+      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
+    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);

@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -183,6 +184,10 @@ bool BridgedPassContext::moduleIsSerialized() const {
   return invocation->getPassManager()->getModule()->isSerialized();
 }
 
+bool BridgedPassContext::moduleHasLoweredAddresses() const {
+  return invocation->getPassManager()->getModule()->useLoweredAddresses();
+}
+
 bool BridgedPassContext::isTransforming(BridgedFunction function) const {
   return invocation->getFunction() == function.getFunction();
 }
@@ -215,6 +220,11 @@ BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
   return {mod->getASTContext().getArrayDecl()};
 }
 
+BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getASTContext().getMutableSpanDecl()};
+}
+
 // AST
 
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
@@ -244,8 +254,8 @@ BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunctio
   return {bridgedFunction.getFunction()->createBasicBlock()};
 }
 
-void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
-  invocation->eraseInstruction(inst.unbridged());
+void BridgedPassContext::eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const {
+  invocation->eraseInstruction(inst.unbridged(), salvageDebugInfo);
 }
 
 void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {
@@ -441,7 +451,7 @@ OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedConfor
   return {mod->lookUpWitnessTable(ref.getConcrete())};
 }
 
-BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkage,
+BridgedWitnessTable BridgedPassContext::createSpecializedWitnessTable(BridgedLinkage linkage,
                                                            bool serialized,
                                                            BridgedConformance conformance,
                                                            BridgedArrayRef bridgedEntries) const {
@@ -453,7 +463,7 @@ BridgedWitnessTable BridgedPassContext::createWitnessTable(BridgedLinkage linkag
   return {swift::SILWitnessTable::create(*mod, (swift::SILLinkage)linkage,
                                          serialized ? swift::IsSerialized : swift::IsNotSerialized,
                                          conformance.unbridged().getConcrete(),
-                                         entries, {})};
+                                         entries, {}, /*specialized=*/true)};
 }
 
 BridgedVTable BridgedPassContext::createSpecializedVTable(BridgedType classType,
@@ -486,6 +496,11 @@ BridgedSubstitutionMap BridgedPassContext::getContextSubstitutionMap(BridgedType
 BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
   auto &ctxt = invocation->getPassManager()->getModule()->getASTContext();
   return swift::SILType::getBuiltinIntegerType(bitWidth, ctxt);
+}
+
+bool BridgedPassContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return swift::calleesAreStaticallyKnowable(*mod, method.unbridged());
 }
 
 void BridgedPassContext::beginTransformFunction(BridgedFunction function) const {
@@ -543,9 +558,14 @@ bool BridgedPassContext::enableStackProtection() const {
   return mod->getOptions().EnableStackProtection;
 }
 
+bool BridgedPassContext::enableMergeableTraps() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().MergeableTraps;
+}
+
 bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return mod->getASTContext().LangOpts.hasFeature((swift::Feature)feature);
+  return mod->getASTContext().LangOpts.hasFeature(swift::Feature(feature));
 }
 
 bool BridgedPassContext::enableMoveInoutStackProtection() const {
@@ -568,9 +588,18 @@ bool BridgedPassContext::shouldExpand(BridgedType ty) const {
   return swift::shouldExpand(mod, ty.unbridged());
 }
 
+BridgedDeclObj BridgedPassContext::getCurrentModuleContext() const {
+  return {invocation->getPassManager()->getModule()->getSwiftModule()};
+}
+
 bool BridgedPassContext::enableWMORequiredDiagnostics() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getOptions().EnableWMORequiredDiagnostics;
+}
+
+bool BridgedPassContext::noAllocations() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().NoAllocations;
 }
 
 bool BridgedPassContext::enableAddressDependencies() const {

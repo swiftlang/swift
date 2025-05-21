@@ -23,8 +23,11 @@ extension ASTGenVisitor {
   func generateAvailableAttr(
     atLoc: BridgedSourceLoc,
     range: BridgedSourceRange,
+    attrName: SyntaxText,
     args: AvailabilityArgumentListSyntax
   ) -> [BridgedAvailableAttr] {
+
+    let isSPI = attrName == "_spi_available"
 
     // Check if this is "shorthand" syntax.
     if let firstArg = args.first?.argument {
@@ -40,15 +43,14 @@ extension ASTGenVisitor {
         isShorthand = false
       }
       if isShorthand {
-        return self.generateAvailableAttrShorthand(atLoc: atLoc, range: range, args: args)
+        return self.generateAvailableAttrShorthand(atLoc: atLoc, range: range, args: args, isSPI: isSPI)
       }
     }
 
     // E.g.
     //   @available(macOS, introduced: 10.12, deprecated: 11.2)
     //   @available(*, unavailable, message: "out of service")
-    let attr = self.generateAvailableAttrExtended(atLoc: atLoc, range: range, args: args)
-
+    let attr = self.generateAvailableAttrExtended(atLoc: atLoc, range: range, args: args, isSPI: isSPI)
     if let attr {
       return [attr]
     } else {
@@ -66,7 +68,8 @@ extension ASTGenVisitor {
   func generateAvailableAttrShorthand(
     atLoc: BridgedSourceLoc,
     range: BridgedSourceRange,
-    args: AvailabilityArgumentListSyntax
+    args: AvailabilityArgumentListSyntax,
+    isSPI: Bool
   ) -> [BridgedAvailableAttr] {
     let specs = self.generateAvailabilitySpecList(args: args, context: .availableAttr)
 
@@ -100,7 +103,8 @@ extension ASTGenVisitor {
         deprecated: BridgedVersionTuple(),
         deprecatedRange: BridgedSourceRange(),
         obsoleted: BridgedVersionTuple(),
-        obsoletedRange: BridgedSourceRange()
+        obsoletedRange: BridgedSourceRange(),
+        isSPI: isSPI
       )
       attr.setIsGroupMember()
       if containsWildCard {
@@ -119,7 +123,8 @@ extension ASTGenVisitor {
   func generateAvailableAttrExtended(
     atLoc: BridgedSourceLoc,
     range: BridgedSourceRange,
-    args: AvailabilityArgumentListSyntax
+    args: AvailabilityArgumentListSyntax,
+    isSPI: Bool
   ) -> BridgedAvailableAttr? {
     var args = args[...]
 
@@ -262,7 +267,8 @@ extension ASTGenVisitor {
       deprecated: deprecated?.version.bridged ?? BridgedVersionTuple(),
       deprecatedRange: deprecated?.range ?? BridgedSourceRange(),
       obsoleted: obsoleted?.version.bridged ?? BridgedVersionTuple(),
-      obsoletedRange: obsoleted?.range ?? BridgedSourceRange()
+      obsoletedRange: obsoleted?.range ?? BridgedSourceRange(),
+      isSPI: isSPI
     )
   }
 

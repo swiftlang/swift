@@ -315,6 +315,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "enable-destroy-hoisting=">,
     HelpText<"Whether to enable destroy hoisting">,
     MetaVarName<"true|false">;
+  def formal_cxx_interoperability_mode :
+    Joined<["-"], "formal-cxx-interoperability-mode=">,
+    HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
+    MetaVarName<"<cxx-interop-version>|off">;
 }
 
 // Flags that are saved into module interfaces
@@ -591,6 +595,12 @@ def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llv
 
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
+
+def enable_llvm_verify_each : Flag<["-"], "enable-llvm-verify-each">,
+  HelpText<"Run the LLVM IR verifier after every pass.">;
+
+def disable_llvm_verify_each : Flag<["-"], "disable-llvm-verify-each">,
+  HelpText<"Don't run the LLVM IR verifier after every pass.">;
 
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
@@ -1165,6 +1175,18 @@ def enable_arm64_corocc : Flag<["-"], "enable-arm64-corocc">,
 def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
   HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
 
+def enable_callee_allocated_coro_abi : Flag<["-"], "enable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and use yield_once_2.">;
+
+def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-coro-abi">,
+  HelpText<"Override per-platform settings and don't use yield_once_2.">;
+
+def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
+  HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
+
+def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
+  HelpText<"Disable cond_fail message annotation.">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,
@@ -1385,6 +1407,10 @@ def disable_split_cold_code :
   Flag<["-"], "disable-split-cold-code">,
   HelpText<"Disable splitting of cold code when optimizing">;
 
+def mergeable_traps :
+  Flag<["-"], "mergeable-traps">,
+  HelpText<"Emit mergeable traps even in optimized builds">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
@@ -1415,9 +1441,6 @@ def enable_emit_generic_class_ro_t_list :
   HelpText<"Enable emission of a section with references to class_ro_t of "
            "generic class patterns">;
 
-def enable_deterministic_check :
-  Flag<["-"], "enable-deterministic-check">,
-  HelpText<"Check compiler output determinism by running it twice">;
 def always_compile_output_files :
   Flag<["-"], "always-compile-output-files">,
   HelpText<"Always compile output files even it might not change the results">;
@@ -1430,9 +1453,6 @@ def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
 
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
-
-def cas_fs: Separate<["-"], "cas-fs">,
-  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
 
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
@@ -1468,7 +1488,7 @@ def platform_c_calling_convention_EQ :
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
-  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
+  HelpText<"Disable sending args and results when region-based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def scanner_module_validation: Flag<["-"], "scanner-module-validation">,
@@ -1491,6 +1511,9 @@ def platform_availability_inheritance_map_path
 
 def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
   HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
+
+def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
+  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 

@@ -281,11 +281,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
 
     // Build the availability scope tree for the primary file before type
     // checking.
-    TypeChecker::buildAvailabilityScopes(*SF);
-
-    // Before we type check any of the top level code decls, generate the per
-    // file language options.
-    (void)SF->getLanguageOptions();
+    (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
@@ -322,7 +318,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     SF->typeCheckDelayedFunctions();
   }
 
-  // If region based isolation is enabled, we diagnose unnecessary
+  // If region-based isolation is enabled, we diagnose unnecessary
   // preconcurrency imports in the SIL pipeline in the
   // DiagnoseUnnecessaryPreconcurrencyImports pass.
   if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))

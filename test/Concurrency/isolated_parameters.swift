@@ -8,7 +8,7 @@
 
 @available(SwiftStdlib 5.1, *)
 actor A {
-  func f() { } // expected-typechecker-note 5{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  func f() { } // expected-typechecker-note 3{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -341,7 +341,7 @@ func isolatedClosures() {
   }
 }
 
-// expected-warning@+3 {{global function 'allOfEm' has multiple actor-isolation attributes ('MainActor' and 'nonisolated')}}
+// expected-warning@+3 {{global function 'allOfEm' has multiple actor-isolation attributes (@MainActor and 'nonisolated')}}
 // expected-warning@+2 {{global function with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{12-24=}}
 // expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in the Swift 6 language mode}}{{1-12=}}
 @MainActor nonisolated func allOfEm(_ a: isolated A) {
@@ -364,11 +364,8 @@ func isolatedClosures() {
   // expected-typechecker-warning@+2 {{cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
   // expected-typechecker-warning@+1 {{subscript with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{3-15=}}
   nonisolated subscript(_ a: isolated A, _ b: isolated A) -> Int {
-    // FIXME: wrong isolation. should be isolated to `a`.
-    #if ALLOW_TYPECHECKER_ERRORS
-    a.f() // expected-typechecker-error {{call to actor-isolated instance method 'f()' in a synchronous actor-isolated context}}
-    b.f() // expected-typechecker-error {{call to actor-isolated instance method 'f()' in a synchronous actor-isolated context}}
-    #endif
+    a.f()
+    b.f()
     return 0
   }
 
@@ -590,4 +587,15 @@ public actor MyActorIsolatedParameterMerge {
 // rdar://138394497
 class ClassWithIsolatedAsyncInitializer {
     init(isolation: isolated (any Actor)? = #isolation) async {}
+}
+
+// https://github.com/swiftlang/swift/issues/80992
+struct WritableActorKeyPath<Root: Actor, Value>: Sendable {
+    var getter: @Sendable (isolated Root) -> Value
+    var setter: @Sendable (isolated Root, Value) -> Void
+
+    subscript(_ root: isolated Root) -> Value {
+        get { getter(root) }
+        nonmutating set { setter(root, newValue) }
+    }
 }

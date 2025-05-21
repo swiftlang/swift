@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Performs mandatory optimizations for performance-annotated functions, and global
@@ -35,16 +36,10 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   if moduleContext.options.enableEmbeddedSwift {
     worklist.addAllNonGenericFunctions(of: moduleContext)
   } else {
-    worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
-    worklist.addAllAnnotatedGlobalInitOnceFunctions(of: moduleContext)
+    worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
-
-  if moduleContext.options.enableEmbeddedSwift {
-    // Print errors for generic functions in vtables, which is not allowed in embedded Swift.
-    checkVTablesForGenericFunctions(moduleContext)
-  }
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
@@ -132,17 +127,41 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
-          specializeWitnessTables(for: initExRef, moduleContext, &worklist)
+          for c in initExRef.conformances where c.isConcrete {
+            specializeWitnessTable(for: c, moduleContext) {
+              worklist.addWitnessMethods(of: $0)
+            }
+          }
         }
+
+      case let bi as BuiltinInst:
+        switch bi.id {
+        case .BuildOrdinaryTaskExecutorRef,
+             .BuildOrdinarySerialExecutorRef,
+             .BuildComplexEqualitySerialExecutorRef:
+          specializeWitnessTable(for: bi.substitutionMap.conformances[0], moduleContext) {
+            worklist.addWitnessMethods(of: $0)
+          }
+
+        default:
+          break
+        }
+
 
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
         if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(destroyValue.location.sourceLoc, .deinit_not_visible)
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyValue.location)
+          }
         }
       case let destroyAddr as DestroyAddrInst:
         if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyAddr.location)
+          }
         }
 
       case let iem as InitExistentialMetatypeInst:
@@ -239,11 +258,13 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
-  if !callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) &&
-     // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
-     // in embedded swift.
-     callee.thunkKind != .thunk
-  {
+  guard callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) ||
+        // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
+        // in embedded swift.
+        callee.thunkKind == .thunk ||
+        // Force inlining transparent co-routines. This might be necessary if `-enable-testing` is turned on.
+        (apply is BeginApplyInst && callee.isTransparent)
+  else {
     return false
   }
 
@@ -281,47 +302,6 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
   }
 
   return false
-}
-
-private func specializeWitnessTables(for initExRef: InitExistentialRefInst, _ context: ModulePassContext,
-                                     _ worklist: inout FunctionWorklist)
-{
-  for c in initExRef.conformances where c.isConcrete {
-    let conformance = c.isInherited ? c.inheritedConformance : c
-    let origWitnessTable = context.lookupWitnessTable(for: conformance)
-    if conformance.isSpecialized {
-      if origWitnessTable == nil {
-        specializeWitnessTable(forConformance: conformance, errorLocation: initExRef.location, context) {
-          worklist.addWitnessMethods(of: $0)
-        }
-      }
-    } else if let origWitnessTable {
-      checkForGenericMethods(in: origWitnessTable, errorLocation: initExRef.location, context)
-    }
-  }
-}
-
-private func checkForGenericMethods(in witnessTable: WitnessTable,
-                                    errorLocation: Location,
-                                    _ context: ModulePassContext)
-{
-  for entry in witnessTable.entries {
-    if case .method(let requirement, let witness) = entry,
-       let witness,
-       witness.isGeneric
-    {
-      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)
-      return
-    }
-  }
-}
-
-private func checkVTablesForGenericFunctions(_ context: ModulePassContext) {
-  for vTable in context.vTables where !vTable.class.isGenericAtAnyLevel {
-    for entry in vTable.entries where entry.implementation.isGeneric {
-      context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
-    }
-  }
 }
 
 private extension FullApplySite {
@@ -483,10 +463,29 @@ fileprivate struct FunctionWorklist {
     }
     return nil
   }
-
-  mutating func addAllPerformanceAnnotatedFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.performanceConstraints != .none {
-      pushIfNotVisited(f)
+  
+  mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions {
+      // Performance annotated functions
+      if f.performanceConstraints != .none {
+        pushIfNotVisited(f)
+      }
+      
+      // Annotated global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
+      
+      // @const global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
     }
   }
 
@@ -495,15 +494,6 @@ fileprivate struct FunctionWorklist {
       pushIfNotVisited(f)
     }
     return
-  }
-
-  mutating func addAllAnnotatedGlobalInitOnceFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.isGlobalInitOnceFunction {
-      if let global = f.getInitializedGlobal(),
-         global.mustBeInitializedStatically {
-        pushIfNotVisited(f)
-      }
-    }
   }
 
   mutating func addCallees(of function: Function) {

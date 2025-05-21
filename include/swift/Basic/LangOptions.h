@@ -96,6 +96,11 @@ namespace swift {
     TaskToThread,
   };
 
+  enum class DefaultIsolation : uint8_t {
+    MainActor,
+    Nonisolated
+  };
+
   /// Describes the code size optimization behavior for code associated with
   /// declarations that are marked unavailable.
   enum class UnavailableDeclOptimization : uint8_t {
@@ -148,6 +153,7 @@ namespace swift {
     /// The lowering triple may result in multiple versions of the same Clang
     /// modules being built.
     std::optional<llvm::Triple> ClangTarget;
+    std::optional<llvm::Triple> ClangTargetVariant;
 
     /// The SDK version, if known.
     std::optional<llvm::VersionTuple> SDKVersion;
@@ -327,6 +333,10 @@ namespace swift {
     /// The C++ interoperability source compatibility version. Defaults
     /// to the Swift language version.
     version::Version cxxInteropCompatVersion;
+
+    /// What version of C++ interoperability a textual interface was originally
+    /// generated with (if at all).
+    std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
                                swift::DiagnosticEngine &Diags);
@@ -593,7 +603,7 @@ namespace swift {
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = true;
+    bool EnableExperimentalLifetimeDependenceInference = false;
 
     /// Skips decls that cannot be referenced externally.
     bool SkipNonExportableDecls = false;
@@ -626,6 +636,9 @@ namespace swift {
 
     /// Disables `DynamicActorIsolation` feature.
     bool DisableDynamicActorIsolation = false;
+
+    /// Defines the default actor isolation.
+    DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
     /// Whether or not to allow experimental features that are only available
     /// in "production".
@@ -794,6 +807,8 @@ namespace swift {
         hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
       if (ClangTarget.has_value())
         hashValue = llvm::hash_combine(hashValue, ClangTarget.value().str());
+      if (ClangTargetVariant.has_value())
+        hashValue = llvm::hash_combine(hashValue, ClangTargetVariant.value().str());
       if (SDKVersion.has_value())
         hashValue = llvm::hash_combine(hashValue, SDKVersion.value().getAsString());
       if (VariantSDKVersion.has_value())
@@ -809,12 +824,13 @@ namespace swift {
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
 
   public:
+    //==========================================================================
     // MARK: Features
-    // =========================================================================
+    //==========================================================================
 
     /// A wrapper around the feature state enumeration.
     struct FeatureState {
-      enum class Kind : uint8_t { Off, EnabledForAdoption, Enabled };
+      enum class Kind : uint8_t { Off, EnabledForMigration, Enabled };
 
     private:
       Feature feature;
@@ -827,9 +843,9 @@ namespace swift {
       /// Returns whether the feature is enabled.
       bool isEnabled() const;
 
-      /// Returns whether the feature is enabled in adoption mode. Should only
+      /// Returns whether the feature is enabled in migration mode. Should only
       /// be called if the feature is known to support this mode.
-      bool isEnabledForAdoption() const;
+      bool isEnabledForMigration() const;
 
       operator Kind() const { return state; }
     };
@@ -862,9 +878,9 @@ namespace swift {
     /// `false` if a feature by this name is not known.
     bool hasFeature(llvm::StringRef featureName) const;
 
-    /// Enables the given feature (enables in adoption mode if `forAdoption` is
-    /// `true`).
-    void enableFeature(Feature feature, bool forAdoption = false);
+    /// Enables the given feature (enables in migration mode if `forMigration`
+    /// is `true`).
+    void enableFeature(Feature feature, bool forMigration = false);
 
     /// Disables the given feature.
     void disableFeature(Feature feature);
@@ -1077,12 +1093,6 @@ namespace swift {
     /// Disable implicitly-built Clang modules because they are explicitly
     /// built and provided to the compiler invocation.
     bool DisableImplicitClangModules = false;
-
-    /// Enable ClangIncludeTree for explicit module builds scanning.
-    bool UseClangIncludeTree = false;
-
-    /// Using ClangIncludeTreeRoot for compilation.
-    bool HasClangIncludeTreeRoot = false;
 
     /// Whether the dependency scanner should construct all swift-frontend
     /// invocations directly from clang cc1 args.

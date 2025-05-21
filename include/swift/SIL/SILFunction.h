@@ -1218,6 +1218,8 @@ public:
   // Used by the MemoryLifetimeVerifier
   bool argumentMayRead(Operand *argOp, SILValue addr);
 
+  bool isDeinitBarrier();
+
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
   /// Get this function's global_init attribute.
@@ -1704,7 +1706,10 @@ public:
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;
-  
+
+  /// Pretty-print the SILFunction with DebugInfo.
+  void dump(bool Verbose, bool DebugInfo) const;
+
   /// Pretty-print the SILFunction.
   /// Useful for dumping the function when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file

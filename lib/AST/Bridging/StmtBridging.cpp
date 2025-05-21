@@ -69,6 +69,15 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
                                     cRParenLoc.unbridged(), isUnavailability);
 }
 
+BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedNullableExpr cSymbolExpr,
+    BridgedSourceLoc cRParenLoc) {
+  return StmtConditionElement(PoundHasSymbolInfo::create(
+      cContext.unbridged(), cPoundLoc.unbridged(), cLParenLoc.unbridged(),
+      cSymbolExpr.unbridged(), cRParenLoc.unbridged()));
+}
+
 BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLBLoc,
                                                BridgedArrayRef elements,
@@ -227,6 +236,13 @@ BridgedIfStmt BridgedIfStmt_createParsed(
   return new (context)
       IfStmt(cLabelInfo.unbridged(), cIfLoc.unbridged(), cond,
              cThen.unbridged(), cElseLoc.unbridged(), cElse.unbridged());
+}
+
+BridgedPoundAssertStmt BridgedPoundAssertStmt_createParsed(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedExpr cConditionExpr, BridgedStringRef cMessage) {
+  return new (cContext.unbridged()) PoundAssertStmt(
+      cRange.unbridged(), cConditionExpr.unbridged(), cMessage.unbridged());
 }
 
 BridgedRepeatWhileStmt BridgedRepeatWhileStmt_createParsed(

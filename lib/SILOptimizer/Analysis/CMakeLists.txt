@@ -16,6 +16,7 @@ target_sources(swiftSILOptimizer PRIVATE
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp
   IVAnalysis.cpp
+  IsSelfRecursiveAnalysis.cpp
   LoopAnalysis.cpp
   LoopRegionAnalysis.cpp
   NonLocalAccessBlockAnalysis.cpp

@@ -90,7 +90,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 @_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, count) = unsafe _getTypeName(type, qualified: qualified)
+  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
   return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
@@ -98,7 +98,7 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
 @_preInverseGenerics
-public func _getMangledTypeName(_ type: any ~Copyable.Type)
+public func _getMangledTypeName(_ type: any (~Copyable & ~Escapable).Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
@@ -106,8 +106,8 @@ public func _getMangledTypeName(_ type: any ~Copyable.Type)
 @_unavailableInEmbedded
 @_preInverseGenerics
 public // SPI
-func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
-  let (stringPtr, count) = unsafe _getMangledTypeName(type)
+func _mangledTypeName(_ type: any (~Copyable & ~Escapable).Type) -> String? {
+  let (stringPtr, count) = _getMangledTypeName(type)
   guard count > 0 else {
     return nil
   }
@@ -237,17 +237,12 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 ///     protocol NoRequirements: ~Copyable { }
 ///
 /// Extensions to the `Copyable` protocol are not allowed.
-@_marker public protocol Copyable {}
+@_marker public protocol Copyable/*: ~Escapable*/ {}
 
 @_documentation(visibility: internal)
-@_marker public protocol Escapable {}
+@_marker public protocol Escapable/*: ~Copyable*/ {}
 
-#if $BitwiseCopyable2
 @_marker public protocol BitwiseCopyable: ~Escapable { }
 
 @available(*, deprecated, message: "Use BitwiseCopyable")
 public typealias _BitwiseCopyable = BitwiseCopyable
-#else
-@_marker public protocol _BitwiseCopyable: ~Escapable { }
-public typealias BitwiseCopyable = _BitwiseCopyable
-#endif

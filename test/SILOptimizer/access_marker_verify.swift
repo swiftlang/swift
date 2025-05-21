@@ -618,11 +618,15 @@ func testShims() -> UInt32 {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify9testShimss6UInt32VyF : $@convention(thin) () -> UInt32 {
 // CHECK: bb0:
-// CHECK:   [[GA:%.*]] = global_addr @_SwiftKeyPathBufferHeader_SizeMask : $*UInt32
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[GA]] : $*UInt32
-// CHECK:   return
+// CHECK:   [[FR:%.*]] = function_ref @$sSo34_SwiftKeyPathBufferHeader_SizeMasks6UInt32Vvg : $@convention(thin) () -> UInt32
+// CHECK:   [[AP:%.*]] = apply [[FR]]() : $@convention(thin) () -> UInt32
+// CHECK:   return [[AP]]
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify9testShimss6UInt32VyF'
+// CHECK: sil shared [transparent] [serialized] [ossa] @$sSo34_SwiftKeyPathBufferHeader_SizeMasks6UInt32Vvg : $@convention(thin) () -> UInt32 {
+// CHECK: bb0:
+// CHECK:   integer_literal $Builtin.IntLiteral, 16777215
+// CHECK: } // end sil function '$sSo34_SwiftKeyPathBufferHeader_SizeMasks6UInt32Vvg'
+
 
 // --- global variable initialization.
 var globalString1 = "⓪" // start non-empty
@@ -928,7 +932,7 @@ func testOpenExistential(p: PBar) {
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr [[Q0]] : $*Optional<any Q>, #Optional.some!enumelt
 // CHECK-NOT: begin_access
-// CHECK: apply %{{.*}}<any Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
+// CHECK: apply %{{.*}}<any Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
 // CHECK: [[Q:%.*]] = alloc_stack [lexical] [var_decl] $any Q, let, name "q"
 // CHECK: [[OPT_Q:%.*]] = alloc_stack $Optional<any Q>
 // CHECK-NOT: begin_access

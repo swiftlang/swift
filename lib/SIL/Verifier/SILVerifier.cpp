@@ -35,6 +35,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -295,12 +296,12 @@ void verifyKeyPathComponent(SILModule &M,
   auto getTypeInExpansionContext = [&](CanType ty) -> CanType {
     return M.Types.getLoweredType(opaque, ty, typeExpansionContext).getASTType();
   };
-  auto checkIndexEqualsAndHash = [&]{
-    if (!component.getSubscriptIndices().empty()) {
+  auto checkIndexEqualsAndHash = [&] {
+    if (!component.getArguments().empty()) {
       // Equals should be
       // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
       {
-        auto equals = component.getSubscriptIndexEquals();
+        auto equals = component.getIndexEquals();
         require(equals, "key path pattern with indexes must have equals "
                         "operator");
         
@@ -332,7 +333,7 @@ void verifyKeyPathComponent(SILModule &M,
       {
         // Hash should be
         // <Sig...> @convention(thin) (RawPointer) -> Int
-        auto hash = component.getSubscriptIndexHash();
+        auto hash = component.getIndexHash();
         require(hash, "key path pattern with indexes must have hash "
                       "operator");
         
@@ -359,8 +360,7 @@ void verifyKeyPathComponent(SILModule &M,
                 "result should be Int");
       }
     } else {
-      require(!component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(!component.getIndexEquals() && !component.getIndexHash(),
               "component without indexes must not have equals/hash");
     }
   };
@@ -395,18 +395,18 @@ void verifyKeyPathComponent(SILModule &M,
   }
     
   case KeyPathPatternComponent::Kind::GettableProperty:
-  case KeyPathPatternComponent::Kind::SettableProperty: {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+  case KeyPathPatternComponent::Kind::Method: {
     if (forPropertyDescriptor) {
-      require(component.getSubscriptIndices().empty()
-              && !component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
+      require(component.getArguments().empty() && !component.getIndexEquals() &&
+                  !component.getIndexHash(),
               "property descriptor should not have index information");
-      
+
       require(component.getExternalDecl() == nullptr
               && component.getExternalSubstitutions().empty(),
               "property descriptor should not refer to another external decl");
     } else {
-      require(hasIndices == !component.getSubscriptIndices().empty(),
+      require(hasIndices == !component.getArguments().empty(),
               "component for subscript should have indices");
     }
     
@@ -414,7 +414,7 @@ void verifyKeyPathComponent(SILModule &M,
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
-      auto getter = component.getComputedPropertyGetter();
+      auto getter = component.getComputedPropertyForGettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 getter->hasValidLinkageForFragileRef(serializedKind),
@@ -460,8 +460,8 @@ void verifyKeyPathComponent(SILModule &M,
     if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
       // Setter should be
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
-      
-      auto setter = component.getComputedPropertySetter();
+
+      auto setter = component.getComputedPropertyForSettable();
       if (expansion == ResilienceExpansion::Minimal) {
         require(serializedKind != IsNotSerialized &&
                 setter->hasValidLinkageForFragileRef(serializedKind),
@@ -510,7 +510,7 @@ void verifyKeyPathComponent(SILModule &M,
     }
     
     if (!forPropertyDescriptor) {
-      for (auto &index : component.getSubscriptIndices()) {
+      for (auto &index : component.getArguments()) {
         auto opIndex = index.Operand;
         auto contextType =
           index.LoweredType.subst(M, patternSubs);
@@ -573,6 +573,11 @@ void verifyKeyPathComponent(SILModule &M,
 /// open_existential_addr. We should expand it as needed.
 struct ImmutableAddressUseVerifier {
   SmallVector<Operand *, 32> worklist;
+  bool ignoreDestroys;
+  bool defaultIsMutating;
+
+  ImmutableAddressUseVerifier(bool ignoreDestroys = false, bool defaultIsMutating = false)
+    : ignoreDestroys(ignoreDestroys), defaultIsMutating(defaultIsMutating) {}
 
   bool isConsumingOrMutatingArgumentConvention(SILArgumentConvention conv) {
     switch (conv) {
@@ -705,13 +710,13 @@ struct ImmutableAddressUseVerifier {
           }
         }
 
-        // Otherwise this is a builtin that we are not expecting to see, so bail
-        // and assert.
-        llvm::errs() << "Unhandled, unexpected builtin instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
+        // Otherwise this is a builtin that we are not expecting to see.
+        if (defaultIsMutating)
+          return true;
         break;
       }
       case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::ExistentialMetatypeInst:
       case SILInstructionKind::ValueMetatypeInst:
@@ -775,7 +780,9 @@ struct ImmutableAddressUseVerifier {
         else
           break;
       case SILInstructionKind::DestroyAddrInst:
-        return true;
+        if (!ignoreDestroys)
+          return true;
+        break;
       case SILInstructionKind::UpcastInst:
       case SILInstructionKind::UncheckedAddrCastInst: {
         if (isAddrCastToNonConsuming(cast<SingleValueInstruction>(inst))) {
@@ -821,6 +828,7 @@ struct ImmutableAddressUseVerifier {
         LLVM_FALLTHROUGH;
       case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
       case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+      case SILInstructionKind::VectorBaseAddrInst:
       case SILInstructionKind::StructElementAddrInst:
       case SILInstructionKind::TupleElementAddrInst:
       case SILInstructionKind::IndexAddrInst:
@@ -841,9 +849,7 @@ struct ImmutableAddressUseVerifier {
           }
           break;
         }
-        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
-        break;
+        return true;
       }
       case SILInstructionKind::TuplePackElementAddrInst: {
         if (&cast<TuplePackElementAddrInst>(inst)->getOperandRef(
@@ -865,8 +871,8 @@ struct ImmutableAddressUseVerifier {
         return false;
       }
       default:
-        llvm::errs() << "Unhandled, unexpected instruction: " << *inst;
-        llvm_unreachable("invoking standard assertion failure");
+        if (defaultIsMutating)
+          return true;
         break;
       }
     }
@@ -1010,6 +1016,11 @@ public:
 #define requireAddressType(type, value, valueDescription) \
   _requireAddressType<type>(value, valueDescription, #type)
 
+  void requireVoidObjectType(SILType type, const Twine &valueDescription) {
+    _require(type.isObject() && type.isVoid(),
+             valueDescription + " must be a scalar of type ()");
+  }
+
   template <class T>
   typename CanTypeWrapperTraits<T>::type
   _forbidObjectType(SILType type, const Twine &valueDescription,
@@ -1048,7 +1059,13 @@ public:
     
     auto objectTy = value->getType().unwrapOptionalType();
     
-    require(objectTy.isReferenceCounted(F.getModule()),
+    // Immortal C++ foreign reference types are represented as trivially lowered
+    // types since they do not require retain/release calls.
+    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
+                         objectTy.getASTType()->getReferenceCounting() ==
+                             ReferenceCounting::None;
+
+    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
             valueDescription + " must have reference semantics");
   }
   
@@ -2194,13 +2211,16 @@ public:
               "mark_dependence [nonescaping] must be an owned value");
     }
   }
-  
+
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
     verifySILFunctionType(resultInfo);
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
+
+    require(PAI->getType().isNoEscapeFunction() == PAI->isOnStack(),
+            "closure must be on stack to have a noescape function type");
 
     // We rely on all indirect captures to be in the argument list.
     require(PAI->getCallee()->getType().isObject(),
@@ -2372,6 +2392,24 @@ public:
 
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
+
+    if (builtinKind == BuiltinValueKind::ZeroInitializer ||
+        builtinKind == BuiltinValueKind::PrepareInitialization) {
+      require(!BI->getSubstitutions(),
+              "zeroInitializer has no generic arguments as a SIL builtin");
+      if (arguments.size() == 0) {
+        require(!fnConv.useLoweredAddresses()
+                || BI->getType().isLoadable(*BI->getFunction()),
+                "scalar zeroInitializer must have a loadable result type");
+      } else {
+        require(arguments.size() == 1,
+                "zeroInitializer cannot have multiple arguments");
+        require(arguments[0]->getType().isAddress(),
+                "zeroInitializer argument must have address type");
+        requireVoidObjectType(BI->getType(),
+                              "result of zeroInitializer");
+      }
+    }
 
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
@@ -4805,7 +4843,7 @@ public:
     }
 
     for (auto i : indices(conformances)) {
-      require(conformances[i].getRequirement() == protocols[i]->getDecl(),
+      require(conformances[i].getProtocol() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
     }
@@ -5248,27 +5286,6 @@ public:
     require(resTI == ti->getThunkKind().getDerivedFunctionType(
                          ti->getFunction(), objTI, ti->getSubstitutionMap()),
             "resTI is not the thunk kind assigned derived function type");
-
-    auto originalCalleeFuncType =
-        ti->getOperand()->getType().castTo<SILFunctionType>();
-
-    switch (ti->getThunkKind()) {
-    case ThunkInst::Kind::Invalid:
-      break;
-    case ThunkInst::Kind::Identity:
-      break;
-    case ThunkInst::Kind::HopToMainActorIfNeeded:
-      require(originalCalleeFuncType->getParameters().empty(),
-              "Hop To Main Actor If Needed cannot have any parameters");
-      require(originalCalleeFuncType->getResults().empty(),
-              "Hop To Main Actor If Needed cannot have any results");
-      // We require that hop_to_main_actor inputs do not an error since we
-      // have to have no results.
-      require(!originalCalleeFuncType->hasErrorResult(),
-              "HopToMainActorIfNeeded thunks cannot have input without an "
-              "error result");
-      break;
-    }
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -5921,7 +5938,8 @@ public:
         switch (component.getKind()) {
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty:
-          hasIndices = !component.getSubscriptIndices().empty();
+        case KeyPathPatternComponent::Kind::Method:
+          hasIndices = !component.getArguments().empty();
           break;
         
         case KeyPathPatternComponent::Kind::StoredProperty:
@@ -7380,6 +7398,11 @@ public:
 #undef require
 #undef requireObjectType
 
+bool swift::isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys,
+                                      bool defaultIsMutating) {
+  return ImmutableAddressUseVerifier(ignoreDestroys, defaultIsMutating).isMutatingOrConsuming(arg);
+}
+
 //===----------------------------------------------------------------------===//
 //                     Out of Line Verifier Run Functions
 //===----------------------------------------------------------------------===//
@@ -7413,6 +7436,10 @@ void SILFunction::verify(CalleeCache *calleeCache,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
     return;
+
+  if (hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
 
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
@@ -7643,57 +7670,111 @@ void SILVTable::verify(const SILModule &M) const {
 }
 
 /// Verify that a witness table follows invariants.
-void SILWitnessTable::verify(const SILModule &M) const {
-  if (!verificationEnabled(M))
+void SILWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
     return;
 
   if (isDeclaration())
     assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
-  for (const Entry &E : getEntries())
-    if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
-      SILFunction *F = E.getMethodWitness().Witness;
-      if (F) {
-        // If a SILWitnessTable is going to be serialized, it must only
-        // reference public or serializable functions.
-        if (isAnySerialized()) {
-          assert(F->hasValidLinkageForFragileRef(getSerializedKind()) &&
-                 "Fragile witness tables should not reference "
-                 "less visible functions.");
-        }
+  for (const Entry &entry : getEntries()) {
+    if (entry.getKind() != SILWitnessTable::WitnessKind::Method)
+      continue;
 
-        assert(F->getLoweredFunctionType()->getRepresentation() ==
-               SILFunctionTypeRepresentation::WitnessMethod &&
-               "Witnesses must have witness_method representation.");
-      }
+    auto *witnessFunction = entry.getMethodWitness().Witness;
+    if (!witnessFunction)
+      continue;
+
+    // If a SILWitnessTable is going to be serialized, it must only
+    // reference public or serializable functions.
+    if (isAnySerialized()) {
+      assert(
+          witnessFunction->hasValidLinkageForFragileRef(getSerializedKind()) &&
+          "Fragile witness tables should not reference "
+          "less visible functions.");
     }
+
+    assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
+           "Witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "witness table entry for " + baseName + " must be ABI-compatible",
+              *witnessFunction);
+    }
+  }
 }
 
 /// Verify that a default witness table follows invariants.
-void SILDefaultWitnessTable::verify(const SILModule &M) const {
-#ifndef NDEBUG
-  for (const Entry &E : getEntries()) {
+void SILDefaultWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
+    return;
+
+  for (const Entry &entry : getEntries()) {
     // FIXME: associated type witnesses.
-    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
+    if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getMethodWitness().Witness;
-    if (!F)
+    auto *witnessFunction = entry.getMethodWitness().Witness;
+    if (!witnessFunction)
       continue;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
-    assert(F->hasValidLinkageForFragileRef(IsSerialized) &&
+    assert(witnessFunction->hasValidLinkageForFragileRef(IsSerialized) &&
            "Default witness tables should not reference "
            "less visible functions.");
 #endif
 
-    assert(F->getLoweredFunctionType()->getRepresentation() ==
-           SILFunctionTypeRepresentation::WitnessMethod &&
+    assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "default witness table entry for " + baseName +
+                  " must be ABI-compatible",
+              *witnessFunction);
+    }
   }
-#endif
 }
 
 /// Verify that a global variable follows invariants.
@@ -7782,14 +7863,20 @@ void SILModule::verify(CalleeCache *calleeCache,
 
   // Check all witness tables.
   LLVM_DEBUG(llvm::dbgs() <<"*** Checking witness tables for duplicates ***\n");
-  llvm::DenseSet<ProtocolConformance*> wtableConformances;
+  llvm::DenseSet<llvm::PointerIntPair<ProtocolConformance *, 1, bool>> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
     LLVM_DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
-    if (!wtableConformances.insert(conformance).second) {
+    if (!wtableConformances.insert({conformance, wt.isSpecialized()}).second) {
       llvm::errs() << "Witness table redefined: ";
       conformance->printName(llvm::errs());
       assert(false && "triggering standard assertion failure routine");
+    }
+    if (wt.isSpecialized()) {
+      ASSERT(specializedWitnessTableMap.find(conformance) != specializedWitnessTableMap.end());
+    } else {
+      auto *rootConf= cast<RootProtocolConformance>(conformance);
+      ASSERT(WitnessTableMap.find(rootConf) != WitnessTableMap.end());
     }
     wt.verify(*this);
   }

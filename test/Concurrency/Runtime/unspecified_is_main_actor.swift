@@ -1,11 +1,10 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -enable-experimental-feature UnspecifiedMeansMainActorIsolated )
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -Xfrontend -default-isolation=MainActor )
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: libdispatch
 // REQUIRES: asserts
-// REQUIRES: swift_feature_UnspecifiedMeansMainActorIsolated
 
 // UNSUPPORTED: freestanding
 

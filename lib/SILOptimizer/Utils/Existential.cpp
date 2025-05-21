@@ -262,8 +262,8 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
-      [&](CanType /*depType*/, Type /*replaceType*/,
-          ProtocolDecl *proto) -> ProtocolConformanceRef {
+      [&](InFlightSubstitution &, Type, ProtocolDecl *proto)
+          -> ProtocolConformanceRef {
         // Directly providing ExistentialConformances to the SubstitutionMap will
         // fail because of the mismatch between opened archetype conformance and
         // existential value conformance. Instead, provide a conformance lookup
@@ -273,7 +273,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         auto iter =
             llvm::find_if(ExistentialConformances,
                           [&](const ProtocolConformanceRef &conformance) {
-                            return conformance.getRequirement() == proto;
+                            return conformance.getProtocol() == proto;
                           });
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;

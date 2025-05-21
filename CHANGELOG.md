@@ -5,6 +5,82 @@
 
 ## Swift 6.2
 
+* The Swift compiler no longer diagnoses references to declarations that are
+  potentially unavailable because the platform version might not be new enough
+  when those references occur inside of contexts that are also unavailable to
+  that platform. This addresses a long-standing nuisance for multi-platform
+  code. However, there is also a chance that existing source code may become
+  ambiguous as a result:
+
+  ```swift
+  struct A {}
+  struct B {}
+
+  func potentiallyAmbiguous(_: A) {}
+
+  @available(macOS 99, *)
+  func potentiallyAmbiguous(_: B) {}
+
+  @available(macOS, unavailable)
+  func unavailableOnMacOS() {
+    potentiallyAmbiguous(.init()) // error: ambiguous use of 'init()'
+  }
+  ```
+
+  Code that is now ambiguous as a result should likely be restructured since
+  disambiguation based on platform introduction alone has never been a reliable
+  strategy, given that the code would eventually become ambiguous anyways when
+  the deployment target is raised.
+
+* [SE-0470][]:
+  A protocol conformance can be isolated to a specific global actor, meaning that the conformance can only be used by code running on that actor. Isolated conformances are expressed by specifying the global actor on the conformance itself:
+
+  ```swift
+  protocol P {
+    func f()
+  }
+
+  @MainActor
+  class MyType: @MainActor P {
+    /*@MainActor*/ func f() {
+      // must be called on the main actor
+    }
+  }
+  ```
+
+  Swift will produce diagnostics if the conformance is directly accessed in code that isn't guaranteed to execute in the same global actor. For example:
+
+  ```swift
+  func acceptP<T: P>(_ value: T) { }
+
+  /*nonisolated*/ func useIsolatedConformance(myType: MyType) {
+    acceptP(myType) // error: main actor-isolated conformance of 'MyType' to 'P' cannot be used in nonisolated context
+  }
+  ```
+
+  To address such issues, only use an isolated conformance from code that executes on the same global actor.
+
+* [SE-0419][]:
+  Introduced the new `Runtime` module, which contains a public API that can
+  generate backtraces, presently supported on macOS and Linux.  Capturing a
+  backtrace is as simple as
+
+  ```swift
+  import Runtime
+
+  func foo() {
+    // Without symbols
+    let backtrace = try! Backtrace.capture()
+
+    print(backtrace)
+
+    // With symbol lookup
+    let symbolicated = backtrace.symbolicated()!
+
+    print(symbolicated)
+  }
+  ```
+
 * [SE-0458][]:
   Introduced an opt-in mode for strict checking of memory safety, which can be
   enabled with the compiler flag `-strict-memory-safety`. In this mode,
@@ -13,12 +89,12 @@
 
   ```swift
   func evilMalloc(size: Int) -> Int {
-    // warning: call to global function 'malloc' involves unsafe type 'UnsafeMutableRawPointer'
+    // use of global function 'malloc' involves unsafe type 'UnsafeMutableRawPointer'
     return Int(bitPattern: malloc(size))
   }
   ```
 
-  These warnings are in their own diagnostic group (`Unsafe`) and can
+  These warnings are in their own diagnostic group (`StrictMemorySafety`) and can
   be suppressed by ackwnowledging the memory-unsafe behavior, for
   example with an `unsafe` expression:
 
@@ -371,7 +447,7 @@ And the module structure to support such applications looks like this:
 
 * [SE-0430][]:
 
-  Region Based Isolation is now extended to enable the application of an
+  Region-Based Isolation is now extended to enable the application of an
   explicit `sending` annotation to function parameters and results. A function
   parameter or result that is annotated with `sending` is required to be
   disconnected at the function boundary and thus possesses the capability of
@@ -409,7 +485,7 @@ And the module structure to support such applications looks like this:
   
   func useValue() {
     let x = NonSendableType()
-    let a = await MyActor(x) // Error without Region Based Isolation!
+    let a = await MyActor(x) // Error without Region-Based Isolation!
   }
   ```
 
@@ -10703,6 +10779,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0432]: https://github.com/apple/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md
 [SE-0430]: https://github.com/apple/swift-evolution/blob/main/proposals/0430-transferring-parameters-and-results.md
 [SE-0418]: https://github.com/apple/swift-evolution/blob/main/proposals/0418-inferring-sendable-for-methods.md
+[SE-0419]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0419-backtrace-api.md
 [SE-0423]: https://github.com/apple/swift-evolution/blob/main/proposals/0423-dynamic-actor-isolation.md
 [SE-0424]: https://github.com/apple/swift-evolution/blob/main/proposals/0424-custom-isolation-checking-for-serialexecutor.md
 [SE-0428]: https://github.com/apple/swift-evolution/blob/main/proposals/0428-resolve-distributed-actor-protocols.md
@@ -10710,6 +10787,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+[SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

@@ -15,7 +15,7 @@ import Foundation
 public func supported() {}
 
 @objc
-@_expose(Cxx) // expected-error {{@objc class 'UnsupportedClass' can not yet be exposed to C++}}
+@_expose(Cxx) // expected-error {{'@objc' class 'UnsupportedClass' can not yet be exposed to C++}}
 public class UnsupportedClass: NSObject {
     override public init() {
         x = 0

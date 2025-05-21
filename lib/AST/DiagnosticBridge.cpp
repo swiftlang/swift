@@ -20,11 +20,28 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
+static BridgedDiagnosticSeverity bridgeDiagnosticSeverity(DiagnosticKind kind) {
+  switch (kind) {
+  case DiagnosticKind::Error:
+    return BridgedDiagnosticSeverity::BridgedError;
+
+  case DiagnosticKind::Warning:
+    return BridgedDiagnosticSeverity::BridgedWarning;
+
+  case DiagnosticKind::Remark:
+    return BridgedDiagnosticSeverity::BridgedRemark;
+
+  case DiagnosticKind::Note:
+    return BridgedDiagnosticSeverity::BridgedNote;
+  }
+}
+
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void addQueueDiagnostic(void *queuedDiagnostics,
                                void *perFrontendState,
@@ -36,55 +53,69 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
                                            info.FormatArgs);
   }
 
-  BridgedDiagnosticSeverity severity;
-  switch (info.Kind) {
-  case DiagnosticKind::Error:
-    severity = BridgedDiagnosticSeverity::BridgedError;
-    break;
-
-  case DiagnosticKind::Warning:
-    severity = BridgedDiagnosticSeverity::BridgedWarning;
-    break;
-
-  case DiagnosticKind::Remark:
-    severity = BridgedDiagnosticSeverity::BridgedRemark;
-    break;
-
-  case DiagnosticKind::Note:
-    severity = BridgedDiagnosticSeverity::BridgedNote;
-    break;
-  }
+  BridgedDiagnosticSeverity severity = bridgeDiagnosticSeverity(info.Kind);
 
   // Map the highlight ranges.
-  SmallVector<const void *, 2> highlightRanges;
+  SmallVector<BridgedCharSourceRange, 2> highlightRanges;
   for (const auto &range : info.Ranges) {
-    if (range.isInvalid())
-      continue;
-
-    highlightRanges.push_back(range.getStart().getOpaquePointerValue());
-    highlightRanges.push_back(range.getEnd().getOpaquePointerValue());
+    if (range.isValid())
+      highlightRanges.push_back(range);
   }
 
-  StringRef documentationPath;
-  if (info.EducationalNotePaths.size() > 0)
-    documentationPath = info.EducationalNotePaths[0];
+  StringRef documentationPath = info.CategoryDocumentationURL;
 
-  // FIXME: Translate Fix-Its.
-  swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, perFrontendState,
-                                   text.data(), text.size(),
-                                   severity, info.Loc.getOpaquePointerValue(),
-                                   info.Category.data(),
-                                   info.Category.size(),
-                                   documentationPath.data(),
-                                   documentationPath.size(),
-                                   highlightRanges.data(),
-                                   highlightRanges.size() / 2);
+  SmallVector<BridgedFixIt, 2> fixIts;
+  for (const auto &fixIt : info.FixIts) {
+    fixIts.push_back(BridgedFixIt{ fixIt.getRange(), fixIt.getText() });
+  }
+
+  swift_ASTGen_addQueuedDiagnostic(
+      queuedDiagnostics, perFrontendState,
+      text.str(),
+      severity, info.Loc,
+      info.Category,
+      documentationPath,
+      highlightRanges.data(), highlightRanges.size(),
+      llvm::ArrayRef<BridgedFixIt>(fixIts));
 
   // TODO: A better way to do this would be to pass the notes as an
   // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires
   // bridging of `Note` structure and new serialization.
   for (auto *childNote : info.ChildDiagnosticInfo) {
     addQueueDiagnostic(queuedDiagnostics, perFrontendState, *childNote, SM);
+  }
+}
+
+void DiagnosticBridge::emitDiagnosticWithoutLocation(
+    const DiagnosticInfo &info, llvm::raw_ostream &out, bool forceColors) {
+  ASSERT(queuedDiagnostics == nullptr);
+
+  // If we didn't have per-frontend state before, create it now.
+  if (!perFrontendState) {
+    perFrontendState = swift_ASTGen_createPerFrontendDiagnosticState();
+  }
+
+  llvm::SmallString<256> text;
+  {
+    llvm::raw_svector_ostream out(text);
+    DiagnosticEngine::formatDiagnosticText(out, info.FormatString,
+                                           info.FormatArgs);
+  }
+
+  BridgedDiagnosticSeverity severity = bridgeDiagnosticSeverity(info.Kind);
+
+  BridgedStringRef bridgedRenderedString{nullptr, 0};
+  swift_ASTGen_renderSingleDiagnostic(
+      perFrontendState, text.str(), severity, info.Category,
+      llvm::StringRef(info.CategoryDocumentationURL), forceColors ? 1 : 0,
+      &bridgedRenderedString);
+
+  auto renderedString = bridgedRenderedString.unbridged();
+  if (renderedString.data()) {
+    out << "<unknown>:0: ";
+    out.write(renderedString.data(), renderedString.size());
+    swift_ASTGen_freeBridgedString(renderedString);
+    out << "\n";
   }
 }
 

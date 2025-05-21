@@ -29,6 +29,7 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -160,6 +161,7 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DefaultOverrideTableListType = llvm::ilist<SILDefaultOverrideTable>;
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
   using SILMoveOnlyDeinitListType = llvm::ArrayRef<SILMoveOnlyDeinit *>;
@@ -184,6 +186,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDefaultOverrideTable;
   friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
@@ -252,8 +255,13 @@ private:
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
-  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
+  llvm::DenseMap<const RootProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;
+
+  /// Lookup table for specialized witness tables from conformances.
+  /// Currently only used in embedded mode.
+  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
+  specializedWitnessTableMap;
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
@@ -264,6 +272,12 @@ private:
 
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
+
+  /// Lookup table for SIL default override tables from classes.
+  llvm::DenseMap<const ClassDecl *, SILDefaultOverrideTable *>
+      DefaultOverrideTableMap;
+
+  DefaultOverrideTableListType defaultOverrideTables;
 
   /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
   llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
@@ -717,6 +731,22 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
+  using default_override_table_iterator = DefaultOverrideTableListType::iterator;
+  using default_override_table_const_iterator = DefaultOverrideTableListType::const_iterator;
+  DefaultOverrideTableListType &getDefaultOverrideTableList() { return defaultOverrideTables; }
+  const DefaultOverrideTableListType &getDefaultOverrideTableList() const { return defaultOverrideTables; }
+  default_override_table_iterator default_override_table_begin() { return defaultOverrideTables.begin(); }
+  default_override_table_iterator default_override_table_end() { return defaultOverrideTables.end(); }
+  default_override_table_const_iterator default_override_table_begin() const { return defaultOverrideTables.begin(); }
+  default_override_table_const_iterator default_override_table_end() const { return defaultOverrideTables.end(); }
+  iterator_range<default_override_table_iterator> getDefaultOverrideTables() {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
+  }
+  iterator_range<default_override_table_const_iterator>
+  getDefaultOverrideTables() const {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
+  }
+
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
   using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
   DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
@@ -841,15 +871,16 @@ public:
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
 
-  /// Look up the SILWitnessTable representing the lowering of a protocol
-  /// conformance, and collect the substitutions to apply to the referenced
-  /// witnesses, if any.
-  ///
-  /// \arg C The protocol conformance mapped key to use to lookup the witness
-  ///        table.
-  /// \arg deserializeLazily If we cannot find the witness table should we
-  ///                        attempt to lazily deserialize it.
+  /// Look up the SILWitnessTable representing the lowering of a conformance `C`.
+  /// If a specialized witness table exists for the conformance, return the specialized table.
+  /// Specialized witness tables are currently only used in embedded mode.
   SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C);
+
+  /// Look up the SILWitnessTable representing the lowering of a conformance `C`.
+  /// The `isSpecialized` flag specifies if only non-specialized or specialized witness
+  /// tables are looked up.
+  /// Specialized witness tables are currently only used in embedded mode.
+  SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C, bool isSpecialized);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
   ///
@@ -870,6 +901,12 @@ public:
   lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
                                       SILDeclRef Requirement,
                                       bool deserializeLazily=true);
+
+  /// Look up the SILDefaultOverrideTable containing the default overrides to be
+  /// applied to subclasses of a resilient class.
+  SILDefaultOverrideTable *
+  lookUpDefaultOverrideTable(const ClassDecl *decl,
+                             bool deserializeLazily = true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
@@ -913,6 +950,12 @@ public:
 
   /// Deletes a dead witness table.
   void deleteWitnessTable(SILWitnessTable *Wt);
+
+  /// Define a default override table for the indicated resilient class \p decl
+  /// consisting of the specified \p entries.
+  SILDefaultOverrideTable *createDefaultOverrideTableDefinition(
+      const ClassDecl *decl, SILLinkage linkage,
+      ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
   /// Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
@@ -974,6 +1017,9 @@ public:
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
+
+  /// Pretty-print the module with DebugInfo.
+  void dump(bool Verbose, bool DebugInfo) const;
 
   /// Pretty-print the module to a file.
   /// Useful for dumping the module when running in a debugger.

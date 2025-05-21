@@ -24,11 +24,11 @@ public struct SubstitutionMap: CustomStringConvertible, NoReflectionChildren {
   public init(bridged: BridgedSubstitutionMap) {
     self.bridged = bridged
   }
-  
+
   public init() {
     self.bridged = BridgedSubstitutionMap()
   }
-  
+
   public init(genericSignature: GenericSignature, replacementTypes: [Type]) {
     let bridgedReplTypes = replacementTypes.map { $0.bridged }
     self.bridged = bridgedReplTypes.withBridgedArrayRef {
@@ -72,5 +72,9 @@ public struct SubstitutionMap: CustomStringConvertible, NoReflectionChildren {
   public var replacementType: Type {
     assert(replacementTypes.count == 1)
     return replacementTypes[0]
+  }
+
+  public static func ==(lhs: SubstitutionMap, rhs: SubstitutionMap) -> Bool {
+    lhs.bridged.isEqualTo(rhs.bridged)
   }
 }

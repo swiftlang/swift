@@ -162,8 +162,16 @@ public:
     return visit(T->getBase());
   }
 
+  FoundResult visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T) {
+    return visit(T->getBase());
+  }
+
   FoundResult visitArrayTypeRepr(ArrayTypeRepr *T) {
     return handleParent(T, T->getBase());
+  }
+
+  FoundResult visitInlineArrayTypeRepr(InlineArrayTypeRepr *T) {
+    return handleParent(T, T->getCount(), T->getElement());
   }
 
   FoundResult visitDictionaryTypeRepr(DictionaryTypeRepr *T) {

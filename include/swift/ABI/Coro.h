@@ -39,6 +39,8 @@ public:
     Kind           = 0,
     Kind_width     = 8,
 
+    ShouldDeallocateImmediately = 8,
+
     // 24 reserved bits
   };
   // clang-format on
@@ -49,6 +51,9 @@ public:
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, CoroAllocatorKind, getKind,
                                  setKind)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldDeallocateImmediately,
+                                shouldDeallocateImmediately,
+                                setShouldDeallocateImmediately)
 };
 
 using CoroAllocation = void *;
@@ -62,8 +67,8 @@ struct CoroAllocator {
 
   /// Whether the allocator should deallocate memory on calls to
   /// swift_coro_dealloc.
-  constexpr bool shouldDeallocateImmediately() {
-    // Only the "mallocator" should immediately deallocate in
+  bool shouldDeallocateImmediately() {
+    // Currently, only the "mallocator" should immediately deallocate in
     // swift_coro_dealloc.  It must because the ABI does not provide a means for
     // the callee to return its allocations to the caller.
     //
@@ -71,7 +76,7 @@ struct CoroAllocator {
     // from where swift_task_dealloc_through can be called and passed the
     // caller-allocated fixed-per-callee-sized-frame.
     // Stack allocations just pop the stack.
-    return flags.getKind() == CoroAllocatorKind::Malloc;
+    return flags.shouldDeallocateImmediately();
   }
 };
 

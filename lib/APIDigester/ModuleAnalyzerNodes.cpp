@@ -1498,7 +1498,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
-    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
+    SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {

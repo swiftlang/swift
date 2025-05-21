@@ -582,7 +582,8 @@ BUILTIN_MISC_OPERATION(IsConcrete, "isConcrete", "n", Special)
 /// IsBitwiseTakable has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
-/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+/// IsSameMetatype has type
+/// (any (~Copyable & ~Escapable).Type, any (~Copyable & ~Escapable).Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
@@ -672,6 +673,13 @@ BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 /// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
 BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 
+/// Select has type either
+///   (VecN<Int1>, VecN<T>, VecN<T>) -> VecN<T>
+/// or
+///   (Int1, T, T) -> T
+/// T must be trivial.
+BUILTIN_MISC_OPERATION(Select, "select", "n", Special)
+
 // Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
 BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
 
@@ -718,9 +726,6 @@ BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
 /// Builtin.wordAtIndex_IntLiteral has type
 /// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
 BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
-
-/// zeroInitializer has type <T> () -> T
-BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
@@ -841,6 +846,14 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
+
+/// zeroInitializer has type <T> () -> T, but the SIL builtin has its
+/// own rules.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
+
+/// Like `zeroInitializer`, but does not actually initialize the memory.
+/// It only indicates to mandatory passes that the memory is going to be initialized.
+BUILTIN_MISC_OPERATION(PrepareInitialization, "prepareInitialization", "n", Special)
 
 // getCurrentExecutor: () async -> Builtin.Executor?
 //

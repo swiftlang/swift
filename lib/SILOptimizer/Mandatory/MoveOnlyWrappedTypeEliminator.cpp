@@ -188,6 +188,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(DestructureStruct)
   NO_UPDATE_NEEDED(SelectEnum)
   NO_UPDATE_NEEDED(MarkDependence)
+  NO_UPDATE_NEEDED(MarkDependenceAddr)
   NO_UPDATE_NEEDED(DestroyAddr)
   NO_UPDATE_NEEDED(DeallocStack)
   NO_UPDATE_NEEDED(DeallocBox)

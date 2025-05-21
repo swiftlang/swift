@@ -55,6 +55,8 @@ void swift::simple_display(llvm::raw_ostream &out, DeclName name) {
 }
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, DeclNameRef I) {
+  if (I.hasModuleSelector())
+    OS << I.getModuleSelector() << "::";
   OS << I.getFullName();
   return OS;
 }
@@ -98,6 +100,11 @@ int Identifier::compare(Identifier other) const {
 }
 
 int DeclName::compare(DeclName other) const {
+  // Fast equality comparsion.
+  if (getOpaqueValue() == other.getOpaqueValue())
+    return 0;
+
+
   // Compare base names.
   if (int result = getBaseName().compare(other.getBaseName()))
     return result;
@@ -111,10 +118,13 @@ int DeclName::compare(DeclName other) const {
       return result;
   }
 
-  if (argNames.size() == otherArgNames.size())
-    return 0;
+  if (argNames.size() != otherArgNames.size())
+    return argNames.size() < otherArgNames.size() ? -1 : 1;
 
-  return argNames.size() < otherArgNames.size() ? -1 : 1;
+  // Order based on if it is compound name or not.
+  assert(isSimpleName() != other.isSimpleName() &&
+         "equality should be covered by opaque value comparsion");
+  return isSimpleName() ? -1 : 1;
 }
 
 static bool equals(ArrayRef<Identifier> idents, ArrayRef<StringRef> strings) {
@@ -200,17 +210,27 @@ void DeclNameRef::dump() const {
 }
 
 StringRef DeclNameRef::getString(llvm::SmallVectorImpl<char> &scratch,
-                             bool skipEmptyArgumentNames) const {
-  return FullName.getString(scratch, skipEmptyArgumentNames);
+                                 bool skipEmptyArgumentNames) const {
+  {
+    llvm::raw_svector_ostream out(scratch);
+    print(out, skipEmptyArgumentNames);
+  }
+
+  return StringRef(scratch.data(), scratch.size());
 }
 
-llvm::raw_ostream &DeclNameRef::print(llvm::raw_ostream &os,
-                                  bool skipEmptyArgumentNames) const {
-  return FullName.print(os, skipEmptyArgumentNames);
+llvm::raw_ostream &
+DeclNameRef::print(llvm::raw_ostream &os,
+                   bool skipEmptyArgumentNames) const {
+  if (hasModuleSelector())
+    os << getModuleSelector() << "::";
+  return getFullName().print(os, skipEmptyArgumentNames);
 }
 
 llvm::raw_ostream &DeclNameRef::printPretty(llvm::raw_ostream &os) const {
-  return FullName.printPretty(os);
+  if (hasModuleSelector())
+    os << getModuleSelector() << "::";
+  return getFullName().printPretty(os);
 }
 
 ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,

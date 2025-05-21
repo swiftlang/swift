@@ -404,6 +404,30 @@ Type ConstraintSystem::openOpaqueType(Type type, ContextualTypePurpose context,
   });
 }
 
+/// FIXME: This can be folded into its callers after a bit of cleanup.
+static FunctionType *substGenericArgs(
+    GenericFunctionType *funcTy,
+    llvm::function_ref<Type(Type)> substFn) {
+  llvm::SmallVector<AnyFunctionType::Param, 4> params;
+  params.reserve(funcTy->getNumParams());
+
+  llvm::transform(funcTy->getParams(), std::back_inserter(params),
+                  [&](const AnyFunctionType::Param &param) {
+                    return param.withType(substFn(param.getPlainType()));
+                  });
+
+  auto resultTy = substFn(funcTy->getResult());
+
+  Type thrownError = funcTy->getThrownError();
+  if (thrownError)
+    thrownError = substFn(thrownError);
+
+  // Build the resulting (non-generic) function type.
+  return FunctionType::get(params, resultTy,
+                           funcTy->getExtInfo().withThrows(
+                              funcTy->isThrowing(), thrownError));
+}
+
 FunctionType *ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        ConstraintLocatorBuilder locator,
@@ -419,7 +443,7 @@ FunctionType *ConstraintSystem::openFunctionType(
                               return openType(type, replacements, locator);
                             });
 
-    funcType = genericFn->substGenericArgs(
+    funcType = substGenericArgs(genericFn,
         [&](Type type) { return openType(type, replacements, locator); });
   }
 
@@ -793,7 +817,18 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         return openType(type, replacements, locator);
       });
 
-  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+  // Infer @Sendable for global actor isolated function types under the
+  // upcoming feature flag.
+  if (Context.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)
+      && !adjustedTy->getExtInfo().isSendable()) {
+    if (adjustedTy->getExtInfo().getIsolation().isGlobalActor()) {
+      adjustedTy =
+          adjustedTy->withExtInfo(adjustedTy->getExtInfo().withSendable());
+    }
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures) &&
+      !adjustedTy->getExtInfo().isSendable()) {
     DeclContext *DC = nullptr;
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
       DC = FD->getDeclContext();
@@ -814,19 +849,27 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
       } else if (numApplies < decl->getNumCurryLevels() &&
                  decl->hasCurriedSelf() ) {
         auto shouldMarkMemberTypeSendable = [&]() {
-          // Static member types are @Sendable on both levels because
-          // they only capture a metatype "base" that is always Sendable.
-          // For example, `(S.Type) -> () -> Void`.
-          if (!decl->isInstanceMember())
-            return true;
+          Type capturedBaseType = baseType;
 
-          // For instance members we need to check whether instance type
-          // is Sendable because @Sendable function values cannot capture
-          // non-Sendable values (base instance type in this case).
-          // For example, `(C) -> () -> Void` where `C` should be Sendable
-          // for the inner function type to be Sendable as well.
-          return baseType &&
-                 baseType->getMetatypeInstanceType()->isSendableType();
+          if (!decl->isInstanceMember()) {
+            // Static member types are Sendable when the metatype of their
+            // base type is Sendable, because they capture that metatype.
+            // For example, `(S.Type) -> () -> Void`.
+            if (!capturedBaseType)
+              capturedBaseType = decl->getDeclContext()->getSelfTypeInContext();
+
+            if (!capturedBaseType->is<AnyMetatypeType>())
+              capturedBaseType = MetatypeType::get(capturedBaseType);
+          } else if (capturedBaseType) {
+            // For instance members we need to check whether instance type
+            // is Sendable because @Sendable function values cannot capture
+            // non-Sendable values (base instance type in this case).
+            // For example, `(C) -> () -> Void` where `C` should be Sendable
+            // for the inner function type to be Sendable as well.
+            capturedBaseType = capturedBaseType->getMetatypeInstanceType();
+          }
+
+          return capturedBaseType && capturedBaseType->isSendableType();
         };
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
@@ -1195,8 +1238,8 @@ void ConstraintSystem::openGenericRequirement(
 
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
-    if (typeParameterProhibitsIsolatedConformance(req.getFirstType(),
-                                                  signature))
+    if (signature &&
+        signature->prohibitsIsolatedConformance(req.getFirstType()))
       prohibitIsolatedConformance = true;
 
     openedReq = Requirement(kind, openedFirst, req.getSecondType());
@@ -1514,6 +1557,13 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
+    // If this is a value generic, undo the wrapping. 'substMemberTypeWithBase'
+    // returns the underlying value type of the value generic (e.g. 'Int').
+    if (isa<GenericTypeParamDecl>(value) &&
+        cast<GenericTypeParamDecl>(value)->isValue()) {
+      memberTy = memberTy->castTo<MetatypeType>()->getInstanceType();
+    }
+
     auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, openedType, memberTy, memberTy, Type() };
   }
@@ -1546,7 +1596,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     openedType = value->getInterfaceType()->castTo<AnyFunctionType>();
 
     if (auto *genericFn = openedType->getAs<GenericFunctionType>()) {
-      openedType = genericFn->substGenericArgs(
+      openedType = substGenericArgs(genericFn,
           [&](Type type) { return openType(type, replacements, locator); });
     }
   } else {
@@ -1900,13 +1950,10 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   return type;
 }
 
-
-
-void ConstraintSystem::bindOverloadType(
-    const SelectedOverload &overload, Type boundType,
-    ConstraintLocator *locator, DeclContext *useDC,
-    llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
-        verifyThatArgumentIsHashable) {
+void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
+                                        Type boundType,
+                                        ConstraintLocator *locator,
+                                        DeclContext *useDC) {
   auto &ctx = getASTContext();
   auto choice = overload.choice;
   auto openedType = overload.adjustedOpenedType;
@@ -1952,7 +1999,8 @@ void ConstraintSystem::bindOverloadType(
 
     if (isExpr<KeyPathExpr>(locator->getAnchor())) {
       auto paramTy = fnTy->getParams()[0].getParameterType();
-      verifyThatArgumentIsHashable(/*idx*/ 0, paramTy, locator);
+      verifyThatArgumentIsHashable(/*idx*/ 0, paramTy, locator,
+                                   choice.getDecl()->getLoc());
     }
   };
   switch (choice.getKind()) {
@@ -2133,8 +2181,6 @@ void ConstraintSystem::bindOverloadType(
   }
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
-
-
 
 static unsigned getApplicationLevel(ConstraintSystem &CS, Type baseTy,
                                     UnresolvedDotExpr *UDE) {
@@ -2346,24 +2392,8 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
-                                       Type boundType,
-                                       OverloadChoice choice,
+                                       Type boundType, OverloadChoice choice,
                                        DeclContext *useDC) {
-  // Add a conformance constraint to make sure that given type conforms
-  // to Hashable protocol, which is important for key path subscript
-  // components.
-  auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
-                                          ConstraintLocator *locator) {
-    if (auto *hashable = TypeChecker::getProtocol(
-            argType->getASTContext(), choice.getDecl()->getLoc(),
-            KnownProtocolKind::Hashable)) {
-      addConstraint(ConstraintKind::ConformsTo, argType,
-                    hashable->getDeclaredInterfaceType(),
-                    getConstraintLocator(
-                        locator, LocatorPathElt::TupleElement(index)));
-    }
-  };
-
   // Determine the type to which we'll bind the overload set's type.
   Type openedType;
   Type adjustedOpenedType;
@@ -2514,7 +2544,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // Hashable, because it would be used as a component inside key path.
         for (auto index : indices(subscriptTy->getParams())) {
           const auto &param = subscriptTy->getParams()[index];
-          verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
+          verifyThatArgumentIsHashable(index, param.getParameterType(), locator,
+                                       choice.getDecl()->getLoc());
         }
       }
     }
@@ -2603,8 +2634,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   recordResolvedOverload(locator, overload);
 
   // Add the constraints necessary to bind the overload type.
-  bindOverloadType(overload, boundType, locator, useDC,
-                   verifyThatArgumentIsHashable);
+  bindOverloadType(overload, boundType, locator, useDC);
 
   if (isDebugMode()) {
     PrintOptions PO;
@@ -2680,5 +2710,18 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   if (choice.isFallbackMemberOnUnwrappedBase()) {
     increaseScore(SK_UnresolvedMemberViaOptional, locator);
+  }
+}
+
+void ConstraintSystem::verifyThatArgumentIsHashable(unsigned index,
+                                                    Type argType,
+                                                    ConstraintLocator *locator,
+                                                    SourceLoc loc) {
+  if (auto *hashable = TypeChecker::getProtocol(argType->getASTContext(), loc,
+                                                KnownProtocolKind::Hashable)) {
+    addConstraint(
+        ConstraintKind::ConformsTo, argType,
+        hashable->getDeclaredInterfaceType(),
+        getConstraintLocator(locator, LocatorPathElt::TupleElement(index)));
   }
 }

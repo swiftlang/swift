@@ -58,5 +58,12 @@ func testPoundIf() {
     // pass
   } else if #unavailable(macOS 80) {
     // pass
+  } else if #_hasSymbol(Int.self) { // expected-warning {{struct 'Int' is not a weakly linked declaration}}
+    // pass
   }
+}
+
+public class ClassWithMembers {
+  @_spi_available(macOS 10.15, *)
+  public func spiFunc() {}
 }

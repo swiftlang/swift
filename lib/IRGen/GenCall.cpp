@@ -44,6 +44,7 @@
 #include <optional>
 
 #include "CallEmission.h"
+#include "ConstantBuilder.h"
 #include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
 #include "GenCall.h"
@@ -57,8 +58,8 @@
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
-#include "IRGenModule.h"
 #include "IRGenMangler.h"
+#include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NativeConventionSchema.h"
 #include "Signature.h"
@@ -261,10 +262,14 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(
     llvm::Function *projectFn = cast<llvm::Function>(
         (cast<llvm::Constant>(args[2])->stripPointerCasts()));
     auto *fnTy = projectFn->getFunctionType();
-
-    llvm::Value *context =
+    llvm::Value *callerContext = nullptr;
+    if (projectFn == getOrCreateResumePrjFn()) {
+      callerContext = popAsyncContext(calleeContext);
+    } else {
+      callerContext =
         Builder.CreateCallWithoutDbgLoc(fnTy, projectFn, {calleeContext});
-    storeCurrentAsyncContext(context);
+    }
+    storeCurrentAsyncContext(callerContext);
   }
 
   return id;
@@ -304,13 +309,14 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
 static void addIndirectValueParameterAttributes(IRGenModule &IGM,
                                                 llvm::AttributeList &attrs,
                                                 const TypeInfo &ti,
-                                                unsigned argIndex) {
+                                                unsigned argIndex,
+                                                bool addressable) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   // Value parameter pointers can't alias or be captured.
   b.addAttribute(llvm::Attribute::NoAlias);
   // Bitwise takable value types are guaranteed not to capture
   // a pointer into itself.
-  if (ti.isBitwiseTakable(ResilienceExpansion::Maximal))
+  if (!addressable && ti.isBitwiseTakable(ResilienceExpansion::Maximal))
     b.addAttribute(llvm::Attribute::NoCapture);
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
@@ -339,7 +345,7 @@ static void addPackParameterAttributes(IRGenModule &IGM,
 static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
                                         llvm::AttributeList &attrs,
                                         const TypeInfo &ti, unsigned argIndex,
-                                        bool aliasable) {
+                                        bool aliasable, bool addressable) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   // Thanks to exclusivity checking, it is not possible to alias inouts except
   // those that are inout_aliasable.
@@ -350,7 +356,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
   }
   // Bitwise takable value types are guaranteed not to capture
   // a pointer into itself.
-  if (ti.isBitwiseTakable(ResilienceExpansion::Maximal))
+  if (!addressable && ti.isBitwiseTakable(ResilienceExpansion::Maximal))
     b.addAttribute(llvm::Attribute::NoCapture);
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
@@ -504,6 +510,13 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
   attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
+void IRGenModule::addSwiftCoroAttributes(llvm::AttributeList &attrs,
+                                         unsigned argIndex) {
+  llvm::AttrBuilder b(getLLVMContext());
+  b.addAttribute(llvm::Attribute::SwiftCoro);
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
+}
+
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
                                           unsigned argIndex) {
   llvm::AttrBuilder b(getLLVMContext());
@@ -592,8 +605,10 @@ namespace {
     Signature getSignature();
 
   private:
-    const TypeInfo &expand(SILParameterInfo param);
+    const TypeInfo &expand(unsigned paramIdx);
     llvm::Type *addIndirectResult(SILType resultType, bool useInReg = false);
+
+    bool isAddressableParam(unsigned paramIdx);
 
     SILFunctionConventions getSILFuncConventions() const {
       return SILFunctionConventions(FnType, IGM.getSILModule());
@@ -891,6 +906,7 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
   if (FnType->isCalleeAllocatedCoroutine()) {
     // Whether this is an unwind resumption.
     ParamIRTypes.push_back(IGM.CoroAllocatorPtrTy);
+    IGM.addSwiftCoroAttributes(Attrs, ParamIRTypes.size() - 1);
   } else {
     // Whether this is an unwind resumption.
     ParamIRTypes.push_back(IGM.Int1Ty);
@@ -922,6 +938,7 @@ void SignatureExpansion::addCoroutineContextParameter() {
 
 void SignatureExpansion::addCoroutineAllocatorParameter() {
   ParamIRTypes.push_back(IGM.CoroAllocatorPtrTy);
+  IGM.addSwiftCoroAttributes(Attrs, ParamIRTypes.size() - 1);
 }
 
 NativeConventionSchema::NativeConventionSchema(IRGenModule &IGM,
@@ -1771,7 +1788,8 @@ static ArrayRef<llvm::Type *> expandScalarOrStructTypeToArray(llvm::Type *&ty) {
   return expandedTys;
 }
 
-const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
+const TypeInfo &SignatureExpansion::expand(unsigned paramIdx) {
+  auto param = FnType->getParameters()[paramIdx];
   auto paramSILType = getSILFuncConventions().getSILType(
       param, IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(paramSILType);
@@ -1779,7 +1797,8 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
-    addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
+    addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size(),
+                                        isAddressableParam(paramIdx));
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
     return ti;
@@ -1787,8 +1806,9 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     addInoutParameterAttributes(
-        IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
-        conv == ParameterConvention::Indirect_InoutAliasable);
+      IGM, paramSILType, Attrs, ti, ParamIRTypes.size(),
+      conv == ParameterConvention::Indirect_InoutAliasable,
+      isAddressableParam(paramIdx));
     addPointerParameter(IGM.getStorageType(getSILFuncConventions().getSILType(
         param, IGM.getMaximalTypeExpansionContext())));
     return ti;
@@ -1812,7 +1832,8 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
       auto &nativeSchema = ti.nativeParameterValueSchema(IGM);
       if (nativeSchema.requiresIndirect()) {
         addIndirectValueParameterAttributes(IGM, Attrs, ti,
-                                            ParamIRTypes.size());
+                                            ParamIRTypes.size(),
+                                            /*addressable*/ false);
         ParamIRTypes.push_back(ti.getStorageType()->getPointerTo());
         return ti;
       }
@@ -1830,6 +1851,13 @@ const TypeInfo &SignatureExpansion::expand(SILParameterInfo param) {
     llvm_unreachable("bad abstract CC");
   }
   llvm_unreachable("bad parameter convention");
+}
+
+bool SignatureExpansion::isAddressableParam(unsigned paramIdx) {
+  return FnType->isAddressable(paramIdx, IGM.IRGen.SIL,
+                               IGM.getGenericEnvironment(),
+                               IGM.getSILTypes(),
+                               IGM.getMaximalTypeExpansionContext());
 }
 
 /// Does the given function type have a self parameter that should be
@@ -1877,7 +1905,6 @@ static void addParamInfo(SignatureExpansionABIDetails *details,
 }
 
 void SignatureExpansion::expandKeyPathAccessorParameters() {
-  auto params = FnType->getParameters();
   unsigned numArgsToExpand;
   SmallVector<llvm::Type *, 4> tailParams;
 
@@ -1923,7 +1950,7 @@ void SignatureExpansion::expandKeyPathAccessorParameters() {
     llvm_unreachable("non keypath accessor convention");
   }
   for (unsigned i = 0; i < numArgsToExpand; i++) {
-    expand(params[i]);
+    expand(i);
   }
   for (auto tailParam : tailParams) {
     ParamIRTypes.push_back(tailParam);
@@ -1977,9 +2004,9 @@ void SignatureExpansion::expandParameters(
     params = params.drop_back();
   }
 
-  for (auto param : params) {
-    const TypeInfo &ti = expand(param);
-    addParamInfo(recordedABIDetails, ti, param.getConvention());
+  for (auto pair : enumerate(params)) {
+    const TypeInfo &ti = expand(pair.index());
+    addParamInfo(recordedABIDetails, ti, pair.value().getConvention());
   }
   if (recordedABIDetails && FnType->hasSelfParam() && !hasSelfContext)
     recordedABIDetails->parameters.back().isSelf = true;
@@ -2005,7 +2032,7 @@ void SignatureExpansion::expandParameters(
 
     if (claimSelf())
       IGM.addSwiftSelfAttributes(Attrs, curLength);
-    expand(FnType->getSelfParameter());
+    expand(FnType->getSelfParameterIndex());
     if (recordedABIDetails)
       recordedABIDetails->hasTrailingSelfParam = true;
     assert(ParamIRTypes.size() == curLength + 1 &&
@@ -2250,8 +2277,8 @@ void SignatureExpansion::expandAsyncEntryType() {
     params = params.drop_back();
   }
 
-  for (auto param : params) {
-    expand(param);
+  for (unsigned i : range(params.size())) {
+    expand(i);
   }
 
   // Next, the generic signature.
@@ -2269,7 +2296,7 @@ void SignatureExpansion::expandAsyncEntryType() {
   if (hasSelfContext) {
     auto curLength = ParamIRTypes.size();
     (void)curLength;
-    expand(FnType->getSelfParameter());
+    expand(FnType->getSelfParameterIndex());
     assert(ParamIRTypes.size() == curLength + 1 &&
            "adding 'self' added unexpected number of parameters");
     if (claimSelf())
@@ -4996,6 +5023,8 @@ static void emitRetconCoroutineEntry(
   for (auto *arg : finalArguments) {
     arguments.push_back(arg);
   }
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, arguments);
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
@@ -5085,7 +5114,7 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
 void irgen::emitYieldOnceCoroutineEntry(
     IRGenFunction &IGF, CanSILFunctionType fnType,
     NativeCCEntryPointArgumentEmission &emission) {
-  // Use malloc and free as our allocator.
+  // Use free as our deallocator.
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
   auto *buffer = emission.getCoroutineBuffer();
   llvm::SmallVector<llvm::Value *, 2> finalArgs;
@@ -5093,15 +5122,19 @@ void irgen::emitYieldOnceCoroutineEntry(
   if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
-    allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocFn());
+    // Use swift_coroFrameAllocStub to emit our allocator.
+    allocFn = IGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(IGF.IGM));
   } else {
+    // Use malloc as our allocator.
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
   }
+
   emitRetconCoroutineEntry(IGF, fnType, buffer,
                            llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM), {},
                            allocFn, deallocFn, finalArgs);
+
 }
 
 void irgen::emitYieldManyCoroutineEntry(
@@ -5117,39 +5150,141 @@ void irgen::emitYieldManyCoroutineEntry(
                            allocFn, deallocFn, {});
 }
 
-static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
+static llvm::Constant *getCoroAllocFn(IRGenModule &IGM) {
+  auto isSwiftCoroCCAvailable = IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
   return IGM.getOrCreateHelperFunction(
-      "__swift_coro_alloc_", IGM.Int8PtrTy,
-      {IGM.CoroAllocatorPtrTy, IGM.SizeTy},
-      [](IRGenFunction &IGF) {
+      "_swift_coro_alloc", IGM.Int8PtrTy, {IGM.CoroAllocatorPtrTy, IGM.SizeTy},
+      [isSwiftCoroCCAvailable](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
         auto *allocator = parameters.claimNext();
         auto *size = parameters.claimNext();
-        auto *nullAllocator = IGF.Builder.CreateCmp(
-            llvm::CmpInst::Predicate::ICMP_EQ, allocator,
-            llvm::ConstantPointerNull::get(
-                cast<llvm::PointerType>(allocator->getType())));
-        auto *poplessReturn = IGF.createBasicBlock("coro.return.popless");
-        auto *normalReturn = IGF.createBasicBlock("coro.return.normal");
-        IGF.Builder.CreateCondBr(nullAllocator, poplessReturn, normalReturn);
-        IGF.Builder.emitBlock(poplessReturn);
-        // Emit the dynamic alloca.
-        auto *alloca =
-            IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int8Ty, size);
-        alloca->setAlignment(llvm::Align(MaximumAlignment));
-        auto *retPopless = IGF.Builder.CreateIntrinsic(
-            IGF.IGM.VoidTy, llvm::Intrinsic::ret_popless, {});
-        retPopless->setTailCallKind(llvm::CallInst::TailCallKind::TCK_MustTail);
-        IGF.Builder.CreateRet(alloca);
-        IGF.Builder.emitBlock(normalReturn);
-        auto *call = IGF.Builder.CreateCall(
-            IGF.IGM.getCoroAllocFunctionPointer(), {allocator, size});
+        if (isSwiftCoroCCAvailable) {
+          // swiftcorocc is available, so if there's no allocator pointer,
+          // allocate storage on the stack and return a pointer to it without
+          // popping the stack.
+          auto *nullAllocator = IGF.Builder.CreateCmp(
+              llvm::CmpInst::Predicate::ICMP_EQ, allocator,
+              llvm::ConstantPointerNull::get(
+                  cast<llvm::PointerType>(allocator->getType())));
+          auto *poplessReturn = IGF.createBasicBlock("popless");
+          auto *normalReturn = IGF.createBasicBlock("normal");
+          IGF.Builder.CreateCondBr(nullAllocator, poplessReturn, normalReturn);
+          IGF.Builder.emitBlock(poplessReturn);
+          // Emit the dynamic alloca.
+          auto *alloca =
+              IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int8Ty, size);
+          alloca->setAlignment(llvm::Align(MaximumAlignment));
+          auto *retPopless = IGF.Builder.CreateIntrinsic(
+              IGF.IGM.VoidTy, llvm::Intrinsic::ret_popless, {});
+          retPopless->setTailCallKind(
+              llvm::CallInst::TailCallKind::TCK_MustTail);
+          IGF.Builder.CreateRet(alloca);
+          // Start emitting the "normal" block.
+          IGF.Builder.emitBlock(normalReturn);
+        }
+        auto *calleePtr = IGF.Builder.CreateInBoundsGEP(
+            IGF.IGM.CoroAllocatorTy, allocator,
+            {llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+             llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)});
+        auto *callee = IGF.Builder.CreateLoad(
+            Address(calleePtr, IGF.IGM.CoroAllocateFnTy->getPointerTo(),
+                    IGF.IGM.getPointerAlignment()),
+            "allocate_fn");
+        auto fnPtr = FunctionPointer::createUnsigned(
+            FunctionPointer::Kind::Function, callee,
+            Signature(cast<llvm::FunctionType>(IGF.IGM.CoroAllocateFnTy), {},
+                      IGF.IGM.SwiftCC));
+        auto *call = IGF.Builder.CreateCall(fnPtr, {size});
+        call->setDoesNotThrow();
+        call->setCallingConv(IGF.IGM.SwiftCC);
         IGF.Builder.CreateRet(call);
       },
-      /*setIsNoInline=*/false,
+      /*setIsNoInline=*/true,
       /*forPrologue=*/false,
       /*isPerformanceConstraint=*/false,
-      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
+      /*optionalLinkageOverride=*/nullptr, IGM.SwiftCoroCC,
+      /*transformAttributes=*/
+      [&IGM](llvm::AttributeList &attrs) {
+        IGM.addSwiftCoroAttributes(attrs, 0);
+      });
+}
+
+static llvm::Constant *getCoroDeallocFn(IRGenModule &IGM) {
+  auto isSwiftCoroCCAvailable = IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
+  return IGM.getOrCreateHelperFunction(
+      "_swift_coro_dealloc", IGM.VoidTy,
+      {IGM.CoroAllocatorPtrTy, IGM.Int8PtrTy},
+      [isSwiftCoroCCAvailable](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *allocator = parameters.claimNext();
+        auto *ptr = parameters.claimNext();
+        if (isSwiftCoroCCAvailable) {
+          // swiftcorocc is available, so if there's no allocator pointer,
+          // storage was allocated on the stack which will be naturally cleaned
+          // up when the coroutine's frame is "freed".
+          auto *nullAllocator = IGF.Builder.CreateCmp(
+              llvm::CmpInst::Predicate::ICMP_EQ, allocator,
+              llvm::ConstantPointerNull::get(
+                  cast<llvm::PointerType>(allocator->getType())));
+          auto *bailBlock = IGF.createBasicBlock("null_allocator");
+          auto *normalBlock = IGF.createBasicBlock("nonnull_allocator");
+          IGF.Builder.CreateCondBr(nullAllocator, bailBlock, normalBlock);
+          IGF.Builder.emitBlock(bailBlock);
+          // Nothing to do here.
+          IGF.Builder.CreateRetVoid();
+          // Start emitting the "normal" block.
+          IGF.Builder.emitBlock(normalBlock);
+        }
+        auto shouldDeallocateImmediatelyFlag = CoroAllocatorFlags(0);
+        shouldDeallocateImmediatelyFlag.setShouldDeallocateImmediately(true);
+        auto *flagsPtr = IGF.Builder.CreateInBoundsGEP(
+            IGF.IGM.CoroAllocatorTy, allocator,
+            {llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+             llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0)});
+        auto *flags = IGF.Builder.CreateLoad(
+            Address(flagsPtr, IGF.IGM.Int32Ty, Alignment(4)), "");
+        auto *deallocDeferringAllocator = IGF.Builder.CreateAnd(
+            flags,
+            llvm::APInt(IGF.IGM.Int32Ty->getBitWidth(),
+                        shouldDeallocateImmediatelyFlag.getOpaqueValue()));
+        auto *isDeallocDeferringAllocator = IGF.Builder.CreateICmpNE(
+            deallocDeferringAllocator,
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+        auto *deferringAllocatorBlock =
+            IGF.createBasicBlock("deferring_allocator");
+        auto *normalBlock = IGF.createBasicBlock("normal");
+        IGF.Builder.CreateCondBr(isDeallocDeferringAllocator,
+                                 deferringAllocatorBlock, normalBlock);
+        IGF.Builder.emitBlock(deferringAllocatorBlock);
+        // Nothing to do here.
+        IGF.Builder.CreateRetVoid();
+        // Start emitting the "normal" block.
+        IGF.Builder.emitBlock(normalBlock);
+        auto *calleePtr = IGF.Builder.CreateInBoundsGEP(
+            IGF.IGM.CoroAllocatorTy, allocator,
+            {llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+             llvm::ConstantInt::get(IGF.IGM.Int32Ty, 2)});
+        auto *callee = IGF.Builder.CreateLoad(
+            Address(calleePtr, IGF.IGM.CoroDeallocateFnTy->getPointerTo(),
+                    IGF.IGM.getPointerAlignment()),
+            "deallocate_fn");
+        auto fnPtr = FunctionPointer::createUnsigned(
+            FunctionPointer::Kind::Function, callee,
+            Signature(cast<llvm::FunctionType>(IGF.IGM.CoroDeallocateFnTy), {},
+                      IGF.IGM.SwiftCC));
+        auto *call = IGF.Builder.CreateCall(fnPtr, {ptr});
+        call->setDoesNotThrow();
+        call->setCallingConv(IGF.IGM.SwiftCC);
+        IGF.Builder.CreateRetVoid();
+      },
+      /*setIsNoInline=*/true,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, IGM.SwiftCoroCC,
+      /*transformAttributes=*/
+      [&IGM](llvm::AttributeList &attrs) {
+        IGM.addSwiftCoroAttributes(attrs, 0);
+      });
 }
 
 void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
@@ -5158,12 +5293,8 @@ void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
                                          llvm::Value *allocator,
                                          llvm::GlobalVariable *cfp) {
   IGF.setCoroutineAllocator(allocator);
-  auto isSwiftCoroCCAvailable =
-      IGF.IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
-  auto allocFn = IGF.IGM.getOpaquePtr(isSwiftCoroCCAvailable
-                                          ? getCoroAllocWrapperFn(IGF.IGM)
-                                          : IGF.IGM.getCoroAllocFn());
-  auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroDeallocFn());
+  auto allocFn = IGF.IGM.getOpaquePtr(getCoroAllocFn(IGF.IGM));
+  auto deallocFn = IGF.IGM.getOpaquePtr(getCoroDeallocFn(IGF.IGM));
   emitRetconCoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
       Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),
@@ -5197,18 +5328,85 @@ Address irgen::emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF) {
   return createOpaqueBufferAlloca(IGF, getYieldManyCoroutineBufferSize(IGF.IGM),
                                  getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
+
+static llvm::Constant *getAddrOfSwiftCCMalloc(IRGenModule &IGM) {
+  auto mallocFnPtr = IGM.getMallocFunctionPointer();
+  auto sig = mallocFnPtr.getSignature();
+  if (sig.getCallingConv() == IGM.SwiftCC) {
+    return IGM.getMallocFn();
+  }
+  return IGM.getOrCreateHelperFunction(
+      "_swift_malloc", sig.getType()->getReturnType(), sig.getType()->params(),
+      [](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *size = parameters.claimNext();
+        auto malloc = IGF.IGM.getMallocFunctionPointer();
+        auto *call = IGF.Builder.CreateCall(malloc, {size});
+        IGF.Builder.CreateRet(call);
+      });
+}
+
+static llvm::Constant *getAddrOfSwiftCCFree(IRGenModule &IGM) {
+  auto freeFnPtr = IGM.getFreeFunctionPointer();
+  auto sig = freeFnPtr.getSignature();
+  if (sig.getCallingConv() == IGM.SwiftCC) {
+    return IGM.getFreeFn();
+  }
+  return IGM.getOrCreateHelperFunction(
+      "_swift_free", sig.getType()->getReturnType(), sig.getType()->params(),
+      [](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *ptr = parameters.claimNext();
+        auto free = IGF.IGM.getFreeFunctionPointer();
+        IGF.Builder.CreateCall(free, {ptr});
+        IGF.Builder.CreateRetVoid();
+      });
+}
+
+static llvm::Constant *getAddrOfGlobalCoroAllocator(
+    IRGenModule &IGM, CoroAllocatorKind kind, bool shouldDeallocateImmediately,
+    llvm::Constant *allocFn, llvm::Constant *deallocFn) {
+  auto entity = LinkEntity::forCoroAllocator(kind);
+  auto taskAllocator = IGM.getOrCreateLazyGlobalVariable(
+      entity,
+      [&](ConstantInitBuilder &builder) -> ConstantInitFuture {
+        auto allocator = builder.beginStruct(IGM.CoroAllocatorTy);
+        auto flags = CoroAllocatorFlags(kind);
+        flags.setShouldDeallocateImmediately(shouldDeallocateImmediately);
+        allocator.addInt32(flags.getOpaqueValue());
+        allocator.add(allocFn);
+        allocator.add(deallocFn);
+        return allocator.finishAndCreateFuture();
+      },
+      [&](llvm::GlobalVariable *var) { var->setConstant(true); });
+  return taskAllocator;
+}
+llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
+  return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Malloc,
+                                      /*shouldDeallocateImmediately=*/true,
+                                      getAddrOfSwiftCCMalloc(*this),
+                                      getAddrOfSwiftCCFree(*this));
+}
+llvm::Constant *IRGenModule::getAddrOfGlobalCoroAsyncTaskAllocator() {
+  return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Async,
+                                      /*shouldDeallocateImmediately=*/false,
+                                      getTaskAllocFn(), getTaskDeallocFn());
+}
 llvm::Value *
 irgen::emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
                                         std::optional<CoroAllocatorKind> kind) {
   if (!kind) {
     return IGF.getCoroutineAllocator();
   }
-  CoroAllocatorFlags flags(*kind);
-  auto *flagsValue = llvm::ConstantInt::get(IGF.IGM.CoroAllocatorFlagsTy,
-                                            flags.getOpaqueValue());
-
-  return IGF.Builder.CreateCall(
-      IGF.IGM.getCoroGetGlobalAllocatorFunctionPointer(), {flagsValue});
+  switch (*kind) {
+  case CoroAllocatorKind::Stack:
+    return llvm::ConstantPointerNull::get(IGF.IGM.CoroAllocatorPtrTy);
+  case CoroAllocatorKind::Async:
+    return IGF.IGM.getAddrOfGlobalCoroAsyncTaskAllocator();
+  case CoroAllocatorKind::Malloc:
+    return IGF.IGM.getAddrOfGlobalCoroMallocAllocator();
+  }
+  llvm_unreachable("unhandled case");
 }
 StackAddress irgen::emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
                                                       llvm::Value *size) {
@@ -6653,10 +6851,12 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
       if (combinedTy->isVoidTy()) {
         assert(result.empty() && "Unexpected result values");
       } else {
+        Explosion native = nativeSchema.mapIntoNative(
+            IGM, IGF, result, funcResultTypeInContext, /*isOutlined*/ false);
         if (auto *structTy = dyn_cast<llvm::StructType>(combinedTy)) {
           llvm::Value *nativeAgg = llvm::UndefValue::get(structTy);
-          for (unsigned i = 0, e = result.size(); i < e; ++i) {
-            llvm::Value *elt = result.claimNext();
+          for (unsigned i = 0, e = native.size(); i < e; ++i) {
+            llvm::Value *elt = native.claimNext();
             auto *nativeTy = structTy->getElementType(i);
             elt = convertForDirectError(IGF, elt, nativeTy,
                                         /*forExtraction*/ false);
@@ -6667,9 +6867,9 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
           while (!out.empty()) {
             nativeResultsStorage.push_back(out.claimNext());
           }
-        } else if (!result.empty()) {
+        } else if (!native.empty()) {
           auto *converted = convertForDirectError(
-              IGF, result.claimNext(), combinedTy, /*forExtraction*/ false);
+              IGF, native.claimNext(), combinedTy, /*forExtraction*/ false);
           nativeResultsStorage.push_back(converted);
         } else {
           nativeResultsStorage.push_back(llvm::UndefValue::get(combinedTy));

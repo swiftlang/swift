@@ -1108,8 +1108,8 @@ static ValueDecl *getIsOptionalOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getIsSameMetatypeOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_existentialMetatype(_any),
-                                        _existentialMetatype(_any)),
+                            _parameters(_existentialMetatype(_unconstrainedAny),
+                                        _existentialMetatype(_unconstrainedAny)),
                             _int(1));
 }
 
@@ -1992,6 +1992,26 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
 
   Type ArgElts[] = { VecTy, ElementTy, IndexTy };
   return getBuiltinFunction(Id, ArgElts, VecTy);
+}
+
+static ValueDecl *getSelectOperation(ASTContext &Context, Identifier Id,
+                                     Type PredTy, Type ValueTy) {
+  // Check for (NxInt1, NxTy, NxTy) -> NxTy
+  auto VecPredTy = PredTy->getAs<BuiltinVectorType>();
+  if (VecPredTy) {
+    // ValueTy must also be vector type with matching element count.
+    auto VecValueTy = ValueTy->getAs<BuiltinVectorType>();
+    if (!VecValueTy ||
+        VecPredTy->getNumElements() != VecValueTy->getNumElements())
+      return nullptr;
+  } else {
+    // Type is (Int1, Ty, Ty) -> Ty
+    auto IntTy = PredTy->getAs<BuiltinIntegerType>();
+    if (!IntTy || !IntTy->isFixedWidth() || IntTy->getFixedWidth() != 1)
+      return nullptr;
+  }
+  Type ArgElts[] = { PredTy, ValueTy, ValueTy };
+  return getBuiltinFunction(Id, ArgElts, ValueTy);
 }
 
 static ValueDecl *getShuffleVectorOperation(ASTContext &Context, Identifier Id,
@@ -3112,6 +3132,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getUnreachableOperation(Context, Id);
       
   case BuiltinValueKind::ZeroInitializer:
+  case BuiltinValueKind::PrepareInitialization:
     return getZeroInitializerOperation(Context, Id);
       
   case BuiltinValueKind::Once:
@@ -3132,6 +3153,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InsertElement:
     if (Types.size() != 3) return nullptr;
     return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
+    
+  case BuiltinValueKind::Select:
+    if (Types.size() != 2) return nullptr;
+    return getSelectOperation(Context, Id, Types[0], Types[1]);
       
   case BuiltinValueKind::ShuffleVector:
     if (Types.size() != 2) return nullptr;

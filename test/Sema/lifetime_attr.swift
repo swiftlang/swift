@@ -3,16 +3,16 @@
 // REQUIRES: swift_feature_LifetimeDependence
 
 struct NE : ~Escapable {
-  @lifetime(self) // expected-error{{invalid lifetime dependence on self in an initializer}}
+  @lifetime(copy self) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
   init() {}
 }
 
-@lifetime(nonexisting) // expected-error{{invalid parameter name specified 'nonexisting'}}
+@lifetime(copy nonexisting) // expected-error{{invalid parameter name specified 'nonexisting'}}
 func invalidAttrOnNonExistingParam(_ ne: NE) -> NE {
   ne
 }
 
-@lifetime(self) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+@lifetime(copy self) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
 func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
@@ -22,7 +22,7 @@ func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
   ne
 }
 
-@lifetime(ne, ne) // expected-error{{duplicate lifetime dependence specifier}}
+@lifetime(copy ne, borrow ne) // expected-error{{duplicate lifetime dependence specifier}}
 func invalidDuplicateLifetimeDependence1(_ ne: borrowing NE) -> NE {
   ne
 }
@@ -34,8 +34,8 @@ func invalidDependence(_ x: consuming Klass) -> NE {
   NE()
 }
 
-@lifetime(result: source) 
-@lifetime(result: source) // TODO: display error here
+@lifetime(result: copy source) 
+@lifetime(result: borrow source) // TODO: display error here
 func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-error{{invalid duplicate target lifetime dependencies on function}}
   result = source
 }
@@ -44,3 +44,28 @@ func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-err
 func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
   NE()
 }
+
+do {
+  struct Test: ~Escapable {
+    var v1: Int
+    var v2: NE
+  }
+
+  _ = \Test.v1 // expected-error {{key path cannot refer to nonescapable type 'Test'}}
+  _ = \Test.v2 // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+
+  func use(t: Test) {
+    t[keyPath: \.v1] // expected-error {{key path cannot refer to nonescapable type 'Test'}}
+    t[keyPath: \.v2] // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+  }
+}
+
+// rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
+@lifetime(span: borrow holder)
+func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter must be 'inout'}}
+
+@lifetime(&ne)
+func inoutLifetimeDependence(_ ne: inout NE) -> NE {
+  ne
+}
+

@@ -108,14 +108,11 @@ std::optional<bool> forEachModuleSearchPath(
             callback(path.Path, ModuleSearchPathKind::Framework, path.IsSystem))
       return result;
 
-  // Apple platforms have extra implicit framework search paths:
-  // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  if (Ctx.LangOpts.Target.isOSDarwin()) {
-    for (const auto &path : Ctx.getDarwinImplicitFrameworkSearchPaths())
-      if (auto result =
-              callback(path, ModuleSearchPathKind::DarwinImplicitFramework,
-                       /*isSystem=*/true))
-        return result;
+  for (const auto &path :
+       Ctx.SearchPathOpts.getImplicitFrameworkSearchPaths()) {
+    if (auto result = callback(path, ModuleSearchPathKind::ImplicitFramework,
+                               /*isSystem=*/true))
+      return result;
   }
 
   for (const auto &importPath :
@@ -240,7 +237,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       return std::nullopt;
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplicitFramework: {
+    case ModuleSearchPathKind::ImplicitFramework: {
       // Look for:
       // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
       forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
@@ -964,7 +961,7 @@ bool SerializedModuleLoaderBase::findModule(
       continue;
     }
     case ModuleSearchPathKind::Framework:
-    case ModuleSearchPathKind::DarwinImplicitFramework: {
+    case ModuleSearchPathKind::ImplicitFramework: {
       isFramework = true;
       llvm::sys::path::append(currPath, moduleName + ".framework");
 
@@ -1100,8 +1097,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }
-    if (loadedModuleFile->supportsExtensibleEnums())
-      M.setSupportsExtensibleEnums();
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     M.setSwiftInterfaceCompilerVersion(
         loadedModuleFile->getSwiftInterfaceCompilerVersion());
@@ -1788,10 +1783,11 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     Ctx.removeLoadedModule(moduleID.Item);
     return nullptr;
   }
-  // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
-  // from .swift_ast sections are never produced from textual interfaces. By
-  // disabling resilience the debugger can directly access private members.
-  if (BypassResilience)
+  // The MemoryBuffer loader is used by LLDB during debugging. Modules
+  // imported from .swift_ast sections are not typically produced from
+  // textual interfaces. By disabling resilience, the debugger can
+  // directly access private members.
+  if (BypassResilience && !M->isBuiltFromInterface())
     M->setBypassResilience();
 
   return M;

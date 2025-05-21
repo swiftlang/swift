@@ -44,7 +44,13 @@ extension Context {
     }
   }
 
+  var currentModuleContext: ModuleDecl {
+    _bridged.getCurrentModuleContext().getAs(ModuleDecl.self)
+  }
+
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
+
+  var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
 
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
@@ -134,7 +140,10 @@ extension MutatingContext {
     return _bridged.createBlockAfter(block.bridged).block
   }
 
-  func erase(instruction: Instruction) {
+  /// Removes and deletes `instruction`.
+  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
+  /// kind of instructions.
+  func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
     if !instruction.isInStaticInitializer {
       verifyIsTransforming(function: instruction.parentFunction)
     }
@@ -146,7 +155,7 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
 
-    _bridged.eraseInstruction(instruction.bridged)
+    _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
   func erase(instructionIncludingAllUsers inst: Instruction) {
@@ -158,7 +167,9 @@ extension MutatingContext {
         erase(instructionIncludingAllUsers: use.instruction)
       }
     }
-    erase(instruction: inst)
+    // We rely that after deleting the instruction its operands have no users.
+    // Therefore `salvageDebugInfo` must be turned off because we cannot insert debug_value instructions.
+    erase(instruction: inst, salvageDebugInfo: false)
   }
 
   func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
@@ -318,6 +329,10 @@ struct FunctionPassContext : MutatingContext {
 
   var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
+  }
+
+  var swiftMutableSpan: NominalTypeDecl {
+    _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
@@ -747,6 +762,20 @@ extension PointerToAddressInst {
   }
 }
 
+extension CopyAddrInst {
+  func set(isTakeOfSource: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsTakeOfSrc(isTakeOfSource)
+    context.notifyInstructionChanged(self)
+  }
+
+  func set(isInitializationOfDestination: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsInitializationOfDest(isInitializationOfDestination)
+    context.notifyInstructionChanged(self)
+  }
+}
+
 extension TermInst {
   func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyBranchesChanged()
@@ -789,5 +818,11 @@ extension Function {
   func appendNewBlock(_ context: FunctionPassContext) -> BasicBlock {
     context.notifyBranchesChanged()
     return context._bridged.appendBlock(bridged).block
+  }
+}
+
+extension DeclRef {
+  func calleesAreStaticallyKnowable(_ context: some Context) -> Bool {
+    context._bridged.calleesAreStaticallyKnowable(bridged)
   }
 }

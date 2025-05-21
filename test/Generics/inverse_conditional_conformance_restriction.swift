@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift \ 
+// RUN:   -enable-experimental-feature LifetimeDependence  \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes
 
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 protocol P {}

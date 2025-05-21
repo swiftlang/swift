@@ -155,7 +155,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
   }();
 
   // FIXME: Avoid loading and checking the expected executor if concurrency is
-  // unavailable. This is specifically relevant for MainActor isolated contexts,
+  // unavailable. This is specifically relevant for MainActor-isolated contexts,
   // which are allowed to be available on OSes where concurrency is not
   // available. rdar://106827064
 
@@ -206,8 +206,12 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
+      break;
+
+    case ActorIsolation::CallerIsolationInheriting:
+      assert(F.isAsync());
+      setExpectedExecutorForParameterIsolation(*this, actorIsolation);
       break;
 
     case ActorIsolation::Erased:
@@ -398,7 +402,7 @@ emitDistributedActorIsolation(SILGenFunction &SGF, SILLocation loc,
   // Doing this manually is ill-advised in general, but this is such a
   // simple case that it's okay.
   auto distributedActorConf = getDistributedActorConformance(SGF, actorType);
-  auto sig = distributedActorConf.getRequirement()->getGenericSignature();
+  auto sig = distributedActorConf.getProtocol()->getGenericSignature();
   auto distributedActorSubs = SubstitutionMap::get(sig, {actorType},
                                                    {distributedActorConf});
 
@@ -524,7 +528,7 @@ SILGenFunction::emitFlowSensitiveSelfIsolation(SILLocation loc,
   SGM.useConformance(conformance);
 
   SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getRequirement(), actorType, conformance);
+      conformance.getProtocol(), actorType, conformance);
   auto origActor =
     maybeEmitValueOfLocalVarDecl(isolatedVar, AccessKind::Read).getValue();
   SILType resultTy = SILType::getOpaqueIsolationType(ctx);

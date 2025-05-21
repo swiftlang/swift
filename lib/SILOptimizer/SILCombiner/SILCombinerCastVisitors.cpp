@@ -145,7 +145,7 @@ public:
     if (!hasOneNonDebugUse(next))
       return false;
 
-    assert(rest.empty() || getSingleNonDebugUser(rest.back()) == next);
+    assert(rest.empty() || getSingleNonDebugUser(next) == rest.back());
     rest.push_back(next);
     return true;
   }
@@ -216,23 +216,6 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
     }
   }
 
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
-  // These are always safe to perform due to interior pointer ownership
-  // requirements being transitive along addresses.
-
-  Builder.setCurrentDebugScope(UADCI->getDebugScope());
-
-  // (unchecked_addr_cast (unchecked_addr_cast x X->Y) Y->Z)
-  //   ->
-  // (unchecked_addr_cast x X->Z)
-  if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
-    return Builder.createUncheckedAddrCast(UADCI->getLoc(),
-                                           OtherUADCI->getOperand(),
-                                           UADCI->getType());
   return nullptr;
 }
 
@@ -790,7 +773,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   //
   // This unblocks the `thin_to_thick_function` peephole optimization below.
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(Cvt->getOperand())) {
-    if (CFI->getSingleUse()) {
+    if (hasOneNonDebugUse(CFI)) {
       if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getOperand())) {
         if (TTTFI->getSingleUse()) {
           auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
@@ -836,7 +819,7 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   // %vjp' = convert_escape_to_noescape %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
   if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(Cvt->getOperand())) {
-    if (DFI->hasOneUse()) {
+    if (hasOneNonDebugUse(DFI)) {
       auto createConvertEscapeToNoEscape =
         [&](NormalDifferentiableFunctionTypeComponent extractee) {
           if (!DFI->hasExtractee(extractee))
@@ -1020,9 +1003,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // %vjp' = convert_function %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
   if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(cfi->getOperand())) {
-    // Workaround for a problem with OSSA: https://github.com/swiftlang/swift/issues/78848
-    // TODO: remove this if-statement once the underlying problem is fixed.
-    if (cfi->getFunction()->hasOwnership())
+    if (!hasOneNonDebugUse(DFI))
       return nullptr;
 
     auto createConvertFunctionOfComponent =

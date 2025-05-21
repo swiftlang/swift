@@ -5,30 +5,6 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
-@_unsafeNonescapableResult
-@lifetime(borrow source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, borrowing source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
-@_unsafeNonescapableResult
-@lifetime(source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, copying source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
 // TODO: Use real Range
 public struct FakeRange<Bound> {
   public let lowerBound: Bound
@@ -83,7 +59,7 @@ public struct Span<Element> : ~Escapable {
   public let count: Int
   private var baseAddress: UnsafeRawPointer { start._rawValue }
 // CHECK-LABEL: sil @$s025lifetime_dependence_span_A5_attr4SpanV11baseAddress5count9dependsOnACyxGSV_Siqd__htcRi_d__Ri0_d__lufC : $@convention(method) <Element><Owner where Owner : ~Copyable, Owner : ~Escapable> (UnsafeRawPointer, Int, @in_guaranteed Owner, @thin Span<Element>.Type) -> @lifetime(copy 2) @owned Span<Element> {
-  @lifetime(owner)
+  @lifetime(copy owner)
   public init<Owner: ~Copyable & ~Escapable>(
       baseAddress: UnsafeRawPointer,
       count: Int,
@@ -94,7 +70,7 @@ public struct Span<Element> : ~Escapable {
       )
   }
 // CHECK-LABEL: sil hidden @$s025lifetime_dependence_span_A5_attr4SpanV5start5count9dependsOnACyxGAA0E5IndexVyxG_Siqd__htcRi_d__Ri0_d__lufC : $@convention(method) <Element><Owner where Owner : ~Copyable, Owner : ~Escapable> (SpanIndex<Element>, Int, @in_guaranteed Owner, @thin Span<Element>.Type) -> @lifetime(copy 2) @owned Span<Element> {
-  @lifetime(owner)
+  @lifetime(copy owner)
   init<Owner: ~Copyable & ~Escapable>(
     start index: SpanIndex<Element>,
     count: Int,
@@ -150,7 +126,7 @@ extension Span {
  
 // CHECK-LABEL: sil @$s025lifetime_dependence_span_A5_attr4SpanVyACyxGAA9FakeRangeVyAA0E5IndexVyxGGcig : $@convention(method) <Element> (FakeRange<SpanIndex<Element>>, @guaranteed Span<Element>) -> @lifetime(copy 1) @owned Span<Element> {
   public subscript(bounds: FakeRange<SpanIndex<Element>>) -> Self {
-  @lifetime(self)
+  @lifetime(copy self)
     get {
       let span = Span(
         start: bounds.lowerBound,
@@ -161,7 +137,7 @@ extension Span {
   }
 
 // CHECK-LABEL: sil @$s025lifetime_dependence_span_A5_attr4SpanV6prefix4upToACyxGAA0E5IndexVyxG_tF : $@convention(method) <Element> (SpanIndex<Element>, @guaranteed Span<Element>) -> @lifetime(copy 1) @owned Span<Element> {
-  @lifetime(self)
+  @lifetime(copy self)
   borrowing public func prefix(upTo index: SpanIndex<Element>) -> Self {
     index == startIndex
     ? Self(start: start, count: 0, dependsOn: copy self)
@@ -169,14 +145,14 @@ extension Span {
   }
 
 // CHECK-LABEL: sil @$s025lifetime_dependence_span_A5_attr4SpanV6prefix7throughACyxGAA0E5IndexVyxG_tF : $@convention(method) <Element> (SpanIndex<Element>, @guaranteed Span<Element>) -> @lifetime(copy 1) @owned Span<Element> {
-  @lifetime(self)
+  @lifetime(copy self)
   borrowing public func prefix(through index: Index) -> Self {
     let nc = distance(from: startIndex, to: index) &+ 1
     return Self(start: start, count: nc, dependsOn: copy self)
   }
 
 // CHECK-LABEL: sil @$s025lifetime_dependence_span_A5_attr4SpanV6prefixyACyxGSiF : $@convention(method) <Element> (Int, @owned Span<Element>) -> @lifetime(copy 1) @owned Span<Element> {
-  @lifetime(self)
+  @lifetime(copy self)
   consuming public func prefix(_ maxLength: Int) -> Self {
     precondition(maxLength >= 0, "Can't have a prefix of negative length.")
     let nc = maxLength < count ? maxLength : count

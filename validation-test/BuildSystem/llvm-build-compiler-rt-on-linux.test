@@ -1,0 +1,17 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=linux-gnu
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes --cmake %cmake  2>&1 | %FileCheck --check-prefix=LINUX %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=1 --cmake %cmake  2>&1 | %FileCheck --check-prefix=LINUX %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=LINUX %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-build-compiler-rt-with-use-runtimes=0 --cmake %cmake  2>&1 | %FileCheck --check-prefix=LINUX %s
+
+# LINUX: Building llvm
+# LINUX-DAG: cmake -G Ninja
+# LINUX-SAME: -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR{{[^ ]*}}=OFF
+# LINUX-SAME: -DSANITIZER_COMMON_LINK_FLAGS{{[^ ]*}}=-Wl,-z,undefs
+# LINUX-SAME: llvm

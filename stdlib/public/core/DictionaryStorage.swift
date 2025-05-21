@@ -232,12 +232,14 @@ extension __RawDictionaryStorage {
     return unsafe keys[bucket.offset]
   }
 
+  @safe
   @_alwaysEmitIntoClient
   @inline(never)
   internal final func find<Key: Hashable>(_ key: Key) -> (bucket: _HashTable.Bucket, found: Bool) {
     return unsafe find(key, hashValue: key._rawHashValue(seed: _seed))
   }
 
+  @safe
   @_alwaysEmitIntoClient
   @inline(never)
   internal final func find<Key: Hashable>(_ key: Key, hashValue: Int) -> (bucket: _HashTable.Bucket, found: Bool) {
@@ -245,11 +247,11 @@ extension __RawDictionaryStorage {
       var bucket = unsafe hashTable.idealBucket(forHashValue: hashValue)
       while unsafe hashTable._isOccupied(bucket) {
         if unsafe uncheckedKey(at: bucket) == key {
-          return unsafe (bucket, true)
+          return (bucket, true)
         }
         unsafe bucket = unsafe hashTable.bucket(wrappedAfter: bucket)
       }
-      return unsafe (bucket, false)
+      return (bucket, false)
   }
 }
 
@@ -298,7 +300,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   }
 
   internal var asNative: _NativeDictionary<Key, Value> {
-    return _NativeDictionary(self)
+    return unsafe _NativeDictionary(self)
   }
 
 #if _runtime(_ObjC)
@@ -356,7 +358,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
       "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
-      if unsafe bucket == endBucket { break }
+      if bucket == endBucket { break }
 
       let key = unsafe _keys[bucket.offset]
       unsafe unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
@@ -477,7 +479,7 @@ extension _DictionaryStorage {
       bucketCount._builtinWordValue, Value.self)
 
     let metadataAddr = unsafe Builtin.projectTailElems(storage, _HashTable.Word.self)
-    let keysAddr = unsafe Builtin.getTailAddr_Word(
+    let keysAddr = Builtin.getTailAddr_Word(
       metadataAddr, wordCount._builtinWordValue, _HashTable.Word.self,
       Key.self)
     let valuesAddr = Builtin.getTailAddr_Word(

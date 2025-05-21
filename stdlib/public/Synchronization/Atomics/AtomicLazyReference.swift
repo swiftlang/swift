@@ -25,7 +25,7 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @inlinable
   public init() {
-    storage = unsafe Atomic<Unmanaged<Instance>?>(nil)
+    unsafe storage = Atomic<Unmanaged<Instance>?>(nil)
   }
 
   @inlinable

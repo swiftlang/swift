@@ -102,6 +102,9 @@ typedef struct {
   /// Clang module dependencies
   swiftscan_string_set_t *swift_overlay_module_dependencies;
 
+  /// Directly-imported in source module dependencies
+  swiftscan_string_set_t *source_import_module_dependencies;
+
   /// Options to the compile command required to build this module interface
   swiftscan_string_set_t *command_line;
 

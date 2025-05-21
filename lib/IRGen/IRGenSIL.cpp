@@ -420,9 +420,6 @@ public:
 
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   
-  // Destination basic blocks for condfail traps.
-  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
-
   SILFunction *CurSILFn;
   // If valid, the address by means of which a return--which is direct in
   // SIL--is passed indirectly in IR.  Such indirection is necessary when the
@@ -1158,18 +1155,50 @@ public:
           }
 
           emitTypeMetadataRef(archetype);
-        } else if (auto packArchetype = dyn_cast<PackArchetypeType>(t)) {
-          emitTypeMetadataRef(packArchetype);
-        } else if (auto packtype = dyn_cast<SILPackType>(t)) {
+        } else if (auto packType = dyn_cast<SILPackType>(t)) {
           llvm::Value *Shape = emitPackShapeExpression(t);
           emitPackCountDebugVariable(Shape);
-        } else if (auto packtype = dyn_cast<PackType>(t)) {
+        } else if (auto packType = dyn_cast<PackType>(t)) {
           llvm::Value *Shape = emitPackShapeExpression(t);
           emitPackCountDebugVariable(Shape);
         }
       });
+
+    if (auto *BGT = llvm::dyn_cast<BoundGenericType>(Ty)) {
+      auto Decl = BGT->getDecl();
+      auto GE = Decl->getGenericEnvironment();
+      auto Requirements = BGT->getDecl()
+                              ->getGenericEnvironment()
+                              ->getGenericSignature()
+                              .getRequirements();
+      for (auto Requirement : Requirements) {
+        if (Requirement.getKind() == RequirementKind::Conformance) {
+          auto ProtocolDecl = Requirement.getProtocolDecl();
+          auto ConformingType = Requirement.getFirstType();
+          Type Archetype;
+          if (auto GTPT = llvm::dyn_cast<GenericTypeParamType>(
+                  ConformingType.getPointer()))
+            Archetype = GE->mapTypeIntoContext(GTPT);
+          else if (auto DMT = llvm::dyn_cast<DependentMemberType>(
+                       ConformingType.getPointer()))
+            Archetype = GE->mapTypeIntoContext(DMT);
+
+          if (Lowering::TypeConverter::protocolRequiresWitnessTable(
+                  ProtocolDecl) &&
+              tryGetLocalTypeData(
+                  Archetype->getCanonicalType(),
+                  LocalTypeDataKind::forAbstractProtocolWitnessTable(
+                      ProtocolDecl))) {
+            auto Conformance =
+                ProtocolConformanceRef::forAbstract(Archetype, ProtocolDecl);
+
+            emitWitnessTableRef(*this, Archetype->getCanonicalType(),
+                                Conformance);
+          }
+        }
+      }
+    }
   }
-  
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
   void emitDebugVariableDeclaration(
@@ -1192,27 +1221,24 @@ public:
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
-  void emitFailBB() {
-    if (!FailBBs.empty()) {
-      // Move the trap basic blocks to the end of the function.
-      for (auto *FailBB : FailBBs) {
-        CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
-      }
-    }
-  }
-
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
 
-  void visitSILBasicBlock(SILBasicBlock *BB);
+  bool shouldUseDispatchThunk(SILDeclRef method);
 
+  void visitSILBasicBlock(SILBasicBlock *BB);
   void emitErrorResultVar(CanSILFunctionType FnTy,
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
   void emitPoisonDebugValueInst(DebugValueInst *i);
-  void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
-                                  llvm::Value *addr);
+  void emitDebugInfoBeforeAllocStack(AllocStackInst *i,
+                                     const TypeInfo &type,
+                                     DebugTypeInfo &DbgTy);
+  void emitDebugInfoAfterAllocStack(AllocStackInst *i,
+                                    const TypeInfo &type,
+                                    const DebugTypeInfo &DbgTy,
+                                    llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocPackInst(AllocPackInst *i);
   void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
@@ -1351,6 +1377,7 @@ public:
   void visitTupleElementAddrInst(TupleElementAddrInst *i);
   void visitStructExtractInst(StructExtractInst *i);
   void visitStructElementAddrInst(StructElementAddrInst *i);
+  void visitVectorBaseAddrInst(VectorBaseAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
   void visitRefTailAddrInst(RefTailAddrInst *i);
 
@@ -1427,6 +1454,7 @@ public:
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
@@ -1436,6 +1464,7 @@ public:
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i);
   void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
@@ -1960,9 +1989,6 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
 
 IRGenSILFunction::~IRGenSILFunction() {
   assert(Builder.hasPostTerminatorIP() && "did not terminate BB?!");
-  // Emit the fail BB if we have one.
-  if (!FailBBs.empty())
-    emitFailBB();
   LLVM_DEBUG(CurFn->print(llvm::dbgs()));
 }
 
@@ -3859,6 +3885,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
+  // Lower the arguments and return value in the callee's generic context.
+  GenericContextScope scope(IGM,
+                            origCalleeType->getInvocationGenericSignature());
+
   Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
@@ -3870,9 +3900,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   emission->begin();
-
-  // Lower the arguments and return value in the callee's generic context.
-  GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
   auto &calleeFP = emission->getCallee().getFunctionPointer();
 
@@ -4040,8 +4067,9 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       Builder.emitBlock(typedErrorLoadBB);
 
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(errorType));
-      auto silResultTy = CurSILFn->mapTypeIntoContext(
-          substConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+      auto silResultTy =
+          substConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+      ASSERT(!silResultTy.hasTypeParameter());
       auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
 
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
@@ -5634,6 +5662,13 @@ void IRGenSILFunction::visitStructElementAddrInst(
   setLoweredAddress(i, field);
 }
 
+void IRGenSILFunction::visitVectorBaseAddrInst(VectorBaseAddrInst *i) {
+  auto addr = getLoweredAddress(i->getVector());
+  auto &ti = getTypeInfo(i->getType());
+  auto result = Builder.CreateElementBitCast(addr, ti.getStorageType());
+  setLoweredAddress(i, result);
+}
+
 void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *value = base.claimNext();
@@ -6135,6 +6170,11 @@ void IRGenSILFunction::visitMarkDependenceInst(swift::MarkDependenceInst *i) {
   }
 }
 
+void IRGenSILFunction::
+visitMarkDependenceAddrInst(swift::MarkDependenceAddrInst *i) {
+  // Dependency-marking is purely for SIL. No result.
+}
+
 void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *copied = emitBlockCopyCall(lowered.claimNext());
@@ -6357,6 +6397,10 @@ void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
   setLoweredExplosion(i, v);
 }
 
+void IRGenSILFunction::visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *i) {
+  // end_cow_mutation_addr is purely for SIL.
+}
+
 void IRGenSILFunction::visitDestroyNotEscapedClosureInst(
     swift::DestroyNotEscapedClosureInst *i) {
   // The closure operand is allowed to be an optional closure.
@@ -6388,14 +6432,52 @@ void IRGenSILFunction::visitDestroyNotEscapedClosureInst(
   setLoweredExplosion(i, out);
 }
 
-void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
-                                                  const TypeInfo &type,
-                                                  llvm::Value *addr) {
+void IRGenSILFunction::emitDebugInfoBeforeAllocStack(AllocStackInst *i,
+                                                     const TypeInfo &type,
+                                                     DebugTypeInfo &DbgTy) {
   auto VarInfo = i->getVarInfo();
-  if (!VarInfo)
+  if (!VarInfo ||
+      !i->getDebugScope() ||
+      i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
   VarDecl *Decl = i->getDecl();
+
+  SILType SILTy;
+  if (auto MaybeSILTy = VarInfo->Type) {
+    // If there is auxiliary type info, use it
+    SILTy = *MaybeSILTy;
+  } else {
+    SILTy = i->getType();
+  }
+  auto RealType = SILTy.getASTType();
+  if (Decl) {
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
+  } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
+             !VarInfo->Name.empty()) {
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+  } else
+    return;
+
+  bindArchetypes(DbgTy.getType());
+}
+
+/// Do not instantiate type metadata in here, since this may allocate on-stack
+/// packs which will then be cleaned up in the wrong order with respect to the
+/// value stack allocation.
+void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
+                                                    const TypeInfo &type,
+                                                    const DebugTypeInfo &DbgTy,
+                                                    llvm::Value *addr) {
+  auto VarInfo = i->getVarInfo();
+  if (!VarInfo ||
+      !i->getDebugScope() ||
+      i->getDebugScope()->getInlinedFunction()->isTransparent())
+    return;
+
+  VarDecl *Decl = i->getDecl();
+  auto *DS = i->getDebugScope();
+
   // Describe the underlying alloca. This way an llvm.dbg.declare intrinsic
   // is used, which is valid for the entire lifetime of the alloca.
   if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
@@ -6412,13 +6494,6 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       (void)isTaskAlloc;
     }
   }
-
-  auto DS = i->getDebugScope();
-  if (!DS)
-    return;
-
-  if (i->getDebugScope()->getInlinedFunction()->isTransparent())
-    return;
   
   bool IsAnonymous = false;
   VarInfo->Name = getVarName(i, IsAnonymous);
@@ -6453,25 +6528,15 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     }
   }
 
-  SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type) {
-    // If there is auxiliary type info, use it
-    SILTy = *MaybeSILTy;
-  } else {
-    SILTy = i->getType();
-  }
-  auto RealType = SILTy.getASTType();
-  DebugTypeInfo DbgTy;
-  if (Decl) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
-  } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
-             !VarInfo->Name.empty()) {
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
-  } else
-    return;
+  if (DbgTy.getType() && IGM.DebugInfo) {
+    SILType SILTy;
+    if (auto MaybeSILTy = VarInfo->Type) {
+      // If there is auxiliary type info, use it
+      SILTy = *MaybeSILTy;
+    } else {
+      SILTy = i->getType();
+    }
 
-  bindArchetypes(DbgTy.getType());
-  if (IGM.DebugInfo) {
     emitDebugVariableDeclaration(
         addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
@@ -6489,6 +6554,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   dbgname = getVarName(i, IsAnonymous);
 # endif
 
+  DebugTypeInfo DbgTy;
+  emitDebugInfoBeforeAllocStack(i, type, DbgTy);
+
   auto stackAddr = type.allocateStack(*this, i->getElementType(), dbgname);
   setLoweredStackAddress(i, stackAddr);
   Address addr = stackAddr.getAddress();
@@ -6503,7 +6571,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
         Ty->getStructOrBoundGenericStruct())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));
   }
-  emitDebugInfoForAllocStack(i, type, addr.getAddress());
+  emitDebugInfoAfterAllocStack(i, type, DbgTy, addr.getAddress());
 }
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
@@ -7179,7 +7247,8 @@ visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
                   src, i->getSourceFormalType(),
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional);
+                  CheckedCastMode::Unconditional,
+                  CastingIsolatedConformances::Allow);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -7409,6 +7478,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                         i->getTargetLoweredType(),
                         i->getTargetFormalType(),
                         CheckedCastMode::Unconditional,
+                        i->getIsolatedConformances(),
                         ex);
   setLoweredExplosion(i, ex);
 }
@@ -7597,7 +7667,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   src, i->getSourceFormalType(),
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
-                  CheckedCastMode::Unconditional);
+                  CheckedCastMode::Unconditional,
+                  i->getIsolatedConformances());
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
@@ -7618,6 +7689,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                           i->getTargetLoweredType(),
                           i->getTargetFormalType(),
                           CheckedCastMode::Conditional,
+                          i->getIsolatedConformances(),
                           ex);
     auto val = ex.claimNext();
     castResult.casted = val;
@@ -7655,7 +7727,8 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
     emitCheckedCast(*this,
                     src, i->getSourceFormalType(),
                     dest, i->getTargetFormalType(),
-                    i->getConsumptionKind(), CheckedCastMode::Conditional);
+                    i->getConsumptionKind(), CheckedCastMode::Conditional,
+                    i->getIsolatedConformances());
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
@@ -8123,7 +8196,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   assert(member.requiresNewWitnessTableEntry());
 
   bool shouldUseDispatchThunk = false;
-  if (IGM.isResilient(conformance.getRequirement(), ResilienceExpansion::Maximal)) {
+  if (IGM.isResilient(conformance.getProtocol(), ResilienceExpansion::Maximal)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().WitnessMethodElimination) {
     // For WME, use a thunk if the target protocol is defined in another module.
@@ -8238,32 +8311,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
-
-  // The condition should be false, or we die.
-  auto expectedCond = Builder.CreateExpect(cond,
-                                         llvm::ConstantInt::get(IGM.Int1Ty, 0));
-  
-  // Emit individual fail blocks so that we can map the failure back to a source
-  // line.
-  auto origInsertionPoint = Builder.GetInsertBlock();
-
-  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  Builder.CreateCondBr(expectedCond, failBB, contBB);
-    
-  Builder.SetInsertPoint(&CurFn->back());
-  Builder.emitBlock(failBB);
-  if (IGM.DebugInfo)
-    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
-    // instruction emitted from ``Builtin.condfail`` should have an inlined
-    // debug location. This is because zero is not an artificial line location
-    // in CodeView.
-    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
-  emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
-  
-  Builder.SetInsertPoint(origInsertionPoint);
-  Builder.emitBlock(contBB);
-  FailBBs.push_back(failBB);
+  emitConditionalTrap(cond, i->getMessage(), i->getDebugScope());
 }
 
 void IRGenSILFunction::visitIncrementProfilerCounterInst(
@@ -8399,28 +8447,17 @@ void IRGenSILFunction::visitObjCSuperMethodInst(swift::ObjCSuperMethodInst *i) {
                               /*startAtSuper=*/true);
 }
 
-void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
-  assert(!i->getMember().isForeign);
-
-  Explosion base = getLoweredExplosion(i->getOperand());
-  llvm::Value *baseValue = base.claimNext();
-
-  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
-  PrettyStackTraceSILDeclRef entry("lowering class method call to", method);
-
-  auto methodType = i->getType().castTo<SILFunctionType>();
-
+bool IRGenSILFunction::shouldUseDispatchThunk(SILDeclRef method) {
   AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
   // Because typechecking for the debugger has more lax rules, check the access
   // level of the getter to decide whether to use a dispatch thunk for the
   // debugger.
-  bool shouldUseDispatchThunkIfInDebugger =
-      !classDecl->getASTContext().LangOpts.DebuggerSupport ||
-      methodAccess == AccessLevel::Public;
+  bool inDebugger = classDecl->getASTContext().LangOpts.DebuggerSupport;
+  bool shouldUseDispatchThunkIfInDebugger = methodAccess >= AccessLevel::Public;
   if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
-      shouldUseDispatchThunkIfInDebugger) {
+      (!inDebugger || shouldUseDispatchThunkIfInDebugger)) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This
@@ -8437,9 +8474,22 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
     shouldUseDispatchThunk =
         classDecl->getModuleContext() != IGM.getSwiftModule();
   }
+  return shouldUseDispatchThunk;
+}
 
-  if (shouldUseDispatchThunk) {
-    llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
+void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
+  assert(!i->getMember().isForeign);
+
+  Explosion base = getLoweredExplosion(i->getOperand());
+  llvm::Value *baseValue = base.claimNext();
+
+  SILDeclRef method = i->getMember().getOverriddenVTableEntry();
+  PrettyStackTraceSILDeclRef entry("lowering class method call to", method);
+
+  auto methodType = i->getType().castTo<SILFunctionType>();
+  if (shouldUseDispatchThunk(method)) {
+    llvm::Constant *fnPtr =
+        IGM.getAddrOfDispatchThunk(method, NotForDefinition);
 
     if (methodType->isAsync()) {
       auto *fnPtrType = fnPtr->getType();

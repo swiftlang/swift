@@ -10,7 +10,7 @@
 @available(SwiftStdlib 5.1, *)
 func isolatedFunc(isolation: isolated (any Actor)? = #isolation) {}
 
-func test() { // expected-note 3 {{add @available attribute to enclosing global function}}
+func test() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
   _ = #isolation // expected-error {{'isolation()' is only available in}} expected-note {{add 'if #available' version check}}
   isolatedFunc() // expected-error {{'isolatedFunc(isolation:)' is only available in}} expected-note {{add 'if #available' version check}}
   // expected-error@-1 {{'isolation()' is only available in}}

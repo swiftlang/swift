@@ -229,7 +229,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
-        isa<MergeIsolationRegionInst>(user)) {
+        isa<MergeIsolationRegionInst>(user) || isa<EndCOWMutationAddrInst>(user)) {
       callVisitUse(op);
       continue;
     }
@@ -249,6 +249,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UncheckedAddrCastInst>(user) ||
+        isa<VectorBaseAddrInst>(user) ||
         isa<MarkUnresolvedNonCopyableValueInst>(user) ||
         isa<MarkUninitializedInst>(user) || isa<DropDeinitInst>(user) ||
         isa<ProjectBlockStorageInst>(user) || isa<UpcastInst>(user) ||
@@ -287,6 +288,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::GenericXor:
         case BuiltinValueKind::TaskRunInline:
         case BuiltinValueKind::ZeroInitializer:
+        case BuiltinValueKind::PrepareInitialization:
         case BuiltinValueKind::GetEnumTag:
         case BuiltinValueKind::InjectEnumTag:
         case BuiltinValueKind::AddressOfRawLayout:
@@ -305,19 +307,25 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       continue;
     }
 
-    if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
+    if (auto mdi = MarkDependenceInstruction(user)) {
       // TODO: continue walking the dependent value, which may not be an
       // address. See AddressUtils.swift. Until that is implemented, this must
       // be considered a pointer escape.
-      if (op->get() == mdi->getBase()) {
+      if (op->get() == mdi.getBase()) {
         recordEscape(op, AddressUseKind::Dependent);
         callVisitUse(op);
         continue;
       }
-
-      // If we are the value use, look through it.
-      transitiveResultUses(op);
-      continue;
+      if (isa<MarkDependenceInst>(user)) {
+        // If we are the value use of a forwarding markdep, look through it.
+        transitiveResultUses(op);
+        continue;
+      }
+      if (isa<MarkDependenceAddrInst>(user)) {
+        // The address operand is simply a leaf use.
+        callVisitUse(op);
+        continue;
+      }
     }
 
     // We were unable to recognize this user, so set AddressUseKind to unknown

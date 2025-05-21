@@ -71,6 +71,7 @@ internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
 ///
 /// - Complexity: O(n), because each element must be checked.
 @inlinable //for performance reasons
+@_semantics("array.conditional_cast")
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   _ source: [SourceElement]
 ) -> [TargetElement]? {

@@ -18,7 +18,9 @@
 
 #include "swift/AST/DiagnosticBridge.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
@@ -469,6 +471,9 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
     return Serialized;
   };
 
+  std::vector<std::string> educationalNotes;
+  if (!Info.CategoryDocumentationURL.empty())
+    educationalNotes.push_back(Info.CategoryDocumentationURL);
   return {(uint32_t)Info.ID,
           convertSourceLoc(SM, Info.Loc),
           (uint8_t)Info.Kind,
@@ -476,8 +481,7 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
           Info.Category.str(),
           convertSourceLoc(SM, Info.BufferIndirectlyCausingDiagnostic),
           convertDiagnosticInfoArray(Info.ChildDiagnosticInfo),
-          std::vector<std::string>(Info.EducationalNotePaths.begin(),
-                                   Info.EducationalNotePaths.end()),
+          educationalNotes,
           convertSourceRangeArray(Info.Ranges),
           convertFixItArray(Info.FixIts),
           Info.IsChildNote};
@@ -623,7 +627,8 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
                                   Ranges,
                                   FixIts,
                                   Info.IsChildNote};
-  DeserializedInfo.EducationalNotePaths = Info.EducationalNotePaths;
+  if (Info.EducationalNotePaths.size() == 1)
+    DeserializedInfo.CategoryDocumentationURL = Info.EducationalNotePaths[0];
   return callback(DeserializedInfo);
 }
 
@@ -752,6 +757,13 @@ public:
     auto &Serializer = getSerializer();
     assert(SM.getFileSystem() == Serializer.getSourceMgr().getFileSystem() &&
            "Caching for a different file system");
+
+    // Bypass the caching.
+    if (BypassDiagIDs.count(Info.ID)) {
+      for (auto *Diag : OrigConsumers)
+        Diag->handleDiagnostic(Serializer.getSourceMgr(), Info);
+      return;
+    }
     Serializer.handleDiagnostic(SM, Info, [&](const DiagnosticInfo &Info) {
       for (auto *Diag : OrigConsumers)
         Diag->handleDiagnostic(Serializer.getSourceMgr(), Info);
@@ -806,6 +818,8 @@ private:
   // Processor/Serializer alive until then.
   std::unique_ptr<DiagnosticSerializer> Serializer;
 
+  const llvm::SmallDenseSet<DiagID> BypassDiagIDs = {diag::macro_loaded.ID};
+
   SourceManager &InstanceSourceMgr;
   const FrontendInputsAndOutputs &InAndOut;
   DiagnosticEngine &Diags;
@@ -854,7 +868,7 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
 
     if (Err) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                   toString(std::move(Err)));
+                                   "storing outputs", toString(std::move(Err)));
       return true;
     }
 

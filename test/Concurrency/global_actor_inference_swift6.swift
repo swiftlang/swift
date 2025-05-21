@@ -155,7 +155,7 @@ struct S: InferMainActor {
 }
 
 protocol InferMainActorInherited: InferMainActor {
-  func f() // expected-note{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
+  func f()
   func g()
 }
 
@@ -169,15 +169,18 @@ struct S2: InferMainActorInherited {
   @MainActor func g() { } // okay for the same reasons, but more explicitly
 }
 
+// expected-error@+2{{conformance of 'S3' to protocol 'InferMainActorInherited' involves isolation mismatches and can cause data races}}
 @SomeGlobalActor
 struct S3: InferenceConflict {
+  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
   nonisolated func g() { }
 }
 
 extension S3 {
+
   func f() { }
-  // expected-error@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy main actor-isolated requirement from protocol 'InferMainActorInherited'}}
-  //expected-note@-2{{add 'nonisolated' to 'f()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy main actor-isolated requirement}}
 }
 
 @MainActor
@@ -198,18 +201,18 @@ class C1: MainActorSuperclass, InferMainFromSuperclass {
 
 protocol InferenceConflictWithSuperclass: MainActorSuperclass, InferSomeGlobalActor {
   func g()
-  // expected-note@-1 {{mark the protocol requirement 'g()' 'async' to allow actor-isolated conformances}}
 }
 
-
+// expected-error@+1{{conformance of 'C2' to protocol 'InferenceConflictWithSuperclass' crosses into main actor-isolated code and can cause data races}}
 class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
-//expected-note@-1 {{add '@preconcurrency' to the 'InferenceConflictWithSuperclass' conformance to defer isolation checking to run time}}
+  //expected-note@-1 {{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
 
   func f() {}
 
   func g() {}
-  // expected-error@-1 {{main actor-isolated instance method 'g()' cannot be used to satisfy nonisolated requirement from protocol 'InferenceConflictWithSuperclass'}}
-  // expected-note@-2 {{add 'nonisolated' to 'g()' to make this instance method not isolated to the actor}}
+  // expected-note@-1 {{main actor-isolated instance method 'g()' cannot satisfy nonisolated requirement}}
 }
 
 
@@ -221,5 +224,5 @@ class InheritConformance: ConformInExtension {
 }
 
 func testInheritedMainActorConformance() {
-  InheritConformance().f() // okay; this is not main actor isolated
+  InheritConformance().f() // okay; this is not MainActor isolated
 }

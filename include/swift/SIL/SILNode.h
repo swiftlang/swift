@@ -285,8 +285,8 @@ protected:
                  pointerEscape : 1,
                  fromVarDecl : 1);
 
-    SHARED_FIELD(MarkDependenceInst, uint8_t
-                 dependenceKind : NumMarkDependenceKindBits);
+    SHARED_TEMPLATE2_FIELD(SILInstructionKind, typename, MarkDependenceInstBase,
+                           uint8_t dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;

@@ -77,7 +77,8 @@ extension ASTGenVisitor {
   }
 
   func generate(missingPattern node: MissingPatternSyntax) -> BridgedPattern {
-    fatalError("unimplemented")
+    // Recover by creating implicit '_' pattern.
+    return BridgedAnyPattern.createImplicit(self.ctx).asPattern
   }
 
   func generate(tuplePattern node: TuplePatternSyntax) -> BridgedPattern {

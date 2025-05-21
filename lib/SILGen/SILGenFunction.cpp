@@ -486,7 +486,7 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
   // Collapse BraceStmtScopes whose parent is a .*BodyScope.
   if (auto Parent = ASTScope->getParent().getPtrOrNull())
     if (Parent->getSourceRangeOfThisASTNode() ==
-        ASTScope->getSourceRangeOfThisASTNode())
+       ASTScope->getSourceRangeOfThisASTNode())
       return cache(getOrCreateScope(Parent, FnScope, InlinedAt));
 
   // The calls to defer closures have cleanup source locations pointing to the
@@ -1073,8 +1073,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
-        (hasErasedIsolation ? SILFunctionTypeIsolation::Erased
-                            : SILFunctionTypeIsolation::Unknown);
+        (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
+                            : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
                            calleeConvention, resultIsolation);
@@ -1107,50 +1107,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         resultType = resultType->getWithExtInfo(extInfo);
         result = B.createConvertFunction(
             loc, result, SILType::getPrimitiveObjectType(resultType));
-      }
-    }
-  }
-
-  // If GenerateForceToMainActorThunks and Dynamic Actor Isolation Checking is
-  // enabled and we have a synchronous function...
-  if (F.getASTContext().LangOpts.hasFeature(
-          Feature::GenerateForceToMainActorThunks) &&
-      F.getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled() &&
-      !functionTy.castTo<SILFunctionType>()->isAsync()) {
-
-    // See if that function is a closure which requires dynamic isolation
-    // checking that doesn't take any parameters or results. In such a case, we
-    // create a hop to main actor if needed thunk.
-    if (auto *closureExpr = constant.getClosureExpr()) {
-      if (closureExpr->requiresDynamicIsolationChecking()) {
-        auto actorIsolation = closureExpr->getActorIsolation();
-        switch (actorIsolation) {
-        case ActorIsolation::Unspecified:
-        case ActorIsolation::Nonisolated:
-        case ActorIsolation::CallerIsolationInheriting:
-        case ActorIsolation::NonisolatedUnsafe:
-        case ActorIsolation::ActorInstance:
-          break;
-
-        case ActorIsolation::Erased:
-          llvm_unreachable("closure cannot have erased isolation");
-
-        case ActorIsolation::GlobalActor:
-          // For now only do this if we are using the main actor and are calling
-          // a function that doesn't depend on its result and doesn't have any
-          // parameters.
-          //
-          // NOTE: Since errors are results, this means that we cannot do this
-          // for throwing functions.
-          if (auto *args = closureExpr->getArgs();
-              (!args || args->empty()) && actorIsolation.isMainActor() &&
-              closureExpr->getResultType()->getCanonicalType() ==
-                  B.getASTContext().TheEmptyTupleType &&
-              !result.getType().castTo<SILFunctionType>()->hasErrorResult()) {
-            result = B.createHopToMainActorIfNeededThunk(loc, result, subs);
-          }
-          break;
-        }
       }
     }
   }
@@ -1431,6 +1387,28 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   }
 }
 
+static bool isCreateExecutorsFunctionAvailable(SILGenModule &SGM) {
+  FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
+  if (!createExecutorsFuncDecl)
+    return false;
+
+  auto &ctx = createExecutorsFuncDecl->getASTContext();
+
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return true;
+
+  if (!ctx.LangOpts.DisableAvailabilityChecking) {
+    auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+    auto runtimeAvailability = AvailabilityRange::forRuntimeTarget(ctx);
+    auto declAvailability = ctx.getCustomGlobalExecutorsAvailability();
+    auto declRtAvailability = ctx.getCustomGlobalExecutorsRuntimeAvailability();
+    return deploymentAvailability.isContainedIn(declAvailability)
+      && runtimeAvailability.isContainedIn(declRtAvailability);
+  }
+
+  return true;
+}
+
 void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   auto moduleLoc = entryPoint.getAsRegularLocation();
   auto *entryBlock = B.getInsertionBB();
@@ -1445,6 +1423,46 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   swift::ASTContext &ctx = entryPoint.getASTContext();
 
   B.setInsertionPoint(entryBlock);
+
+  // If we're using a new enough deployment target, and we can find a
+  // DefaultExecutorFactory type, call swift_createExecutors()
+  Type factoryNonCanTy = SGM.getConfiguredExecutorFactory();
+
+  if (isCreateExecutorsFunctionAvailable(SGM) && factoryNonCanTy) {
+    CanType factoryTy = factoryNonCanTy->getCanonicalType();
+
+    ProtocolDecl *executorFactoryProtocol
+      = ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
+    auto conformance = lookupConformance(factoryTy, executorFactoryProtocol);
+
+    if (conformance.isInvalid()) {
+      // If this type doesn't conform, ignore it and use the default factory
+      SourceLoc loc = extractNearestSourceLoc(factoryTy);
+
+      ctx.Diags.diagnose(loc, diag::executor_factory_must_conform);
+
+      factoryTy = SGM.getDefaultExecutorFactory()->getCanonicalType();
+      conformance = lookupConformance(factoryTy, executorFactoryProtocol);
+
+      assert(!conformance.isInvalid());
+    }
+
+    FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
+    assert(createExecutorsFuncDecl
+           && "Failed to find swift_createExecutors function decl");
+    SILFunction *createExecutorsSILFunc =
+      SGM.getFunction(SILDeclRef(createExecutorsFuncDecl, SILDeclRef::Kind::Func),
+                        NotForDefinition);
+    SILValue createExecutorsFunc =
+      B.createFunctionRefFor(moduleLoc, createExecutorsSILFunc);
+    MetatypeType *factoryThickMetaTy
+      = MetatypeType::get(factoryTy, MetatypeRepresentation::Thick);
+    SILValue factorySILMetaTy
+      = B.createMetatype(moduleLoc, getLoweredType(factoryThickMetaTy));
+    auto ceSubs = SubstitutionMap::getProtocolSubstitutions(
+      conformance.getProtocol(), factoryTy, conformance);
+    B.createApply(moduleLoc, createExecutorsFunc, ceSubs, { factorySILMetaTy });
+  }
 
   auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
                             uint32_t paramIndex) -> SILValue {
@@ -1891,7 +1909,7 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
   PartialApplyInst *setterPAI =
       B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
@@ -1943,7 +1961,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
 

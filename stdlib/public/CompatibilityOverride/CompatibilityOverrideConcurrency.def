@@ -439,9 +439,10 @@ OVERRIDE_TASK(task_startOnMainActor, void,
               swift::, (AsyncTask *task), (task))
 
 // In ACTOR since we need ExecutorTracking info
-OVERRIDE_ACTOR(task_startSynchronously, void,
+OVERRIDE_ACTOR(task_immediate, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (AsyncTask *task), (task))
+               swift::, (AsyncTask *task, SerialExecutorRef targetExecutor),
+               (task, targetExecutor))
 
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR

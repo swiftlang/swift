@@ -163,15 +163,16 @@ static void splitConcreteEquivalenceClasses(
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
 
   if (attempt >= maxAttempts) {
-    llvm::errs() << "Splitting concrete equivalence classes did not "
-                 << "reach fixed point after " << attempt << " attempts.\n";
-    llvm::errs() << "Last attempt produced these requirements:\n";
-    for (auto req : requirements) {
-      req.dump(llvm::errs());
-      llvm::errs() << "\n";
-    }
-    machine->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Splitting concrete equivalence classes did not "
+          << "reach fixed point after " << attempt << " attempts.\n";
+      out << "Last attempt produced these requirements:\n";
+      for (auto req : requirements) {
+        req.dump(out);
+        out << "\n";
+      }
+      machine->dump(out);
+    });
   }
 
   splitRequirements.clear();
@@ -671,7 +672,8 @@ AbstractGenericSignatureRequest::evaluate(
 
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramsAsTypes, defaults);
-  applyInverses(ctx, paramsAsTypes, inverses, defaults, errors);
+  applyInverses(ctx, paramsAsTypes, inverses, requirements,
+                defaults, errors);
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -870,7 +872,7 @@ InferredGenericSignatureRequest::evaluate(
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
   for (const auto &req : addedRequirements)
-    requirements.push_back({req, SourceLoc()});
+    requirements.push_back({req, loc});
 
   desugarRequirements(requirements, inverses, errors);
 
@@ -884,7 +886,8 @@ InferredGenericSignatureRequest::evaluate(
 
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
-  applyInverses(ctx, paramTypes, inverses, defaults, errors);
+  applyInverses(ctx, paramTypes, inverses, requirements,
+                defaults, errors);
   
   // Any remaining implicit defaults in a conditional inverse requirement
   // extension must be made explicit.

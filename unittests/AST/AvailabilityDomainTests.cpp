@@ -124,46 +124,29 @@ TEST_F(AvailabilityDomainLattice, Contains) {
   EXPECT_FALSE(visionOSAppExt.contains(macOSAppExt));
 }
 
-TEST_F(AvailabilityDomainLattice, ABICompatibilityDomain) {
-  EXPECT_EQ(Universal.getABICompatibilityDomain(), Universal);
-  EXPECT_EQ(Swift.getABICompatibilityDomain(), Swift);
-  EXPECT_EQ(Package.getABICompatibilityDomain(), Package);
-  EXPECT_EQ(Embedded.getABICompatibilityDomain(), Embedded);
-  EXPECT_EQ(macOS.getABICompatibilityDomain(), macOS);
-  EXPECT_EQ(macOSAppExt.getABICompatibilityDomain(), macOS);
-  EXPECT_EQ(iOS.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(iOSAppExt.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(macCatalyst.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(macCatalystAppExt.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(visionOS.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(visionOSAppExt.getABICompatibilityDomain(), iOS);
-}
-
-TEST(AvailabilityDomain, TargetPlatform) {
-  using namespace llvm;
-
-  struct TargetToPlatformKind {
-    Triple target;
-    PlatformKind platformKind;
-  };
-  TargetToPlatformKind tests[] = {
-      {Triple("x86_64", "apple", "macosx10.15"), PlatformKind::macOS},
-      {Triple("arm64", "apple", "ios13"), PlatformKind::iOS},
-      {Triple("arm64_32", "apple", "watchos8"), PlatformKind::watchOS},
-      {Triple("x86_64", "apple", "ios14", "macabi"), PlatformKind::macCatalyst},
-      {Triple("x86_64", "unknown", "windows", "msvc"), PlatformKind::none},
-      {Triple("x86_64", "unknown", "linux", "gnu"), PlatformKind::none},
-  };
-
-  for (TargetToPlatformKind test : tests) {
-    TestContext context{test.target};
-    auto domain = AvailabilityDomain::forTargetPlatform(context.Ctx);
-    if (test.platformKind != PlatformKind::none) {
-      EXPECT_TRUE(domain);
-      if (domain)
-        EXPECT_TRUE(domain->getPlatformKind() == test.platformKind);
-    } else {
-      EXPECT_FALSE(domain);
-    }
-  }
+TEST_F(AvailabilityDomainLattice, RootDomain) {
+  EXPECT_EQ(Universal.getRootDomain(), Universal);
+  EXPECT_TRUE(Universal.isRoot());
+  EXPECT_EQ(Swift.getRootDomain(), Swift);
+  EXPECT_TRUE(Swift.isRoot());
+  EXPECT_EQ(Package.getRootDomain(), Package);
+  EXPECT_TRUE(Package.isRoot());
+  EXPECT_EQ(Embedded.getRootDomain(), Embedded);
+  EXPECT_TRUE(Embedded.isRoot());
+  EXPECT_EQ(macOS.getRootDomain(), macOS);
+  EXPECT_TRUE(macOS.isRoot());
+  EXPECT_EQ(macOSAppExt.getRootDomain(), macOS);
+  EXPECT_FALSE(macOSAppExt.isRoot());
+  EXPECT_EQ(iOS.getRootDomain(), iOS);
+  EXPECT_TRUE(iOS.isRoot());
+  EXPECT_EQ(iOSAppExt.getRootDomain(), iOS);
+  EXPECT_FALSE(iOSAppExt.isRoot());
+  EXPECT_EQ(macCatalyst.getRootDomain(), iOS);
+  EXPECT_FALSE(macCatalyst.isRoot());
+  EXPECT_EQ(macCatalystAppExt.getRootDomain(), iOS);
+  EXPECT_FALSE(macCatalystAppExt.isRoot());
+  EXPECT_EQ(visionOS.getRootDomain(), iOS);
+  EXPECT_FALSE(visionOS.isRoot());
+  EXPECT_EQ(visionOSAppExt.getRootDomain(), iOS);
+  EXPECT_FALSE(visionOSAppExt.isRoot());
 }

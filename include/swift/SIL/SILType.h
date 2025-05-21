@@ -264,23 +264,6 @@ public:
     });
   }
 
-  bool isBuiltinInteger() const {
-    return is<BuiltinIntegerType>();
-  }
-
-  bool isBuiltinFixedWidthInteger(unsigned width) const {
-    BuiltinIntegerType *bi = getAs<BuiltinIntegerType>();
-    return bi && bi->isFixedWidth(width);
-  }
-
-  bool isBuiltinFloat() const {
-    return is<BuiltinFloatType>();
-  }
-
-  bool isBuiltinVector() const {
-    return is<BuiltinVectorType>();
-  }
-
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
   SILType getBuiltinVectorElementType() const {
@@ -937,14 +920,25 @@ public:
 
   SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
-  bool isOrContainsObjectiveCClass() const;
-
   bool isCalleeConsumedFunction() const {
     auto funcTy = castTo<SILFunctionType>();
     return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
   }
 
+  bool isNonIsolatedCallerFunction() const {
+    auto funcTy = getAs<SILFunctionType>();
+    if (!funcTy)
+      return false;
+    auto isolatedParam = funcTy->maybeGetIsolatedParameter();
+    return isolatedParam &&
+           isolatedParam->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
   bool isMarkedAsImmortal() const;
+
+  /// True if a value of this type can have its address taken by a
+  /// lifetime-dependent value.
+  bool isAddressableForDeps(const SILFunction &function) const;
 
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed

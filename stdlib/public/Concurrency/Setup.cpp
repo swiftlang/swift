@@ -41,6 +41,7 @@ bool _swift_task_isCurrentGlobalActor(
 // Register our type descriptors with standard manglings when the concurrency
 // runtime is loaded. This allows the runtime to quickly resolve those standard
 // manglings.
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor)) static void setupStandardConcurrencyDescriptors() {
   static const swift::ConcurrencyStandardTypeDescriptors descriptors = {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)
@@ -52,3 +53,4 @@ __attribute__((constructor)) static void setupStandardConcurrencyDescriptors() {
       &descriptors,
       &_swift_task_isCurrentGlobalActor);
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END

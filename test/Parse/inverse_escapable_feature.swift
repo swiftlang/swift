@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -enable-experimental-feature LifetimeDependence
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct S: ~Escapable {}
 

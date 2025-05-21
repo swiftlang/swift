@@ -32,6 +32,7 @@
 namespace swift {
 class ASTContext;
 class CustomAvailabilityDomain;
+class Decl;
 class DeclContext;
 class ModuleDecl;
 
@@ -100,7 +101,7 @@ private:
   using InlineDomainPtr =
       llvm::PointerEmbeddedInt<uint32_t, InlineDomain::ReprBits>;
   using Storage =
-      llvm::PointerUnion<CustomAvailabilityDomain *, InlineDomainPtr>;
+      llvm::PointerUnion<const CustomAvailabilityDomain *, InlineDomainPtr>;
   Storage storage;
 
   AvailabilityDomain(Kind kind)
@@ -111,7 +112,8 @@ private:
   AvailabilityDomain(PlatformKind platform)
       : storage(InlineDomain(Kind::Platform, platform).asInteger()) {};
 
-  AvailabilityDomain(CustomAvailabilityDomain *domain) : storage(domain) {};
+  AvailabilityDomain(const CustomAvailabilityDomain *domain)
+      : storage(domain) {};
 
   AvailabilityDomain(Storage storage) : storage(storage) {};
 
@@ -120,11 +122,6 @@ private:
                ? static_cast<std::optional<InlineDomain>>(
                      storage.get<InlineDomainPtr>())
                : std::nullopt;
-  }
-
-  CustomAvailabilityDomain *getCustomDomain() const {
-    ASSERT(isCustom());
-    return storage.get<CustomAvailabilityDomain *>();
   }
 
 public:
@@ -152,19 +149,14 @@ public:
     return AvailabilityDomain(Kind::Embedded);
   }
 
-  static AvailabilityDomain forCustom(CustomAvailabilityDomain *domain) {
+  /// If `decl` represents an availability domain, returns the corresponding
+  /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
+  static std::optional<AvailabilityDomain> forCustom(Decl *decl,
+                                                     const ASTContext &ctx);
+
+  static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
   }
-
-  /// Returns the most specific platform domain for the target of the
-  /// compilation context.
-  static std::optional<AvailabilityDomain>
-  forTargetPlatform(const ASTContext &ctx);
-
-  /// Returns the most specific platform domain for the target variant of the
-  /// compilation context.
-  static std::optional<AvailabilityDomain>
-  forTargetVariantPlatform(const ASTContext &ctx);
 
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
@@ -205,6 +197,14 @@ public:
     return PlatformKind::none;
   }
 
+  /// If the domain represents a user-defined domain, returns the metadata for
+  /// the domain. Returns `nullptr` otherwise.
+  const CustomAvailabilityDomain *getCustomDomain() const {
+    if (isCustom())
+      return storage.get<const CustomAvailabilityDomain *>();
+    return nullptr;
+  }
+
   /// Returns true if availability for this domain can be specified in terms of
   /// version ranges.
   bool isVersioned() const;
@@ -223,15 +223,15 @@ public:
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
 
-  /// Returns true if this domain is a platform domain that is contained by the
-  /// set of active platform-specific domains.
-  bool isActiveForTargetPlatform(const ASTContext &ctx) const;
+  /// Returns true if this domain is a platform domain and is considered active
+  /// in the current compilation context.
+  bool isActivePlatform(const ASTContext &ctx) const;
 
-  /// Returns the minimum available range for the attribute's domain. For
+  /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
-  /// this will be the deployment target. For the Swift language domain, this
-  /// will be the language mode for compilation. For domains which have don't
-  /// have a "deployment target", this returns `std::nullopt`.
+  /// this version is specified with the `-target` option. For the Swift
+  /// language domain, it is specified with the `-swift-version` option. Returns
+  /// `std::nullopt` for domains which have don't have a "deployment target".
   std::optional<AvailabilityRange>
   getDeploymentRange(const ASTContext &ctx) const;
 
@@ -242,6 +242,10 @@ public:
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
 
+  /// Returns the decl that represents the domain, or `nullptr` if the domain
+  /// does not have a decl.
+  Decl *getDecl() const;
+
   /// Returns the module that the domain belongs to, if it is a custom domain.
   ModuleDecl *getModule() const;
 
@@ -250,10 +254,14 @@ public:
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
 
-  /// Returns the root availability domain that this domain must be compatible
-  /// with. For example, macCatalyst and visionOS must both be ABI compatible
-  /// with iOS. The compatible domain must contain this domain.
-  AvailabilityDomain getABICompatibilityDomain() const;
+  /// Returns true for domains that are not contained by any domain other than
+  /// the universal domain.
+  bool isRoot() const;
+
+  /// Returns the root availability domain that contains this domain (see
+  /// `isRoot()`). For example, macCatalyst and visionOS are both ultimately
+  /// descendants of the iOS domain.
+  AvailabilityDomain getRootDomain() const;
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
@@ -294,7 +302,7 @@ struct StableAvailabilityDomainComparator {
 };
 
 /// Represents an availability domain that has been defined in a module.
-class CustomAvailabilityDomain : public ASTAllocated<CustomAvailabilityDomain> {
+class CustomAvailabilityDomain : public llvm::FoldingSetNode {
 public:
   enum class Kind {
     /// A domain that is known to be enabled at compile time.
@@ -309,16 +317,26 @@ private:
   Identifier name;
   Kind kind;
   ModuleDecl *mod;
+  Decl *decl;
 
-  CustomAvailabilityDomain(Identifier name, ModuleDecl *mod, Kind kind);
+  CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
+                           Decl *decl);
 
 public:
-  static CustomAvailabilityDomain *create(const ASTContext &ctx, StringRef name,
-                                          ModuleDecl *mod, Kind kind);
+  static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
+                                             ModuleDecl *mod, Decl *decl,
+                                             const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
+  Decl *getDecl() const { return decl; }
+
+  /// Uniquing for `ASTContext`.
+  static void Profile(llvm::FoldingSetNodeID &ID, Identifier name,
+                      ModuleDecl *mod);
+
+  void Profile(llvm::FoldingSetNodeID &ID) const { Profile(ID, name, mod); }
 };
 
 /// Represents either a resolved availability domain or an identifier written

@@ -191,6 +191,23 @@
 #define SWIFT_RETURNS_UNRETAINED                                               \
   __attribute__((swift_attr("returns_unretained")))
 
+/// Applied to a C++ foreign reference type annotated with
+/// SWIFT_SHARED_REFERENCE. Indicates that C++ APIs returning this type are
+/// assumed to return an unowned (+0) value by default, unless explicitly annotated
+/// with SWIFT_RETURNS_RETAINED.
+///
+/// For example:
+/// ```c++
+/// struct SWIFT_SHARED_REFERENCE(retainBar, releaseBar)
+/// SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT
+/// Bar { ... };
+/// ```
+///
+/// In Swift, C++ APIs returning `Bar*` will be assumed to return an unowned
+/// value.
+#define SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT                                    \
+  __attribute__((swift_attr("returned_as_unretained_by_default")))
+
 /// Specifies that the non-public members of a C++ class, struct, or union can
 /// be accessed from extensions of that type, in the given file ID.
 ///

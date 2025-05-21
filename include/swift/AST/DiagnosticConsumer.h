@@ -59,8 +59,8 @@ struct DiagnosticInfo {
   /// DiagnosticInfo of notes which are children of this diagnostic, if any
   ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
 
-  /// Paths to "educational note" diagnostic documentation in the toolchain.
-  ArrayRef<std::string> EducationalNotePaths;
+  /// Path for category documentation.
+  std::string CategoryDocumentationURL;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {

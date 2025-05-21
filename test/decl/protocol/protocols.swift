@@ -111,9 +111,9 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
 protocol CircleMiddle : CircleStart { func circle_middle() }
 // expected-note@-1 2 {{protocol 'CircleMiddle' declared here}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
@@ -412,7 +412,7 @@ class DoesntConformToObjCProtocol : ObjCProtocol {
 
 @objc protocol ObjCProtocolRefinement : ObjCProtocol { }
 
-@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{@objc protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-@objc protocol 'NonObjCProtocol'}}
+@objc protocol ObjCNonObjCProtocolRefinement : NonObjCProtocol { } //expected-error{{'@objc' protocol 'ObjCNonObjCProtocolRefinement' cannot refine non-'@objc' protocol 'NonObjCProtocol'}}
 
 
 // <rdar://problem/16079878>

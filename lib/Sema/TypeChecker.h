@@ -135,8 +135,8 @@ enum class TypeCheckExprFlags {
   /// Don't expand macros.
   DisableMacroExpansions = 0x04,
 
-  /// If set, typeCheckExpression will avoid invalidating the AST if
-  /// type-checking fails. Do not add new uses of this.
+  /// If set, typeCheckExpression will avoid pre-checking and invalidating
+  /// the AST if type-checking fails. Do not add new uses of this.
   AvoidInvalidatingAST = 0x08,
 };
 
@@ -244,7 +244,7 @@ public:
     SmallVector<ParentConditionalConformance, 2> ReqPath;
 
     /// The isolated conformances that caused the requirement failure.
-    llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances = {};
+    llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances = {};
 
     /// The protocol (Sendable or SendableMetatype) to which the type
     /// parameter conforms, causing a conflict with the isolated conformances
@@ -282,7 +282,7 @@ public:
 
   static CheckGenericArgumentsResult createIsolatedConformanceFailure(
       Requirement Req, Requirement SubstReq,
-      llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances,
+      llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances,
       ProtocolDecl *IsolatedConformanceProto) {
     return CheckGenericArgumentsResult(
         CheckRequirementsResult::RequirementFailure,
@@ -506,6 +506,7 @@ void typeCheckDecl(Decl *D);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
+void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
 
@@ -797,9 +798,6 @@ bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
 
-/// Check for invalid captures from stored property initializers.
-void checkPatternBindingCaptures(IterableDeclContext *DC);
-
 /// Update the DeclContexts for AST nodes in a given DeclContext. This is
 /// necessary after type-checking since autoclosures may have been introduced.
 void contextualizeExpr(Expr *E, DeclContext *DC);
@@ -834,12 +832,15 @@ Expr *addImplicitLoadExpr(
     std::function<void(Expr *, Type)> setType =
         [](Expr *E, Type type) { E->setType(type); });
 
-/// Determine whether the given type contains the given protocol.
+/// Determine whether the given type either conforms to, or itself an
+/// existential subtype of, the given protocol.
 ///
-/// \returns the conformance, if \c T conforms to the protocol \c Proto, or
-/// an empty optional.
-ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        bool allowMissing=false);
+/// \returns if the first element of the pair is true, T is an existential
+/// subtype of Proto, and the second element is ignored; if the first element
+/// is false, the second element is the result of the conformance lookup.
+std::pair<bool, ProtocolConformanceRef>
+containsProtocol(Type T, ProtocolDecl *Proto,
+                 bool allowMissing=false);
 
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
@@ -1031,32 +1032,6 @@ bool isAvailabilitySafeForConformance(
     const ValueDecl *witness, const DeclContext *dc,
     AvailabilityRange &requiredAvailability);
 
-/// Returns the most refined `AvailabilityContext` for the given location.
-/// If `MostRefined` is not `nullptr`, it will be set to the most refined scope
-/// that contains the given location.
-AvailabilityContext
-availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                       const AvailabilityScope **MostRefined = nullptr);
-
-/// Returns the availability context of the signature of the given declaration.
-AvailabilityContext availabilityForDeclSignature(const Decl *decl);
-
-/// Returns an over-approximation of the range of operating system versions
-/// that could the passed-in location could be executing upon for
-/// the target platform. If MostRefined != nullptr, set to the most-refined
-/// scope found while approximating.
-AvailabilityRange overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined = nullptr);
-
-/// Walk the AST to build the tree of AvailabilityScopes.
-void buildAvailabilityScopes(SourceFile &SF);
-
-/// Build the hierarchy of AvailabilityScopes for the entire
-/// source file, if it has not already been built. Returns the root
-/// AvailabilityScope for the source file.
-AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
-
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
@@ -1073,7 +1048,7 @@ diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
+                       AvailabilityRange PlatformRange,
                        const DeclContext *ReferenceDC,
                        llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
                                                              AvailabilityRange)>
@@ -1083,7 +1058,7 @@ bool checkAvailability(SourceRange ReferenceRange,
 /// platform are available at the given `SourceRange`. If not, `Diag` is
 /// emitted.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
+                       AvailabilityRange PlatformRange,
                        Diag<AvailabilityDomain, AvailabilityRange> Diag,
                        const DeclContext *ReferenceDC);
 
@@ -1559,14 +1534,6 @@ bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
-
-/// Determine whether the type parameter has requirements that would prohibit
-/// it from using any isolated conformances.
-///
-/// Returns the protocol to which the type conforms that causes the conflict,
-/// which can be either Sendable or SendableMetatype.
-std::optional<ProtocolDecl *> typeParameterProhibitsIsolatedConformance(
-    Type type, GenericSignature signature);
 
 } // end namespace swift
 

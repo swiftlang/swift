@@ -2657,6 +2657,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
+    case BuiltinValueKind::PrepareInitialization:
       if (builtin->getAllOperands().size() > 0) {
         visitor(&builtin->getAllOperands()[0]);
       }
@@ -2809,6 +2810,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::BindMemoryInst:
   case SILInstructionKind::RebindMemoryInst:
@@ -2830,6 +2832,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::HopToExecutorInst:

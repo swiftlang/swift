@@ -47,7 +47,7 @@ SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueGlobalWithDeadline,
 SWIFT_CONCURRENCY_HOOK(void, swift_task_checkIsolated,
     SerialExecutorRef executor);
 
-SWIFT_CONCURRENCY_HOOK(bool, swift_task_isIsolatingCurrentContext,
+SWIFT_CONCURRENCY_HOOK(int8_t, swift_task_isIsolatingCurrentContext,
     SerialExecutorRef executor);
 
 SWIFT_CONCURRENCY_HOOK(bool, swift_task_isOnExecutor,

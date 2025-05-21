@@ -64,8 +64,9 @@ static SwiftMetatype declMetatypes[(unsigned)DeclKind::Last_Decl + 1];
 SwiftMetatype Decl::getDeclMetatype(DeclKind kind) {
   SwiftMetatype metatype = declMetatypes[(unsigned)kind];
   if (declMetatypesInitialized && !metatype) {
-    llvm::errs() << "Decl " << getKindName(kind) << " not registered\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Decl " << getKindName(kind) << " not registered";
+    });
   }
   return metatype;
 }
@@ -83,9 +84,9 @@ void registerBridgedDecl(BridgedStringRef bridgedClassName,
                       .Default(std::nullopt);
 
   if (!declKind) {
-    llvm::errs() << "Unknown Decl class " << bridgedClassName.unbridged()
-                 << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Unknown Decl class " << bridgedClassName.unbridged();
+    });
   }
   declMetatypes[(unsigned)declKind.value()] = metatype;
 }
@@ -148,4 +149,15 @@ BridgedOwnedString BridgedGenericSignature::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged().print(os);
   return BridgedOwnedString(str);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedPoundKeyword
+//===----------------------------------------------------------------------===//
+
+BridgedPoundKeyword BridgedPoundKeyword_fromString(BridgedStringRef cStr) {
+  return llvm::StringSwitch<BridgedPoundKeyword>(cStr.unbridged())
+#define POUND_KEYWORD(NAME) .Case(#NAME, BridgedPoundKeyword_##NAME)
+#include "swift/AST/TokenKinds.def"
+      .Default(BridgedPoundKeyword_None);
 }

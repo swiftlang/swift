@@ -877,7 +877,6 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       llvm::dbgs()
       << "    Destructuring available values in preds to smallest size for bb"
       << block->getDebugID() << '\n');
-  auto *fn = block->getFunction();
   IntervalMapAllocator::Map typeSpanToValue(getAllocator());
   for (auto *predBlock : predsSkippingBackEdges) {
     SWIFT_DEFER { typeSpanToValue.clear(); };
@@ -930,20 +929,10 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       // smallest offset size could result in further destructuring that an
       // earlier value required. Instead, we do a final loop afterwards using
       // the interval map to update each available value.
-      auto iterType = iterValue->getType();
       auto loc = getSafeLoc(predBlock->getTerminator());
       SILBuilderWithScope builder(predBlock->getTerminator());
 
       while (smallestOffsetSize->first.size < iterOffsetSize.size) {
-        TypeOffsetSizePair childOffsetSize;
-        SILType childType;
-
-        // We are returned an optional here and should never fail... so use a
-        // force unwrap.
-        std::tie(childOffsetSize, childType) =
-            *iterOffsetSize.walkOneLevelTowardsChild(iterOffsetSize, iterType,
-                                                     fn);
-
         // Before we destructure ourselves, erase our entire value from the
         // map. We do not need to consider the possibility of there being holes
         // in our range since we always store values whole to their entire
@@ -1401,8 +1390,8 @@ update_operand:
 
           // Then walk one level towards our target type.
           std::tie(iterOffsetSize, iterType) =
-              *useOffsetSize.walkOneLevelTowardsChild(parentOffsetSize,
-                                                      iterType, fn);
+              *useOffsetSize.walkOneLevelTowardsChild(
+                  parentOffsetSize, iterType, unwrappedOperandType, fn);
 
           unsigned start = parentOffsetSize.startOffset;
           consumeBuilder.emitDestructureValueOperation(
@@ -1551,10 +1540,10 @@ static bool gatherBorrows(SILValue rootValue,
     // escape. Is it legal to canonicalize ForwardingUnowned?
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
-      if (auto *md = dyn_cast<MarkDependenceInst>(use->getUser())) {
+      if (auto mdi = MarkDependenceInstruction(use->getUser())) {
         // mark_depenence uses only keep its base value alive; they do not use
         // the base value itself and are irrelevant for destructuring.
-        if (use == &md->getOperandRef(MarkDependenceInst::Base))
+        if (use->get() == mdi.getBase())
           continue;
       }
       return false;

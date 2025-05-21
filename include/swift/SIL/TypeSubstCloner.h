@@ -247,13 +247,16 @@ protected:
     if (canSILUseScalarCheckedCastInstructions(B.getModule(),
                                                sourceType, targetType)) {
       emitIndirectConditionalCastWithScalar(
-          B, SwiftMod, loc, inst->getConsumptionKind(), src, sourceType, dest,
+          B, SwiftMod, loc, inst->getIsolatedConformances(),
+          inst->getConsumptionKind(), src, sourceType, dest,
           targetType, succBB, failBB, TrueCount, FalseCount);
       return;
     }
 
     // Otherwise, use the indirect cast.
-    B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(loc,
+                                  inst->getIsolatedConformances(),
+                                  inst->getConsumptionKind(),
                                   src, sourceType,
                                   dest, targetType,
                                   succBB, failBB);

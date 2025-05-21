@@ -170,6 +170,10 @@ enum class AvailabilityConstraintFlag : uint8_t {
   /// referencing the extension. When this flag is specified, though, only the
   /// attributes directly attached to the declaration are considered.
   SkipEnclosingExtension = 1 << 0,
+
+  /// Include constraints for all domains, regardless of whether they are active
+  /// or relevant to type checking.
+  IncludeAllDomains = 1 << 1,
 };
 using AvailabilityConstraintFlags = OptionSet<AvailabilityConstraintFlag>;
 

@@ -49,8 +49,8 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE"
-      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE;NO_SWIFTMODULE"
+      "SDK;ARCHITECTURE;ARCHITECTURE_SUBDIR_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -66,6 +66,7 @@ function(handle_swift_sources
   translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
   translate_flag(${SWIFTSOURCES_IS_FRAGILE} "IS_FRAGILE" IS_FRAGILE_arg)
   translate_flag(${SWIFTSOURCES_ONLY_SWIFTMODULE} "ONLY_SWIFTMODULE" ONLY_SWIFTMODULE_arg)
+  translate_flag(${SWIFTSOURCES_NO_SWIFTMODULE} "NO_SWIFTMODULE" NO_SWIFTMODULE_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
   endif()
@@ -82,6 +83,9 @@ function(handle_swift_sources
   precondition(SWIFTSOURCES_SDK "Should specify an SDK")
   precondition(SWIFTSOURCES_ARCHITECTURE "Should specify an architecture")
   precondition(SWIFTSOURCES_INSTALL_IN_COMPONENT "INSTALL_IN_COMPONENT is required")
+  if (NOT SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME)
+    set(SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME "${SWIFTSOURCES_ARCHITECTURE}")
+  endif()
 
   # Clear the result variable.
   set("${dependency_target_out_var_name}" "" PARENT_SCOPE)
@@ -107,12 +111,12 @@ function(handle_swift_sources
   endif()
 
   if(swift_sources)
-    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE}")
+    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME}")
 
     get_maccatalyst_build_flavor(maccatalyst_build_flavor
       "${SWIFTSOURCES_SDK}" "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     if(maccatalyst_build_flavor STREQUAL "ios-like")
-      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE}")
+      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME}")
     endif()
 
     get_bootstrapping_path(lib_dir
@@ -161,6 +165,7 @@ function(handle_swift_sources
         ${BOOTSTRAPPING_arg}
         ${IS_FRAGILE_arg}
         ${ONLY_SWIFTMODULE_arg}
+        ${NO_SWIFTMODULE_arg}
         INSTALL_BINARY_SWIFTMODULE ${SWIFTSOURCES_INSTALL_BINARY_SWIFTMODULE}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX ${SWIFTSOURCES_DEPLOYMENT_VERSION_OSX}
@@ -405,6 +410,8 @@ endfunction()
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]                  # This is the core standard library
+#     [ONLY_SWIFTMODULE]                # Emit swiftmodule only, no binary
+#     [NO_SWIFTMODULE]                  # Emit binary only, no swiftmodule
 #     [OPT_FLAGS]                       # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     [MODULE_DIR]                      # Put .swiftmodule, .swiftdoc., and .o
 #                                       # into this directory.
@@ -419,7 +426,7 @@ function(_compile_swift_files
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE;NO_SWIFTMODULE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -631,6 +638,8 @@ function(_compile_swift_files
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
+  list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
+  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
@@ -677,6 +686,10 @@ function(_compile_swift_files
   get_bootstrapping_path(lib_dir ${SWIFTLIB_DIR} "${SWIFTFILE_BOOTSTRAPPING}")
 
   if(NOT SWIFTFILE_IS_MAIN)
+    list(APPEND swift_flags "-parse-as-library")
+  endif()
+
+  if(NOT SWIFTFILE_IS_MAIN AND NOT SWIFTFILE_NO_SWIFTMODULE)
     # Determine the directory where the module file should be placed.
     if(SWIFTFILE_MODULE_DIR)
       set(module_dir "${SWIFTFILE_MODULE_DIR}")
@@ -685,8 +698,6 @@ function(_compile_swift_files
     else()
       message(FATAL_ERROR "Don't know where to put the module files")
     endif()
-
-    list(APPEND swift_flags "-parse-as-library")
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
 
@@ -738,7 +749,9 @@ function(_compile_swift_files
     endif()
 
     set(exclude_binary_swiftmodule_installation_args "")
-    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE)
+    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE OR
+       (SWIFTFILE_INSTALL_BINARY_SWIFTMODULE STREQUAL "NON_DARWIN_ONLY" AND
+        SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS))
         list(APPEND
           exclude_binary_swiftmodule_installation_args
           "REGEX" "${SWIFTFILE_MODULE_NAME}.swiftmodule/[^/]*\\.swiftmodule$" EXCLUDE)
@@ -915,9 +928,9 @@ function(_compile_swift_files
   endif()
 
   set(custom_env "PYTHONIOENCODING=UTF8")
-  if(SWIFTFILE_IS_STDLIB OR
+  if(SWIFT_INCLUDE_TOOLS AND (SWIFTFILE_IS_STDLIB OR
      # Linux "hosttools" build require builder's runtime before building the runtime.
-     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD"))
   )
     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
     if(bs_lib_dir)
@@ -1067,7 +1080,7 @@ function(_compile_swift_files
   #
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
-  if (NOT SWIFTFILE_IS_MAIN)
+  if (NOT SWIFTFILE_IS_MAIN AND NOT SWIFTFILE_NO_SWIFTMODULE)
     add_custom_command_target(
         module_dependency_target
         COMMAND

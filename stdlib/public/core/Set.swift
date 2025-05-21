@@ -231,7 +231,7 @@ extension Set: ExpressibleByArrayLiteral {
         // FIXME: Shouldn't this trap?
         continue
       }
-      native._unsafeInsertNew(element, at: bucket)
+      unsafe native._unsafeInsertNew(element, at: bucket)
     }
     self.init(_native: native)
   }
@@ -1309,7 +1309,7 @@ extension Set {
     @inlinable
     @inline(__always)
     internal init(_native index: _HashTable.Index) {
-      self.init(_variant: .native(index))
+      self.init(_variant: unsafe .native(index))
     }
 
 #if _runtime(_ObjC)
@@ -1393,7 +1393,7 @@ extension Set.Index {
           "Attempting to access Set elements using an invalid index")
       }
       let dummy = unsafe _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
-      _variant = .native(dummy)
+      _variant = unsafe .native(dummy)
       defer { _variant = .cocoa(cocoa) }
       yield &cocoa
     }

@@ -1741,6 +1741,9 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through borrows.
         for (auto value : nextUse->getUser()->getResults()) {
           for (auto *use : value->getUses()) {
+            if (use->get()->getType().isTrivial(*use->getFunction())) {
+              continue;
+            }
             useWorklist.push_back(use);
           }
         }
@@ -1853,8 +1856,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   if (feature &&
       !fn->getModule().getASTContext().LangOpts.hasFeature(*feature) &&
       !isa<DropDeinitInst>(user)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "    " << getFeatureName(*feature) << " disabled!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    " << feature->getName() << " disabled!\n");
     // If the types equal, just bail early.
     // Emit the error.
     return {PartialMutationError::featureDisabled(iterType, kind)};
@@ -1893,7 +1895,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // Otherwise, walk one level towards our child type. We unconditionally
     // unwrap since we should never fail here due to earlier checking.
     std::tie(iterPair, iterType) =
-        *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
+        *pair.walkOneLevelTowardsChild(iterPair, iterType, targetType, fn);
   }
 
   return {};
@@ -2181,7 +2183,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-    
+  
+  // Ignore end_cow_mutation_addr.
+  if (isa<EndCOWMutationAddrInst>(user)) {
+    return true;
+  }
+
   // Ignore sanitizer markers.
   if (auto bu = dyn_cast<BuiltinInst>(user)) {
     if (bu->getBuiltinKind() == BuiltinValueKind::TSanInoutAccess) {
@@ -3425,6 +3432,10 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
       auto accessPath = AccessPathWithBase::computeInScope(copy->getSrc());
       if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
+      if (auto *oeai =
+              dyn_cast_or_null<OpenExistentialAddrInst>(copy->getSrc())) {
+        oeai->setAccessKind(OpenedExistentialAccess::Mutable);
+      }
       copy->setIsTakeOfSrc(IsTake);
       continue;
     }

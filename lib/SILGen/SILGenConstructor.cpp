@@ -739,15 +739,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
       // Raw memory is not directly decomposable, but we still want to mark
       // it as initialized. Use a zero initializer.
-      auto &C = ctor->getASTContext();
-      auto zeroInit = getBuiltinValueDecl(C, C.getIdentifier("zeroInitializer"));
-      B.createBuiltin(ctor, zeroInit->getBaseIdentifier(),
-                      SILType::getEmptyTupleType(C),
-                      SubstitutionMap::get(zeroInit->getInnermostDeclContext()
-                                               ->getGenericSignatureOfContext(),
-                                           {selfDecl->getTypeInContext()},
-                                           LookUpConformanceInModule()),
-                      selfLV.getLValueAddress());
+      B.createZeroInitAddr(ctor, selfLV.getLValueAddress());
     } else if (isa<StructDecl>(nominal)
                && lowering.getLoweredType().isMoveOnly()
                && nominal->getStoredProperties().empty()) {
@@ -1122,8 +1114,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                    /*ignored parameters*/ 1);
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getTypeInContext());
-  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
-  
+  // Force a lexical lifetime for the self argument of an eagerMove class' init
+  // to ensure that the body of its deinit always runs after the body of that
+  // init.
+  LifetimeAnnotation annotation = selfTy.getLifetime(F).isEagerMove()
+                                      ? LifetimeAnnotation::Lexical
+                                      : LifetimeAnnotation::None;
+  ManagedValue selfArg = B.createInputFunctionArgument(
+      selfTy, selfDecl, /*isNoImplicitCopy=*/false, annotation);
+
   // is this a designated initializer for a distributed actor?
   const bool isDesignatedDistActorInit =
     selfClassDecl->isDistributedActor() && !isDelegating;

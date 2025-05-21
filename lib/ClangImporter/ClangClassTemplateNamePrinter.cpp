@@ -203,7 +203,12 @@ struct TemplateArgumentPrinter
     if (arg.getIntegralType()->isBuiltinType()) {
       buffer << typePrinter.Visit(arg.getIntegralType().getTypePtr()) << "_";
     }
-    arg.getAsIntegral().print(buffer, true);
+    auto value = arg.getAsIntegral();
+    if (value.isNegative()) {
+      value.negate();
+      buffer << "Neg_";
+    }
+    value.print(buffer, arg.getIntegralType()->isSignedIntegerType());
   }
 
   void VisitPackTemplateArgument(const clang::TemplateArgument &arg,

@@ -142,7 +142,7 @@ internal final class __BridgingHashBuffer
   }
 
   deinit {
-    for bucket in unsafe header.hashTable {
+    for unsafe bucket in unsafe header.hashTable {
       unsafe (firstElementAddress + bucket.offset).deinitialize(count: 1)
     }
     unsafe _fixLifetime(self)

@@ -14,7 +14,7 @@ func simple(_ placeholder: Int64) throws -> () {
   // CHECK: define {{.*}}void @"$s8ErrorVar6simpleyys5Int64VKF"(
   // CHECK-SAME: i64
   // CHECK-SAME: %swift.refcounted* {{.*}}swiftself
-  // CHECK-SAME: %swift.error** noalias nocapture dereferenceable(4)
+  // CHECK-SAME: %swift.error** noalias {{(nocapture|captures\(none\))}} dereferenceable(4)
   // CHECK: #dbg_declare
   // CHECK: #dbg_declare({{.*}}, ![[ERROR:[0-9]+]], !DIExpression(DW_OP_deref)
   // CHECK-DAG: ![[ERRTY:.*]] = !DICompositeType({{.*}}identifier: "$ss5Error_pD"

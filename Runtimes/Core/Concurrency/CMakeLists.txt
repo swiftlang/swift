@@ -1,7 +1,7 @@
 add_subdirectory(InternalShims)
 
 gyb_expand(TaskGroup+addTask.swift.gyb TaskGroup+addTask.swift)
-gyb_expand(Task+startSynchronously.swift.gyb Task+startSynchronously.swift)
+gyb_expand(Task+immediate.swift.gyb Task+immediate.swift)
 
 add_library(swift_Concurrency
   Actor.cpp
@@ -11,6 +11,8 @@ add_library(swift_Concurrency
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
+  ExecutorBridge.cpp
+  ExecutorImpl.cpp
   ExecutorChecks.cpp
   GlobalExecutor.cpp
   Setup.cpp
@@ -47,6 +49,7 @@ add_library(swift_Concurrency
   CheckedContinuation.swift
   Clock.swift
   ContinuousClock.swift
+  CooperativeExecutor.swift
   Deque/_DequeBuffer.swift
   Deque/_DequeBufferHeader.swift
   Deque/_DequeSlot.swift
@@ -67,24 +70,34 @@ add_library(swift_Concurrency
   Deque/Deque+UnsafeHandle.swift
   Deque/UnsafeMutableBufferPointer+Utilities.swift
   DiscardingTaskGroup.swift
+  DummyExecutor.swift
   Errors.swift
   Executor.swift
   ExecutorAssertions.swift
+  ExecutorBridge.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
   PartialAsyncTask.swift
+  PlatformExecutorDarwin.swift
+  PlatformExecutorLinux.swift
+  PlatformExecutorFreeBSD.swift
+  PlatformExecutorOpenBSD.swift
+  PlatformExecutorWindows.swift
+  PriorityQueue.swift
   SourceCompatibilityShims.swift
   SuspendingClock.swift
   Task.swift
+  Task+PriorityEscalation.swift
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
+  TaskGroup+Embedded.swift
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
-  "${CMAKE_CURRENT_BINARY_DIR}/Task+startSynchronously.swift")
+  "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE
@@ -115,12 +128,14 @@ target_link_libraries(swift_Concurrency PRIVATE
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
   # Link to the runtime that we are just building.
-  swiftCore
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt>)
-target_link_options(swift_Concurrency PRIVATE
-  -nostartfiles)
+  swiftCore)
 set_target_properties(swift_Concurrency PROPERTIES
-  Swift_MODULE_NAME _Concurrency)
+  Swift_MODULE_NAME _Concurrency
+  LINKER_LANGUAGE CXX)
+if(NOT BUILD_SHARED_LIBS AND CMAKE_STATIC_LIBRARY_PREFIX_Swift)
+  set_target_properties(swift_Concurrency PROPERTIES
+    PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX_Swift})
+endif()
 
 install(TARGETS swift_Concurrency
   EXPORT SwiftCoreTargets

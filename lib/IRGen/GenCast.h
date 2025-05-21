@@ -28,6 +28,7 @@ namespace swift {
   class SILType;
   class ProtocolDecl;
   enum class CastConsumptionKind : unsigned char;
+  enum class CastingIsolatedConformances: uint8_t;
 
 namespace irgen {
   class Address;
@@ -46,7 +47,8 @@ namespace irgen {
                                Address dest,
                                CanType toType,
                                CastConsumptionKind consumptionKind,
-                               CheckedCastMode mode);
+                               CheckedCastMode mode,
+                              CastingIsolatedConformances isolatedConformances);
 
   void emitScalarCheckedCast(IRGenFunction &IGF, Explosion &value,
                              SILType sourceLoweredType,
@@ -54,11 +56,12 @@ namespace irgen {
                              SILType targetLoweredType,
                              CanType targetFormalType,
                              CheckedCastMode mode,
+                             CastingIsolatedConformances isolatedConformances,
                              Explosion &out);
 
   llvm::Value *emitFastClassCastIfPossible(
       IRGenFunction &IGF, llvm::Value *instance, CanType sourceFormalType,
-      CanType targetFormalType, bool sourceWrappedInOptional,
+      CanType targetFormalType, CheckedCastMode mode, bool sourceWrappedInOptional,
       llvm::BasicBlock *&nilCheckBB, llvm::BasicBlock *&nilMergeBB);
 
   /// Convert a class object to the given destination type,

@@ -491,6 +491,9 @@ public:
 
     addFunction(SILDeclRef(AFD));
 
+    ASSERT(ABIRoleInfo(AFD).providesAPI()
+              && "SILSymbolVisitorImpl visiting ABI-only decl?");
+
     if (auto dynKind = getDynamicKind(AFD)) {
       // Add the global function pointer for a dynamically replaceable function.
       Visitor.addDynamicFunction(AFD, *dynKind);
@@ -832,7 +835,6 @@ public:
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
         void addMethod(SILDeclRef declRef) {
-          // TODO: alternatively maybe prevent adding distributed thunk here rather than inside those?
           if (Resilient || WitnessMethodElimination) {
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
@@ -849,8 +851,8 @@ public:
           }
         }
 
-        void addAssociatedType(AssociatedType associatedType) {
-          Visitor.addAssociatedTypeDescriptor(associatedType.getAssociation());
+        void addAssociatedType(AssociatedTypeDecl *assocType) {
+          Visitor.addAssociatedTypeDescriptor(assocType);
         }
 
         void addProtocolConformanceDescriptor() {

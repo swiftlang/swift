@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
@@ -658,6 +659,15 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     }
   }
 
+  if (auto *uoc = dyn_cast<UncheckedOwnershipConversionInst>(value)) {
+    // When converting from `unowned`, which can happen for ObjectiveC blocks,
+    // we don't require and scope-ending instruction. This falls in the category:
+    // "trust me, I know what I'm doing".
+    if (uoc->getOperand()->getOwnershipKind() == OwnershipKind::Unowned) {
+      return true;
+    }
+  }
+
   // If we have an unowned value, then again there is nothing left to do.
   if (value->getOwnershipKind() == OwnershipKind::Unowned)
     return true;
@@ -856,6 +866,14 @@ void SILInstruction::verifyOperandOwnership(
   if (!getModule().getOptions().VerifyAll)
     return;
 #endif
+
+  if (getModule().getOptions().VerifyNone) {
+    return;
+  }
+
+  if (getFunction()->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
 
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().VerifySILOwnership)

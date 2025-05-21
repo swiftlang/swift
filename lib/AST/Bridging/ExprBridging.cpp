@@ -356,6 +356,26 @@ BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
       cParsedPath.unbridged(), hasLeadingDot);
 }
 
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsedPoundKeyPath(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cNames,
+    BridgedArrayRef cNameLocs, BridgedSourceLoc cRParenLoc) {
+
+  SmallVector<KeyPathExpr::Component> components;
+  auto cNameArr = cNames.unbridged<BridgedDeclNameRef>();
+  auto cNameLocArr = cNameLocs.unbridged<BridgedDeclNameLoc>();
+  for (size_t i = 0, e = cNameArr.size(); i != e; ++i) {
+    auto name = cNameArr[i].unbridged();
+    auto loc = cNameLocArr[i].unbridged().getBaseNameLoc();
+    components.push_back(KeyPathExpr::Component::forUnresolvedMember(
+        name, FunctionRefInfo::unappliedBaseName(), loc));
+  }
+
+  return KeyPathExpr::createParsedPoundKeyPath(
+      cContext.unbridged(), cPoundLoc.unbridged(), cLParenLoc.unbridged(),
+      components, cRParenLoc.unbridged());
+}
+
 BridgedSuperRefExpr
 BridgedSuperRefExpr_createParsed(BridgedASTContext cContext,
                                  BridgedSourceLoc cSuperLoc) {
@@ -443,6 +463,28 @@ BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc) {
   return new (cContext.unbridged()) NilLiteralExpr(cNilKeywordLoc.unbridged());
+}
+
+BridgedObjCSelectorExpr BridgedObjCSelectorExpr_createParsed(
+    BridgedASTContext cContext, BridgedObjCSelectorKind cKind,
+    BridgedSourceLoc cKeywordLoc, BridgedSourceLoc cLParenLoc,
+    BridgedSourceLoc cModifierLoc, BridgedExpr cSubExpr,
+    BridgedSourceLoc cRParenLoc) {
+  ObjCSelectorExpr::ObjCSelectorKind kind;
+  switch (cKind) {
+  case BridgedObjCSelectorKindMethod:
+    kind = ObjCSelectorExpr::Method;
+    break;
+  case BridgedObjCSelectorKindGetter:
+    kind = ObjCSelectorExpr::Getter;
+    break;
+  case BridgedObjCSelectorKindSetter:
+    kind = ObjCSelectorExpr::Setter;
+    break;
+  }
+  return new (cContext.unbridged()) ObjCSelectorExpr(
+      kind, cKeywordLoc.unbridged(), cLParenLoc.unbridged(),
+      cModifierLoc.unbridged(), cSubExpr.unbridged(), cRParenLoc.unbridged());
 }
 
 SWIFT_NAME("BridgedObjectLiteralKind.init(from:)")

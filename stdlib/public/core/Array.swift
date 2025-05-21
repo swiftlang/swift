@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -354,6 +354,17 @@ extension Array {
       _buffer = _buffer._consumeAndCreateNew()
     }
   }
+
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+  @inlinable
+  @_semantics("array.make_mutable")
+  @_effects(notEscaping self.**)
+  internal mutating func _makeMutableAndUniqueUnchecked() {
+    if _slowPath(!_buffer.beginCOWMutationUnchecked()) {
+      _buffer = _buffer._consumeAndCreateNew()
+    }
+  }
+#endif
 
   /// Marks the end of an Array mutation.
   ///
@@ -951,6 +962,7 @@ extension Array: RangeReplaceableCollection {
   /// Entry point for `Array` literal construction; builds and returns
   /// an Array of `count` uninitialized elements.
   @inlinable
+  @unsafe
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -966,6 +978,7 @@ extension Array: RangeReplaceableCollection {
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
   @inlinable
+  @unsafe
   @_semantics("array.uninitialized")
   @_effects(escaping storage => return.0.value**)
   @_effects(escaping storage.class*.value** => return.0.value**.class*.value**)
@@ -1427,7 +1440,7 @@ extension Array: RangeReplaceableCollection {
       return try unsafe body(bufferPointer)
     }
   }
-
+  
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
@@ -1611,6 +1624,27 @@ extension Array {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
 
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+#if _runtime(_ObjC)
+      if _slowPath(!_buffer._isNative) {
+        let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
+        let pointer = unsafe buffer.firstElementAddress
+        let count = buffer.immutableCount
+        let span = unsafe Span(_unsafeStart: pointer, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let pointer = unsafe _buffer.firstElementAddress
+      let count = _buffer.immutableCount
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_semantics("array.withUnsafeMutableBufferPointer")
@@ -1707,6 +1741,27 @@ extension Array {
 
     // Invoke the body.
     return try unsafe body(&inoutBufferPointer)
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(&self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      // _makeMutableAndUnique*() inserts begin_cow_mutation.
+      // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+      // We have runtime verification to check if begin_cow_mutation/end_cow_mutation are properly nested in asserts build of stdlib,
+      // disable checking whenever it is turned on since the compiler generated `end_cow_mutation_addr` is conservative and cannot be verified.
+      _makeMutableAndUniqueUnchecked()
+#else
+      _makeMutableAndUnique()
+#endif
+      let pointer = unsafe _buffer.firstElementAddress
+      let count = _buffer.mutableCount
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
   }
 
   @inlinable

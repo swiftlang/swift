@@ -555,6 +555,13 @@ Remangler::mangleDependentProtocolConformanceAssociated(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError
+Remangler::mangleDependentProtocolConformanceOpaque(Node *node,
+                                                    unsigned depth) {
+  // Dependent conformances aren't in the old mangling
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleProtocolConformance(Node *node, unsigned depth) {
   // type, protocol name, context
   DEMANGLER_ASSERT(node->getNumChildren() == 3, node);
@@ -1200,6 +1207,11 @@ ManglingError Remangler::mangleAsyncFunctionPointer(Node *node,
 
 ManglingError Remangler::mangleCoroFunctionPointer(Node *node, unsigned depth) {
   Buffer << "Twc";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleDefaultOverride(Node *node, unsigned depth) {
+  Buffer << "Twd";
   return ManglingError::Success;
 }
 
@@ -1971,6 +1983,11 @@ ManglingError Remangler::mangleCompileTimeLiteral(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
+ManglingError Remangler::mangleConstValue(Node *node, unsigned depth) {
+  Buffer << "Yg";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
 ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   Buffer << 'k';
   return mangleSingleChildNode(node, depth + 1); // type
@@ -2545,12 +2562,6 @@ ManglingError Remangler::mangleSILThunkIdentity(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleSILThunkHopToMainActorIfNeeded(Node *node,
-                                                              unsigned depth) {
-  Buffer << "<sil-hop-to-main-actor-if-needed-thunk>";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleDispatchThunk(Node *node, unsigned depth) {
   Buffer << "<dispatch-thunk>";
   return ManglingError::Success;
@@ -2715,6 +2726,18 @@ ManglingError Remangler::mangleKeyPathSetterThunkHelper(Node *node,
   return mangleChildNodes(node, depth + 1);
 }
 
+ManglingError
+Remangler::mangleKeyPathUnappliedMethodThunkHelper(Node *node, unsigned depth) {
+  Buffer << "Tkmu";
+  return mangleChildNodes(node, depth + 1);
+}
+
+ManglingError Remangler::mangleKeyPathAppliedMethodThunkHelper(Node *node,
+                                                               unsigned depth) {
+  Buffer << "TkMA";
+  return mangleChildNodes(node, depth + 1);
+}
+
 ManglingError Remangler::mangleKeyPathEqualsThunkHelper(Node *node,
                                                         unsigned depth) {
   Buffer << "TH";
@@ -2857,6 +2880,10 @@ ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleSugaredArray(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleSugaredInlineArray(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 

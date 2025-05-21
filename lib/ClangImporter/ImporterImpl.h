@@ -217,6 +217,10 @@ enum class ImportTypeAttr : uint8_t {
   ///
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter = 1 << 5,
+
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((swift_attr("sending"))) .
+  Sending = 1 << 6,
 };
 
 /// Find and iterate over swift attributes embedded in the type
@@ -474,8 +478,6 @@ public:
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
-  const bool UseClangIncludeTree;
-  bool importSymbolicCXXDecls;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -1722,8 +1724,15 @@ public:
 
     if constexpr (std::is_base_of_v<NominalTypeDecl, DeclTy>) {
       // Estimate brace locations.
-      auto begin = ClangN.getAsDecl()->getBeginLoc();
-      auto end = ClangN.getAsDecl()->getEndLoc();
+      clang::SourceLocation begin;
+      clang::SourceLocation end;
+      if (auto *td = dyn_cast_or_null<clang::TagDecl>(ClangN.getAsDecl())) {
+        begin = td->getBraceRange().getBegin();
+        end = td->getBraceRange().getEnd();
+      } else {
+        begin = ClangN.getAsDecl()->getBeginLoc();
+        end = ClangN.getAsDecl()->getEndLoc();
+      }
       SourceRange range;
       if (begin.isValid() && end.isValid() && D->getNameLoc().isValid())
         range = SourceRange(importSourceLoc(begin), importSourceLoc(end));
@@ -1732,6 +1741,11 @@ public:
       }
       assert(range.isValid() == D->getNameLoc().isValid());
       D->setBraces(range);
+#ifndef NDEBUG
+      auto declRange = D->getSourceRange();
+      CharSourceRange checkValidRange(SwiftContext.SourceMgr, declRange.Start,
+                                      declRange.End);
+#endif
     }
 
     // SwiftAttrs on ParamDecls are interpreted by applyParamAttributes().
@@ -1890,6 +1904,10 @@ namespace importer {
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
 
+/// Returns true if the given C/C++ reference type uses "immortal"
+/// retain/release functions.
+bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -1914,6 +1932,7 @@ void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx,
+                                  bool requiresBuiltinHeadersInSystemModules,
                                   bool ignoreClangTarget);
 
 /// Finds a particular kind of nominal by looking through typealiases.
@@ -2042,16 +2061,23 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   return std::nullopt;
 }
 
-inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
-#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
-  if (OperatorToken == Spelling) {                                             \
-    return "__operator" #Name;                                                 \
-  };
-#include "clang/Basic/OperatorKinds.def"
-  return "None";
-}
+/// Construct the imported Swift name for an imported Clang operator kind,
+/// e.g., \c "__operatorPlus" for Clang::OO_Plus.
+///
+/// Returns an empty identifier (internally, a nullptr) when \a op does not
+/// represent an actual operator, i.e., OO_None or NUM_OVERLOADED_OPERATORS.
+Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 
+/// Construct the imported Swift name corresponding to an operator identifier,
+/// e.g., \c "__operatorPlus" for \c "+".
+///
+/// Returns an empty identifier (internally, a nullptr) when \a op does not
+/// correspond to an overloaded C++ operator.
+Identifier getOperatorName(ASTContext &ctx, Identifier op);
+
+bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
+bool hasIteratorAPIAttr(const clang::Decl *decl);
 
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 

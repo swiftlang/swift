@@ -1217,7 +1217,7 @@ static bool findEscapeOrMutationUses(Operand *op,
       if (isa<PartialApplyInst>(parent))
         return false;
       state.accumulatedEscapes.push_back(
-          &userMDI->getOperandRef(MarkDependenceInst::Value));
+          &userMDI->getOperandRef(MarkDependenceInst::Dependent));
       return true;
     }
   }

@@ -41,6 +41,17 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   set(SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES Darwin)
 endif()
 
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # We need to make this dependency explicit because this library
+  # imports Darwin and Darwin re-exports _Builtin_float,
+  # but in most configurations we pull Darwin from the SDK,
+  # meaning we specify no Darwin dependency in the build system
+  list(APPEND SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES _Builtin_float)
+endif()
+
 set(SWIFT_SYNCHRONIZATION_DARWIN_SOURCES
   Mutex/DarwinImpl.swift
   Mutex/Mutex.swift
@@ -182,7 +193,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
       SWIFT_COMPILE_FLAGS
         ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
-        -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
+        -Xcc -ffreestanding -enable-experimental-feature Embedded
 
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"

@@ -333,7 +333,14 @@ public:
 
   /// Enable enforcement of lifetime dependencies on addressable arguments.
   /// Temporarily used to bootstrap the AddressableParameters feature.
-  bool EnableAddressDependencies = false;
+  bool EnableAddressDependencies = true;
+
+  // Whether to allow merging traps and cond_fails.
+  bool MergeableTraps = false;
+
+  /// Whether the @yield_once_2 convention is used by accessors added with the
+  /// CoroutineAccessors feature (i.e. read2/modify2).
+  bool CoroutineAccessorsUseYieldOnce2 = false;
 
   SILOptions() {}
 

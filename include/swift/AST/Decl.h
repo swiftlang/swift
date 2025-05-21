@@ -169,6 +169,7 @@ enum class DescriptiveDeclKind : uint8_t {
   PostfixOperator,
   PrecedenceGroup,
   TypeAlias,
+  GenericTypeAlias,
   GenericTypeParam,
   AssociatedType,
   Type,
@@ -183,7 +184,6 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericClass,
   GenericActor,
   GenericDistributedActor,
-  GenericType,
   Subscript,
   StaticSubscript,
   ClassSubscript,
@@ -310,6 +310,9 @@ struct OverloadSignature {
   /// Whether this is a macro.
   unsigned IsMacro : 1;
 
+  /// Whether this is a generic argument.
+  unsigned IsGenericArg : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
@@ -323,8 +326,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsEnumElement(false), IsNominal(false),
+        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -735,7 +740,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -804,10 +809,7 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1,
-
-    /// Whether this module has enabled `ExtensibleEnums` feature.
-    ExtensibleEnums : 1
+    StrictMemorySafety : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1041,6 +1043,10 @@ public:
   /// from source code.
   void attachParsedAttrs(DeclAttributes attrs);
 
+  /// Retrieve the custom name in the \c @objc attribute, if present.
+  std::optional<ObjCSelector>
+  getExplicitObjCName(bool allowInvalid = false) const;
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
@@ -1144,6 +1150,10 @@ public:
   /// \Note this method returns \c false if this declaration was
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
+
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context, and the macro was attached to a node imported from clang.
+  bool isInMacroExpansionFromClangHeader() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -1475,11 +1485,6 @@ public:
   /// extension) that makes it unavailable.
   std::optional<SemanticAvailableAttr> getUnavailableAttr() const;
 
-  /// Returns true if the decl is effectively always unavailable in the current
-  /// compilation context. This query differs from \c isUnavailable() because it
-  /// takes the availability of parent declarations into account.
-  bool isSemanticallyUnavailable() const;
-
   /// Returns true if code associated with this declaration should be considerd
   /// unreachable at runtime because the declaration is unavailable in all
   /// execution contexts in which the code may run. This result takes the
@@ -1509,6 +1514,16 @@ public:
 
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
+
+  /// Return the declaration upon which the attributes for this declaration
+  /// would appear in concrete syntax. This function is necessary because for
+  /// semantic analysis, the parser attaches attributes to declarations other
+  /// than those on which they, concretely, appear.
+  const Decl *getConcreteSyntaxDeclForAttributes() const;
+
+  /// Return the declaration to which the parser actually attaches attributes in
+  /// the abstract syntax tree (see `getConcreteSyntaxDeclForAttributes()`).
+  const Decl *getAbstractSyntaxDeclForAttributes() const;
 
   /// Apply the specified function to decls that should be placed _next_ to
   /// this decl when constructing AST.
@@ -1806,16 +1821,20 @@ private:
   /// This is true in cases like ~Copyable but not (P & ~Copyable).
   bool IsSuppressed : 1;
 
+  /// The global actor isolation provided (for a conformance).
+  TypeExpr *globalActorIsolationType = nullptr;
+
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, ProtocolConformanceOptions options,
                  bool isSuppressed = false)
       : TypeLoc(typeLoc), RawOptions(options.toRaw()),
-        IsSuppressed(isSuppressed) {}
+        IsSuppressed(isSuppressed),
+        globalActorIsolationType(options.getGlobalActorIsolationType()) {}
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(RawOptions);
+    return ProtocolConformanceOptions(RawOptions, globalActorIsolationType);
   }
 
   bool isUnchecked() const {
@@ -1827,8 +1846,12 @@ public:
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
-  bool isIsolated() const {
-    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  bool isNonisolated() const {
+    return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
+  }
+
+  TypeExpr *getGlobalActorIsolationType() const {
+    return globalActorIsolationType;
   }
 
   ExplicitSafety getExplicitSafety() const {
@@ -2270,6 +2293,7 @@ private:
   // Flags::Checked.
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   bool isFullyValidated() const {
     return InitContextAndFlags.getInt().contains(
@@ -2418,8 +2442,20 @@ private:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  /// Retrieve the computed capture info, or \c nullopt if it hasn't been
+  /// computed yet.
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    ASSERT(!Captures.hasBeenComputed());
+    ASSERT(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2443,6 +2479,7 @@ class PatternBindingDecl final : public Decl,
   friend class Decl;
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
@@ -2486,9 +2523,7 @@ public:
                                                Pattern *Pat, Expr *E,
                                                DeclContext *Parent);
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : VarLoc;
-  }
+  SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
 
   unsigned getNumPatternEntries() const {
@@ -2622,13 +2657,9 @@ public:
     getMutablePatternList()[i].setInitContext(init);
   }
 
-  CaptureInfo getCaptureInfo(unsigned i) const {
-    return getPatternList()[i].getCaptureInfo();
-  }
-
-  void setCaptureInfo(unsigned i, CaptureInfo captures) {
-    getMutablePatternList()[i].setCaptureInfo(captures);
-  }
+  /// Retrieve the capture info for the initializer at the given index,
+  /// computing if needed.
+  CaptureInfo getCaptureInfo(unsigned i) const;
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -3184,6 +3215,11 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  /// Returns whether accesses to this declaration are asynchronous.
+  /// If the declaration is neither `AbstractFunctionDecl` nor
+  /// `AbstractStorageDecl`, returns `false`.
+  bool isAsync() const;
+
 private:
   bool isObjCDynamic() const {
     return isObjC() && isDynamic();
@@ -3306,6 +3342,14 @@ public:
   /// Note that not all declarations with function interface types have
   /// parameter lists, for example an enum element without associated values.
   bool hasParameterList() const;
+
+  /// Returns the parameter list directly associated with this declaration,
+  /// or `nullptr` if there is none.
+  ///
+  /// Note that some declarations with function interface types do not have
+  /// parameter lists. For example, an enum element without associated values.
+  ParameterList *getParameterList();
+  const ParameterList *getParameterList() const;
 
   /// Returns the number of curry levels in the declaration's interface type.
   unsigned getNumCurryLevels() const;
@@ -5885,12 +5929,20 @@ public:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
   bool isCompileTimeLiteral() const;
+  bool isConstValue() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
   /// Return the interface type of the stored value.
   Type getValueInterfaceType() const;
+
+  /// Retrieve the source range of the variable type, or an invalid range if the
+  /// variable's type is not explicitly written in the source.
+  ///
+  /// Only for use in diagnostics.  It is not always possible to always
+  /// precisely point to the variable type because of type aliases.
+  SourceRange getTypeSourceRangeForDiagnostics() const;
 
   /// Determine how this storage is implemented.
   StorageImplInfo getImplInfo() const;
@@ -6194,10 +6246,16 @@ public:
                               bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
-  AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind, ModuleDecl *module,
-                                   ResilienceExpansion expansion,
-                                   bool useOldABI) const;
+  AccessStrategy getAccessStrategy(
+      AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+      ResilienceExpansion expansion,
+      std::optional<std::pair<SourceRange, const DeclContext *>> location,
+      bool useOldABI) const;
+
+  /// Whether access is via physical storage.
+  bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
+                                    AccessKind accessKind, ModuleDecl *module,
+                                    ResilienceExpansion expansion) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -6325,13 +6383,6 @@ public:
   /// environment of its parent DeclContext. Make sure this is what you want
   /// and not just getInterfaceType().
   Type getTypeInContext() const;
-
-  /// Retrieve the source range of the variable type, or an invalid range if the
-  /// variable's type is not explicitly written in the source.
-  ///
-  /// Only for use in diagnostics.  It is not always possible to always
-  /// precisely point to the variable type because of type aliases.
-  SourceRange getTypeSourceRangeForDiagnostics() const;
 
   /// Determine the mutability of this variable declaration when
   /// accessed from a given declaration context.
@@ -6816,6 +6867,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is '_const'.
     IsCompileTimeLiteral = 1 << 1,
+
+    /// Whether or not this parameter is '@const'.
+    IsConstValue = 1 << 2,
   };
 
   llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
@@ -6861,6 +6915,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
+
+    /// Whether or not this parameter is isolated to a caller.
+    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -6937,6 +6994,10 @@ public:
 
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
+
+  static ParamDecl *cloneAccessor(const ASTContext &Ctx,
+                                  ParamDecl const *subscriptParam,
+                                  DeclContext *Parent);
 
   static ParamDecl *
   createImplicit(ASTContext &Context, SourceLoc specifierLoc,
@@ -7149,6 +7210,18 @@ public:
       removeFlag(Flag::IsSending);
   }
 
+  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
+  bool isCallerIsolated() const {
+    return getOptions().contains(Flag::IsCallerIsolated);
+  }
+
+  void setCallerIsolated(bool value = true) {
+    if (value)
+      addFlag(Flag::IsCallerIsolated);
+    else
+      removeFlag(Flag::IsCallerIsolated);
+  }
+
   /// Whether or not this parameter is marked with '@_addressable'.
   bool isAddressable() const {
     return getOptions().contains(Flag::IsAddressable);
@@ -7171,6 +7244,19 @@ public:
     auto flags = ArgumentNameAndFlags.getInt();
     flags = value ? flags | ArgumentNameFlags::IsCompileTimeLiteral
                   : flags - ArgumentNameFlags::IsCompileTimeLiteral;
+    ArgumentNameAndFlags.setInt(flags);
+  }
+
+  /// Whether or not this parameter is marked with '@const'.
+  bool isConstVal() const {
+    return ArgumentNameAndFlags.getInt().contains(
+        ArgumentNameFlags::IsConstValue);
+  }
+
+  void setConstValue(bool value = true) {
+    auto flags = ArgumentNameAndFlags.getInt();
+    flags = value ? flags | ArgumentNameFlags::IsConstValue
+                  : flags - ArgumentNameFlags::IsConstValue;
     ArgumentNameAndFlags.setInt(flags);
   }
 
@@ -8059,6 +8145,11 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
+  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// formalizing the attribute.
+  std::optional<ForeignLanguage> getCDeclKind() const;
+
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
@@ -8091,8 +8182,6 @@ public:
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
-
-  std::optional<ExecutionKind> getExecutionBehavior() const;
 
   /// Whether the declaration is later overridden in the module
   ///
@@ -8157,6 +8246,18 @@ public:
 
   /// The async function marked as the alternative to this function, if any.
   AbstractFunctionDecl *getAsyncAlternative() const;
+
+  /// True if the storage can be referenced by a keypath directly.
+  /// Otherwise, its override must be referenced.
+  bool isValidKeyPathComponent() const;
+
+  /// Do we need to use resilient access patterns outside of this
+  /// method's resilience domain?
+  bool isResilient() const;
+
+  /// Do we need to use resilient access patterns when accessing this
+  /// method from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the
@@ -8314,9 +8415,8 @@ public:
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
-  }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
@@ -9707,14 +9807,6 @@ inline bool ValueDecl::hasCurriedSelf() const {
   return false;
 }
 
-inline bool ValueDecl::hasParameterList() const {
-  if (auto *eed = dyn_cast<EnumElementDecl>(this))
-    return eed->hasAssociatedValues();
-  if (auto *macro = dyn_cast<MacroDecl>(this))
-    return macro->parameterList != nullptr;
-  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
-}
-
 inline unsigned ValueDecl::getNumCurryLevels() const {
   unsigned curryLevels = 0;
   if (hasParameterList())
@@ -9801,10 +9893,6 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   }
   return result;
 }
-
-/// Retrieve the parameter list for a given declaration, or nullptr if there
-/// is none.
-ParameterList *getParameterList(ValueDecl *source);
 
 /// Retrieve the parameter list for a given declaration context, or nullptr if
 /// there is none.

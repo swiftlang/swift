@@ -112,8 +112,7 @@ PackType *PackConformance::getTypeWitness(
     // conformance.
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
       auto assocTypePattern =
-        conformances[i].getTypeWitness(packExpansion->getPatternType(),
-                                       assocType, options);
+        conformances[i].getTypeWitness(assocType, options);
 
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
@@ -121,8 +120,7 @@ PackType *PackConformance::getTypeWitness(
     // If the pack element is a scalar type, replace the scalar type with
     // the associated type witness from the pattern conformance.
     } else {
-      auto assocTypeScalar =
-        conformances[i].getTypeWitness(packElement, assocType, options);
+      auto assocTypeScalar = conformances[i].getTypeWitness(assocType, options);
       packElements.push_back(assocTypeScalar);
     }
   }
@@ -144,24 +142,20 @@ PackConformance *PackConformance::getAssociatedConformance(
     auto packElement = ConformingType->getElementType(i);
 
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
-      auto assocTypePattern =
-        conformances[i].getAssociatedType(packExpansion->getPatternType(),
-                                          assocType);
+      auto assocConformancePattern =
+        conformances[i].getAssociatedConformance(assocType, protocol);
+      packConformances.push_back(assocConformancePattern);
+
+      auto assocTypePattern = assocConformancePattern.getType();
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
-
-      auto assocConformancePattern =
-        conformances[i].getAssociatedConformance(packExpansion->getPatternType(),
-                                                 assocType, protocol);
-      packConformances.push_back(assocConformancePattern);
     } else {
-      auto assocTypeScalar =
-        conformances[i].getAssociatedType(packElement, assocType);
-      packElements.push_back(assocTypeScalar);
-
       auto assocConformanceScalar =
-        conformances[i].getAssociatedConformance(packElement, assocType, protocol);
+        conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformanceScalar);
+
+      auto assocTypeScalar = assocConformanceScalar.getType();
+      packElements.push_back(assocTypeScalar);
     }
   }
 
@@ -202,15 +196,12 @@ PackConformance::subst(InFlightSubstitution &IFS) const {
         // Just substitute the conformance.  We don't directly represent
         // pack expansion conformances here; it's sort of implicit in the
         // corresponding pack element type.
-        substConformances.push_back(
-            origConformances[i].subst(origExpansion->getPatternType(), IFS));
+        substConformances.push_back(origConformances[i].subst(IFS));
       });
     } else {
       // Substitute a scalar element of the original pack.
       substElementTypes.push_back(origElementType.subst(IFS));
-
-      substConformances.push_back(
-          origConformances[i].subst(origElementType, IFS));
+      substConformances.push_back(origConformances[i].subst(IFS));
     }
   }
 

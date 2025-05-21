@@ -8,6 +8,16 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
+@_unsafeNonescapableResult
+@lifetime(copy source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  dependent
+}
+
 // Some container-ish thing.
 struct CN: ~Copyable {
   let p: UnsafeRawPointer
@@ -45,9 +55,10 @@ struct MBV : ~Escapable, ~Copyable {
   }
 
   // Requires a borrow.
-  @lifetime(self)
+  @lifetime(copy self)
   borrowing func getBV() -> BV {
-    BV(p, i)
+    let bv = BV(p, i)
+    return _overrideLifetime(bv, copying: self)
   }
 }
 
@@ -55,25 +66,26 @@ struct MBV : ~Escapable, ~Copyable {
 struct NEBV : ~Escapable {
   var bv: BV
 
+  @lifetime(copy bv)
   init(_ bv: consuming BV) {
     self.bv = bv
   }
 }
 
 // Propagate a borrow.
-@lifetime(container)
+@lifetime(copy container)
 func bv_get_borrow(container: borrowing MBV) -> BV {
   container.getBV()
 }
 
 // Copy a borrow.
-@lifetime(container)
+@lifetime(copy container)
 func bv_get_copy(container: borrowing MBV) -> BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-@lifetime(container)
+@lifetime(copy container)
 func bv_get_mutate(container: inout MBV) -> BV {
   container.getBV()
 }

@@ -120,14 +120,16 @@ func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor'
 // Make sure we don't infer 'nonisolated' for stored properties.
 @MainActor
 protocol Interface {
-  nonisolated var baz: Int { get } // expected-note{{requirement 'baz' declared here}}
+  nonisolated var baz: Int { get }
 }
 
+// expected-warning@+2{{conformance of 'Object' to protocol 'Interface' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 class Object: Interface {
-  // expected-note@-1{{add '@preconcurrency' to the 'Interface' conformance to defer isolation checking to run time}}{{15-15=@preconcurrency }}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{15-15=@preconcurrency }}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
 
-  var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated requirement from protocol 'Interface'}}
+  var baz: Int = 42 // expected-note{{main actor-isolated property 'baz' cannot satisfy nonisolated requirement}}
 }
 
 

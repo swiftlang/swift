@@ -41,14 +41,14 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(native: __owned _NativeDictionary<Key, Value>) {
-      self.object = unsafe _BridgeStorage(native: native._storage)
+      unsafe self.object = _BridgeStorage(native: native._storage)
     }
 
     @inlinable
     @inline(__always)
     init(dummy: Void) {
 #if _pointerBitWidth(_64) && !$Embedded
-      self.object = unsafe _BridgeStorage(taggedPayload: 0)
+      unsafe self.object = _BridgeStorage(taggedPayload: 0)
 #elseif _pointerBitWidth(_32) || $Embedded
       self.init(native: _NativeDictionary())
 #else
@@ -60,7 +60,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(cocoa: __owned __CocoaDictionary) {
-      self.object = unsafe _BridgeStorage(objC: cocoa.object)
+      unsafe self.object = _BridgeStorage(objC: cocoa.object)
     }
 #endif
   }
@@ -83,7 +83,7 @@ extension Dictionary._Variant {
   @usableFromInline @_transparent
   internal var isNative: Bool {
     if guaranteedNative { return true }
-    return object.isUnflaggedNative
+    return unsafe object.isUnflaggedNative
   }
 #endif
 
@@ -98,7 +98,7 @@ extension Dictionary._Variant {
     _modify {
       var native = unsafe _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
-      defer { object = unsafe .init(native: native._storage) }
+      defer { unsafe object = .init(native: native._storage) }
       yield &native
     }
   }
@@ -324,7 +324,7 @@ extension Dictionary._Variant {
         cocoa, capacity: cocoa.count + 1)
       let result = native.mutatingFind(key, isUnique: true)
       self = .init(native: native)
-      return unsafe result
+      return result
     }
 #endif
     let isUnique = isUniquelyReferenced()
@@ -391,7 +391,7 @@ extension Dictionary._Variant {
     // operation.
     let native = ensureUniqueNative()
     let bucket = native.validatedBucket(for: index)
-    return asNative.uncheckedRemove(at: bucket, isUnique: true)
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: true)
   }
 
   @inlinable
@@ -404,7 +404,7 @@ extension Dictionary._Variant {
       var native = _NativeDictionary<Key, Value>(cocoa)
       let (bucket, found) = native.find(key)
       _precondition(found, "Bridging did not preserve equality")
-      let old = native.uncheckedRemove(at: bucket, isUnique: true).value
+      let old = unsafe native.uncheckedRemove(at: bucket, isUnique: true).value
       self = .init(native: native)
       return old
     }
@@ -412,7 +412,7 @@ extension Dictionary._Variant {
     let (bucket, found) = asNative.find(key)
     guard found else { return nil }
     let isUnique = isUniquelyReferenced()
-    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
+    return unsafe asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
   }
 
   @inlinable

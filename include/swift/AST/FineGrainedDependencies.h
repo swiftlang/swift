@@ -137,10 +137,6 @@ public:
 template <typename Key1, typename Key2, typename Value> class TwoStageMap {
 public:
   // Define this here so it can be changed easily.
-  // TODO: Use llvm structure such as DenseMap. However, DenseMap does not
-  // preserve pointers to elements, so be careful!
-  // TODO: Consider using an ordered structure to guarantee determinism
-  // when compilation order changes.
   template <typename Key, typename MapValue>
   using Map = std::unordered_map<Key, MapValue>;
 
@@ -187,32 +183,6 @@ public:
 
   /// Returns the submap at \p k1. May create one if not present.
   Map<Key2, Value> &operator[](const Key1 &k1) { return map[k1]; }
-
-  /// Invoke \p fn on each Key2 and Value matching (k, *)
-  void forEachValueMatching(
-      const Key1 &k1,
-      function_ref<void(const Key2 &, const Value &)> fn) const {
-    const auto &iter = map.find(k1);
-    if (iter == map.end())
-      return;
-    for (auto &p : iter->second)
-      fn(p.first, p.second);
-  }
-
-  /// Invoke \p fn for each entry
-  void forEachEntry(
-      function_ref<void(const Key1 &, const Key2 &, const Value &)> fn) const {
-    for (const auto &p : map)
-      for (const auto &p2 : p.second)
-        fn(p.first, p2.first, p2.second);
-  }
-
-  /// Invoke fn for each Key1 and submap
-  void
-  forEachKey1(function_ref<void(const Key1 &, const InnerMap &)> fn) const {
-    for (const auto &p : map)
-      fn(p.first, p.second);
-  }
 
   /// Check integrity and call \p verifyFn for each element, so that element can
   /// be verified.
@@ -290,36 +260,6 @@ public:
   /// Return the erased value.
   Value findAndErase(const Key2 &k2, const Key1 &k1) {
     return findAndErase(k1, k2);
-  }
-
-  /// Invoke \p fn on each Key2 and Value matching (\p k1, *)
-  void forEachValueMatching(
-      const Key1 &k1,
-      function_ref<void(const Key2 &, const Value &)> fn) const {
-    map1.forEachValueMatching(k1, fn);
-  }
-
-  /// Invoke \p fn on each Key1 and Value matching (*, \p k2)
-  void forEachValueMatching(
-      const Key2 &k2,
-      function_ref<void(const Key1 &, const Value &)> fn) const {
-    map2.forEachValueMatching(k2, fn);
-  }
-
-  /// Invoke \p fn for each entry
-  void forEachEntry(
-      function_ref<void(const Key1 &, const Key2 &, const Value &)> fn) const {
-    map1.forEachEntry(fn);
-  }
-
-  /// Invoke fn for each Key1 and submap
-  void forEachKey1(function_ref<void(const Key1 &, const Key2Map &)> fn) const {
-    map1.forEachKey1(fn);
-  }
-
-  /// Invoke fn for each Key2 and submap
-  void forEachKey2(function_ref<void(const Key1 &, const Key1Map &)> fn) const {
-    map2.forEachKey1(fn);
   }
 
   /// Verify the integrity of each map and the cross-map consistency.

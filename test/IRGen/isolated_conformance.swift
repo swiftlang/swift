@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -swift-version 6 -enable-experimental-feature IsolatedConformances | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -swift-version 6 | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: PTRSIZE=64
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_IsolatedConformances
 // UNSUPPORTED: CPU=arm64e
 
 protocol P {
@@ -17,6 +16,6 @@ protocol P {
 // CHECK-SAME: ScM
 // CHECK-SAME: $sScMs11GlobalActorsMc"
 @MainActor
-struct X<T>: isolated P {
+struct X<T>: @MainActor P {
   func f() { }
 }

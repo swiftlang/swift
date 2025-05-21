@@ -368,11 +368,9 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
           return;
 
       emittedError = true;
-      auto diag = diags.diagnose(decl->getStartLoc(),
-                                 diag::override_optional_mismatch,
-                                 member->getDescriptiveKind(),
-                                 isa<SubscriptDecl>(member),
-                                 parentParamTy, paramTy);
+      auto diag = diags.diagnose(
+          decl->getStartLoc(), diag::override_optional_mismatch, member,
+          isa<SubscriptDecl>(member), parentParamTy, paramTy);
       if (repr->isSimple()) {
         diag.fixItInsertAfter(repr->getEndLoc(), "?");
       } else {
@@ -392,8 +390,8 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
     }
 
     diags
-        .diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
-                  member->getDescriptiveKind(), parentParamTy, paramTy)
+        .diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO, member,
+                  parentParamTy, paramTy)
         .highlight(repr->getSourceRange());
 
     if (auto iuoRepr = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
@@ -435,11 +433,10 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       if (parentResultTy->getOptionalObjectType())
         return;
       emittedError = true;
-      auto diag = diags.diagnose(resultTL.getSourceRange().Start,
-                                 diag::override_optional_result_mismatch,
-                                 member->getDescriptiveKind(),
-                                 isa<SubscriptDecl>(member),
-                                 parentResultTy, resultTy);
+      auto diag =
+          diags.diagnose(resultTL.getSourceRange().Start,
+                         diag::override_optional_result_mismatch, member,
+                         isa<SubscriptDecl>(member), parentResultTy, resultTy);
       if (auto optForm = dyn_cast<OptionalTypeRepr>(TR)) {
         diag.fixItRemove(optForm->getQuestionLoc());
       } else if (auto iuoForm =
@@ -458,10 +455,11 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
         return;
     }
 
-    diags.diagnose(resultTL.getSourceRange().Start,
-                   diag::override_unnecessary_result_IUO,
-                   member->getDescriptiveKind(), parentResultTy, resultTy)
-      .highlight(resultTL.getSourceRange());
+    diags
+        .diagnose(resultTL.getSourceRange().Start,
+                  diag::override_unnecessary_result_IUO, member, parentResultTy,
+                  resultTy)
+        .highlight(resultTL.getSourceRange());
 
     auto sugaredForm = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TR);
     if (sugaredForm) {
@@ -525,7 +523,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
           if (!HasNotes)
             return std::nullopt;
           return diags.diagnose(decl, diag::override_type_mismatch_with_fixits,
-                                base->getDescriptiveKind(), baseTy);
+                                base, baseTy);
         });
   }
 
@@ -648,8 +646,8 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   if ((isa<AbstractFunctionDecl>(derivedDecl) &&
        isa<AbstractFunctionDecl>(baseDecl)) ||
       isa<SubscriptDecl>(baseDecl)) {
-    derivedParams = getParameterList(const_cast<ValueDecl *>(derivedDecl));
-    baseParams = getParameterList(const_cast<ValueDecl *>(baseDecl));
+    derivedParams = derivedDecl->getParameterList();
+    baseParams = baseDecl->getParameterList();
   }
 
   if (!derivedParams && !baseParams) {
@@ -1115,8 +1113,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
         .fixItReplace(cast<FuncDecl>(decl)->getFuncLoc(), getTokenText(tok::kw_var))
         .fixItReplace(cast<FuncDecl>(decl)->getParameters()->getSourceRange(), ": Int");
     } else {
-      diags.diagnose(decl, diag::override_of_non_open,
-                     decl->getDescriptiveKind());
+      diags.diagnose(decl, diag::override_of_non_open, decl);
     }
   } else if (baseHasOpenAccess &&
              classDecl->hasOpenAccess(dc) &&
@@ -1124,9 +1121,8 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
              !decl->isSemanticallyFinal()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
-                                 /*setter*/false,
-                                 decl->getDescriptiveKind(),
-                                 /*fromOverridden*/true);
+                                 /*setter*/ false, decl,
+                                 /*fromOverridden*/ true);
       fixItAccess(diag, decl, AccessLevel::Open);
     }
     diags.diagnose(baseDecl, diag::overridden_here);
@@ -1167,10 +1163,9 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       AccessLevel requiredAccess =
         requiredAccessScope->requiredAccessForDiagnostics();
       {
-        auto diag = diags.diagnose(decl, diag::override_not_accessible,
-                                   shouldDiagnoseSetter,
-                                   decl->getDescriptiveKind(),
-                                   overriddenForcesAccess);
+        auto diag =
+            diags.diagnose(decl, diag::override_not_accessible,
+                           shouldDiagnoseSetter, decl, overriddenForcesAccess);
         fixItAccess(diag, decl, requiredAccess, shouldDiagnoseSetter);
       }
       diags.diagnose(baseDecl, diag::overridden_here);
@@ -1593,13 +1588,13 @@ namespace  {
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
+    UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Documentation)
     UNINTERESTING_ATTR(Dynamic)
     UNINTERESTING_ATTR(DynamicCallable)
     UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
-    UNINTERESTING_ATTR(Execution)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
@@ -1615,6 +1610,8 @@ namespace  {
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Exclusivity)
+    UNINTERESTING_ATTR(Extensible)
+    UNINTERESTING_ATTR(PreEnumExtensibility)
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(NoRuntime)
@@ -1726,6 +1723,7 @@ namespace  {
     UNINTERESTING_ATTR(NoMetadata)
     UNINTERESTING_ATTR(CompileTimeLiteral)
     UNINTERESTING_ATTR(ConstVal)
+    UNINTERESTING_ATTR(ConstInitialized)
 
     UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
@@ -1824,7 +1822,7 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
 
   // Allow overrides that are not as available as the base decl as long as the
   // override is as available as its context.
-  auto availabilityContext = TypeChecker::availabilityForDeclSignature(
+  auto availabilityContext = AvailabilityContext::forDeclSignature(
       override->getDeclContext()->getSelfNominalTypeDecl());
 
   return availabilityContext.getPlatformRange().isContainedIn(overrideInfo);
@@ -1933,7 +1931,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
     // If the parent of the override is unavailable, then the unavailability of
     // the override decl is irrelevant.
-    if (overrideParent->isSemanticallyUnavailable())
+    if (AvailabilityContext::forDeclSignature(overrideParent).isUnavailable())
       return {OverrideUnavailabilityStatus::Ignored, std::nullopt};
   }
 
@@ -2042,12 +2040,12 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure an effectful storage decl is only overridden by a storage
     // decl with the same or fewer effect kinds.
     if (!overrideASD->isLessEffectfulThan(baseASD, EffectKind::Async)) {
-      diags.diagnose(overrideASD, diag::override_with_more_effects,
-                     overrideASD->getDescriptiveKind(), "async");
+      diags.diagnose(overrideASD, diag::override_with_more_effects, overrideASD,
+                     "async");
       return true;
     } else if (!overrideASD->isLessEffectfulThan(baseASD, EffectKind::Throws)) {
-      diags.diagnose(overrideASD, diag::override_with_more_effects,
-                     overrideASD->getDescriptiveKind(), "throwing");
+      diags.diagnose(overrideASD, diag::override_with_more_effects, overrideASD,
+                     "throwing");
       return true;
     }
   }
@@ -2097,7 +2095,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
       overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
       !override->isImplicit() &&
-      override->getDeclContext()->getParentSourceFile()) {
+      override->getDeclContext()->getParentSourceFile() &&
+      ABIRoleInfo(override).providesAPI()) {
     auto theDiag =
       overrideRequiresKeyword(base) == OverrideRequiresKeyword::Always
         ? diag::missing_override
@@ -2152,15 +2151,14 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     switch (compareThrownErrorsForSubtyping(
                 overrideThrownError, baseThrownError, overrideFn)) {
     case ThrownErrorSubtyping::DropsThrows:
-      diags.diagnose(override, diag::override_with_more_effects,
-                     override->getDescriptiveKind(), "throwing");
+      diags.diagnose(override, diag::override_with_more_effects, override,
+                     "throwing");
       diags.diagnose(base, diag::overridden_here);
       break;
 
     case ThrownErrorSubtyping::Mismatch:
-      diags.diagnose(override, diag::override_typed_throws,
-                     override->getDescriptiveKind(), overrideThrownError,
-                     baseThrownError);
+      diags.diagnose(override, diag::override_typed_throws, overrideFn,
+                     overrideThrownError, baseThrownError);
       diags.diagnose(base, diag::overridden_here);
       break;
 
@@ -2179,8 +2177,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // problem.
     if (overrideFn->hasAsync() &&
         !cast<AbstractFunctionDecl>(base)->hasAsync()) {
-      diags.diagnose(override, diag::override_with_more_effects,
-                     override->getDescriptiveKind(), "async");
+      diags.diagnose(override, diag::override_with_more_effects, override,
+                     "async");
       diags.diagnose(base, diag::overridden_here);
     }
 
@@ -2217,11 +2215,10 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       case DescriptiveDeclKind::StaticProperty:
       case DescriptiveDeclKind::StaticMethod:
       case DescriptiveDeclKind::StaticSubscript:
-        override->diagnose(diag::override_static, baseKind);
+        override->diagnose(diag::override_static, base);
         break;
       default:
-        override->diagnose(diag::override_final,
-                           override->getDescriptiveKind(), baseKind);
+        override->diagnose(diag::override_final, override, base);
         break;
       }
     }
@@ -2512,6 +2509,19 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
 
 llvm::TinyPtrVector<ValueDecl *>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    auto apiOverriddenDecls = abiRole.getCounterpart()->getOverriddenDecls();
+
+    TinyPtrVector<ValueDecl *> abiOverriddenDecls;
+    for (auto apiOverriddenDecl : apiOverriddenDecls) {
+      auto abiOverriddenDecl = ABIRoleInfo(apiOverriddenDecl).getCounterpart();
+      abiOverriddenDecls.push_back(abiOverriddenDecl);
+    }
+
+    return abiOverriddenDecls;
+  }
+
   auto &ctx = decl->getASTContext();
   auto overridden = computeOverriddenDecls(decl, false);
 
@@ -2576,7 +2586,7 @@ void swift::checkImplementationOnlyOverride(const ValueDecl *VD) {
   ModuleDecl *M = overridden->getModuleContext();
   if (SF->getRestrictedImportKind(M) == RestrictedImportKind::ImplementationOnly) {
     VD->diagnose(diag::implementation_only_override_import_without_attr,
-                 overridden->getDescriptiveKind())
+                 overridden)
         .fixItInsert(VD->getAttributeInsertionLoc(false),
                      "@_implementationOnly ");
     overridden->diagnose(diag::overridden_here);
@@ -2584,8 +2594,7 @@ void swift::checkImplementationOnlyOverride(const ValueDecl *VD) {
   }
 
   if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
-    VD->diagnose(diag::implementation_only_override_without_attr,
-                 overridden->getDescriptiveKind())
+    VD->diagnose(diag::implementation_only_override_without_attr, overridden)
         .fixItInsert(VD->getAttributeInsertionLoc(false),
                      "@_implementationOnly ");
     overridden->diagnose(diag::overridden_here);

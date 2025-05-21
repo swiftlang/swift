@@ -658,7 +658,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   auto &ctx = getASTContext();
   auto *nsErrorDecl = ctx.getNSErrorDecl();
   if (ctx.LangOpts.EnableObjCInterop && conformances.size() == 1 &&
-      conformances[0].getRequirement() == ctx.getErrorDecl() &&
+      conformances[0].getProtocol() == ctx.getErrorDecl() &&
       nsErrorDecl && referenceAllowed(nsErrorDecl)) {
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.

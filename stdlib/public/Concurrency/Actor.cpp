@@ -25,6 +25,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
+#include "ExecutorBridge.h"
 #include "TaskPrivate.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
@@ -299,6 +300,46 @@ static bool isExecutingOnMainThread() {
 #endif
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+
+extern "C" SWIFT_CC(swift)
+SerialExecutorRef _swift_getActiveExecutor() {
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking) {
+    SerialExecutorRef executor = currentTracking->getActiveExecutor();
+    // This might be an actor, in which case return nil ("generic")
+    if (executor.isDefaultActor())
+      return SerialExecutorRef::generic();
+    return executor;
+  }
+
+  // If there's no tracking and we're on the main thread, then the main
+  // executor is notionally active.
+  if (isExecutingOnMainThread())
+    return swift_getMainExecutor();
+
+  return SerialExecutorRef::generic();
+}
+
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _swift_getCurrentTaskExecutor() {
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking)
+    return currentTracking->getTaskExecutor();
+  return TaskExecutorRef::undefined();
+}
+
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef _swift_getPreferredTaskExecutor() {
+  AsyncTask *task = swift_task_getCurrent();
+  if (!task)
+    return TaskExecutorRef::undefined();
+  return task->getPreferredTaskExecutor();
+}
+
+#pragma clang diagnostic pop
+
 JobPriority swift::swift_task_getCurrentThreadPriority() {
 #if SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
   return JobPriority::UserInitiated;
@@ -351,17 +392,40 @@ enum IsCurrentExecutorCheckMode : unsigned {
   Legacy_NoCheckIsolated_NonCrashing,
 };
 
+namespace {
+using SwiftTaskIsCurrentExecutorOptions =
+    OptionSet<swift_task_is_current_executor_flag>;
+}
+
+static void _swift_task_debug_dumpIsCurrentExecutorFlags(
+    const char *hint,
+    swift_task_is_current_executor_flag flags) {
+  if (flags == swift_task_is_current_executor_flag::None) {
+    SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
+                         hint, "None");
+    return;
+  }
+
+  auto options = SwiftTaskIsCurrentExecutorOptions(flags);
+  if (options.contains(swift_task_is_current_executor_flag::Assert))
+    SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
+                         hint, "Assert");
+}
+
 // Shimming call to Swift runtime because Swift Embedded does not have
 // these symbols defined.
 swift_task_is_current_executor_flag
 __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+  swift_task_is_current_executor_flag options = swift_task_is_current_executor_flag::None;
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  if (swift::runtime::bincompat::
+  if (!swift::runtime::bincompat::
       swift_bincompat_useLegacyNonCrashingExecutorChecks()) {
-    return swift_task_is_current_executor_flag::None;
+    options = swift_task_is_current_executor_flag(
+        options | swift_task_is_current_executor_flag::Assert);
   }
 #endif
-  return swift_task_is_current_executor_flag::Assert;
+  _swift_task_debug_dumpIsCurrentExecutorFlags("runtime linking determined default mode", options);
+  return options;
 }
 
 // Shimming call to Swift runtime because Swift Embedded does not have
@@ -376,47 +440,40 @@ const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
 #endif
 }
 
+// Determine the default effective executor checking mode, and apply environment
+// variable overrides of the executor checking mode.
+
 // Done this way because of the interaction with the initial value of
-// 'unexpectedExecutorLogLevel'
-swift_task_is_current_executor_flag swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+// 'unexpectedExecutorLogLevel'.
+swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode() {
+  // Default options as determined by linked runtime,
+  // i.e. very old runtimes were not allowed to crash but then we introduced 'checkIsolated'
+  // which was allowed to crash;
   swift_task_is_current_executor_flag options =
       __swift_bincompat_useLegacyNonCrashingExecutorChecks();
+
   // Potentially, override the platform detected mode, primarily used in tests.
   if (const char *modeStr =
           __swift_runtime_env_useLegacyNonCrashingExecutorChecks()) {
 
     if (strlen(modeStr) == 0) {
-      return swift_task_is_current_executor_flag::None;
+      _swift_task_debug_dumpIsCurrentExecutorFlags("mode override is empty", options);
+      return options;
     }
 
     if (strcmp(modeStr, "nocrash") == 0 ||
         strcmp(modeStr, "legacy") == 0) {
-        // Since we're in nocrash/legacy mode:
-        // Remove the assert option which is what would cause the "crash" mode
-        options = swift_task_is_current_executor_flag(
-          options & ~swift_task_is_current_executor_flag::Assert);
-        SWIFT_TASK_DEBUG_LOG("executor checking: SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE = %s => NONE; options = %d",
-                           modeStr, options);
-    } else if (strcmp(modeStr, "swift6.2") == 0) {
-      options = swift_task_is_current_executor_flag(
-        options | swift_task_is_current_executor_flag::HasIsIsolatingCurrentContext);
-      // When we're using the isIsolatingCurrentContext we don't want to use crashing APIs,
-      // so disable it explicitly.
+      // Since we're in nocrash/legacy mode:
+      // Remove the assert option which is what would cause the "crash" mode
       options = swift_task_is_current_executor_flag(
         options & ~swift_task_is_current_executor_flag::Assert);
-      SWIFT_TASK_DEBUG_LOG("executor checking: SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE = %s => 6.2; options = %d", modeStr, options);
     } else if (strcmp(modeStr, "crash") == 0 ||
                strcmp(modeStr, "swift6") == 0) {
       options = swift_task_is_current_executor_flag(
         options | swift_task_is_current_executor_flag::Assert);
-      SWIFT_TASK_DEBUG_LOG("executor checking: SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE = %s => 6.9; options = %d", modeStr, options);
-    }
-//    else { // else, just use the platform detected mode
-//      assert(strlen(modeStr) > 0 && "why is it empty!");
-//    }
+    } // else, just use the platform detected mode
   } // no override, use the default mode
 
-  SWIFT_TASK_DEBUG_LOG("executor checking: final options = %d", options);
   return options;
 }
 
@@ -434,24 +491,14 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
 
-namespace {
-using SwiftTaskIsCurrentExecutorOptions =
-    OptionSet<swift_task_is_current_executor_flag>;
-}
-
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorWithFlagsImpl(
     SerialExecutorRef expectedExecutor,
     swift_task_is_current_executor_flag flags) {
-  auto options = SwiftTaskIsCurrentExecutorOptions(flags);
   auto current = ExecutorTrackingInfo::current();
-  SWIFT_TASK_DEBUG_LOG("executor checking: current task %p", current);
-#ifndef NDEBUG
-  if (options.contains(swift_task_is_current_executor_flag::Assert))
-    SWIFT_TASK_DEBUG_LOG("executor checking: active option = Assert (%d)", flags);
-  if (options.contains(swift_task_is_current_executor_flag::HasIsIsolatingCurrentContext))
-    SWIFT_TASK_DEBUG_LOG("executor checking: active option = HasIsIsolatingCurrentContext (%d)", flags);
-#endif
+
+  auto options = SwiftTaskIsCurrentExecutorOptions(flags);
+  _swift_task_debug_dumpIsCurrentExecutorFlags(__FUNCTION__, flags);
 
   if (!current) {
     // We have no current executor, i.e. we are running "outside" of Swift
@@ -468,16 +515,28 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     // We cannot use 'complexEquality' as it requires two executor instances,
     // and we do not have a 'current' executor here.
 
-    if (options.contains(swift_task_is_current_executor_flag::HasIsIsolatingCurrentContext)) {
-      SWIFT_TASK_DEBUG_LOG("executor checking mode option: HasIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext",
-                           expectedExecutor.getIdentity());
-      // The executor has the most recent 'isIsolatingCurrentContext' API
-      // so available so we prefer calling that to 'checkIsolated'.
-      auto result = swift_task_isIsolatingCurrentContext(expectedExecutor);
+    // Invoke the 'isIsolatingCurrentContext', if "undecided" (i.e. nil), we need to make further calls
+    SWIFT_TASK_DEBUG_LOG("executor checking, invoke (%p).isIsolatingCurrentContext",
+                         expectedExecutor.getIdentity());
+    // The executor has the most recent 'isIsolatingCurrentContext' API
+    // so available so we prefer calling that to 'checkIsolated'.
+    auto isIsolatingCurrentContextDecision =
+        getIsIsolatingCurrentContextDecisionFromInt(
+            swift_task_isIsolatingCurrentContext(expectedExecutor));
 
-      SWIFT_TASK_DEBUG_LOG("executor checking mode option: HasIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
-                     expectedExecutor.getIdentity(), result ? "pass" : "fail");
-      return result;
+    SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
+                   expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
+    switch (isIsolatingCurrentContextDecision) {
+      case IsIsolatingCurrentContextDecision::Isolated:
+        // We know for sure that this serial executor is isolating this context, return the decision.
+        return true;
+      case IsIsolatingCurrentContextDecision::NotIsolated:
+        // We know for sure that this serial executor is NOT isolating this context, return this decision.
+        return false;
+      case IsIsolatingCurrentContextDecision::Unknown:
+        // We don't know, so we have to continue trying to check using other methods.
+        // This most frequently would happen if a serial executor did not implement isIsolatingCurrentContext.
+        break;
     }
 
     // Otherwise, as last resort, let the expected executor check using
@@ -553,6 +612,8 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
   // We may be able to prove we're on the same executor as expected by
   // using 'checkIsolated' later on though.
   if (expectedExecutor.isComplexEquality()) {
+    SWIFT_TASK_DEBUG_LOG("executor checking: expectedExecutor is complex equality (%p)",
+                         expectedExecutor.getIdentity());
     if (currentExecutor.getIdentity() &&
         currentExecutor.hasSerialExecutorWitnessTable() &&
         expectedExecutor.getIdentity() &&
@@ -582,16 +643,23 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     }
   }
 
-  if (options.contains(swift_task_is_current_executor_flag::HasIsIsolatingCurrentContext)) {
-    // We can invoke the 'isIsolatingCurrentContext' function.
-    SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext",
+  // Invoke the 'isIsolatingCurrentContext' function if we can; If so, we can
+  // avoid calling the `checkIsolated` because their result will be the same.
+  SWIFT_TASK_DEBUG_LOG("executor checking: call (%p).isIsolatingCurrentContext",
     expectedExecutor.getIdentity());
 
-    bool checkResult = swift_task_isIsolatingCurrentContext(expectedExecutor);
+  const auto isIsolatingCurrentContextDecision =
+    getIsIsolatingCurrentContextDecisionFromInt(swift_task_isIsolatingCurrentContext(expectedExecutor));
 
-    SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
-      expectedExecutor.getIdentity(), checkResult ? "pass" : "fail");
-    return checkResult;
+  SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
+    expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
+  switch (isIsolatingCurrentContextDecision) {
+  case IsIsolatingCurrentContextDecision::Isolated:
+    return true;
+  case IsIsolatingCurrentContextDecision::NotIsolated:
+    return false;
+  case IsIsolatingCurrentContextDecision::Unknown:
+    break;
   }
 
   // This provides a last-resort check by giving the expected SerialExecutor the
@@ -623,6 +691,9 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     SWIFT_TASK_DEBUG_LOG("executor checking: call (%p).checkIsolated passed => pass",
       expectedExecutor.getIdentity());
     return true;
+  } else {
+    SWIFT_TASK_DEBUG_LOG("executor checking: can NOT call (%p).checkIsolated",
+                         expectedExecutor.getIdentity());
   }
 
   // In the end, since 'checkIsolated' could not be used, so we must assume
@@ -633,30 +704,15 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
 
 // Check override of executor checking mode.
 static void swift_task_setDefaultExecutorCheckingFlags(void *context) {
-  SWIFT_TASK_DEBUG_LOG("executor checking: swift_task_setDefaultExecutorCheckingFlags = %d", nullptr);
-  auto useLegacyMode = swift_bincompat_useLegacyNonCrashingExecutorChecks();
-  SWIFT_TASK_DEBUG_LOG("executor checking: use legacy mode = %d", useLegacyMode);
   auto *options = static_cast<swift_task_is_current_executor_flag *>(context);
-  if (useLegacyMode) {
-    *options = useLegacyMode;
-  }
-//  else {
-//    *options = swift_task_is_current_executor_flag(
-//        *options | swift_task_is_current_executor_flag::Assert);
-//    SWIFT_TASK_DEBUG_LOG("executor checking: ADD ASSERT -> %d", *options);
-//  }
 
-  // FIXME: remove this
-  *options = swift_task_is_current_executor_flag(
-        *options | swift_task_is_current_executor_flag::None);
+  auto modeOverride = swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode();
+  if (modeOverride != swift_task_is_current_executor_flag::None) {
+    *options = modeOverride;
+  }
 
   SWIFT_TASK_DEBUG_LOG("executor checking: resulting options = %d", *options);
-  SWIFT_TASK_DEBUG_LOG("executor checking: option Assert = %d",
-                       SwiftTaskIsCurrentExecutorOptions(*options)
-                           .contains(swift_task_is_current_executor_flag::Assert));
-  SWIFT_TASK_DEBUG_LOG("executor checking: option HasIsIsolatingCurrentContext = %d",
-                       SwiftTaskIsCurrentExecutorOptions(*options)
-                           .contains(swift_task_is_current_executor_flag::HasIsIsolatingCurrentContext));
+  _swift_task_debug_dumpIsCurrentExecutorFlags(__FUNCTION__, *options);
 }
 
 SWIFT_CC(swift)
@@ -689,7 +745,7 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
 /// an application was linked to. Since Swift 6 the default is to crash,
 /// and the logging behavior is no longer available.
 static unsigned unexpectedExecutorLogLevel =
-    swift_bincompat_useLegacyNonCrashingExecutorChecks()
+    (swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode() == swift_task_is_current_executor_flag::None)
         ? 1 // legacy apps default to the logging mode, and cannot use `checkIsolated`
         : 2; // new apps will only crash upon concurrency violations, and will call into `checkIsolated`
 
@@ -701,9 +757,9 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
 
   long level = strtol(levelStr, nullptr, 0);
   if (level >= 0 && level < 3) {
-    auto flag = SwiftTaskIsCurrentExecutorOptions(
-        swift_bincompat_useLegacyNonCrashingExecutorChecks());
-    if (flag.contains(swift_task_is_current_executor_flag::Assert)) {
+    auto options = SwiftTaskIsCurrentExecutorOptions(
+        swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode());
+    if (options.contains(swift_task_is_current_executor_flag::Assert)) {
       // We are in swift6/crash mode of isCurrentExecutor which means that
       // rather than returning false, that method will always CRASH when an
       // executor mismatch is discovered.
@@ -1084,8 +1140,8 @@ public:
 #endif
   }
 
-  Job *getFirstUnprioritisedJob() const { return FirstJob; }
-  ActiveActorStatus withFirstUnprioritisedJob(Job *firstJob) const {
+  Job *getFirstUnprioritizedJob() const { return FirstJob; }
+  ActiveActorStatus withFirstUnprioritizedJob(Job *firstJob) const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveActorStatus(Flags, DrainLock, firstJob);
 #else
@@ -1130,7 +1186,7 @@ public:
       break;
     }
     concurrency::trace::actor_state_changed(
-        actor, getFirstUnprioritisedJob(), traceState, distributedActorIsRemote,
+        actor, getFirstUnprioritizedJob(), traceState, distributedActorIsRemote,
         isMaxPriorityEscalated(), static_cast<uint8_t>(getMaxPriority()));
   }
 };
@@ -1314,7 +1370,7 @@ public:
   /// new priority
   void enqueueStealer(Job *job, JobPriority priority);
 
-  /// Dequeues one job from `prioritisedJobs`.
+  /// Dequeues one job from `prioritizedJobs`.
   /// The calling thread must be holding the actor lock while calling this
   Job *drainOne();
 
@@ -1503,9 +1559,9 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     auto newState = oldState;
 
     // Link this into the queue in the atomic state
-    Job *currentHead = oldState.getFirstUnprioritisedJob();
+    Job *currentHead = oldState.getFirstUnprioritizedJob();
     setNextJob(job, currentHead);
-    newState = newState.withFirstUnprioritisedJob(job);
+    newState = newState.withFirstUnprioritizedJob(job);
 
     if (oldState.isIdle()) {
       // Schedule the actor
@@ -1686,13 +1742,13 @@ void DefaultActorImpl::processIncomingQueue() {
   while (true) {
     // If there aren't any new jobs in the incoming queue, we can return
     // immediately without updating the status.
-    if (!oldState.getFirstUnprioritisedJob()) {
+    if (!oldState.getFirstUnprioritizedJob()) {
       return;
     }
     assert(oldState.isAnyRunning());
 
     auto newState = oldState;
-    newState = newState.withFirstUnprioritisedJob(nullptr);
+    newState = newState.withFirstUnprioritizedJob(nullptr);
 
     if (_status().compare_exchange_weak(
             oldState, newState,
@@ -1705,7 +1761,7 @@ void DefaultActorImpl::processIncomingQueue() {
     }
   }
 
-  handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+  handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
 }
 
 // Called with actor lock held on current thread
@@ -1873,7 +1929,7 @@ void DefaultActorImpl::destroy() {
   // Tasks on an actor are supposed to keep the actor alive until they start
   // running and we can only get here if ref count of the object = 0 which means
   // there should be no more tasks enqueued on the actor.
-  assert(!oldState.getFirstUnprioritisedJob() && "actor has queued jobs at destruction");
+  assert(!oldState.getFirstUnprioritizedJob() && "actor has queued jobs at destruction");
 
   if (oldState.isIdle()) {
     assert(prioritizedJobs.empty() && "actor has queued jobs at destruction");
@@ -1981,7 +2037,7 @@ retry:;
       }
 
       assert(oldState.getMaxPriority() == JobPriority::Unspecified);
-      assert(!oldState.getFirstUnprioritisedJob());
+      assert(!oldState.getFirstUnprioritizedJob());
       // We cannot assert here that prioritizedJobs is empty,
       // because lock is not held yet. Raise a flag to assert after getting the lock.
       assertNoJobs = true;
@@ -2000,7 +2056,7 @@ retry:;
     // check for higher priority jobs that could have been scheduled in the
     // meantime. And processing is more efficient when done in larger batches.
     if (asDrainer) {
-      newState = newState.withFirstUnprioritisedJob(nullptr);
+      newState = newState.withFirstUnprioritizedJob(nullptr);
     }
 
     // This needs an acquire since we are taking a lock
@@ -2013,7 +2069,7 @@ retry:;
       }
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
       if (asDrainer) {
-        handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+        handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
       }
       return true;
     }
@@ -2064,7 +2120,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
     auto newState = oldState;
     // Lock is still held at this point, so it is safe to access prioritizedJobs
-    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritisedJob()) {
+    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritizedJob()) {
       // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
@@ -2454,22 +2510,31 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 }
 
 SWIFT_CC(swift)
-static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
+static void
+swift_task_immediateImpl(AsyncTask *task,
+                         SerialExecutorRef targetExecutor) {
   swift_retain(task);
+  if (targetExecutor.isGeneric()) {
+  // If the target is generic, it means that the closure did not specify
+  // an isolation explicitly. According to the "start synchronously" rules,
+  // we should therefore ignore the global and just start running on the
+  // caller immediately.
+  SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
 
-  auto currentTracking = ExecutorTrackingInfo::current();
-  if (currentTracking) {
-    auto currentExecutor = currentTracking->getActiveExecutor();
-    AsyncTask * originalTask = _swift_task_clearCurrent();
-
-    swift_job_run(task, currentExecutor);
-    _swift_task_setCurrent(originalTask);
+  auto originalTask = ActiveTask::swap(task);
+  swift_job_run(task, executor);
+  _swift_task_setCurrent(originalTask);
   } else {
-    auto originalTask = ActiveTask::swap(task);
-    assert(!originalTask);
+    assert(swift_task_isCurrentExecutor(targetExecutor) &&
+           "'immediate' must only be invoked when it is correctly in "
+           "the same isolation already, but wasn't!");
 
-    SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
-     swift_job_run(task, executor);
+    // We can run synchronously, we're on the expected executor so running in
+    // the caller context is going to be in the same context as the requested
+    // "caller" context.
+    AsyncTask *originalTask = _swift_task_clearCurrent();
+
+    swift_job_run(task, targetExecutor);
     _swift_task_setCurrent(originalTask);
   }
 }

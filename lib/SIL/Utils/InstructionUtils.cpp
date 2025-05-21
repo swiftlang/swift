@@ -558,6 +558,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DropDeinitInst:
@@ -580,6 +581,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::StructInst:
   case SILInstructionKind::StructExtractInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::RefElementAddrInst:
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::UncheckedEnumDataInst:
@@ -627,6 +629,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::PackPackIndexInst:
@@ -1019,7 +1022,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::WitnessMethod: {
       auto conformance =
           as.getOrigCalleeType()->getWitnessMethodConformanceOrInvalid();
-      if (conformance.getRequirement()->requiresClass()) {
+      if (conformance.getProtocol()->requiresClass()) {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
       } else {
           rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;

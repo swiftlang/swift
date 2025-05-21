@@ -98,6 +98,11 @@ BridgedASTContext_langOptsTargetPointerBitWidth(BridgedASTContext cContext) {
                                                               : 0;
 }
 
+bool BridgedASTContext_langOptsAttachCommentsToDecls(
+    BridgedASTContext cContext) {
+  return cContext.unbridged().LangOpts.AttachCommentsToDecls;
+}
+
 BridgedEndianness
 BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext) {
   return cContext.unbridged().LangOpts.Target.isLittleEndian() ? EndianLittle
