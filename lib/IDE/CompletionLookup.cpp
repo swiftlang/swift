@@ -1946,22 +1946,8 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
   return {stash.data(), stash.size()};
 }
 
-void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
-                                         DeclVisibilityKind Reason) {
-  if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
-      MD->shouldHideFromEditor())
-    return;
-
-  OptionSet<CustomAttributeKind> expectedKinds =
-      expectedTypeContext.getExpectedCustomAttributeKinds();
-  if (expectedKinds) {
-    CodeCompletionMacroRoles expectedRoles =
-        getCompletionMacroRoles(expectedKinds);
-    CodeCompletionMacroRoles roles = getCompletionMacroRoles(MD);
-    if (!(roles & expectedRoles))
-      return;
-  }
-
+void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
+                                             DeclVisibilityKind Reason) {
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(MD, Reason, DynamicLookupInfo()));
@@ -1986,6 +1972,25 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
     llvm::SmallVector<char, 0> stash;
     Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
   }
+}
+
+void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
+                                         DeclVisibilityKind Reason) {
+  if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
+      MD->shouldHideFromEditor())
+    return;
+
+  OptionSet<CustomAttributeKind> expectedKinds =
+      expectedTypeContext.getExpectedCustomAttributeKinds();
+  if (expectedKinds) {
+    CodeCompletionMacroRoles expectedRoles =
+        getCompletionMacroRoles(expectedKinds);
+    CodeCompletionMacroRoles roles = getCompletionMacroRoles(MD);
+    if (!(roles & expectedRoles))
+      return;
+  }
+
+  addMacroCallArguments(MD, Reason);
 }
 
 void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
