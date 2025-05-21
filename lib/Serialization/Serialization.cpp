@@ -3124,6 +3124,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
             return AvailabilityDomainKind::Universal;
           case AvailabilityDomain::Kind::SwiftLanguage:
             return AvailabilityDomainKind::SwiftLanguage;
+          case AvailabilityDomain::Kind::SwiftToolchain:
+            return AvailabilityDomainKind::SwiftToolchain;
           case AvailabilityDomain::Kind::PackageDescription:
             return AvailabilityDomainKind::PackageDescription;
           case AvailabilityDomain::Kind::Embedded:
