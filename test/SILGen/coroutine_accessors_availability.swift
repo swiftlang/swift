@@ -238,6 +238,57 @@ open class BaseClassOld {
   }
 }
 
+public protocol ProtocolOld {
+  var i: Int { read set }
+}
+
+// CHECK-LABEL: sil {{.*}}@modifyProtocolOldInlinableOld : {{.*}} {
+// Binaries built with a deployment target earlier than the availability of the
+// feature must use the old accessor because conforming types may not have the
+// new accessor.
+// CHECK-NOT:     witness_method {{.*}}#ProtocolOld.i!modify2
+// CHECK:         witness_method {{.*}}#ProtocolOld.i!modify
+// CHECK-LABEL: } // end sil function 'modifyProtocolOldInlinableOld'
+@inlinable
+@_silgen_name("modifyProtocolOldInlinableOld")
+public func modifyProtocolOldInlinableOld(_ p: inout ProtocolOld) {
+  p.i.increment()
+}
+
+@_silgen_name("modifyProtocolOldNoninlinableOld")
+public func modifyProtocolOldNoninlinableOld(_ p: inout ProtocolOld) {
+// CHECK-LABEL: sil {{.*}}@modifyProtocolOldNoninlinableOld : {{.*}} {
+// In the case of old binaries running against this version, this is correct
+// because a default implementation of the accessor is provided by default
+// witness table.
+// CHECK:         witness_method {{.*}}#ProtocolOld.i!modify2
+// CHECK-LABEL: } // end sil function 'modifyProtocolOldNoninlinableOld'
+  p.i.increment()
+}
+
+@inlinable
+@available(SwiftStdlib 9999, *)
+@_silgen_name("modifyProtocolOldInlinableNew")
+public func modifyProtocolOldInlinableNew(_ p: inout ProtocolOld) {
+// CHECK-LABEL: sil {{.*}}@modifyProtocolOldInlinableNew : {{.*}} {
+// CHECK:         witness_method {{.*}}#ProtocolOld.i!modify2
+// CHECK-LABEL: } // end sil function 'modifyProtocolOldInlinableNew'
+  p.i.increment()
+}
+
+@available(SwiftStdlib 9999, *)
+public protocol ProtocolNew {
+  var i: Int { read set }
+}
+
+// CHECK-LABEL: sil_default_witness_table ProtocolOld {
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ProtocolOld.i!read2
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ProtocolOld.i!modify2
+// CHECK-NEXT:  }
+
 //--- Downstream.swift
 
 import Library
