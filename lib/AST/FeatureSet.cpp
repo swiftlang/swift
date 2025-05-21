@@ -640,6 +640,7 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinSelect)
+UNINTERESTING_FEATURE(BuiltinInterleave)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

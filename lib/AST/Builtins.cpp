@@ -2035,6 +2035,42 @@ static ValueDecl *getShuffleVectorOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static bool isPowerOfTwoOrZero(unsigned x) {
+  return (x & -x) == x;
+}
+
+static ValueDecl *getInterleaveOperation(ASTContext &Context, Identifier Id,
+                                         Type FirstTy) {
+  // (Vector<N,T>, Vector<N,T>) -> (Vector<N,T>, Vector<N,T>)
+  auto VecTy = FirstTy->getAs<BuiltinVectorType>();
+  // Require power-of-two length because we don't need anything else to support
+  // SIMDn<T> and it saves us from having to define what happens for odd length
+  // vectors until we actually need to care about them.
+  if (!VecTy || !isPowerOfTwoOrZero(VecTy->getNumElements()))
+    return nullptr;
+  
+  Type ArgElts[] = { VecTy, VecTy };
+  TupleTypeElt ResultElts[] = { FirstTy, FirstTy };
+  Type ResultTy = TupleType::get(ResultElts, Context);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
+}
+
+static ValueDecl *getDeinterleaveOperation(ASTContext &Context, Identifier Id,
+                                           Type FirstTy) {
+  // (Vector<N,T>, Vector<N,T>) -> (Vector<N,T>, Vector<N,T>)
+  auto VecTy = FirstTy->getAs<BuiltinVectorType>();
+  // Require power-of-two length because we don't need anything else to support
+  // SIMDn<T> and it saves us from having to define what happens for odd length
+  // vectors until we actually need to care about them.
+  if (!VecTy || !isPowerOfTwoOrZero(VecTy->getNumElements()))
+    return nullptr;
+  
+  Type ArgElts[] = { VecTy, VecTy };
+  TupleTypeElt ResultElts[] = { FirstTy, FirstTy };
+  Type ResultTy = TupleType::get(ResultElts, Context);
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
+}
+
 static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   auto BoolTy = BuiltinIntegerType::get(1, Context);
   auto MessageTy = Context.TheRawPointerType;
@@ -3160,6 +3196,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ShuffleVector:
     if (Types.size() != 2) return nullptr;
     return getShuffleVectorOperation(Context, Id, Types[0], Types[1]);
+    
+  case BuiltinValueKind::Interleave:
+    if (Types.size() != 1) return nullptr;
+    return getInterleaveOperation(Context, Id, Types[0]);
+    
+  case BuiltinValueKind::Deinterleave:
+    if (Types.size() != 1) return nullptr;
+    return getDeinterleaveOperation(Context, Id, Types[0]);
 
   case BuiltinValueKind::StaticReport:
     if (!Types.empty()) return nullptr;
