@@ -1,3 +1,4 @@
+// REQUIRES: rdar151740742
 // This test ensures that the parent invocation's '-Xcc X' flags are inherited when building dependency modules
 // RUN: %empty-directory(%t)
 
