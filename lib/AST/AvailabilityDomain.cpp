@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Version.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -81,6 +82,8 @@ AvailabilityDomain::builtinDomainForString(StringRef string,
   auto domain = llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
                     .Case("*", AvailabilityDomain::forUniversal())
                     .Case("swift", AvailabilityDomain::forSwiftLanguage())
+                    .Case("_SwiftToolchain",
+                          AvailabilityDomain::forSwiftToolchain())
                     .Case("_PackageDescription",
                           AvailabilityDomain::forPackageDescription())
                     .Default(std::nullopt);
@@ -100,6 +103,7 @@ bool AvailabilityDomain::isVersioned() const {
   case Kind::Embedded:
     return false;
   case Kind::SwiftLanguage:
+  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
   case Kind::Platform:
     return true;
@@ -134,6 +138,7 @@ bool AvailabilityDomain::supportsContextRefinement() const {
   case Kind::Universal:
   case Kind::Embedded:
   case Kind::SwiftLanguage:
+  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
     return false;
   case Kind::Platform:
@@ -147,6 +152,7 @@ bool AvailabilityDomain::supportsQueries() const {
   case Kind::Universal:
   case Kind::Embedded:
   case Kind::SwiftLanguage:
+  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
     return false;
   case Kind::Platform:
@@ -159,6 +165,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguage:
+  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
   case Kind::Embedded:
     return true;
@@ -187,6 +194,8 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
     return std::nullopt;
   case AvailabilityDomain::Kind::SwiftLanguage:
     return ctx.LangOpts.EffectiveLanguageVersion;
+  case AvailabilityDomain::Kind::SwiftToolchain:
+    return version::Version::getCurrentLanguageVersion();
   case AvailabilityDomain::Kind::PackageDescription:
     return ctx.LangOpts.PackageDescriptionVersion;
   case AvailabilityDomain::Kind::Platform:
@@ -209,6 +218,8 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
     return "*";
   case Kind::SwiftLanguage:
     return "Swift";
+  case Kind::SwiftToolchain:
+    return "Swift Toolchain";
   case Kind::PackageDescription:
     return "PackageDescription";
   case Kind::Embedded:
@@ -226,6 +237,8 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
     return "*";
   case Kind::SwiftLanguage:
     return "swift";
+  case Kind::SwiftToolchain:
+    return "_SwiftToolchain";
   case Kind::PackageDescription:
     return "_PackageDescription";
   case Kind::Embedded:
@@ -256,6 +269,7 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   case Kind::Universal:
     return true;
   case Kind::SwiftLanguage:
+  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Custom:
@@ -273,6 +287,7 @@ bool AvailabilityDomain::isRoot() const {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftToolchain:
   case AvailabilityDomain::Kind::PackageDescription:
     return true;
   case AvailabilityDomain::Kind::Platform:
@@ -319,6 +334,7 @@ AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguage:
+  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Platform:
@@ -341,6 +357,7 @@ bool StableAvailabilityDomainComparator::operator()(
   switch (lhsKind) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftToolchain:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Embedded:
     return false;

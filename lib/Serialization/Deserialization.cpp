@@ -5795,6 +5795,8 @@ decodeDomainKind(uint8_t kind) {
       return AvailabilityDomainKind::Platform;
     case static_cast<uint8_t>(AvailabilityDomainKind::Custom):
       return AvailabilityDomainKind::Custom;
+    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftToolchain):
+      return AvailabilityDomainKind::SwiftToolchain;
     default:
       return std::nullopt;
   }
@@ -5809,6 +5811,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
     return AvailabilityDomain::forUniversal();
   case AvailabilityDomainKind::SwiftLanguage:
     return AvailabilityDomain::forSwiftLanguage();
+  case AvailabilityDomainKind::SwiftToolchain:
+    return AvailabilityDomain::forSwiftToolchain();
   case AvailabilityDomainKind::PackageDescription:
     return AvailabilityDomain::forPackageDescription();
   case AvailabilityDomainKind::Embedded:
