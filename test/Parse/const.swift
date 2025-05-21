@@ -21,12 +21,11 @@ func takeIntConst(@const _ a: Int) {}
 struct Article {
   let id: String
 }
-@const let keypath = \Article.id
+@const let keypath = \Article.id // expected-error{{keypaths not supported in a '@const' expression}}
 
 func LocalConstVarUser() -> Int {
   @const let localConst = 3
   return localConst + 1
 }
 
-// FIXME: This should be diagnosed
-@const let a: Bool = Bool.random()
+@const let a: Bool = Bool.random() // expected-error{{not supported in a '@const' expression}}
