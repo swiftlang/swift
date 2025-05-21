@@ -25,6 +25,10 @@ await foo(x: <#T##() -> Void#>)
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
+foo(bar(<#T##() -> Void#>))
+// CHECK:      foo(bar({
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }))
 
 anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?##((AnyObject!, Int, UnsafePointer<ObjCBool>) -> Bool)?#>)
 // CHECK:      anArr.indexOfObjectPassingTest { <#AnyObject!#>, <#Int#>, <#UnsafePointer<ObjCBool>#> in
@@ -272,4 +276,42 @@ expandClosureWithInternalParameterNames {
   withtrail(<#T##callback: (Int, Int) -> Bool##(_ a: Int, _ b: Int) -> Bool#>)
 // CHECK: withtrail { a, b in
 // CHECK-NEXT: <#code#>
+}
+
+// CHECK-LABEL: func expandMacro()
+func expandMacro() {
+  #foo(<#T##() -> Int#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+
+  #foo(bar: <#T##() -> ()#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+
+  #foo(bar: <#T##() -> Int#>, baz: <#T##() -> ()#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: } baz: {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+}
+
+// CHECK-LABEL: struct ExpandDeclMacro
+struct ExpandDeclMacro {
+  #foo(<#T##() -> ()#>)
+  // CHECK:      #foo {
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }
+
+  #foo(bar(<#T##() -> ()#>))
+  // CHECK:      #foo(bar({
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }))
+
+  #foo(#bar(<#T##() -> ()#>))
+  // CHECK:      #foo(#bar({
+  // CHECK-NEXT:   <#code#>
+  // CHECK-NEXT: }))
 }
