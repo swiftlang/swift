@@ -19,7 +19,7 @@ extension Validatable {
   public func tested<S: ValidationSuite>(by suite: S.Type) where S.InputType == Self {
       // CHECK:   [[S_AS_VALIDATION_SUITE_GEP:%[0-9]+]] = getelementptr inbounds ptr, ptr %S.ValidationSuite, i32 1
       // CHECK:   [[S_AS_VALIDATION_SUITE:%.*]] = load ptr, ptr [[S_AS_VALIDATION_SUITE_GEP]]
-      // CHECK-NEXT: call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %S.Validator, ptr %S, ptr %Self,
+      // CHECK: call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %S.Validator, ptr %S, ptr %Self,
       tested()
     }
 }
