@@ -1780,8 +1780,12 @@ public:
   void visitMoveValueInst(MoveValueInst *mvi) {
     switch (getTangentValueCategory(mvi)) {
     case SILValueCategory::Address:
-      llvm::report_fatal_error("AutoDiff does not support move_value with "
-                               "SILValueCategory::Address");
+      LLVM_DEBUG(getADDebugStream() << "AutoDiff does not support move_value with "
+                 "SILValueCategory::Address");
+      getContext().emitNondifferentiabilityError(
+        mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
     case SILValueCategory::Object:
       visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
     }
@@ -3121,8 +3125,21 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         break;
       }
       }
-    } else
-      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
+    } else {
+      LLVM_DEBUG(getADDebugStream() <<
+                 "do not know how to handle this incoming bb argument");
+      if (auto term = bbArg->getSingleTerminator()) {
+        getContext().emitNondifferentiabilityError(term, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      } else {
+        // This will be a bit confusing, but still better than nothing.
+        getContext().emitNondifferentiabilityError(bbArg, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      }
+
+      errorOccurred = true;
+      return;
+    }
   }
 
   // 3. Build the pullback successor cases for the `switch_enum`
