@@ -1009,7 +1009,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
     const BuiltinInfo &BInfo = BI->getBuiltinInfo();
-    if (BInfo.ID == BuiltinValueKind::ZeroInitializer) {
+    if (BInfo.ID == BuiltinValueKind::ZeroInitializer ||
+        BInfo.ID == BuiltinValueKind::PrepareInitialization) {
       // The address form of `zeroInitializer` writes to its argument to
       // initialize it. The value form has no side effects.
       return BI->getArguments().size() > 0

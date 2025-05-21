@@ -45,6 +45,13 @@ extension Value {
     }
   }
 
+  var lookThroughTruncOrBitCast: Value {
+    if let truncOrBitCast = self as? BuiltinInst, truncOrBitCast.id == .TruncOrBitCast {
+      return truncOrBitCast.arguments[0]
+    }
+    return self
+  }
+
   func isInLexicalLiverange(_ context: some Context) -> Bool {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
@@ -844,77 +851,6 @@ extension InstructionRange {
       }
     }
   }
-}
-
-/// Analyses the global initializer function and returns the `alloc_global` and `store`
-/// instructions which initialize the global.
-/// Returns nil if `function` has any side-effects beside initializing the global.
-///
-/// The function's single basic block must contain following code pattern:
-/// ```
-///   alloc_global @the_global
-///   %a = global_addr @the_global
-///   %i = some_const_initializer_insts
-///   store %i to %a
-/// ```
-/// 
-/// For all other instructions `handleUnknownInstruction` is called and such an instruction
-/// is accepted if `handleUnknownInstruction` returns true.
-func getGlobalInitialization(
-  of function: Function,
-  _ context: some Context,
-  handleUnknownInstruction: (Instruction) -> Bool
-) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
-  guard let block = function.blocks.singleElement else {
-    return nil
-  }
-
-  var allocInst: AllocGlobalInst? = nil
-  var globalAddr: GlobalAddrInst? = nil
-  var store: StoreInst? = nil
-
-  for inst in block.instructions {
-    switch inst {
-    case is ReturnInst,
-         is DebugValueInst,
-         is DebugStepInst,
-         is BeginAccessInst,
-         is EndAccessInst:
-      continue
-    case let agi as AllocGlobalInst:
-      if allocInst == nil {
-        allocInst = agi
-        continue
-      }
-    case let ga as GlobalAddrInst:
-      if let agi = allocInst, agi.global == ga.global {
-        globalAddr = ga
-      }
-      continue
-    case let si as StoreInst:
-      if store == nil,
-         let ga = globalAddr,
-         si.destination == ga
-      {
-        store = si
-        continue
-      }
-    // Note that the initializer must not contain a `global_value` because `global_value` needs to
-    // initialize the class metadata at runtime.
-    default:
-      if inst.isValidInStaticInitializerOfGlobal(context) {
-        continue
-      }
-    }
-    if handleUnknownInstruction(inst) {
-      continue
-    }
-    return nil
-  }
-  if let store = store {
-    return (allocInst: allocInst!, storeToGlobal: store)
-  }
-  return nil
 }
 
 func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,

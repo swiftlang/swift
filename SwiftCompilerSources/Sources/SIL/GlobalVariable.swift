@@ -29,6 +29,8 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
 
   public var shortDescription: String { name.string }
 
+  public var type: Type { Type(bridged: bridged.getType()) }
+
   public var isLet: Bool { bridged.isLet() }
 
   public var linkage: Linkage { bridged.getLinkage().linkage }
