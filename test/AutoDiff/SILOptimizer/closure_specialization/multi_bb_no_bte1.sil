@@ -93,15 +93,15 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> Class.TangentVector):
 sil hidden @$s4test13methodWrapperySfAA5ClassVFTJrSpSr : $@convention(thin) (Class) -> (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) {
 bb0(%0 : $Class):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_site"
+  specify_test "autodiff_closure_specialize_get_pullback_closure_info"
   // TRUNNER-LABEL: Specializing closures in function: $s4test13methodWrapperySfAA5ClassVFTJrSpSr
-  // TRUNNER:       PartialApply call site:   %[[#]] = partial_apply [callee_guaranteed] %[[#]](%[[#A36:]]) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) -> Class.TangentVector
+  // TRUNNER:       PartialApply of pullback:   %[[#]] = partial_apply [callee_guaranteed] %[[#]](%[[#A36:]]) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) -> Class.TangentVector
   // TRUNNER-NEXT:  Passed in closures:
   // TRUNNER-NEXT:  1.   %[[#A36]] = partial_apply [callee_guaranteed] %[[#]](%[[#]]) : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector
   // TRUNNER-EMPTY:
 
   //=========== Test specialized function signature and body ===========//
-  specify_test "closure_specialize_specialized_function_signature_and_body"
+  specify_test "autodiff_closure_specialize_specialized_function_signature_and_body"
   // TRUNNER-LABEL: Generated specialized function: $s4test13methodWrapperySfAA5ClassVFTJpSpSr08$s4test5D19V6methodSfyFTJpSpSr4main05_AD__edfG24F_bb3__Pred__src_0_wrt_0OTf1nc_n
   // CHECK:         sil private [signature_optimized_thunk] [always_inline] @$s4test13methodWrapperySfAA5ClassVFTJpSpSr08$s4test5D19V6methodSfyFTJpSpSr4main05_AD__edfG24F_bb3__Pred__src_0_wrt_0OTf1nc_n : $@convention(thin) (Float, @owned _AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector {
   // CHECK:         bb0(%0 : $Float, %1 : $_AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0):
@@ -114,7 +114,7 @@ bb0(%0 : $Class):
   // CHECK:           return %[[#B4]]
 
   //=========== Test rewritten body ===========//
-  specify_test "closure_specialize_rewritten_caller_body"
+  specify_test "autodiff_closure_specialize_rewritten_caller_body"
   // TRUNNER-LABEL: Rewritten caller body for: $s4test13methodWrapperySfAA5ClassVFTJrSpSr:
   // CHECK:         sil hidden @$s4test13methodWrapperySfAA5ClassVFTJrSpSr : $@convention(thin) (Class) -> (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) {
   // CHECK:         bb3(%[[#C33:]] : $Float, %[[#C34:]] : $_AD__$s4test5ClassV6methodSfyF_bb3__Pred__src_0_wrt_0):

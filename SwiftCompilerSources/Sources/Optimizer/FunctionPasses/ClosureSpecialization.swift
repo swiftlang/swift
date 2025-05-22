@@ -129,24 +129,20 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
   var remainingSpecializationRounds = 5
 
   repeat {
-    // TODO: Names here are pretty misleading. We are looking for a place where
-    // the pullback closure is created (so for `partial_apply` instruction).
-    let callSiteOpt = gatherCallSite(in: function, context)
-    if callSiteOpt == nil {
+    guard let pullbackClosureInfo = getPullbackClosureInfo(in: function, context) else {
       break
     }
 
-    let callSite = callSiteOpt!
-    var (specializedFunction, alreadyExists) = getOrCreateSpecializedFunction(basedOn: callSite, context)
+    var (specializedFunction, alreadyExists) = getOrCreateSpecializedFunction(basedOn: pullbackClosureInfo, context)
 
     if !alreadyExists {
-      context.notifyNewFunction(function: specializedFunction, derivedFrom: callSite.applyCallee)
+      context.notifyNewFunction(function: specializedFunction, derivedFrom: pullbackClosureInfo.pullbackFn)
     }
 
-    rewriteApplyInstruction(using: specializedFunction, callSite: callSite, context)
+    rewriteApplyInstruction(using: specializedFunction, pullbackClosureInfo: pullbackClosureInfo, context)
 
     var deadClosures = InstructionWorklist(context)
-    callSite.closureArgDescriptors
+    pullbackClosureInfo.closureArgDescriptors
       .map { $0.closure }
       .forEach { deadClosures.pushIfNotVisited($0) }
 
@@ -173,7 +169,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
 
 private let specializationLevelLimit = 2
 
-private func gatherCallSite(in caller: Function, _ context: FunctionPassContext) -> CallSite? {
+private func getPullbackClosureInfo(in caller: Function, _ context: FunctionPassContext) -> PullbackClosureInfo? {
   /// __Root__ closures created via `partial_apply` or `thin_to_thick_function` may be converted and reabstracted
   /// before finally being used at an apply site. We do not want to handle these intermediate closures separately
   /// as they are handled and cloned into the specialized function as part of the root closures. Therefore, we keep 
@@ -205,59 +201,59 @@ private func gatherCallSite(in caller: Function, _ context: FunctionPassContext)
     convertedAndReabstractedClosures.deinitialize()
   }
 
-  var callSiteOpt = CallSite?(nil)
+  var pullbackClosureInfoOpt = PullbackClosureInfo?(nil)
 
   for inst in caller.instructions {
     if !convertedAndReabstractedClosures.contains(inst),
        let rootClosure = inst.asSupportedClosure
     {
-      updateCallSite(for: rootClosure, in: &callSiteOpt,
-                     convertedAndReabstractedClosures: &convertedAndReabstractedClosures, context)
+      updatePullbackClosureInfo(for: rootClosure, in: &pullbackClosureInfoOpt,
+                                convertedAndReabstractedClosures: &convertedAndReabstractedClosures, context)
     }
   }
 
-  return callSiteOpt
+  return pullbackClosureInfoOpt
 }
 
-private func getOrCreateSpecializedFunction(basedOn callSite: CallSite, _ context: FunctionPassContext)
+private func getOrCreateSpecializedFunction(basedOn pullbackClosureInfo: PullbackClosureInfo, _ context: FunctionPassContext)
   -> (function: Function, alreadyExists: Bool)
 {
-  let specializedFunctionName = callSite.specializedCalleeName(context)
+  let specializedFunctionName = pullbackClosureInfo.specializedCalleeName(context)
   if let specializedFunction = context.lookupFunction(name: specializedFunctionName) {
     return (specializedFunction, true)
   }
 
-  let applySiteCallee = callSite.applyCallee
-  let specializedParameters = applySiteCallee.convention.getSpecializedParameters(basedOn: callSite)
+  let pullbackFn = pullbackClosureInfo.pullbackFn
+  let specializedParameters = pullbackFn.convention.getSpecializedParameters(basedOn: pullbackClosureInfo)
 
   let specializedFunction = 
-    context.createSpecializedFunctionDeclaration(from: applySiteCallee, withName: specializedFunctionName,
+    context.createSpecializedFunctionDeclaration(from: pullbackFn, withName: specializedFunctionName,
                                                  withParams: specializedParameters,
                                                  makeThin: true, makeBare: true)
 
   context.buildSpecializedFunction(specializedFunction: specializedFunction,
                                    buildFn: { (emptySpecializedFunction, functionPassContext) in 
                                       let closureSpecCloner = SpecializationCloner(emptySpecializedFunction: emptySpecializedFunction, functionPassContext)
-                                      closureSpecCloner.cloneAndSpecializeFunctionBody(using: callSite)
+                                      closureSpecCloner.cloneAndSpecializeFunctionBody(using: pullbackClosureInfo)
                                    })
 
   return (specializedFunction, false)
 }
 
-private func rewriteApplyInstruction(using specializedCallee: Function, callSite: CallSite, 
+private func rewriteApplyInstruction(using specializedCallee: Function, pullbackClosureInfo: PullbackClosureInfo, 
                                      _ context: FunctionPassContext) {
-  let newApplyArgs = callSite.getArgumentsForSpecializedApply(of: specializedCallee)
+  let newApplyArgs = pullbackClosureInfo.getArgumentsForSpecializedApply(of: specializedCallee)
 
   for newApplyArg in newApplyArgs {
     if case let .PreviouslyCaptured(capturedArg, needsRetain, parentClosureArgIndex) = newApplyArg,
        needsRetain 
     {
-      let closureArgDesc = callSite.closureArgDesc(at: parentClosureArgIndex)!
+      let closureArgDesc = pullbackClosureInfo.closureArgDesc(at: parentClosureArgIndex)!
       var builder = Builder(before: closureArgDesc.closure, context)
 
       // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization 
       // passes.
-      if callSite.applySite.parentBlock != closureArgDesc.closure.parentBlock {
+      if pullbackClosureInfo.paiOfPullback.parentBlock != closureArgDesc.closure.parentBlock {
         // Emit the retain and release that keeps the argument live across the callee using the closure.
         builder.createRetainValue(operand: capturedArg)
 
@@ -268,7 +264,7 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
 
         // Emit the retain that matches the captured argument by the partial_apply in the callee that is consumed by
         // the partial_apply.
-        builder = Builder(before: callSite.applySite, context)
+        builder = Builder(before: pullbackClosureInfo.paiOfPullback, context)
         builder.createRetainValue(operand: capturedArg)
       } else {
         builder.createRetainValue(operand: capturedArg)
@@ -277,20 +273,20 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
   }
 
   // Rewrite apply instruction
-  var builder = Builder(before: callSite.applySite, context)
-  let oldApply = callSite.applySite as! PartialApplyInst
+  var builder = Builder(before: pullbackClosureInfo.paiOfPullback, context)
+  let oldPartialApply = pullbackClosureInfo.paiOfPullback
   let funcRef = builder.createFunctionRef(specializedCallee)
   let capturedArgs = Array(newApplyArgs.map { $0.value })
 
-  let newApply = builder.createPartialApply(function: funcRef, substitutionMap: SubstitutionMap(), 
-                                            capturedArguments: capturedArgs, calleeConvention: oldApply.calleeConvention,
-                                            hasUnknownResultIsolation: oldApply.hasUnknownResultIsolation,
-                                            isOnStack: oldApply.isOnStack)
+  let newPartialApply = builder.createPartialApply(function: funcRef, substitutionMap: SubstitutionMap(), 
+                                                   capturedArguments: capturedArgs, calleeConvention: oldPartialApply.calleeConvention,
+                                                   hasUnknownResultIsolation: oldPartialApply.hasUnknownResultIsolation,
+                                                   isOnStack: oldPartialApply.isOnStack)
 
-  builder = Builder(before: callSite.applySite.next!, context)
+  builder = Builder(before: pullbackClosureInfo.paiOfPullback.next!, context)
   // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization 
   // passes.
-  for closureArgDesc in callSite.closureArgDescriptors {
+  for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
     if closureArgDesc.isClosureConsumed,
        !closureArgDesc.isPartialApplyOnStack,
        !closureArgDesc.parameterInfo.isTrivialNoescapeClosure
@@ -299,13 +295,13 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
     }
   }
 
-  oldApply.replace(with: newApply, context)
+  oldPartialApply.replace(with: newPartialApply, context)
 }
 
 // ===================== Utility functions and extensions ===================== //
 
-private func updateCallSite(for rootClosure: SingleValueInstruction, in callSiteOpt: inout CallSite?,
-                            convertedAndReabstractedClosures: inout InstructionSet, _ context: FunctionPassContext) {
+private func updatePullbackClosureInfo(for rootClosure: SingleValueInstruction, in pullbackClosureInfoOpt: inout PullbackClosureInfo?,
+                                       convertedAndReabstractedClosures: inout InstructionSet, _ context: FunctionPassContext) {
   var rootClosurePossibleLiveRange = InstructionRange(begin: rootClosure, context)
   defer {
     rootClosurePossibleLiveRange.deinitialize()
@@ -317,17 +313,17 @@ private func updateCallSite(for rootClosure: SingleValueInstruction, in callSite
   }
 
   // A "root" closure undergoing conversions and/or reabstractions has additional restrictions placed upon it, in order
-  // for a call site to be specialized against it. We handle conversion/reabstraction uses before we handle apply uses
-  // to gather the parameters required to evaluate these restrictions or to skip call site uses of "unsupported" 
+  // for a pullback to be specialized against it. We handle conversion/reabstraction uses before we handle apply uses
+  // to gather the parameters required to evaluate these restrictions or to skip pullback's uses of "unsupported" 
   // closures altogether.
   //
-  // There are currently 2 restrictions that are evaluated prior to specializing a callsite against a converted and/or 
+  // There are currently 2 restrictions that are evaluated prior to specializing a pullback against a converted and/or 
   // reabstracted closure -
   // 1. A reabstracted root closure can only be specialized against, if the reabstracted closure is ultimately passed
-  //    trivially (as a noescape+thick function) into the call site.
+  //    trivially (as a noescape+thick function) as captured argument of pullback's partial_apply.
   //
   // 2. A root closure may be a partial_apply [stack], in which case we need to make sure that all mark_dependence 
-  //    bases for it will be available in the specialized callee in case the call site is specialized against this root
+  //    bases for it will be available in the specialized callee in case the pullback is specialized against this root
   //    closure.
 
   let (foundUnexpectedUse, haveUsedReabstraction) = 
@@ -340,18 +336,18 @@ private func updateCallSite(for rootClosure: SingleValueInstruction, in callSite
   }
 
   let intermediateClosureArgDescriptorData = 
-    handleApplies(for: rootClosure, callSiteOpt: &callSiteOpt, rootClosureApplies: &rootClosureApplies,
+    handleApplies(for: rootClosure, pullbackClosureInfoOpt: &pullbackClosureInfoOpt, rootClosureApplies: &rootClosureApplies,
                   rootClosurePossibleLiveRange: &rootClosurePossibleLiveRange, 
                   convertedAndReabstractedClosures: &convertedAndReabstractedClosures,
                   haveUsedReabstraction: haveUsedReabstraction, context)
 
-  if callSiteOpt == nil {
+  if pullbackClosureInfoOpt == nil {
     return
   }
 
-  finalizeCallSite(for: rootClosure, in: &callSiteOpt,
-                   rootClosurePossibleLiveRange: rootClosurePossibleLiveRange,
-                   intermediateClosureArgDescriptorData: intermediateClosureArgDescriptorData, context)
+  finalizePullbackClosureInfo(for: rootClosure, in: &pullbackClosureInfoOpt,
+                              rootClosurePossibleLiveRange: rootClosurePossibleLiveRange,
+                              intermediateClosureArgDescriptorData: intermediateClosureArgDescriptorData, context)
 }
 
 /// Handles all non-apply direct and transitive uses of `rootClosure`.
@@ -371,7 +367,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
 
   /// The root closure or an intermediate closure created by reabstracting the root closure may be a `partial_apply
   /// [stack]` and we need to make sure that all `mark_dependence` bases for this `onStack` closure will be available in
-  /// the specialized callee, in case the call site is specialized against this root closure.
+  /// the specialized callee, in case the pullback is specialized against this root closure.
   ///
   /// `possibleMarkDependenceBases` keeps track of all potential values that may be used as bases for creating
   /// `mark_dependence`s for our `onStack` root/reabstracted closures. For root closures these values are non-trivial
@@ -390,7 +386,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
   /// ```
   ///
   /// Any value outside of the aforementioned values is not going to be available in the specialized callee and a
-  /// `mark_dependence` of the root closure on such a value means that we cannot specialize the call site against it.
+  /// `mark_dependence` of the root closure on such a value means that we cannot specialize the pullback against it.
   var possibleMarkDependenceBases = ValueSet(context)
   defer {
     possibleMarkDependenceBases.deinitialize()
@@ -480,7 +476,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
 
 private typealias IntermediateClosureArgDescriptorDatum = (applySite: SingleValueInstruction, closureArgIndex: Int, paramInfo: ParameterInfo)
 
-private func handleApplies(for rootClosure: SingleValueInstruction, callSiteOpt: inout CallSite?,
+private func handleApplies(for rootClosure: SingleValueInstruction, pullbackClosureInfoOpt: inout PullbackClosureInfo?,
                            rootClosureApplies: inout OperandWorklist, 
                            rootClosurePossibleLiveRange: inout InstructionRange, 
                            convertedAndReabstractedClosures: inout InstructionSet, haveUsedReabstraction: Bool, 
@@ -587,10 +583,10 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteOpt:
                                                  convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
     }
     
-    if callSiteOpt == nil {
-      callSiteOpt = CallSite(applySite: pai)
+    if pullbackClosureInfoOpt == nil {
+      pullbackClosureInfoOpt = PullbackClosureInfo(paiOfPullback: pai)
     } else {
-      assert(callSiteOpt!.applySite == pai)
+      assert(pullbackClosureInfoOpt!.paiOfPullback == pai)
     }
 
     intermediateClosureArgDescriptorData
@@ -600,23 +596,22 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteOpt:
   return intermediateClosureArgDescriptorData
 }
 
-/// Finalizes the call sites for a given root closure by adding a corresponding `ClosureArgDescriptor`
-/// to all call sites where the closure is ultimately passed as an argument.
-private func finalizeCallSite(for rootClosure: SingleValueInstruction, in callSiteOpt: inout CallSite?,
-                              rootClosurePossibleLiveRange: InstructionRange,
-                              intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum],
-                              _ context: FunctionPassContext) {
-  assert(callSiteOpt != nil)
+/// Finalizes the pullback closure info for a given root closure by adding a corresponding `ClosureArgDescriptor`
+private func finalizePullbackClosureInfo(for rootClosure: SingleValueInstruction, in pullbackClosureInfoOpt: inout PullbackClosureInfo?,
+                                         rootClosurePossibleLiveRange: InstructionRange,
+                                         intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum],
+                                         _ context: FunctionPassContext) {
+  assert(pullbackClosureInfoOpt != nil)
 
   let closureInfo = ClosureInfo(closure: rootClosure, lifetimeFrontier: Array(rootClosurePossibleLiveRange.ends))
 
   for (applySite, closureArgumentIndex, parameterInfo) in intermediateClosureArgDescriptorData {
-    if callSiteOpt!.applySite != applySite {
-      fatalError("While finalizing call sites, call site descriptor not found for call site: \(applySite)!")
+    if pullbackClosureInfoOpt!.paiOfPullback != applySite {
+      fatalError("ClosureArgDescriptor's applySite field is not equal to pullback's partial_apply; got \(applySite)!")
     }
     let closureArgDesc = ClosureArgDescriptor(closureInfo: closureInfo, closureArgumentIndex: closureArgumentIndex, 
                                               parameterInfo: parameterInfo)
-    callSiteOpt!.appendClosureArgDescriptor(closureArgDesc)
+    pullbackClosureInfoOpt!.appendClosureArgDescriptor(closureArgDesc)
   }
 }
 
@@ -682,7 +677,7 @@ private func markConvertedAndReabstractedClosuresAsUsed(rootClosure: Value, conv
         markConvertedAndReabstractedClosuresAsUsed(rootClosure: rootClosure, convertedAndReabstractedClosure: mdi.value,
                                                    convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
     default:
-      log("Parent function of callSite: \(rootClosure.parentFunction)")
+      log("Parent function of pullbackClosureInfo: \(rootClosure.parentFunction)")
       log("Root closure: \(rootClosure)")
       log("Converted/reabstracted closure: \(convertedAndReabstractedClosure)")
       fatalError("While marking converted/reabstracted closures as used, found unexpected instruction: \(convertedAndReabstractedClosure)")
@@ -691,25 +686,25 @@ private func markConvertedAndReabstractedClosuresAsUsed(rootClosure: Value, conv
 }
 
 private extension SpecializationCloner {
-  func cloneAndSpecializeFunctionBody(using callSite: CallSite) {
-    self.cloneEntryBlockArgsWithoutOrigClosures(usingOrigCalleeAt: callSite)
+  func cloneAndSpecializeFunctionBody(using pullbackClosureInfo: PullbackClosureInfo) {
+    self.cloneEntryBlockArgsWithoutOrigClosures(usingOrigCalleeAt: pullbackClosureInfo)
 
-    let (allSpecializedEntryBlockArgs, closureArgIndexToAllClonedReleasableClosures) = cloneAllClosures(at: callSite)
+    let (allSpecializedEntryBlockArgs, closureArgIndexToAllClonedReleasableClosures) = cloneAllClosures(at: pullbackClosureInfo)
 
-    self.cloneFunctionBody(from: callSite.applyCallee, entryBlockArguments: allSpecializedEntryBlockArgs)
+    self.cloneFunctionBody(from: pullbackClosureInfo.pullbackFn, entryBlockArguments: allSpecializedEntryBlockArgs)
 
     self.insertCleanupCodeForClonedReleasableClosures(
-      from: callSite, closureArgIndexToAllClonedReleasableClosures: closureArgIndexToAllClonedReleasableClosures)
+      from: pullbackClosureInfo, closureArgIndexToAllClonedReleasableClosures: closureArgIndexToAllClonedReleasableClosures)
   }
 
-  private func cloneEntryBlockArgsWithoutOrigClosures(usingOrigCalleeAt callSite: CallSite) {
-    let originalEntryBlock = callSite.applyCallee.entryBlock
+  private func cloneEntryBlockArgsWithoutOrigClosures(usingOrigCalleeAt pullbackClosureInfo: PullbackClosureInfo) {
+    let originalEntryBlock = pullbackClosureInfo.pullbackFn.entryBlock
     let clonedFunction = self.cloned
     let clonedEntryBlock = self.entryBlock
 
     originalEntryBlock.arguments
       .enumerated()
-      .filter { index, _ in !callSite.hasClosureArg(at: index) }
+      .filter { index, _ in !pullbackClosureInfo.hasClosureArg(at: index) }
       .forEach { _, arg in
         let clonedEntryBlockArgType = arg.type.getLoweredType(in: clonedFunction)
         let clonedEntryBlockArg = clonedEntryBlock.addFunctionArgument(type: clonedEntryBlockArgType, self.context)
@@ -717,31 +712,31 @@ private extension SpecializationCloner {
       }
   }
 
-  /// Clones all closures, originally passed to the callee at the given callSite, into the specialized function.
+  /// Clones all closures, originally passed to the callee at the given pullbackClosureInfo, into the specialized function.
   ///
   /// Returns the following -
   /// - allSpecializedEntryBlockArgs: Complete list of entry block arguments for the specialized function. This includes
   ///   the original arguments to the function (minus the closure arguments) and the arguments representing the values
   ///   originally captured by the skipped closure arguments.
   ///
-  /// - closureArgIndexToAllClonedReleasableClosures: Mapping from a closure's argument index at `callSite` to the list
+  /// - closureArgIndexToAllClonedReleasableClosures: Mapping from a closure's argument index at `pullbackClosureInfo` to the list
   ///   of corresponding releasable closures cloned into the specialized function. We have a "list" because we clone
   ///   "closure chains", which consist of a "root" closure and its conversions/reabstractions. This map is used to
   ///   generate cleanup code for the cloned closures in the specialized function.
-  private func cloneAllClosures(at callSite: CallSite) 
+  private func cloneAllClosures(at pullbackClosureInfo: PullbackClosureInfo) 
     -> (allSpecializedEntryBlockArgs: [Value], 
         closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]]) 
   {
     func entryBlockArgsWithOrigClosuresSkipped() -> [Value?] {
       var clonedNonClosureEntryBlockArgs = self.entryBlock.arguments.makeIterator()
 
-      return callSite.applyCallee
+      return pullbackClosureInfo.pullbackFn
         .entryBlock
         .arguments
         .enumerated()
         .reduce(into: []) { result, origArgTuple in
           let (index, _) = origArgTuple
-          if !callSite.hasClosureArg(at: index) {
+          if !pullbackClosureInfo.hasClosureArg(at: index) {
             result.append(clonedNonClosureEntryBlockArgs.next())
           } else {
             result.append(Optional.none)
@@ -752,9 +747,9 @@ private extension SpecializationCloner {
     var entryBlockArgs: [Value?] = entryBlockArgsWithOrigClosuresSkipped()
     var closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]] = [:]
 
-    for closureArgDesc in callSite.closureArgDescriptors {
+    for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
       let (finalClonedReabstractedClosure, allClonedReleasableClosures) =
-        self.cloneClosureChain(representedBy: closureArgDesc, at: callSite)
+        self.cloneClosureChain(representedBy: closureArgDesc, at: pullbackClosureInfo)
 
       entryBlockArgs[closureArgDesc.closureArgIndex] = finalClonedReabstractedClosure
       closureArgIndexToAllClonedReleasableClosures[closureArgDesc.closureArgIndex] = allClonedReleasableClosures
@@ -763,7 +758,7 @@ private extension SpecializationCloner {
     return (entryBlockArgs.map { $0! }, closureArgIndexToAllClonedReleasableClosures)
   }
 
-  private func cloneClosureChain(representedBy closureArgDesc: ClosureArgDescriptor, at callSite: CallSite) 
+  private func cloneClosureChain(representedBy closureArgDesc: ClosureArgDescriptor, at pullbackClosureInfo: PullbackClosureInfo) 
     -> (finalClonedReabstractedClosure: SingleValueInstruction, allClonedReleasableClosures: [SingleValueInstruction]) 
   {
     let (origToClonedValueMap, capturedArgRange) = self.addEntryBlockArgs(forValuesCapturedBy: closureArgDesc)
@@ -779,7 +774,7 @@ private extension SpecializationCloner {
 
     let finalClonedReabstractedClosure =
       builder.cloneRootClosureReabstractions(rootClosure: closureArgDesc.closure, clonedRootClosure: clonedRootClosure,
-                                             reabstractedClosure: callSite.appliedArgForClosure(at: closureArgDesc.closureArgIndex)!,
+                                             reabstractedClosure: pullbackClosureInfo.appliedArgForClosure(at: closureArgDesc.closureArgIndex)!,
                                              origToClonedValueMap: origToClonedValueMap,
                                              self.context)
 
@@ -810,10 +805,10 @@ private extension SpecializationCloner {
     return (origToClonedValueMap, capturedArgRange)
   }
 
-  private func insertCleanupCodeForClonedReleasableClosures(from callSite: CallSite, 
+  private func insertCleanupCodeForClonedReleasableClosures(from pullbackClosureInfo: PullbackClosureInfo, 
                                                             closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]])
   {
-    for closureArgDesc in callSite.closureArgDescriptors {
+    for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
       let allClonedReleasableClosures = closureArgIndexToAllClonedReleasableClosures[closureArgDesc.closureArgIndex]!
 
       // Insert a `destroy_value`, for all releasable closures, in all reachable exit BBs if the closure was passed as a
@@ -822,7 +817,7 @@ private extension SpecializationCloner {
       if closureArgDesc.isClosureGuaranteed || closureArgDesc.parameterInfo.isTrivialNoescapeClosure,
          !allClonedReleasableClosures.isEmpty
       {
-        for exitBlock in callSite.reachableExitBBsInCallee {
+        for exitBlock in pullbackClosureInfo.reachableExitBBsInCallee {
           let clonedExitBlock = self.getClonedBlock(for: exitBlock)
           
           let terminator = clonedExitBlock.terminator is UnreachableInst
@@ -857,7 +852,7 @@ private extension [HashableValue: Value] {
   }
 }
 
-private extension CallSite {
+private extension PullbackClosureInfo {
   enum NewApplyArg {
     case Original(Value)
     // TODO: This can be simplified in OSSA. We can just do a copy_value for everything - except for addresses???
@@ -879,8 +874,8 @@ private extension CallSite {
     var newApplyArgs: [NewApplyArg] = []
 
     // Original arguments
-    for (applySiteIndex, arg) in self.applySite.arguments.enumerated() {
-      let calleeArgIndex = self.applySite.unappliedArgumentCount + applySiteIndex
+    for (applySiteIndex, arg) in self.paiOfPullback.arguments.enumerated() {
+      let calleeArgIndex = self.paiOfPullback.unappliedArgumentCount + applySiteIndex
       if !self.hasClosureArg(at: calleeArgIndex) {
         newApplyArgs.append(.Original(arg))
       }
@@ -963,7 +958,7 @@ private extension Builder {
                                        &origToClonedValueMap)
           
           guard let function = pai.referencedFunction else {
-            log("Parent function of callSite: \(rootClosure.parentFunction)")
+            log("Parent function of pullbackClosureInfo: \(rootClosure.parentFunction)")
             log("Root closure: \(rootClosure)")
             log("Unsupported reabstraction closure: \(pai)")
             fatalError("Encountered unsupported reabstraction (via partial_apply) of root closure!")
@@ -986,7 +981,7 @@ private extension Builder {
           return reabstracted
         
         default:
-          log("Parent function of callSite: \(rootClosure.parentFunction)")
+          log("Parent function of pullbackClosureInfo: \(rootClosure.parentFunction)")
           log("Root closure: \(rootClosure)")
           log("Converted/reabstracted closure: \(reabstractedClosure)")
           fatalError("Encountered unsupported reabstraction of root closure: \(reabstractedClosure)")
@@ -1030,15 +1025,15 @@ private extension Builder {
 }
 
 private extension FunctionConvention {
-  func getSpecializedParameters(basedOn callSite: CallSite) -> [ParameterInfo] {
-    let applySiteCallee = callSite.applyCallee
+  func getSpecializedParameters(basedOn pullbackClosureInfo: PullbackClosureInfo) -> [ParameterInfo] {
+    let pullbackFn = pullbackClosureInfo.pullbackFn
     var specializedParamInfoList: [ParameterInfo] = []
 
     // Start by adding all original parameters except for the closure parameters.
-    let firstParamIndex = applySiteCallee.argumentConventions.firstParameterIndex
-    for (index, paramInfo) in applySiteCallee.convention.parameters.enumerated() {
+    let firstParamIndex = pullbackFn.argumentConventions.firstParameterIndex
+    for (index, paramInfo) in pullbackFn.convention.parameters.enumerated() {
       let argIndex = index + firstParamIndex
-      if !callSite.hasClosureArg(at: argIndex) {
+      if !pullbackClosureInfo.hasClosureArg(at: argIndex) {
         specializedParamInfoList.append(paramInfo)
       }
     }
@@ -1051,7 +1046,7 @@ private extension FunctionConvention {
     // - direct and non-trivial, pass the new parameter as Direct_Owned.
     // - indirect, pass the new parameter using the same parameter convention as in
     //   the original closure.
-    for closureArgDesc in callSite.closureArgDescriptors {
+    for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
       if let closure = closureArgDesc.closure as? PartialApplyInst {
         let closureCallee = closureArgDesc.callee
         let closureCalleeConvention = closureCallee.convention
@@ -1205,10 +1200,10 @@ private struct OrderedDict<Key: Hashable, Value> {
   }
 }
 
-/// Represents all the information required to represent a closure in isolation, i.e., outside of a callsite context
-/// where the closure may be getting passed as an argument.
+/// Represents all the information required to represent a closure in isolation, i.e., outside of a pullback's partial_apply context
+/// where the closure may be getting captured as an argument.
 ///
-/// Composed with other information inside a `ClosureArgDescriptor` to represent a closure as an argument at a callsite.
+/// Composed with other information inside a `ClosureArgDescriptor` to represent a closure as a captured argument of a pullback's partial_apply.
 private struct ClosureInfo {
   let closure: SingleValueInstruction
   let lifetimeFrontier: [Instruction]
@@ -1220,10 +1215,10 @@ private struct ClosureInfo {
 
 }
 
-/// Represents a closure as an argument at a callsite.
+/// Represents a closure as a captured argument of a pullback's partial_apply.
 private struct ClosureArgDescriptor {
   let closureInfo: ClosureInfo
-  /// The index of the closure in the callsite's argument list.
+  /// The index of the closure in the pullback's partial_apply argument list.
   let closureArgumentIndex: Int
   let parameterInfo: ParameterInfo
 
@@ -1286,25 +1281,25 @@ private struct ClosureArgDescriptor {
   }
 }
 
-/// Represents a callsite containing one or more closure arguments.
-private struct CallSite {
-  let applySite: ApplySite
+/// Represents a partial_apply of pullback capturing one or more closure arguments.
+private struct PullbackClosureInfo {
+  let paiOfPullback: PartialApplyInst
   var closureArgDescriptors: [ClosureArgDescriptor] = []
 
-  init(applySite: ApplySite) {
-    self.applySite = applySite
+  init(paiOfPullback: PartialApplyInst) {
+    self.paiOfPullback = paiOfPullback
   }
 
   mutating func appendClosureArgDescriptor(_ descriptor: ClosureArgDescriptor) {
     self.closureArgDescriptors.append(descriptor)
   }
 
-  var applyCallee: Function {
-    applySite.referencedFunction!
+  var pullbackFn: Function {
+    paiOfPullback.referencedFunction!
   }
 
   var reachableExitBBsInCallee: [BasicBlock] {
-    applyCallee.blocks.filter { $0.isReachableExitBlock }
+    pullbackFn.blocks.filter { $0.isReachableExitBlock }
   }
 
   func hasClosureArg(at index: Int) -> Bool {
@@ -1317,7 +1312,7 @@ private struct CallSite {
 
   func appliedArgForClosure(at index: Int) -> Value? {
     if let closureArgDesc = closureArgDesc(at: index) {
-      return applySite.arguments[closureArgDesc.closureArgIndex - applySite.unappliedArgumentCount]
+      return paiOfPullback.arguments[closureArgDesc.closureArgIndex - paiOfPullback.unappliedArgumentCount]
     }
 
     return nil
@@ -1328,40 +1323,40 @@ private struct CallSite {
     let closureIndices = Array(self.closureArgDescriptors.map { $0.closureArgIndex })
 
     return context.mangle(withClosureArguments: closureArgs, closureArgIndices: closureIndices, 
-                          from: applyCallee)
+                          from: pullbackFn)
   }
 }
 
 // ===================== Unit tests ===================== //
 
-let gatherCallSiteTest = FunctionTest("closure_specialize_gather_call_site") { function, arguments, context in
+let getPullbackClosureInfoTest = FunctionTest("autodiff_closure_specialize_get_pullback_closure_info") { function, arguments, context in
   print("Specializing closures in function: \(function.name)")
   print("===============================================")
-  let callSite = gatherCallSite(in: function, context)!
-  print("PartialApply call site: \(callSite.applySite)")
+  let pullbackClosureInfo = getPullbackClosureInfo(in: function, context)!
+  print("PartialApply of pullback: \(pullbackClosureInfo.paiOfPullback)")
   print("Passed in closures: ")
-  for index in callSite.closureArgDescriptors.indices {
-    var closureArgDescriptor = callSite.closureArgDescriptors[index]
+  for index in pullbackClosureInfo.closureArgDescriptors.indices {
+    var closureArgDescriptor = pullbackClosureInfo.closureArgDescriptors[index]
     print("\(index+1). \(closureArgDescriptor.closureInfo.closure)")
   }
   print("\n")
 }
 
 let specializedFunctionSignatureAndBodyTest = FunctionTest(
-  "closure_specialize_specialized_function_signature_and_body") { function, arguments, context in
+  "autodiff_closure_specialize_specialized_function_signature_and_body") { function, arguments, context in
 
-  let callSite = gatherCallSite(in: function, context)!
+  let pullbackClosureInfo = getPullbackClosureInfo(in: function, context)!
 
-  let (specializedFunction, _) = getOrCreateSpecializedFunction(basedOn: callSite, context)
+  let (specializedFunction, _) = getOrCreateSpecializedFunction(basedOn: pullbackClosureInfo, context)
   print("Generated specialized function: \(specializedFunction.name)")
   print("\(specializedFunction)\n")
 }
 
-let rewrittenCallerBodyTest = FunctionTest("closure_specialize_rewritten_caller_body") { function, arguments, context in
-  let callSite = gatherCallSite(in: function, context)!
+let rewrittenCallerBodyTest = FunctionTest("autodiff_closure_specialize_rewritten_caller_body") { function, arguments, context in
+  let pullbackClosureInfo = getPullbackClosureInfo(in: function, context)!
 
-  let (specializedFunction, _) = getOrCreateSpecializedFunction(basedOn: callSite, context)
-  rewriteApplyInstruction(using: specializedFunction, callSite: callSite, context)
+  let (specializedFunction, _) = getOrCreateSpecializedFunction(basedOn: pullbackClosureInfo, context)
+  rewriteApplyInstruction(using: specializedFunction, pullbackClosureInfo: pullbackClosureInfo, context)
 
   print("Rewritten caller body for: \(function.name):")
   print("\(function)\n")

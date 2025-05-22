@@ -50,15 +50,15 @@ bb0(%0 : $Float, %1 : $@callee_guaranteed (@guaranteed Array<Float>.Differentiab
 sil hidden @$s4test4sum1ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
 bb0(%0 : $Array<Float>, %1 : $Array<Float>):
   //=========== Test callsite and closure gathering logic ===========//
-  specify_test "closure_specialize_gather_call_site"
+  specify_test "autodiff_closure_specialize_get_pullback_closure_info"
   // TRUNNER-LABEL: Specializing closures in function: $s4test4sum1ySfSaySfG_ACtFTJrSSpSr
-  // TRUNNER:       PartialApply call site:   %[[#]] = partial_apply [callee_guaranteed] %[[#]](%[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // TRUNNER:       PartialApply of pullback:   %[[#]] = partial_apply [callee_guaranteed] %[[#]](%[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned @callee_guaranteed (@in_guaranteed Float) -> @owned Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // TRUNNER-NEXT:  Passed in closures:
   // TRUNNER-NEXT:  1.   %[[#]] = partial_apply [callee_guaranteed] %[[#]](%[[#]], %[[#]]) : $@convention(thin) (@in_guaranteed Float, @guaranteed Array<Float>, Int) -> @owned Array<Float>.DifferentiableView
   // TRUNNER-EMPTY:
 
   //=========== Test specialized function signature and body ===========//
-  specify_test "closure_specialize_specialized_function_signature_and_body"
+  specify_test "autodiff_closure_specialize_specialized_function_signature_and_body"
   // TRUNNER-LABEL: Generated specialized function: $s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n0ce1_fghi39E13_vjpSubscript5indexx5value_SaA2aBRzljkl48Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaV7FSf_TG5ACSiTf1nnc_n
   // CHECK:         sil private [signature_optimized_thunk] [always_inline] @$s4test4sum1ySfSaySfG_ACtFTJpSSpSr055$sSfSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVyd8_GIegno_D10AEIegyo_TRSfSa01_F0AE0H0RzlE0hL0VySf_GIegno_Tf1nnc_n0ce1_fghi39E13_vjpSubscript5indexx5value_SaA2aBRzljkl48Vy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaV7FSf_TG5ACSiTf1nnc_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
   // CHECK:         bb0(%0 : $Float, %1 : $@callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), %2 : $Array<Float>, %3 : $Int):
@@ -75,7 +75,7 @@ bb0(%0 : $Array<Float>, %1 : $Array<Float>):
   // CHECK:           return %[[#D17]] : $(Array<Float>.DifferentiableView, Array<Float>.DifferentiableView)
 
   //=========== Test rewritten body ===========//
-  specify_test "closure_specialize_rewritten_caller_body"
+  specify_test "autodiff_closure_specialize_rewritten_caller_body"
   // TRUNNER-LABEL: Rewritten caller body for:  $s4test4sum1ySfSaySfG_ACtFTJrSSpSr:
   // CHECK:         sil hidden @$s4test4sum1ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
   // CHECK:         bb8:
