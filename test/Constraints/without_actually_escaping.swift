@@ -61,7 +61,7 @@ func rethrowThroughWAE(_ zz: (Int, Int, Int) throws -> Int, _ value: Int) throws
 }
 
 let _: ((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> () = withoutActuallyEscaping(_:do:)
-// expected-error@-1 {{invalid conversion from 'async' function of type '((Int) -> Int, (@escaping (Int) -> Int) async -> ()) async -> ()' to synchronous function type '((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()'}}
+// expected-error@-1 {{cannot convert value of type '((Swift.Int) -> Swift.Int, (@escaping (Swift.Int) -> Swift.Int) -> ()) -> ()' to specified type '((Swift.Int) -> Swift.Int, (@escaping (Swift.Int) -> Swift.Int) -> ()) -> ()'}}
 
 
 // Failing to propagate @noescape into non-single-expression
