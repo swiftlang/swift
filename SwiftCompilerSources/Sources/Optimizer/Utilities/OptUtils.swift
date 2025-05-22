@@ -45,9 +45,14 @@ extension Value {
     }
   }
 
-  var lookThroughTruncOrBitCast: Value {
-    if let truncOrBitCast = self as? BuiltinInst, truncOrBitCast.id == .TruncOrBitCast {
-      return truncOrBitCast.arguments[0]
+  var lookThroughIndexScalarCast: Value {
+    if let castBuiltin = self as? BuiltinInst {
+      switch castBuiltin.id {
+      case .TruncOrBitCast, .SExtOrBitCast:
+        return castBuiltin.arguments[0]
+      default:
+        return self
+      }
     }
     return self
   }
