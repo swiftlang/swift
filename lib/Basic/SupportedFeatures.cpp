@@ -52,11 +52,31 @@ static std::vector<DiagGroupID> migratableCategories(Feature feature) {
   }
 }
 
+/// For optional language features, return the flag name used by the compiler to enable the feature. For all others,
+/// returns an empty optional.
+static std::optional<std::string_view> optionalFlagName(Feature feature) {
+  switch (feature) {
+  case Feature::StrictMemorySafety:
+    return "-strict-memory-safety";
+
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) case Feature::FeatureName:
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#include "swift/Basic/Features.def"
+    return std::nullopt;
+  }
+}
+
 /// Print information about what features upcoming/experimental are
 /// supported by the compiler.
 /// The information includes whether a feature is adoptable and for
 /// upcoming features - what is the first mode it's introduced.
 void printSupportedFeatures(llvm::raw_ostream &out) {
+  std::array optional{
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) Feature::FeatureName,
+#include "swift/Basic/Features.def"
+  };
+
   std::array upcoming{
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) Feature::FeatureName,
@@ -93,10 +113,19 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
     if (auto version = feature.getLanguageVersion()) {
       out << ", \"enabled_in\": \"" << *version << "\"";
     }
+
+    if (auto flagName = optionalFlagName(feature)) {
+      out << ", \"flag_name\": \"" << *flagName << "\"";
+    }
+
     out << " }";
   };
 
   out << "  \"features\": {\n";
+  out << "    \"optional\": [\n";
+  llvm::interleave(optional, printFeature, [&out] { out << ",\n"; });
+  out << "\n    ],\n";
+
   out << "    \"upcoming\": [\n";
   llvm::interleave(upcoming, printFeature, [&out] { out << ",\n"; });
   out << "\n    ],\n";
