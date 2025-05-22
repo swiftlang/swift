@@ -128,7 +128,7 @@ static bool canIgnoreConstraintInUnavailableContexts(
     // which they are available. However, make an exception for types and
     // conformances, which can sometimes be awkward to avoid references to.
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
-      if (domain.isUniversal() || domain.isSwiftLanguage() || domain.isSwiftToolchain())
+      if (domain.isUniversal() || domain.isSwiftLanguage())
         return false;
     }
     return true;
