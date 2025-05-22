@@ -13,6 +13,7 @@
 #include <array>
 #include <vector>
 
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Frontend/Frontend.h"
 
@@ -22,6 +23,32 @@ using namespace swift;
 
 namespace swift {
 namespace features {
+
+/// The subset of diagnostic groups (called categories by the diagnostic machinery) whose diagnostics should be
+/// considered to be part of the migration for this feature.
+///
+///  When making a
+static std::vector<DiagGroupID> migratableCategories(Feature feature) {
+  switch (feature) {
+    case Feature::InnerKind::ExistentialAny:
+      return { DiagGroupID::ExistentialAny };
+    case Feature::InnerKind::InferIsolatedConformances:
+      return { DiagGroupID::IsolatedConformances };
+    case Feature::InnerKind::NonisolatedNonsendingByDefault:
+      return { DiagGroupID::NonisolatedNonsendingByDefault };
+    case Feature::InnerKind::StrictMemorySafety:
+      return { DiagGroupID::StrictMemorySafety };
+
+    // Provide unreachable cases for all of the non-migratable features.
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) case Feature::FeatureName:
+#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)
+#include "swift/Basic/Features.def"
+    llvm_unreachable("Not a migratable feature");
+  }
+}
+
 /// Print information about what features upcoming/experimental are
 /// supported by the compiler.
 /// The information includes whether a feature is adoptable and for
@@ -50,6 +77,15 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
     out << "{ \"name\": \"" << feature.getName() << "\"";
     if (feature.isMigratable()) {
       out << ", \"migratable\": true";
+
+      auto categories = migratableCategories(feature);
+      out << ", \"categories\": [";
+      llvm::interleave(categories, [&out](DiagGroupID diagGroupID) {
+        out << "\"" << getDiagGroupInfoByID(diagGroupID).name << "\"";
+      }, [&out] {
+        out << ", ";
+      });
+      out << "]";
     }
     if (auto version = feature.getLanguageVersion()) {
       out << ", \"enabled_in\": \"" << *version << "\"";

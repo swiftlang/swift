@@ -2,9 +2,9 @@
 
 // CHECK: "features": {
 // CHECK-NEXT:   "upcoming": [
-// CHECK:     { "name": "{{.*}}"{{, "migratable": true}}, "enabled_in": "{{.*}}" }
+// CHECK:     { "name": "InferIsolatedConformances", "migratable": true, "categories": ["IsolatedConformances"], "enabled_in": "7" },
 // CHECK:   ],
-// CHECK-NEXT:   "experimental": [
+// CHECK:   "experimental": [
 // CHECK:     { "name": "{{.*}}" }
 // CHECK:   ]
 // CHECK: }
