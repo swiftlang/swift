@@ -181,12 +181,10 @@ func test_multiple_generic<T: P>(_ t: T) -> some P {
 // CHECK: define private ptr @"get_underlying_type_ref 43opaque_result_with_conditional_availabilityAA21test_multiple_genericyQrxAA1PRzlFQOQr"(ptr %0)
 // CHECK-NEXT: entry:
 // CHECK-NEXT:  %"\CF\84_0_01" = alloca ptr
-// CHECK-NEXT:  %"\CF\84_0_02" = alloca ptr
 // CHECK-NEXT:  %"\CF\84_0_0" = load ptr, ptr %0
 // CHECK-NEXT:  store ptr %"\CF\84_0_0", ptr %"\CF\84_0_01"
 // CHECK-NEXT:  %1 = getelementptr inbounds ptr, ptr %0, i32 1
 // CHECK-NEXT:  %"\CF\84_0_0.P" = load ptr, ptr %1
-// CHECK-NEXT:  store ptr %"\CF\84_0_0.P", ptr %"\CF\84_0_02"
 // CHECK-NEXT:  br label %conditional-0
 // CHECK: conditional-0:                                    ; preds = %entry
 // CHECK-NEXT:  br label %cond-0-0
@@ -203,12 +201,10 @@ func test_multiple_generic<T: P>(_ t: T) -> some P {
 // CHECK: define private ptr @"get_underlying_witness 43opaque_result_with_conditional_availabilityAA21test_multiple_genericyQrxAA1PRzlFQOqd__AaCHC"(ptr %0)
 // CHECK-NEXT: entry:
 // CHECK-NEXT:  %"\CF\84_0_01" = alloca ptr, align 8
-// CHECK-NEXT:  %"\CF\84_0_02" = alloca ptr, align 8
 // CHECK-NEXT:  %"\CF\84_0_0" = load ptr, ptr %0, align 8
 // CHECK-NEXT:  store ptr %"\CF\84_0_0", ptr %"\CF\84_0_01", align 8
 // CHECK-NEXT:  %1 = getelementptr inbounds ptr, ptr %0, i32 1
 // CHECK-NEXT:  %"\CF\84_0_0.P" = load ptr, ptr %1, align 8
-// CHECK-NEXT:  store ptr %"\CF\84_0_0.P", ptr %"\CF\84_0_02"
 // CHECK-NEXT:  br label %conditional-0
 // CHECK: conditional-0:                                    ; preds = %entry
 // CHECK-NEXT:  br label %cond-0-0
