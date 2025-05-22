@@ -15,7 +15,7 @@ bb0(%0 : $ConformingAssoc):
   return %2 : $()
 }
 
-sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
+sil @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@in_guaranteed ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
   %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (ConformingAssoc) -> ()

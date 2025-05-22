@@ -531,9 +531,9 @@ public struct S : P {
 }
 
 // CHECK-LABEL: sil shared @$s4test1SVAA1PA2aDP3fooyS2iycFZTW8closure2SiTf1cn_n : $@convention(thin) (@thick S.Type, Int) -> Int
-sil @$s4test1SVAA1PA2aDP3fooyS2iycFZTW : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int {
-bb0(%0 : $@callee_owned () -> Int, %1 : $@thick S.Type):
-  %3 = apply %0() : $@callee_owned () -> Int
+sil @$s4test1SVAA1PA2aDP3fooyS2iycFZTW : $@convention(witness_method: P) (@guaranteed @noescape @callee_guaranteed () -> Int, @thick S.Type) -> Int {
+bb0(%0 : $@noescape @callee_guaranteed () -> Int, %1 : $@thick S.Type):
+  %3 = apply %0() : $@noescape @callee_guaranteed () -> Int
   return %3 : $Int
 }
 
@@ -545,10 +545,11 @@ bb0(%0 : $Int):
 sil @call_witness_method : $@convention(thin) (Int, S) -> Int {
 bb0(%0 : $Int, %1 : $S):
   %3 = function_ref @closure2 : $@convention(thin) (Int) -> Int
-  %4 = partial_apply %3(%0) : $@convention(thin) (Int) -> Int
+  %4 = partial_apply [callee_guaranteed] %3(%0) : $@convention(thin) (Int) -> Int
+  %4a = convert_escape_to_noescape %4 : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
   %5 = metatype $@thick S.Type
-  %6 = function_ref @$s4test1SVAA1PA2aDP3fooyS2iycFZTW : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
-  %7 = apply %6(%4, %5) : $@convention(witness_method: P) (@owned @callee_owned () -> Int, @thick S.Type) -> Int
+  %6 = function_ref @$s4test1SVAA1PA2aDP3fooyS2iycFZTW : $@convention(witness_method: P) (@guaranteed @noescape @callee_guaranteed () -> Int, @thick S.Type) -> Int
+  %7 = apply %6(%4a, %5) : $@convention(witness_method: P) (@guaranteed @noescape @callee_guaranteed () -> Int, @thick S.Type) -> Int
   return %7 : $Int
 }
 

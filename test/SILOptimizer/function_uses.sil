@@ -180,13 +180,13 @@ struct SP2 : P {
 // CHECK-NEXT:  <unknown uses>
 // CHECK-NEXT:  ]
 // CHECK-NEXT:  End function witness
-sil @witness : $@convention(witness_method: P) (@inout SP) -> () {
+sil @witness : $@convention(witness_method: P) (@in_guaranteed SP) -> () {
 bb0(%0 : $*SP):
   %7 = tuple ()
   return %7 : $()
 }
 
-sil @witness2 : $@convention(witness_method: P) (@inout SP) -> () {
+sil @witness2 : $@convention(witness_method: P) (@in_guaranteed SP) -> () {
 bb0(%0 : $*SP):
   %7 = tuple ()
   return %7 : $()
