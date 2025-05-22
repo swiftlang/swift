@@ -124,6 +124,9 @@ def setup_mock_remote(base_dir, base_config):
                      cwd=local_repo_path)
         call_quietly(['git', 'config', '--local', 'commit.gpgsign', 'false'],
                      cwd=local_repo_path)
+        # any installed user certificate won't match the email address
+        call_quietly(['git', 'config', 'commit.gpgsign', 'false'],
+                     cwd=local_repo_path)
         call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
                      cwd=local_repo_path)
         for (i, (filename, contents)) in enumerate(v):
