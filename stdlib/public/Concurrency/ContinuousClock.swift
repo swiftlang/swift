@@ -102,7 +102,7 @@ extension ContinuousClock: Clock {
 
   /// The continuous clock is continuous and monotonic
   @available(SwiftStdlib 6.2, *)
-  public var _traits: _ClockTraits {
+  public var traits: ClockTraits {
     return [.continuous, .monotonic]
   }
 

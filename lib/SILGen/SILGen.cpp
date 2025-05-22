@@ -515,7 +515,7 @@ Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
   // Look in the main module for a typealias
-  Type factory = ctx.getNamedSwiftType(ctx.MainModule, "_DefaultExecutorFactory");
+  Type factory = ctx.getNamedSwiftType(ctx.MainModule, "DefaultExecutorFactory");
 
   // If we don't find it, fall back to _Concurrency.PlatformExecutorFactory
   if (!factory)
@@ -531,7 +531,7 @@ Type SILGenModule::getDefaultExecutorFactory() {
   if (!module)
     return Type();
 
-  return ctx.getNamedSwiftType(module, "_DefaultExecutorFactory");
+  return ctx.getNamedSwiftType(module, "DefaultExecutorFactory");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
