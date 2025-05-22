@@ -1404,7 +1404,8 @@ static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
 
   if (langOpts.EnableCXXInterop) {
     auto OptionalCxxDep = cache.findDependency(CXX_MODULE_NAME);
-    auto OptionalCxxStdLibDep = cache.findDependency("CxxStdlib");
+    auto OptionalCxxStdLibDep =
+        cache.findDependency(instance.getASTContext().Id_CxxStdlib.str());
     bool hasStaticCxx =
         OptionalCxxDep.has_value() && OptionalCxxDep.value()->isStaticLibrary();
     bool hasStaticCxxStdlib = OptionalCxxStdLibDep.has_value() &&
