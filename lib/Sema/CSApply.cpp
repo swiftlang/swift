@@ -7731,11 +7731,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate a global actor
-    // to the closure without invalidating prior analysis.
+    // to the closure if it's not explicitly marked as `@concurrent` without
+    // invalidating prior analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.getGlobalActor() && !fromEI.getGlobalActor()) {
-      auto newFromFuncType = fromFunc->withExtInfo(
-          fromEI.withGlobalActor(toEI.getGlobalActor()));
+    if (toEI.getGlobalActor() && !fromEI.getGlobalActor() &&
+        !isClosureMarkedAsConcurrent(expr)) {
+      auto newFromFuncType =
+          fromFunc->withExtInfo(fromEI.withGlobalActor(toEI.getGlobalActor()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
