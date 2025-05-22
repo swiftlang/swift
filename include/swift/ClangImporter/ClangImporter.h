@@ -877,6 +877,13 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
 
+/// Apply the given file mapping to the specified 'fileSystem', used
+/// primarily to inject modulemaps on platforms with non-modularized
+/// platform libraries.
+void applyClangInvocationMapping(const ASTContext &ctx,
+                                 const ClangInvocationFileMapping &mapping,
+                                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem);
+
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {
   /// The cumulative inheritance access specifier, that is used to compute the
