@@ -155,6 +155,11 @@
   #endif
 #endif
 
+#ifndef MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE
+  #define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)   \
+      OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, #Name)
+#endif
+
 #ifndef UPCOMING_FEATURE
   #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
@@ -283,14 +288,14 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
-UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
+MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 
 // Optional language features / modes
 
 /// Diagnose uses of language constructs and APIs that can violate memory
 /// safety.
-OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
+MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
 
 // Experimental features
 
@@ -521,6 +526,7 @@ EXPERIMENTAL_FEATURE(ModuleSelector, false)
 #undef UPCOMING_FEATURE
 #undef MIGRATABLE_UPCOMING_FEATURE
 #undef MIGRATABLE_EXPERIMENTAL_FEATURE
+#undef MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
 #undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE

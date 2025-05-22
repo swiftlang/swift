@@ -106,7 +106,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto *argList = ArgumentList::forImplicitCallTo(functionRef->getName(),
                                                     {selfRef, typeExpr}, C);
     Expr *call = CallExpr::createImplicit(C, functionRef, argList);
-    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety))
+    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
       call = UnsafeExpr::createImplicit(C, SourceLoc(), call);
     auto *returnStmt = ReturnStmt::createImplicit(C, call);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
