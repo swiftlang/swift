@@ -58,7 +58,7 @@ struct TickingClock: Clock {
   private var _now: Instant
   var now: Instant { return _now }
   var minimumResolution: Duration { return Duration(ticks: 1) }
-  var traits: _ClockTraits { [.monotonic] }
+  var traits: ClockTraits { [.monotonic] }
 
   init() {
     _now = Instant(ticksFromStart: 0)
@@ -67,11 +67,11 @@ struct TickingClock: Clock {
   // These are a bit of a lie, since this clock is weird and doesn't
   // actually tell the time; for the purposes of this test, we pretend
   // that the ticks are 20ms.
-  func _convert(from duration: Duration) -> Swift.Duration? {
+  func convert(from duration: Duration) -> Swift.Duration? {
     return .seconds(Double(duration.ticks) / 50)
   }
 
-  func _convert(from duration: Swift.Duration) -> Duration? {
+  func convert(from duration: Swift.Duration) -> Duration? {
     let (seconds, attoseconds) = duration.components
     let extraTicks = attoseconds / 20_000_000_000_000_000
     return Duration(ticks: Int(seconds * 50) + Int(extraTicks))
@@ -136,7 +136,7 @@ struct TockingClock: Clock {
   private var _now: Instant
   var now: Instant { return _now }
   var minimumResolution: Duration { return Duration(tocks: 1) }
-  var traits: _ClockTraits { [.monotonic] }
+  var traits: ClockTraits { [.monotonic] }
 
   init() {
     _now = Instant(tocksFromStart: 1000)
@@ -145,11 +145,11 @@ struct TockingClock: Clock {
   // These are a bit of a lie, since this clock is weird and doesn't
   // actually tell the time; for the purposes of this test, we pretend
   // that the tocks are 10ms.
-  func _convert(from duration: Duration) -> Swift.Duration? {
+  func convert(from duration: Duration) -> Swift.Duration? {
     return .seconds(Double(duration.tocks) / 100)
   }
 
-  func _convert(from duration: Swift.Duration) -> Duration? {
+  func convert(from duration: Swift.Duration) -> Duration? {
     let (seconds, attoseconds) = duration.components
     let extraTocks = attoseconds / 10_000_000_000_000_000
     return Duration(tocks: Int(seconds * 100) + Int(extraTocks))
@@ -196,14 +196,14 @@ struct TockingClock: Clock {
       expectEqual(futureA.ticksFromStart, 26)
       expectEqual(futureB.ticksFromStart, 42)
 
-      let futureAinB = clockB._convert(instant: futureA, from: clockA)!
-      let futureBinA = clockA._convert(instant: futureB, from: clockB)!
+      let futureAinB = clockB.convert(instant: futureA, from: clockA)!
+      let futureBinA = clockA.convert(instant: futureB, from: clockB)!
 
       expectEqual(futureAinB.ticksFromStart, 23)
       expectEqual(futureBinA.ticksFromStart, 45)
 
-      let futureAinBinA = clockA._convert(instant: futureAinB, from: clockB)!
-      let futureBinAinB = clockB._convert(instant: futureBinA, from: clockA)!
+      let futureAinBinA = clockA.convert(instant: futureAinB, from: clockB)!
+      let futureBinAinB = clockB.convert(instant: futureBinA, from: clockA)!
 
       expectEqual(futureAinBinA.ticksFromStart, futureA.ticksFromStart)
       expectEqual(futureBinAinB.ticksFromStart, futureB.ticksFromStart)
@@ -222,14 +222,14 @@ struct TockingClock: Clock {
       expectEqual(futureA.ticksFromStart, 26)
       expectEqual(futureC.tocksFromStart, 1043)
 
-      let futureAinC = clockC._convert(instant: futureA, from: clockA)!
-      let futureCinA = clockA._convert(instant: futureC, from: clockC)!
+      let futureAinC = clockC.convert(instant: futureA, from: clockA)!
+      let futureCinA = clockA.convert(instant: futureC, from: clockC)!
 
       expectEqual(futureAinC.tocksFromStart, 1047)
       expectEqual(futureCinA.ticksFromStart, 24)
 
-      let futureAinCinA = clockA._convert(instant: futureAinC, from: clockC)!
-      let futureCinAinC = clockC._convert(instant: futureCinA, from: clockA)!
+      let futureAinCinA = clockA.convert(instant: futureAinC, from: clockC)!
+      let futureCinAinC = clockC.convert(instant: futureCinA, from: clockA)!
 
       expectEqual(futureAinCinA.ticksFromStart, futureA.ticksFromStart)
       expectEqual(futureCinAinC.tocksFromStart, futureC.tocksFromStart)
@@ -245,15 +245,15 @@ struct TockingClock: Clock {
       let futureC = nowC.advanced(by: .seconds(5.3))
       let futureS = nowS.advanced(by: .seconds(4.2))
 
-      let futureCinS = suspending._convert(instant: futureC,
-                                           from: .continuous)!
-      let futureSinC = continuous._convert(instant: futureS,
-                                           from: .suspending)!
+      let futureCinS = suspending.convert(instant: futureC,
+                                          from: .continuous)!
+      let futureSinC = continuous.convert(instant: futureS,
+                                          from: .suspending)!
 
-      let futureCinSinC = continuous._convert(instant: futureCinS,
-                                              from: .suspending)!
-      let futureSinCinS = suspending._convert(instant: futureSinC,
-                                              from: .continuous)!
+      let futureCinSinC = continuous.convert(instant: futureCinS,
+                                             from: .suspending)!
+      let futureSinCinS = suspending.convert(instant: futureSinC,
+                                             from: .continuous)!
 
       // These clocks may not be exact, so allow differences of up to 50ms
       var delta1 = futureCinSinC - futureC
