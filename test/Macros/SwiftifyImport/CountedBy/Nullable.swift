@@ -71,7 +71,7 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:     if ptr?.count ?? 0 < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return { () in
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime({ () in
 // CHECK-NEXT:         let _resultValue = { () in
 // CHECK-NEXT:             return if ptr == nil {
 // CHECK-NEXT:                 unsafe myFunc4(nil, len)
@@ -84,7 +84,7 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:         if unsafe _resultValue == nil {
 // CHECK-NEXT:             return nil
 // CHECK-NEXT:         } else {
-// CHECK-NEXT:             return unsafe MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len))
+// CHECK-NEXT:             return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 // CHECK-NEXT:         }
-// CHECK-NEXT:     }()
+// CHECK-NEXT:     }(), copying: ())
 // CHECK-NEXT: }
