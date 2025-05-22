@@ -1306,6 +1306,18 @@ func setLifetimeDependencies(
   }
 }
 
+func isInout(_ type: TypeSyntax) -> Bool {
+  guard let attr = type.as(AttributedTypeSyntax.self) else {
+    return false
+  }
+  return attr.specifiers.contains(where: { e in
+    guard let simpleSpec = e.as(SimpleTypeSpecifierSyntax.self) else {
+      return false
+    }
+    return simpleSpec.specifier.text == "inout"
+  })
+}
+
 func getReturnLifetimeAttribute(
   _ funcDecl: FunctionDeclSyntax,
   _ dependencies: [SwiftifyExpr: [LifetimeDependence]]
@@ -1318,10 +1330,14 @@ func getReturnLifetimeAttribute(
   for dependence in returnDependencies {
     switch dependence.type {
     case .borrow:
-      args.append(
-        LabeledExprSyntax(
-          expression:
-            DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
+      if isInout(getSwiftifyExprType(funcDecl, dependence.dependsOn)) {
+        args.append(LabeledExprSyntax(expression: ExprSyntax("&")))
+      } else {
+        args.append(
+          LabeledExprSyntax(
+            expression:
+              DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
+      }
     case .copy:
       args.append(
         LabeledExprSyntax(
