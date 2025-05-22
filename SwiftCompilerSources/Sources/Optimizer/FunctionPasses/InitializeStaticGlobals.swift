@@ -399,7 +399,7 @@ private extension StoreInst {
        let headerBr = vectorBase.parentBlock.terminator as? BranchInst,
        headerBr.targetBlock == parentBlock,
        let vectorSize = vectorBase.vector.type.builtinFixedArraySizeType.valueOfInteger,
-       let (start, loopCount, increment) = getLoopInductionInfo(of: indexAddr.index.lookThroughTruncOrBitCast),
+       let (start, loopCount, increment) = getLoopInductionInfo(of: indexAddr.index.lookThroughIndexScalarCast),
        start == 0, loopCount == vectorSize, increment == 1
     {
       return true
