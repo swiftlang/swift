@@ -73,15 +73,13 @@ func testCalls(x: X) {
 }
 
 func testCallsWithAsync() async {
-  onMainActorAlways() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
+  onMainActorAlways() // expected-error{{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}} {{3-3=await }}
 
   let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
 
-  c.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  c.f() // expected-error{{main actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{3-3=await }}
 }
 
 // ---------------------------------------------------------------------------

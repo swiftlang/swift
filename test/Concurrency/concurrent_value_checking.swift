@@ -100,8 +100,7 @@ extension A1 {
 
     // Across to a different actor, so Sendable restriction is enforced.
     _ = other.localLet // expected-warning{{non-Sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
-    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
-    // expected-note@-2 {{property access is 'async'}}
+    // expected-warning@-1 {{actor-isolated property 'localLet' cannot be accessed from outside of the actor}} {{9-9=await }}
     _ = await other.synchronous() // expected-tns-warning {{non-Sendable 'NotConcurrent?'-typed result can not be returned from actor-isolated instance method 'synchronous()' to actor-isolated context}}
     _ = await other.asynchronous(nil)
   }
@@ -138,14 +137,12 @@ enum E {
 }
 
 func globalTest() async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{property access is 'async'}}
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot be accessed from outside of the actor}} {{11-11=await }}
   let a = globalValue // expected-warning{{non-Sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
   await globalAsync(a)
   await globalSync(a)
 
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{property access is 'async'}}
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot be accessed from outside of the actor}} {{11-11=await }}
   let _ = E.notSafe // expected-warning{{non-Sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
 
 #if ALLOW_TYPECHECKER_ERRORS
@@ -174,8 +171,7 @@ class ClassWithGlobalActorInits { // expected-tns-note 2{{class 'ClassWithGlobal
 
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{property access is 'async'}}
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot be accessed from outside of the actor}} {{11-11=await }}
   let a = globalValue // expected-warning {{non-Sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
   await globalAsync(a)
   await globalSync(a)
