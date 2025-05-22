@@ -111,16 +111,13 @@ func testCalls(x: X) {
 }
 
 func testCallsWithAsync() async {
-  onMainActorAlways() // expected-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
+  onMainActorAlways() // expected-warning{{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}} {{3-3=await }}
 
   let _: () -> Void = onMainActorAlways // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-minimal-targeted-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-minimal-targeted-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  let c = MyModelClass() // expected-minimal-targeted-warning{{main actor-isolated initializer 'init()' cannot be called from outside of the actor}} {{11-11=await }}
 
-  c.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  c.f() // expected-warning{{main actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{3-3=await }}
 }
 
 // ---------------------------------------------------------------------------
