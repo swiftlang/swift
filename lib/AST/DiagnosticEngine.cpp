@@ -414,9 +414,20 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
   if (insertionLoc.isValid()) {
     return fixItInsert(insertionLoc, "%0 ", {Attr});
   } else {
-    insertionLoc = E->getBody()->getLBraceLoc();
+    auto *body = E->getBody();
+
+    insertionLoc = body->getLBraceLoc();
     ASSERT(insertionLoc.isValid());
-    return fixItInsertAfter(insertionLoc, " %0 in ", {Attr});
+
+    StringRef fixIt = " %0 in";
+    // If the first token in the body literally begins with the next char after
+    // '{', play it safe with a trailing space.
+    if (body->getContentStartLoc() ==
+        insertionLoc.getAdvancedLoc(/*ByteOffset=*/1)) {
+      fixIt = " %0 in ";
+    }
+
+    return fixItInsertAfter(insertionLoc, fixIt, {Attr});
   }
 }
 
