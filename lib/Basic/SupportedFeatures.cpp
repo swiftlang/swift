@@ -27,7 +27,8 @@ namespace features {
 /// The subset of diagnostic groups (called categories by the diagnostic machinery) whose diagnostics should be
 /// considered to be part of the migration for this feature.
 ///
-///  When making a
+///  When making a feature migratable, ensure that all of the warnings that are used to drive the migration are
+///  part of a diagnostic group, and put that diagnostic group into the list for that feature here.
 static std::vector<DiagGroupID> migratableCategories(Feature feature) {
   switch (feature) {
     case Feature::InnerKind::ExistentialAny:
