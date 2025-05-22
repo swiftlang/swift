@@ -15,6 +15,7 @@
 // XFAIL: LinuxDistribution=rhel-9.3
 // XFAIL: LinuxDistribution=rhel-9.4
 // XFAIL: LinuxDistribution=rhel-9.5
+// XFAIL: LinuxDistribution=rhel-9.6
 // XFAIL: LinuxDistribution=fedora-39
 // XFAIL: LinuxDistribution=debian-12
 
