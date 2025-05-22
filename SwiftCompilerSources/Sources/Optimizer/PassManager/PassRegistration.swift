@@ -101,6 +101,7 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
   registerPass(copyToBorrowOptimization, { copyToBorrowOptimization.run($0) })
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
+  registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
   registerPass(generalClosureSpecialization, { generalClosureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
 
