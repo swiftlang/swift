@@ -60,18 +60,18 @@ struct TestStruct {}
 @available(macOS 10.11, *)
 extension TestStruct {
   @available(_SwiftToolchain 400)
-  func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift Toolchain 400}}
+  func doTheThing() {}
 }
 
 @available(_SwiftToolchain 400)
 extension TestStruct {
-  func doAnotherThing() {} // expected-note {{'doAnotherThing()' was introduced in Swift Toolchain 400}}
+  func doAnotherThing() {}
 }
 
 @available(macOS 10.11, *)
 func testMemberAvailability() {
-  TestStruct().doTheThing() // expected-error {{'doTheThing()' is unavailable}}
-  TestStruct().doAnotherThing() // expected-error {{'doAnotherThing()' is unavailable}}
+  TestStruct().doTheThing() // no error, toolchain availability is inactive
+  TestStruct().doAnotherThing()
 }
 
 @available(_SwiftToolchain 400) // FIXME: This has no effect and should be complained about.

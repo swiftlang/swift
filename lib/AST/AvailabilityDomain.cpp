@@ -165,7 +165,6 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguage:
-  case Kind::SwiftToolchain:
   case Kind::PackageDescription:
   case Kind::Embedded:
     return true;
@@ -175,6 +174,9 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
     // For now, custom domains are always active but it's conceivable that in
     // the future someone might want to define a domain but leave it inactive.
     return true;
+  case Kind::SwiftToolchain:
+    // Swift Toolchain availability information is only informational.
+    return false;
   }
 }
 
