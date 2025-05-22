@@ -8290,15 +8290,13 @@ ERROR(lifetime_parameter_requires_inout, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_feature_required_return, none,
-      "%0 with a ~Escapable result requires "
-      "'-enable-experimental-feature LifetimeDependence'", (StringRef))
+      "%0 cannot return a ~Escapable result", (StringRef))
 ERROR(lifetime_dependence_feature_required_mutating, none,
-      "%0 with ~Escapable 'self' requires "
-      "'-enable-experimental-feature LifetimeDependence'", (StringRef))
+      "%0 cannot have a ~Escapable 'self'", (StringRef))
 ERROR(lifetime_dependence_feature_required_inout, none,
-      "%0 with a ~Escapable 'inout' parameter requires "
-      "'-enable-experimental-feature LifetimeDependence'",
-      // arg list is interchangable with lifetime_dependence_cannot_infer_inout
+      "%0 cannot have a ~Escapable 'inout' parameter %1",
+      // this arg list must be compatible with
+      // lifetime_dependence_cannot_infer_inout
       (StringRef, Identifier))
 
 ERROR(lifetime_dependence_cannot_infer_return, none,
