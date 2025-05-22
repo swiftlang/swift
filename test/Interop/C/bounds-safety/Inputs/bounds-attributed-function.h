@@ -3,6 +3,11 @@
 #include <ptrcheck.h>
 #include <stdarg.h>
 
+// Test __counted_by, __sized_by, __ended_by, __single, __indexable and __bidi_indexable pointers
+// in function parameters, return values, nested and unnested, pointing to void, char and int.
+// Also test VLAs, and incomplete pointer type with __counted_by, since they are pretty much the same
+// as __counted_by pointers in the -fbounds-safety model.
+
 #ifndef __unsafe_late_const
 #define __unsafe_late_const
 #endif
@@ -23,6 +28,7 @@ char * __single j(char *__single p);
 void *__single k(void *__single p);
 
 #if __has_ptrcheck
+// __indexable and __bidi_indexable are not defined unless -fbounds-safety is enabled
 char * __indexable l(char *__indexable p);
 void *__indexable m(void *__indexable p);
 
@@ -31,6 +37,7 @@ void * __bidi_indexable o(void *__bidi_indexable p);
 #endif
 
 #if !__cplusplus
+// No VLAs in C++
 void p(int len, int p[len]);
 #endif
 void q(int p[__counted_by(len)], int len);
@@ -45,4 +52,5 @@ int * __counted_by(len1) u(int * __counted_by(len1) p);
 int len2 __unsafe_late_const;
 int * __counted_by(len2) v(int * __counted_by(len2) p);
 
+// -fbounds-safety can sometimes affect va_list
 void w(va_list p);

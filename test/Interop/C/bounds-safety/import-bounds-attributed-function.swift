@@ -2,6 +2,9 @@
 // RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
 // RUN: %target-swift-ide-test -Xcc -fbounds-safety -disable-objc-interop -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,BOUNDS-SAFETY,C-ONLY
 
+// This test case checks that ClangImporter can import declarations using various bounds attributes,
+// rather than being marked unavailable because of an unknown type.
+
 // CHECK:      func a(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
 // CHECK-NEXT: func b(_ p: UnsafeMutablePointer<CChar>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<CChar>!
 // CHECK-NEXT: func c(_ p: UnsafeMutablePointer<CChar>!, _ len: Int{{[0-9]+}}) -> UnsafeMutablePointer<CChar>!

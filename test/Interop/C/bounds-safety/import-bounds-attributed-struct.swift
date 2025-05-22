@@ -2,6 +2,8 @@
 // RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedStruct -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default -Xcc -std=c++20 | %FileCheck %s
 // RUN: %target-swift-ide-test -Xcc -fbounds-safety -disable-objc-interop -print-module -module-to-print=BoundsAttributedStruct -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,BOUNDS-SAFETY
 
+// This test case checks that ClangImporter can import declarations using various bounds attributes,
+// rather than being marked unavailable because of an unknown type.
 
 // CHECK:      struct a {
 // CHECK-NEXT:   init()
@@ -93,7 +95,7 @@
 
 import BoundsAttributedStruct
 
-func call(aa: a, bb: b, cc: c, dd: d, ee: e, ff: f, ii: UnsafeMutablePointer<i>, jj: j, kk: k) {
+func call(aa: a, bb: b, cc: c, dd: d, ee: e, ff: f, ii: UnsafeMutablePointer<i>, jj: j, kk: k, ll: l, mm: m) {
     let _ = aa.a
     let _ = a(aa)
 
@@ -126,6 +128,14 @@ func call(aa: a, bb: b, cc: c, dd: d, ee: e, ff: f, ii: UnsafeMutablePointer<i>,
     let _ = kk.a
     let _ = kk.b
     let _ = k(kk)
+
+    let _ = ll.a
+    let _ = ll.end
+    let _ = l(ll)
+
+    let _ = mm.a
+    let _ = mm.end
+    let _ = m(mm)
 }
 
 #if BOUNDS_SAFETY
