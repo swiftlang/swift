@@ -647,11 +647,7 @@ extension Deallocation {
 }
 
 
-final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
