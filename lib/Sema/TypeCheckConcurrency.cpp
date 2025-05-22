@@ -6826,6 +6826,9 @@ static bool checkSendableInstanceStorage(
 
 bool swift::checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check) {
+  ASSERT(conformance->getProtocol()->isSpecificProtocol(
+           KnownProtocolKind::Sendable));
+
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
@@ -6915,13 +6918,16 @@ bool swift::checkSendableConformance(
     return false;
   }
 
+  // An implied conformance is generated when you state a conformance to
+  // a protocol P that inherits from Sendable.
+  bool wasImplied = (conformance->getSourceKind() ==
+                     ConformanceEntryKind::Implied);
+
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   SendableCheckContext checkContext(conformanceDC, check);
   DiagnosticBehavior behavior = checkContext.defaultDiagnosticBehavior();
-  if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
-      conformance->getProtocol()->isSpecificProtocol(
-          KnownProtocolKind::Sendable)) {
+  if (wasImplied) {
     if (auto optBehavior = checkContext.preconcurrencyBehavior(
             nominal, /*ignoreExplicitConformance=*/true))
       behavior = *optBehavior;
@@ -6930,12 +6936,14 @@ bool swift::checkSendableConformance(
   if (conformanceDC->getOutermostParentSourceFile() &&
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
-    conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
-                              nominal)
-      .limitBehaviorUntilSwiftVersion(behavior, 6);
+    if (!(nominal->hasClangNode() && wasImplied)) {
+      conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
+                                nominal)
+        .limitBehaviorUntilSwiftVersion(behavior, 6);
 
-    if (behavior == DiagnosticBehavior::Unspecified)
-      return true;
+      if (behavior == DiagnosticBehavior::Unspecified)
+        return true;
+    }
   }
 
   if (classDecl && classDecl->getParentSourceFile()) {
@@ -6973,7 +6981,7 @@ bool swift::checkSendableConformance(
   // a Sendable conformance. The implied conformance is unconditional, so check
   // the storage for sendability as if the conformance was declared on the nominal,
   // and not some (possibly constrained) extension.
-  if (conformance->getSourceKind() == ConformanceEntryKind::Implied)
+  if (wasImplied)
     conformanceDC = nominal;
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
