@@ -2282,7 +2282,7 @@ function Build-ExperimentalRuntime {
   }
 }
 
-function Write-SDKSettingsPlist([OS] $OS) {
+function Write-SDKSettings([OS] $OS) {
   $SDKSettings = @{
     DefaultProperties = @{
     }
@@ -2293,11 +2293,14 @@ function Write-SDKSettingsPlist([OS] $OS) {
   Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS)\SDKSettings.plist"
 
   $SDKSettings = @{
-    CanonicalName = $OS.ToString()
+    CanonicalName = $OS.ToString().ToLowerInvariant()
     DisplayName = $OS.ToString()
-    IsBaseSDK = "NO"
+    IsBaseSDK = "YES"
     Version = "${ProductVersion}"
     VersionMap = @{}
+    HeaderSearchPaths = @( "usr/include" );
+    LibrarySearchPaths = @();
+    Toolchains = @( "${ToolchainIdentifier}" );
     DefaultProperties = @{
       PLATFORM_NAME = $OS.ToString()
       DEFAULT_COMPILER = "${ToolchainIdentifier}"
@@ -3230,7 +3233,7 @@ if (-not $SkipBuild) {
 
   Install-Platform $WindowsSDKPlatforms Windows
   Write-PlatformInfoPlist Windows
-  Write-SDKSettingsPlist Windows
+  Write-SDKSettings Windows
 
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
@@ -3245,7 +3248,7 @@ if (-not $SkipBuild) {
 
     Install-Platform $AndroidSDKPlatforms Android
     Write-PlatformInfoPlist Android
-    Write-SDKSettingsPlist Android
+    Write-SDKSettings Android
 
     # Android swift-inspect only supports 64-bit platforms.
     $AndroidSDKPlatforms | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
