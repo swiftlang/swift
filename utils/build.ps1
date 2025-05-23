@@ -539,7 +539,7 @@ function Write-Summary {
 
   if ($EnableCaching) {
     Write-Host "SCCache:" -ForegroundColor Green
-    & sccache.exe --show-stats
+    Invoke-Program (Get-SCCache).Path --show-stats
   }
 
   $TotalTime = [TimeSpan]::Zero
