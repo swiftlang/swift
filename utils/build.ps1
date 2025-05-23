@@ -643,6 +643,10 @@ enum Project {
   ClangRuntime
   SwiftInspect
   ExperimentalRuntime
+  ExperimentalOverlay
+  ExperimentalStringProcessing
+  ExperimentalSynchronization
+  ExperimentalDispatch
   StaticFoundation
 }
 
@@ -2276,13 +2280,88 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        # NOTE(compnerd) we can get away with this currently because we only
+        # use the C portion of the dispatch build, which is always built
+        # dynamically.
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
         SwiftCore_ENABLE_CONCURRENCY = "YES";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Overlay `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalOverlay) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\StringProcessing `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStringProcessing) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Synchronization `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalSynchronization) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    # FIXME(compnerd) workaround the build not copying the clang resources into place
+    if ($Static) {
+      & "$ninja" -C $(Get-ProjectBinaryCache $BuildPlatform Compilers) symlink_clang_headers_static
+    }
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-libdispatch `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalDispatch) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental") `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_Swift_FLAGS = if ($Static) { @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir") } else { "" };
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        ENABLE_SWIFT = "YES";
       }
   }
 }
 
-function Write-SDKSettingsPlist([OS] $OS) {
+function Write-SDKSettingsPlist([OS] $OS, [string] $Identifier = $OS.ToString()) {
   $SDKSettings = @{
     DefaultProperties = @{
     }
@@ -2290,7 +2369,7 @@ function Write-SDKSettingsPlist([OS] $OS) {
   if ($OS -eq [OS]::Windows) {
     $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
   }
-  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS)\SDKSettings.plist"
+  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS -Identifier $Identifier)\SDKSettings.plist"
 
   $SDKSettings = @{
     CanonicalName = $OS.ToString()
@@ -2324,7 +2403,7 @@ function Write-SDKSettingsPlist([OS] $OS) {
       $SDKSettings.SupportedTargets.android.Archs = $AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
   }
-  $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS)\SDKSettings.json"
+  $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS -Identifier $Identifier)\SDKSettings.json"
 }
 
 function Build-Dispatch([Hashtable] $Platform) {
@@ -3225,12 +3304,18 @@ if (-not $SkipBuild) {
       Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
     }
 
+    Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+    }
+
     Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
   }
 
   Install-Platform $WindowsSDKPlatforms Windows
   Write-PlatformInfoPlist Windows
   Write-SDKSettingsPlist Windows
+  Write-SDKSettingsPlist Windows -Identifier WindowsExperimental
 
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
@@ -3241,11 +3326,17 @@ if (-not $SkipBuild) {
         Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
         Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\" | Out-Null
       }
+
+      Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match "*.a$|*.so$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+      }
     }
 
     Install-Platform $AndroidSDKPlatforms Android
     Write-PlatformInfoPlist Android
     Write-SDKSettingsPlist Android
+    Write-SDKSettingsPlist Android -Identifier AndroidExperimental
 
     # Android swift-inspect only supports 64-bit platforms.
     $AndroidSDKPlatforms | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
