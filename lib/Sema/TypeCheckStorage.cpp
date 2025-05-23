@@ -2773,13 +2773,13 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     Evaluator &evaluator, AbstractStorageDecl *storage,
     bool isUnderscored) const {
   auto &ctx = storage->getASTContext();
-  bool hasModifyFeature = ctx.LangOpts.hasFeature(Feature::CoroutineAccessors);
+  bool hasCoroutineAccessorsFeature = ctx.LangOpts.hasFeature(Feature::CoroutineAccessors);
 
   // No `modify` accessor without the feature.
-  if (!hasModifyFeature && !isUnderscored)
+  if (!hasCoroutineAccessorsFeature && !isUnderscored)
     return false;
 
-  if (hasModifyFeature && isUnderscored) {
+  if (hasCoroutineAccessorsFeature && isUnderscored) {
     return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
         AccessorKind::Modify2);
   }
