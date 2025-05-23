@@ -35,6 +35,8 @@ static std::vector<DiagGroupID> migratableCategories(Feature feature) {
       return { DiagGroupID::ExistentialAny };
     case Feature::InnerKind::InferIsolatedConformances:
       return { DiagGroupID::IsolatedConformances };
+    case Feature::InnerKind::MemberImportVisibility:
+      return { DiagGroupID::MemberImportVisibility };
     case Feature::InnerKind::NonisolatedNonsendingByDefault:
       return { DiagGroupID::NonisolatedNonsendingByDefault };
     case Feature::InnerKind::StrictMemorySafety:

@@ -363,6 +363,10 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   return false;
 }
 
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
+}
+
 void LangOptions::enableFeature(Feature feature, bool forMigration) {
   if (forMigration) {
     ASSERT(feature.isMigratable());

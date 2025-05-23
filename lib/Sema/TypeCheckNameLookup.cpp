@@ -852,6 +852,12 @@ class MissingImportFixItCache {
   llvm::DenseMap<const ModuleDecl *, MissingImportFixItInfo> infos;
   bool internalImportsByDefaultEnabled;
 
+public:
+  MissingImportFixItCache(SourceFile &sf)
+      : sf(sf),
+        internalImportsByDefaultEnabled(sf.getASTContext().LangOpts.hasFeature(
+            Feature::InternalImportsByDefault)) {};
+
   MissingImportFixItInfo getFixItInfo(ModuleDecl *mod) {
     auto existing = infos.find(mod);
     if (existing != infos.end())
@@ -900,12 +906,6 @@ class MissingImportFixItCache {
     return info;
   }
 
-public:
-  MissingImportFixItCache(SourceFile &sf) : sf(sf) {
-    internalImportsByDefaultEnabled = sf.getASTContext().LangOpts.hasFeature(
-        Feature::InternalImportsByDefault);
-  };
-
   std::pair<SmallVector<ModuleDecl *, 2>,
             SmallVector<MissingImportFixItInfo, 2>>
   getModulesAndFixIts(ModuleDecl *mod) {
@@ -929,20 +929,17 @@ diagnoseMissingImportsForMember(const ValueDecl *decl,
   ASSERT(count > 0);
 
   if (count > 1) {
-    ctx.Diags.diagnose(loc, diag::candidate_from_missing_imports_2_or_more,
-                       decl, bool(count > 2), modulesToImport[0],
-                       modulesToImport[1]);
+    ctx.Diags.diagnose(loc, diag::member_from_missing_imports_2_or_more, decl,
+                       bool(count > 2), modulesToImport[0], modulesToImport[1]);
   } else {
-    ctx.Diags.diagnose(loc, diag::candidate_from_missing_import, decl,
+    ctx.Diags.diagnose(loc, diag::member_from_missing_import, decl,
                        modulesToImport.front());
   }
 }
 
-static void emitMissingImportFixIt(SourceLoc loc,
-                                   const MissingImportFixItInfo &fixItInfo,
-                                   ASTContext &ctx) {
-  llvm::SmallString<64> importText;
-
+static void appendMissingImportFixIt(llvm::SmallString<64> &importText,
+                                     const MissingImportFixItInfo &fixItInfo,
+                                     ASTContext &ctx) {
   // Add flags that must be used consistently on every import in every file.
   if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
     importText += "@_implementationOnly ";
@@ -969,6 +966,12 @@ static void emitMissingImportFixIt(SourceLoc loc,
   importText += "import ";
   importText += fixItInfo.moduleToImport->getName().str();
   importText += "\n";
+}
+
+static void emitMissingImportNoteAndFixIt(
+    SourceLoc loc, const MissingImportFixItInfo &fixItInfo, ASTContext &ctx) {
+  llvm::SmallString<64> importText;
+  appendMissingImportFixIt(importText, fixItInfo, ctx);
   ctx.Diags
       .diagnose(loc, diag::candidate_add_import, fixItInfo.moduleToImport)
       .fixItInsert(loc, importText);
@@ -995,7 +998,7 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
     return;
 
   for (auto &fixItInfo : fixItInfos) {
-    emitMissingImportFixIt(bestLoc, fixItInfo, ctx);
+    emitMissingImportNoteAndFixIt(bestLoc, fixItInfo, ctx);
   }
 }
 
@@ -1024,6 +1027,11 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
   // In lazy typechecking mode just emit the diagnostic immediately without a
   // fix-it since there won't be an opportunity to emit delayed diagnostics.
   if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    // Lazy type-checking and migration for MemberImportVisibility are
+    // completely incompatible, so just skip the diagnostic entirely.
+    if (ctx.LangOpts.isMigratingToFeature(Feature::MemberImportVisibility))
+      return false;
+
     auto modulesToImport = missingImportsForDefiningModule(definingModule, *sf);
     if (modulesToImport.empty())
       return false;
@@ -1036,7 +1044,76 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
   return false;
 }
 
+void migrateToMemberImportVisibility(SourceFile &sf) {
+  auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
+  if (delayedDiags.empty())
+    return;
+
+  auto &ctx = sf.getASTContext();
+  auto bestLoc = ctx.Diags.getBestAddImportFixItLoc(&sf);
+  if (bestLoc.isInvalid())
+    return;
+
+  // Collect the distinct modules that need to be imported and map them
+  // to the collection of declarations which are used in the file and belong
+  // to the module.
+  llvm::SmallVector<ModuleDecl *, 8> modulesToImport;
+  llvm::SmallDenseMap<ModuleDecl *, std::vector<const ValueDecl *>>
+      declsByModuleToImport;
+  for (auto declAndLocs : delayedDiags) {
+    auto decl = declAndLocs.first;
+    auto definingModules = missingImportsForDefiningModule(
+        decl->getModuleContextForNameLookup(), sf);
+
+    for (auto definingModule : definingModules) {
+      auto existing = declsByModuleToImport.find(definingModule);
+      if (existing != declsByModuleToImport.end()) {
+        existing->second.push_back(decl);
+      } else {
+        declsByModuleToImport[definingModule] = {decl};
+        modulesToImport.push_back(definingModule);
+      }
+    }
+  }
+
+  // Emit one warning for each module that needcs to be imported and emit notes
+  // for each reference to a declaration from that module in the file.
+  llvm::sort(modulesToImport, [](ModuleDecl *lhs, ModuleDecl *rhs) -> int {
+    return lhs->getName().compare(rhs->getName());
+  });
+
+  auto fixItCache = MissingImportFixItCache(sf);
+  for (auto mod : modulesToImport) {
+    auto fixItInfo = fixItCache.getFixItInfo(mod);
+    llvm::SmallString<64> importText;
+    appendMissingImportFixIt(importText, fixItInfo, ctx);
+    ctx.Diags.diagnose(bestLoc, diag::add_required_import_for_member, mod)
+        .fixItInsert(bestLoc, importText);
+
+    auto decls = declsByModuleToImport.find(mod);
+    if (decls == declsByModuleToImport.end())
+      continue;
+
+    for (auto decl : decls->second) {
+      auto locs = delayedDiags.find(decl);
+      if (locs == delayedDiags.end())
+        continue;
+
+      for (auto loc : locs->second) {
+        ctx.Diags.diagnose(loc, diag::decl_from_module_used_here, decl, mod);
+      }
+    }
+  }
+}
+
 void swift::diagnoseMissingImports(SourceFile &sf) {
+  // Missing import diagnostics should be emitted differently in "migrate" mode.
+  if (sf.getASTContext().LangOpts.isMigratingToFeature(
+          Feature::MemberImportVisibility)) {
+    migrateToMemberImportVisibility(sf);
+    return;
+  }
+
   auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
   auto fixItCache = MissingImportFixItCache(sf);
 
