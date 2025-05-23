@@ -116,7 +116,7 @@ func checkAsyncPropertyAccess() async {
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
   // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
-  _ = act.point  // expected-warning{{non-sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
+  _ = act.point  // expected-warning{{non-Sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
   // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
   // expected-note@-2 {{property access is 'async'}}
 }
@@ -156,20 +156,20 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ ext: InferredFromContext,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
-  _ = await ext.point // expected-warning {{non-sendable type 'Point' of property 'point' cannot exit main actor-isolated context}}
-  _ = await anno.point // expected-warning {{non-sendable type 'Point' of property 'point' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-  // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' cannot be sent into global actor 'SomeGlobalActor'-isolated context in call to property 'point'}}
+  _ = await ext.point // expected-warning {{non-Sendable type 'Point' of property 'point' cannot exit main actor-isolated context}}
+  _ = await anno.point // expected-warning {{non-Sendable type 'Point' of property 'point' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  // expected-warning@-1 {{non-Sendable type 'NoGlobalActorValueType' cannot be sent into global actor 'SomeGlobalActor'-isolated context in call to property 'point'}}
 
   _ = formance.counter
   _ = anno.counter
 
   // these will always need an await
-  _ = await (formance as MainCounter).counter // expected-warning {{non-sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
+  _ = await (formance as MainCounter).counter // expected-warning {{non-Sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
   _ = await ext[1]
   _ = await formance.ticker
-  _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' of property 'polygon' cannot exit main actor-isolated context}}
+  _ = await ext.polygon // expected-warning {{non-Sendable type '[Point]' of property 'polygon' cannot exit main actor-isolated context}}
   _ = await InferredFromContext.stuff
-  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' of static property 'polygon' cannot exit main actor-isolated context}}
+  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-Sendable type '[Point]' of static property 'polygon' cannot exit main actor-isolated context}}
 }
 
 // expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
@@ -734,7 +734,7 @@ func checkLocalFunctions() async {
   local1()
   local2()
 
-  // non-sendable closures don't cause problems.
+  // non-Sendable closures don't cause problems.
   acceptClosure {
     local1()
     local2()
@@ -742,7 +742,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
+    local2() // expected-warning{{capture of 'local2()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
     // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 
@@ -752,7 +752,7 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
+      local3() // expected-warning{{capture of 'local3()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
       // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
   }
@@ -889,7 +889,7 @@ actor SomeActorWithInits {
   // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   let nonSendable: SomeClass
 
-  // Sema should not complain about referencing non-sendable members
+  // Sema should not complain about referencing non-Sendable members
   // in an actor init or deinit, as those are diagnosed later by flow-isolation.
   init(_ x: SomeClass) {
     self.nonSendable = x
@@ -1078,8 +1078,8 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
   _ = actor.b         // okay
   _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{property access is 'async'}}
-  // expected-warning@-2{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
-  _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+  // expected-warning@-2{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+  _ = await actor.c // expected-warning{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
   _ = await actor.d // okay
 }
 
@@ -1114,8 +1114,8 @@ actor CrossModuleFromInitsActor {
     _ = actor.b         // okay
     _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
     // expected-note@-1{{property access is 'async'}}
-    // expected-warning@-2{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
-    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+    // expected-warning@-2{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+    _ = await actor.c // expected-warning{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
     _ = await actor.d // okay
   }
 }
@@ -1679,7 +1679,7 @@ class ReferenceActor {
   init() async {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+3 {{non-sendable type 'NonSendable' of property 'ns' cannot exit actor-isolated context}}
+    // expected-warning@+3 {{non-Sendable type 'NonSendable' of property 'ns' cannot exit actor-isolated context}}
     // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@+1 {{property access is 'async'}}
     _ = a.ns
@@ -1764,7 +1764,7 @@ struct ReferenceSelfDotMethods {
   private func testCurry() -> (Self) -> (@MainActor () -> Void) {
     let functionRef = Self.mainActorAffinedFunction
     // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
-    return functionRef // expected-warning {{converting non-sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
   }
 
   @MainActor

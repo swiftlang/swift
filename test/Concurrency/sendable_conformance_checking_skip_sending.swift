@@ -23,8 +23,8 @@ protocol P2 {
 @MainActor
 class P2Class: P2 {
   func bar(_ a: NonSendableKlass2) async -> NonSendableKlass2 { a }
-  // expected-error@-1 {{non-sendable type 'NonSendableKlass2' cannot be returned from main actor-isolated implementation to caller of protocol requirement 'bar'}}
-  // expected-error@-2 {{non-sendable parameter type 'NonSendableKlass2' cannot be sent from caller of protocol requirement 'bar' into main actor-isolated implementation}}
+  // expected-error@-1 {{non-Sendable type 'NonSendableKlass2' cannot be returned from main actor-isolated implementation to caller of protocol requirement 'bar'}}
+  // expected-error@-2 {{non-Sendable parameter type 'NonSendableKlass2' cannot be sent from caller of protocol requirement 'bar' into main actor-isolated implementation}}
 }
 
 class NonSendableKlass3 {}
@@ -46,8 +46,8 @@ protocol P4 {
 
 actor P4Actor: P4 {
   func bar(_ a: NonSendableKlass4) async -> NonSendableKlass4 { NonSendableKlass4() }
-  // expected-error@-1 {{non-sendable type 'NonSendableKlass4' cannot be returned from actor-isolated implementation to caller of protocol requirement 'bar'}}
-  // expected-error@-2 {{non-sendable parameter type 'NonSendableKlass4' cannot be sent from caller of protocol requirement 'bar' into actor-isolated implementation}}
+  // expected-error@-1 {{non-Sendable type 'NonSendableKlass4' cannot be returned from actor-isolated implementation to caller of protocol requirement 'bar'}}
+  // expected-error@-2 {{non-Sendable parameter type 'NonSendableKlass4' cannot be sent from caller of protocol requirement 'bar' into actor-isolated implementation}}
 }
 
 class NonSendableKlass5 {}
@@ -61,7 +61,7 @@ protocol P5 {
 @MainActor
 class P5Class: P5 {
   func bar(_ a: sending NonSendableKlass5, _ b: NonSendableKlass5) async -> sending NonSendableKlass5 { a }
-  // expected-error@-1 {{non-sendable parameter type 'NonSendableKlass5' cannot be sent from caller of protocol requirement 'bar' into main actor-isolated implementation}}
+  // expected-error@-1 {{non-Sendable parameter type 'NonSendableKlass5' cannot be sent from caller of protocol requirement 'bar' into main actor-isolated implementation}}
 }
 
 class NonSendableKlass6 {}
