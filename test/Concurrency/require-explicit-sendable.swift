@@ -98,7 +98,7 @@ public struct S10 { // expected-warning{{public struct 'S10' does not specify wh
 }
 
 struct S11: Sendable {
-  var s7: S7 // expected-warning{{stored property 's7' of 'Sendable'-conforming struct 'S11' has non-sendable type 'S7'}}
+  var s7: S7 // expected-warning{{stored property 's7' of 'Sendable'-conforming struct 'S11' has non-Sendable type 'S7'}}
 }
 
 @_nonSendable public struct S12 { }
