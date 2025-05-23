@@ -2487,6 +2487,19 @@ public:
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(BorrowExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying BorrowExpr", E);
+
+      auto toType = E->getType();
+      auto fromType = E->getSubExpr()->getType();
+
+      if (!fromType->hasLValueType())
+        error("borrow source must be an l-value", E);
+
+      if (toType->hasLValueType())
+        error("borrow result must be an r-value", E);
+    }
+
     void verifyChecked(ABISafeConversionExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verify ABISafeConversionExpr", E);
 
