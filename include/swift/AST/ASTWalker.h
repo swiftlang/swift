@@ -603,6 +603,13 @@ public:
   /// params in AbstractFunctionDecl and NominalTypeDecl.
   virtual bool shouldWalkIntoGenericParams() { return false; }
 
+  /// Whether the walker should walk into any attached CustomAttrs.
+  virtual bool shouldWalkIntoCustomAttrs() const {
+    // Default to false currently since some walkers don't handle this case
+    // well.
+    return false;
+  }
+
   /// This method configures how the walker should walk the initializers of
   /// lazy variables. These initializers are semantically different from other
   /// initializers in their context and so sometimes should be visited as part
