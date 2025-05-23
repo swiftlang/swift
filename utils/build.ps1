@@ -2398,15 +2398,6 @@ function Build-ExperimentalRuntime {
 
 function Write-SDKSettings([OS] $OS) {
   $SDKSettings = @{
-    DefaultProperties = @{
-    }
-  }
-  if ($OS -eq [OS]::Windows) {
-    $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
-  }
-  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS)\SDKSettings.plist"
-
-  $SDKSettings = @{
     CanonicalName = $OS.ToString().ToLowerInvariant()
     DisplayName = $OS.ToString()
     IsBaseSDK = "YES"
@@ -2442,6 +2433,7 @@ function Write-SDKSettings([OS] $OS) {
     }
   }
   $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS)\SDKSettings.json"
+  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS)\SDKSettings.plist"
 }
 
 function Build-Dispatch([Hashtable] $Platform) {
