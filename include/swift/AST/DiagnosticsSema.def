@@ -2807,9 +2807,6 @@ WARNING(remove_package_import,none,
 WARNING(public_decl_needs_sendable,none,
         "public %kind0 does not specify whether it is 'Sendable' or not",
         (const ValueDecl *))
-NOTE(explicit_unchecked_sendable,none,
-     "add '@unchecked Sendable' conformance to %kind0 if this type manually implements concurrency safety",
-     (const ValueDecl *))
 NOTE(explicit_disable_sendable,none,
      "make %kind0 explicitly non-Sendable to suppress this warning",
      (const ValueDecl *))
