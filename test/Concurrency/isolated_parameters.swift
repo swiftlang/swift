@@ -445,7 +445,7 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
 #if ALLOW_TYPECHECKER_ERRORS
   optionalIsolatedSync(ns, to: myActor)
   // expected-typechecker-error@-1 {{actor-isolated global function 'optionalIsolatedSync(_:to:)' cannot be called from outside of the actor}} {{3-3=await }}
-  // expected-complete-warning@-2 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-complete-warning@-2 {{passing argument of non-Sendable type 'NotSendable' into actor-isolated context may introduce data races}}
   #endif
 }
 
@@ -467,7 +467,7 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
 #if ALLOW_TYPECHECKER_ERRORS
   optionalIsolatedSync(ns, to: myActor)
   // expected-typechecker-error@-1 {{actor-isolated global function 'optionalIsolatedSync(_:to:)' cannot be called from outside of the actor}} {{3-3=await }}
-  // expected-complete-warning@-2 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-complete-warning@-2 {{passing argument of non-Sendable type 'NotSendable' into actor-isolated context may introduce data races}}
 #endif
 }
 

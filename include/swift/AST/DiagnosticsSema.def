@@ -5960,7 +5960,7 @@ ERROR(nonisolated_lazy,none,
       ())
 
 ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
+        "cannot access %1 %2 with a non-Sendable type %0 from nonisolated deinit",
         (Type, DescriptiveDeclKind, DeclName))
 
 ERROR(actor_instance_property_wrapper,none,

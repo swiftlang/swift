@@ -116,7 +116,7 @@ func checkAsyncPropertyAccess() async {
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
   // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
-  _ = act.point  // expected-warning{{non-sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
+  _ = act.point  // expected-warning{{non-Sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
   // expected-warning@-1 {{actor-isolated property 'point' cannot be accessed from outside of the actor}} {{7-7=await }}
 }
 
@@ -1054,8 +1054,8 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
   _ = await actor.a   // okay
   _ = actor.b         // okay
   _ = actor.c // expected-error{{actor-isolated property 'c' cannot be accessed from outside of the actor}} {{7-7=await }}
-  // expected-warning@-1{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
-  _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+  // expected-warning@-1{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+  _ = await actor.c // expected-warning{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
   _ = await actor.d // okay
 }
 
@@ -1088,8 +1088,8 @@ actor CrossModuleFromInitsActor {
     _ = await actor.a   // okay
     _ = actor.b         // okay
     _ = actor.c // expected-error{{actor-isolated property 'c' cannot be accessed from outside of the actor}} {{9-9=await }}
-    // expected-warning@-1{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
-    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+    // expected-warning@-1{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+    _ = await actor.c // expected-warning{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
     _ = await actor.d // okay
   }
 }
@@ -1636,7 +1636,7 @@ class ReferenceActor {
   init() async {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+2 {{non-sendable type 'NonSendable' of property 'ns' cannot exit actor-isolated context}}
+    // expected-warning@+2 {{non-Sendable type 'NonSendable' of property 'ns' cannot exit actor-isolated context}}
     // expected-warning@+1 {{actor-isolated property 'ns' cannot be accessed from outside of the actor}} {{9-9=await }}
     _ = a.ns
   }

@@ -176,7 +176,7 @@ func someAsyncFunc() async {
   ////////////
   // effectful properties from outside the actor instance
 
-  // expected-warning@+2 {{non-sendable type 'Box' of property 'effPropA' cannot exit actor-isolated context}}
+  // expected-warning@+2 {{non-Sendable type 'Box' of property 'effPropA' cannot exit actor-isolated context}}
   // expected-error@+1{{actor-isolated property 'effPropA' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = a.effPropA
 

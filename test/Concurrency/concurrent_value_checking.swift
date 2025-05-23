@@ -99,7 +99,7 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
+    _ = other.localLet // expected-warning{{non-Sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
     // expected-warning@-1 {{actor-isolated property 'localLet' cannot be accessed from outside of the actor}} {{9-9=await }}
     _ = await other.synchronous() // expected-tns-warning {{non-Sendable 'NotConcurrent?'-typed result can not be returned from actor-isolated instance method 'synchronous()' to actor-isolated context}}
     _ = await other.asynchronous(nil)
@@ -138,13 +138,13 @@ enum E {
 
 func globalTest() async {
   // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot be accessed from outside of the actor}} {{11-11=await }}
-  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  let a = globalValue // expected-warning{{non-Sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
   await globalAsync(a) // expected-tns-warning {{sending 'a' risks causing data races}}
   // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local nonisolated uses}}
   await globalSync(a) // expected-tns-note {{access can happen concurrently}}
 
   // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot be accessed from outside of the actor}} {{11-11=await }}
-  let _ = E.notSafe // expected-warning{{non-sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  let _ = E.notSafe // expected-warning{{non-Sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
 
 #if ALLOW_TYPECHECKER_ERRORS
   // expected-typechecker-error@+3 {{expression is 'async' but is not marked with 'await'}}
@@ -173,7 +173,7 @@ class ClassWithGlobalActorInits { // expected-tns-note 2{{class 'ClassWithGlobal
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
   // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot be accessed from outside of the actor}} {{11-11=await }}
-  let a = globalValue // expected-warning {{non-sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  let a = globalValue // expected-warning {{non-Sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
   await globalAsync(a) // expected-tns-warning {{sending 'a' risks causing data races}}
   // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local main actor-isolated uses}}
   await globalSync(a) // expected-tns-note {{access can happen concurrently}}
