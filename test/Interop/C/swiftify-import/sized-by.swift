@@ -1,9 +1,9 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by parameters.
 import SizedByClang
@@ -44,53 +44,53 @@ import SizedByClang
 
 @inlinable
 public func callComplexExpr(_ p: UnsafeMutableRawBufferPointer) {
-  complexExpr(CInt(p.count), 1, p)
+  unsafe complexExpr(CInt(p.count), 1, p)
 }
 
 @inlinable
 public func callNonnull(_ p: UnsafeMutableRawBufferPointer) {
-  nonnull(p)
+  unsafe nonnull(p)
 }
 
 @inlinable
 public func callNullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
-  nullUnspecified(p)
+  unsafe nullUnspecified(p)
 }
 
 @inlinable
 public func callNullable(_ p: UnsafeMutableRawBufferPointer?) {
-  nullable(p)
+  unsafe nullable(p)
 }
 
 @inlinable
 public func callOpaque(_ p: UnsafeRawBufferPointer) {
-  opaque(p)
+  unsafe opaque(p)
 }
 
 @inlinable
 public func callReturnPointer() {
-  let a: UnsafeMutableRawBufferPointer? = returnPointer(4) // call wrapper
-  let b: UnsafeMutableRawPointer? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableRawBufferPointer? = returnPointer(4) // call wrapper
+  let _: UnsafeMutableRawPointer? = returnPointer(4) // call unsafe interop
 }
 
 @inlinable
 public func callShared(_ p: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
-  shared(p, p2)
+  unsafe shared(p, p2)
 }
 
 @inlinable
 public func callSimple(_ p: UnsafeMutableRawBufferPointer) {
-  simple(p)
+  unsafe simple(p)
 }
 
 @inlinable
 public func callSwiftAttr(_ p: UnsafeMutableRawBufferPointer) {
-  swiftAttr(p)
+  unsafe swiftAttr(p)
 }
 
 @inlinable
 public func callCharsized(_ p: UnsafeMutableRawBufferPointer) {
-  charsized(p)
+  unsafe charsized(p)
 }
 
 @inlinable

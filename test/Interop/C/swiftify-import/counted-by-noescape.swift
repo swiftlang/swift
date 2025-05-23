@@ -1,11 +1,11 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by __noescape parameters.
 
@@ -150,14 +150,14 @@ public func callNullable(_ p: inout MutableSpan<CInt>?) {
 @lifetime(p: copy p)
 @inlinable
 public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
-  let a: MutableSpan<CInt> = returnLifetimeBound(2, &p)
+  let _: MutableSpan<CInt> = returnLifetimeBound(2, &p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callReturnPointer() {
-  let a: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
-  let b: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
+  let _: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -207,7 +207,7 @@ public func callFunc(_ p: inout MutableSpan<CInt>?) {
 @lifetime(p: copy p)
 @inlinable
 public func callFuncRenameKeyword(_ p: inout MutableSpan<CInt>?) {
-  funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
+  let _ = funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

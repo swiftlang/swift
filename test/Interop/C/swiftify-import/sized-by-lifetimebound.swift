@@ -1,11 +1,11 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByLifetimeboundClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByLifetimeboundClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/SizedByLifetimebound.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/SizedByLifetimebound.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence -strict-memory-safety -warnings-as-errors -Xcc -Werror -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __lifetimebound parameters and return values.
 
@@ -102,7 +102,7 @@ public func callSimple(_ p: RawSpan) {
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callNonsizedLifetime(_ p: UnsafeRawPointer) {
-  let _: RawSpan = nonsizedLifetime(73, p)
+  let _: RawSpan = unsafe nonsizedLifetime(73, p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
