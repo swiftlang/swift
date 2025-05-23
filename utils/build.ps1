@@ -152,6 +152,8 @@ param
   [string] $Variant = "Asserts",
   [switch] $Clean,
   [switch] $DebugInfo,
+  [ValidatePattern('^\d+(\.\d+)*$')]
+  [string] $SCCacheVersion = "0.10.0",
   [switch] $EnableCaching,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
@@ -394,6 +396,34 @@ $KnownNDKs = @{
   }
 }
 
+$KnownSCCache = @{
+  "0.9.1" = @{
+    AMD64 = @{
+      URL = "https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-x86_64-pc-windows-msvc.zip"
+      SHA256 = "9C862BCAEF62804F2124DFC2605A0204F4FE0C5FA337BA4264E9BCAE9D2BA487"
+      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.9.1\sccache-v0.9.1-x86_64-pc-windows-msvc", "sccache.exe");
+    }
+    ARM64 = @{
+      URL = "https://github.com/mozilla/sccache/releases/download/v0.9.1/sccache-v0.9.1-aarch64-pc-windows-msvc.tar.gz"
+      SHA256 = "99BD024919430DE3C741658ADC60334305A61C0A109F7A334C030F0BB56007A6"
+      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.9.1\sccache-v0.9.1-aarch64-pc-windows-msvc", "sccache.exe")
+    }
+  }
+
+  "0.10.0" = @{
+    AMD64 = @{
+      URL = "https://github.com/mozilla/sccache/releases/download/v0.10.0/sccache-v0.10.0-x86_64-pc-windows-msvc.zip"
+      SHA256 = "6D8823B5C13E0DBA776D88C537229256ECB2F01A1D775B507FD141CB55D30578"
+      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.10.0\sccache-v0.10.0-x86_64-pc-windows-msvc", "sccache.exe")
+    }
+    ARM64 = @{
+      URL = "https://github.com/mozilla/sccache/releases/download/v0.10.0/sccache-v0.10.0-aarch64-pc-windows-msvc.tar.gz"
+      SHA256 = "5FD6CD6DD474E91C37510719BF27CFE1826F929E40DD383C22A7B96DA9A5458D"
+      Path = [IO.Path]::Combine("$BinaryCache\sccache-0.10.0\sccache-v0.10.0-aarch64-pc-windows-msvc", "sccache.exe")
+    }
+  }
+}
+
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 # TODO: Support other cross-compilation scenarios.
 $BuildOS = [OS]::Windows
@@ -559,6 +589,10 @@ function Get-BisonExecutable {
   return Join-Path -Path $BinaryCache -ChildPath "win_flex_bison\win_bison.exe"
 }
 
+function Get-SCCache {
+  return $KnownSCCache[$SCCacheVersion][$BuildArchName]
+}
+
 function Get-PythonPath([Hashtable] $Platform) {
   return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
@@ -663,6 +697,9 @@ enum Project {
   ClangRuntime
   SwiftInspect
   ExperimentalRuntime
+  ExperimentalOverlay
+  ExperimentalStringProcessing
+  ExperimentalSynchronization
   StaticFoundation
 }
 
@@ -987,6 +1024,12 @@ function Get-Dependencies {
 
   if ($SkipBuild) { return }
 
+  if ($EnableCaching) {
+    $SCCache = Get-SCCache
+    DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.zip" $SCCache.SHA256
+    Expand-ZipFile sccache-$SCCacheVersion.zip $BinaryCache sccache-$SCCacheVersion
+  }
+
   DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
   if ($Test -contains "lldb") {
@@ -1180,20 +1223,6 @@ function Add-FlagsDefine([hashtable]$Defines, [string]$Name, [string[]]$Value) {
   }
 }
 
-function Test-SCCacheAtLeast([int]$Major, [int]$Minor, [int]$Patch = 0) {
-  if ($ToBatch) { return $false }
-
-  $SCCacheVersionString = @(& sccache.exe --version)[0]
-  if (-not ($SCCacheVersionString -match "sccache (\d+)\.(\d+)(?:\.(\d+))?")) {
-    throw "Unexpected SCCache version string format"
-  }
-
-  if ([int]$Matches.1 -ne $Major) { return [int]$Matches.1 -gt $Major }
-  if ([int]$Matches.2 -ne $Minor) { return [int]$Matches.2 -gt $Minor }
-  if ($null -eq $Matches.3) { return 0 -gt $Patch }
-  return [int]$Matches.3 -ge $Patch
-}
-
 function Get-PlatformRoot([OS] $OS) {
   return ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms", "$($OS.ToString()).platform"))
 }
@@ -1322,14 +1351,14 @@ function Build-CMakeProject {
     if ($UseMSVCCompilers.Contains("C")) {
       Add-KeyValueIfNew $Defines CMAKE_C_COMPILER cl
       if ($EnableCaching) {
-        Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER sccache
+        Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_LAUNCHER $(Get-SCCache).Path
       }
       Add-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UseMSVCCompilers.Contains("CXX")) {
       Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER cl
       if ($EnableCaching) {
-        Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER sccache
+        Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_LAUNCHER $(Get-SCCache).Path
       }
       Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFlags
     }
@@ -2309,8 +2338,60 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        # NOTE(compnerd) we can get away with this currently because we only
+        # use the C portion of the dispatch build, which is always built
+        # dynamically.
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
         SwiftCore_ENABLE_CONCURRENCY = "YES";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Overlay `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalOverlay) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\StringProcessing `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStringProcessing) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Synchronization `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalSynchronization) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       }
   }
 }
@@ -3228,10 +3309,7 @@ if ($Clean) {
 
 if (-not $SkipBuild) {
   if ($EnableCaching) {
-    if (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4)) {
-      throw "Minimum required sccache version is 0.7.4"
-    }
-    & sccache.exe --zero-stats
+    Invoke-Program (Get-SCCache).Path --zero-stats
   }
 
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
