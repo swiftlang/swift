@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.29)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
-
 if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
@@ -20,11 +16,15 @@ if(NOT PROJECT_IS_TOP_LEVEL)
   message(FATAL_ERROR "Swift StringProcessing must build as a standalone project")
 endif()
 
+set(CMAKE_POSITION_INDEPENDENT_CODE YES)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
+
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
-find_package(SwiftCore)
+find_package(SwiftCore REQUIRED)
 
 include(GNUInstallDirs)
 

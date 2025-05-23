@@ -3451,6 +3451,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::InheritActorContext: {
+      auto *theAttr = cast<InheritActorContextAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[InheritActorContextDeclAttrLayout::Code];
+      InheritActorContextDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
+      return;
+    }
+
     case DeclAttrKind::MacroRole: {
       auto *theAttr = cast<MacroRoleAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[MacroRoleDeclAttrLayout::Code];
@@ -5327,7 +5337,7 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
     if (initialOffset == Out.GetCurrentBitNo()) {
-      abortWithPrettyStackTraceMessage("failed to serialize anything");
+      ABORT("failed to serialize anything");
     }
   };
 
@@ -6154,7 +6164,7 @@ void Serializer::writeASTBlockEntity(Type ty) {
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
     if (initialOffset == Out.GetCurrentBitNo()) {
-      abortWithPrettyStackTraceMessage("failed to serialize anything");
+      ABORT("failed to serialize anything");
     }
   };
 

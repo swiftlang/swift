@@ -230,6 +230,10 @@ protected:
       Modifier : NumNonIsolatedModifierBits
     );
 
+    SWIFT_INLINE_BITFIELD(InheritActorContextAttr, DeclAttribute, NumInheritActorContextKindBits,
+      Modifier : NumInheritActorContextKindBits
+    );
+
     SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
       : NumPadBits,
       Inverted : 1,
@@ -3007,6 +3011,50 @@ public:
   }
 
   bool isEquivalent(const NonisolatedAttr *other, Decl *attachedTo) const {
+    return getModifier() == other->getModifier();
+  }
+};
+
+/// Represents @_inheritActorContext modifier.
+class InheritActorContextAttr final : public DeclAttribute {
+public:
+  InheritActorContextAttr(SourceLoc atLoc, SourceRange range,
+                          InheritActorContextModifier modifier, bool implicit)
+      : DeclAttribute(DeclAttrKind::InheritActorContext, atLoc, range,
+                      implicit) {
+    Bits.InheritActorContextAttr.Modifier = static_cast<unsigned>(modifier);
+    assert((getModifier() == modifier) && "not enough bits for modifier");
+  }
+
+  InheritActorContextModifier getModifier() const {
+    return static_cast<InheritActorContextModifier>(
+        Bits.InheritActorContextAttr.Modifier);
+  }
+
+  bool isAlways() const {
+    return getModifier() == InheritActorContextModifier::Always;
+  }
+
+  static InheritActorContextAttr *
+  createImplicit(ASTContext &ctx, InheritActorContextModifier modifier =
+                                      InheritActorContextModifier::None) {
+    return new (ctx)
+        InheritActorContextAttr(/*atLoc*/ {}, /*range*/ {}, modifier,
+                                /*implicit=*/true);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::InheritActorContext;
+  }
+
+  /// Create a copy of this attribute.
+  InheritActorContextAttr *clone(ASTContext &ctx) const {
+    return new (ctx)
+        InheritActorContextAttr(AtLoc, Range, getModifier(), isImplicit());
+  }
+
+  bool isEquivalent(const InheritActorContextAttr *other,
+                    Decl *attachedTo) const {
     return getModifier() == other->getModifier();
   }
 };

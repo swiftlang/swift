@@ -14,7 +14,7 @@ struct NotAutomaticallySendable: ~Copyable {} // expected-note{{}}
 func testNotAutomaticallySendable() {
     let s = NotAutomaticallySendable()
 
-    checkSendable { _ = s } // expected-warning{{capture of 's' with non-sendable type 'NotAutomaticallySendable'}}
+    checkSendable { _ = s } // expected-warning{{capture of 's' with non-Sendable type 'NotAutomaticallySendable'}}
 }
 
 @_rawLayout(size: 4, alignment: 4)

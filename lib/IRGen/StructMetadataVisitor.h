@@ -63,8 +63,11 @@ public:
 
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
-    for (VarDecl *prop : Target->getStoredProperties())
-      asImpl().addFieldOffset(prop);
+    for (VarDecl *prop : Target->getStoredProperties()) {
+      if (!(prop->getClangDecl() &&
+            prop->getFormalAccess() == AccessLevel::Private))
+        asImpl().addFieldOffset(prop);
+    }
 
     asImpl().noteEndOfFieldOffsets();
 

@@ -847,31 +847,6 @@ static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
 using MirroredMethodEntry =
   std::tuple<const clang::ObjCMethodDecl*, ProtocolDecl*, bool /*isAsync*/>;
 
-ImportedType findOptionSetType(clang::QualType type,
-                               ClangImporter::Implementation &Impl) {
-  ImportedType importedType;
-  auto fieldType = type;
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
-    fieldType = elaborated->desugar();
-  if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
-    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum =
-              findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(
-            clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-            typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
-  return importedType;
-}
-
 static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   for (const auto *f : decl->fields()) {
     auto *fieldRecord = f->getType()->getAsCXXRecordDecl();
@@ -4511,8 +4486,8 @@ namespace {
           return nullptr;
       }
 
-      auto fieldType = decl->getType();
-      ImportedType importedType = findOptionSetType(fieldType, Impl);
+      auto fieldType = desugarIfElaborated(decl->getType());
+      ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
         importedType =
@@ -6155,8 +6130,8 @@ namespace {
         }
       }
 
-      auto fieldType = decl->getType();
-      ImportedType importedType = findOptionSetType(fieldType, Impl);
+      auto fieldType = desugarIfElaborated(decl->getType());
+      ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
         importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
@@ -7120,8 +7095,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       getAccessorPropertyType(getter, false, getterName.getSelfIndex());
   if (propertyType.isNull())
     return nullptr;
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(propertyType))
-    propertyType = elaborated->desugar();
+  propertyType = desugarIfElaborated(propertyType);
 
   // If there is a setter, check that the property it implies
   // matches that of the getter.
@@ -7147,24 +7121,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (dc->isTypeContext() && !getterName.getSelfIndex())
     isStatic = true;
 
-  ImportedType importedType;
-
-  // Sometimes we import unavailable typedefs as enums. If that's the case,
-  // use the enum, not the typedef here.
-  if (auto typedefType = dyn_cast<clang::TypedefType>(propertyType.getTypePtr())) {
-    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
+  ImportedType importedType = importer::findOptionSetEnum(propertyType, Impl);
 
   if (!importedType) {
     // Compute the property type.
@@ -9192,6 +9149,14 @@ static bool SwiftifiableCAT(const clang::CountAttributedType *CAT) {
   return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr());
 }
 
+static bool SwiftifiablePointerType(Type swiftType) {
+  // don't try to transform any Swift types that _SwiftifyImport doesn't know how to handle
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  PointerTypeKind PTK;
+  return nonnullType->isOpaquePointer() ||
+    (nonnullType->getAnyPointerElementType(PTK) && PTK != PTK_AutoreleasingUnsafeMutablePointer);
+}
+
 void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
@@ -9225,10 +9190,11 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
           return false;
         };
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
+    Type swiftReturnTy = MappedDecl->getResultInterfaceType();
     bool returnIsStdSpan = registerStdSpanTypeMapping(
-        MappedDecl->getResultInterfaceType(), ClangDecl->getReturnType());
+        swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(CAT)) {
+    if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       attachMacro = true;
     }
@@ -9242,14 +9208,15 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       auto clangParamTy = clangParam->getType();
       auto swiftParam = MappedDecl->getParameters()->get(index);
+      Type swiftParamTy = swiftParam->getInterfaceType();
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
-      if (SwiftifiableCAT(CAT)) {
+      if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftParamTy)) {
         printer.printCountedBy(CAT, index);
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan = registerStdSpanTypeMapping(
-          swiftParam->getInterfaceType(), clangParamTy);
+          swiftParamTy, clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
 
       bool paramHasLifetimeInfo = false;
@@ -9258,9 +9225,10 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
         paramHasLifetimeInfo = true;
       }
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
-        printer.printLifetimeboundReturn(
-            index, !paramHasBoundsInfo &&
-                       swiftParam->getInterfaceType()->isEscapable());
+        // If this parameter has bounds info we will tranform it into a Span,
+        // so then it will no longer be Escapable.
+        bool willBeEscapable = swiftParamTy->isEscapable() && !paramHasBoundsInfo;
+        printer.printLifetimeboundReturn(index, willBeEscapable);
         paramHasLifetimeInfo = true;
         returnHasLifetimeInfo = true;
       }
@@ -9271,10 +9239,28 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       attachMacro = true;
     printer.printAvailability();
     printer.printTypeMapping(typeMapping);
+
   }
 
-  if (attachMacro)
-    importNontrivialAttribute(MappedDecl, MacroString);
+  if (attachMacro) {
+    if (clang::RawComment *raw =
+            getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+      // swift::RawDocCommentAttr doesn't contain its text directly, but instead
+      // references the source range of the parsed comment. Instead of creating
+      // a new source file just to parse the doc comment, we can add the
+      // comment to the macro invocation attribute, which the macro has access
+      // to. Waiting until we know that the macro will be attached before
+      // emitting the comment to the string, despite the comment occurring
+      // first, avoids copying a bunch of potentially long comments for nodes
+      // that don't end up with wrappers.
+      auto commentString =
+          raw->getRawText(getClangASTContext().getSourceManager());
+      importNontrivialAttribute(MappedDecl,
+                                (commentString + "\n" + MacroString).str());
+    } else {
+      importNontrivialAttribute(MappedDecl, MacroString);
+    }
+  }
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
@@ -9789,11 +9775,11 @@ static void finishTypeWitnesses(
     }
 
     if (!satisfied) {
-      llvm::errs() << ("Cannot look up associated type for "
-                        "imported conformance:\n");
-      conformance->getType().dump(llvm::errs());
-      assocType->dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot look up associated type for imported conformance:\n";
+        conformance->getType().dump(out);
+        assocType->dump(out);
+      });
     }
   }
 }

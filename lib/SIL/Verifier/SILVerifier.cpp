@@ -1059,7 +1059,13 @@ public:
     
     auto objectTy = value->getType().unwrapOptionalType();
     
-    require(objectTy.isReferenceCounted(F.getModule()),
+    // Immortal C++ foreign reference types are represented as trivially lowered
+    // types since they do not require retain/release calls.
+    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
+                         objectTy.getASTType()->getReferenceCounting() ==
+                             ReferenceCounting::None;
+
+    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
             valueDescription + " must have reference semantics");
   }
   
@@ -2387,7 +2393,8 @@ public:
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
 
-    if (builtinKind == BuiltinValueKind::ZeroInitializer) {
+    if (builtinKind == BuiltinValueKind::ZeroInitializer ||
+        builtinKind == BuiltinValueKind::PrepareInitialization) {
       require(!BI->getSubstitutions(),
               "zeroInitializer has no generic arguments as a SIL builtin");
       if (arguments.size() == 0) {
@@ -7430,6 +7437,10 @@ void SILFunction::verify(CalleeCache *calleeCache,
   if (!verificationEnabled(getModule()))
     return;
 
+  if (hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
+
   // Please put all checks in visitSILFunction in SILVerifier, not here. This
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
@@ -7659,57 +7670,111 @@ void SILVTable::verify(const SILModule &M) const {
 }
 
 /// Verify that a witness table follows invariants.
-void SILWitnessTable::verify(const SILModule &M) const {
-  if (!verificationEnabled(M))
+void SILWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
     return;
 
   if (isDeclaration())
     assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
-  for (const Entry &E : getEntries())
-    if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
-      SILFunction *F = E.getMethodWitness().Witness;
-      if (F) {
-        // If a SILWitnessTable is going to be serialized, it must only
-        // reference public or serializable functions.
-        if (isAnySerialized()) {
-          assert(F->hasValidLinkageForFragileRef(getSerializedKind()) &&
-                 "Fragile witness tables should not reference "
-                 "less visible functions.");
-        }
+  for (const Entry &entry : getEntries()) {
+    if (entry.getKind() != SILWitnessTable::WitnessKind::Method)
+      continue;
 
-        assert(F->getLoweredFunctionType()->getRepresentation() ==
-               SILFunctionTypeRepresentation::WitnessMethod &&
-               "Witnesses must have witness_method representation.");
-      }
+    auto *witnessFunction = entry.getMethodWitness().Witness;
+    if (!witnessFunction)
+      continue;
+
+    // If a SILWitnessTable is going to be serialized, it must only
+    // reference public or serializable functions.
+    if (isAnySerialized()) {
+      assert(
+          witnessFunction->hasValidLinkageForFragileRef(getSerializedKind()) &&
+          "Fragile witness tables should not reference "
+          "less visible functions.");
     }
+
+    assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
+           "Witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "witness table entry for " + baseName + " must be ABI-compatible",
+              *witnessFunction);
+    }
+  }
 }
 
 /// Verify that a default witness table follows invariants.
-void SILDefaultWitnessTable::verify(const SILModule &M) const {
-#ifndef NDEBUG
-  for (const Entry &E : getEntries()) {
+void SILDefaultWitnessTable::verify(const SILModule &mod) const {
+  if (!verificationEnabled(mod))
+    return;
+
+  for (const Entry &entry : getEntries()) {
     // FIXME: associated type witnesses.
-    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
+    if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getMethodWitness().Witness;
-    if (!F)
+    auto *witnessFunction = entry.getMethodWitness().Witness;
+    if (!witnessFunction)
       continue;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
-    assert(F->hasValidLinkageForFragileRef(IsSerialized) &&
+    assert(witnessFunction->hasValidLinkageForFragileRef(IsSerialized) &&
            "Default witness tables should not reference "
            "less visible functions.");
 #endif
 
-    assert(F->getLoweredFunctionType()->getRepresentation() ==
-           SILFunctionTypeRepresentation::WitnessMethod &&
+    assert(witnessFunction->getLoweredFunctionType()->getRepresentation() ==
+               SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
+
+    if (mod.getStage() != SILStage::Lowered &&
+        !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      // Note the direction of the compatibility check: the witness
+      // function must be compatible with being used as the requirement
+      // type.
+      auto baseInfo = witnessFunction->getModule().Types.getConstantInfo(
+          TypeExpansionContext::minimal(),
+          entry.getMethodWitness().Requirement);
+      SmallString<32> baseName;
+      {
+        llvm::raw_svector_ostream os(baseName);
+        entry.getMethodWitness().Requirement.print(os);
+      }
+
+      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
+                  /*SingleFunction=*/true,
+                  /*checkLinearLifetime=*/false)
+          .requireABICompatibleFunctionTypes(
+              witnessFunction->getLoweredFunctionType(),
+              baseInfo.getSILType().castTo<SILFunctionType>(),
+              "default witness table entry for " + baseName +
+                  " must be ABI-compatible",
+              *witnessFunction);
+    }
   }
-#endif
 }
 
 /// Verify that a global variable follows invariants.

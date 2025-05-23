@@ -770,6 +770,7 @@ Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
 Added: _$sSBsE5radixSivpZMV
 Added: _$sSFsE8ulpOfOnexvpZMV
 Added: _$sSUsE8isSignedSbvpZMV

@@ -1370,35 +1370,34 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
         isUnchecked = true;
     }
 
-    auto note = nominal->diagnose(
-        isUnchecked ? diag::explicit_unchecked_sendable
-                    : diag::add_nominal_sendable_conformance,
-        nominal);
-    if (canMakeSendable && !requirements.empty()) {
-      // Produce a Fix-It containing a conditional conformance to Sendable,
-      // based on the requirements harvested from instance storage.
+    // If we can only make the type Sendable via @unchecked, don't provide a Fix-It.
+    if (!isUnchecked) {
+      auto note = nominal->diagnose(diag::add_nominal_sendable_conformance, nominal);
+      if (canMakeSendable && !requirements.empty()) {
+        // Produce a Fix-It containing a conditional conformance to Sendable,
+        // based on the requirements harvested from instance storage.
 
-      // Form the where clause containing all of the requirements.
-      SmallString<64> whereClause;
-      {
-        llvm::raw_svector_ostream out(whereClause);
-        llvm::interleaveComma(
-            requirements, out,
-            [&](const Requirement &req) {
-              out << req.getFirstType().getString() << ": "
-                  << req.getSecondType().getString();
-            });
+        // Form the where clause containing all of the requirements.
+        SmallString<64> whereClause;
+        {
+          llvm::raw_svector_ostream out(whereClause);
+          llvm::interleaveComma(
+              requirements, out,
+              [&](const Requirement &req) {
+                out << req.getFirstType().getString() << ": "
+                    << req.getSecondType().getString();
+              });
+        }
+
+        // Add a Fix-It containing the conditional extension text itself.
+        auto insertionLoc = nominal->getBraces().End;
+        note.fixItInsertAfter(
+            insertionLoc,
+            ("\n\nextension " + nominal->getName().str() + ": "
+             + "Sendable where " + whereClause + " { }\n").str());
+      } else {
+        addSendableFixIt(nominal, note, isUnchecked);
       }
-
-      // Add a Fix-It containing the conditional extension text itself.
-      auto insertionLoc = nominal->getBraces().End;
-      note.fixItInsertAfter(
-          insertionLoc,
-          ("\n\nextension " + nominal->getName().str() + ": "
-           + (isUnchecked? "@unchecked " : "") + "Sendable where " +
-           whereClause + " { }\n").str());
-    } else {
-      addSendableFixIt(nominal, note, isUnchecked);
     }
   }
 
@@ -4783,6 +4782,16 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
       if (checkIsolatedCapture) {
         if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
           return ActorIsolation::forActorInstanceCapture(param);
+
+        auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
+        // @_inheritActorContext(always) forces the isolation capture.
+        if (explicitClosure && explicitClosure->alwaysInheritsActorContext()) {
+          if (parentIsolation.isActorInstanceIsolated()) {
+            if (auto *param = parentIsolation.getActorInstance())
+              return ActorIsolation::forActorInstanceCapture(param);
+          }
+          return parentIsolation;
+        }
       } else {
         // If we don't have capture information during code completion, assume
         // that the closure captures the `isolated` parameter from the parent
@@ -5808,8 +5817,13 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
             isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
             isa<ConstructorDecl>(value)) {
-          return {
-              {{ActorIsolation::forGlobalActor(globalActor), {}}, nullptr, {}}};
+          // Preconcurrency here is used to stage the diagnostics
+          // when users select `@MainActor` default isolation with
+          // non-strict concurrency modes (pre Swift 6).
+          auto isolation =
+              ActorIsolation::forGlobalActor(globalActor)
+                  .withPreconcurrency(!ctx.LangOpts.isSwiftVersionAtLeast(6));
+          return {{{isolation, {}}, nullptr, {}}};
         }
       }
 
@@ -6811,6 +6825,9 @@ static bool checkSendableInstanceStorage(
 
 bool swift::checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check) {
+  ASSERT(conformance->getProtocol()->isSpecificProtocol(
+           KnownProtocolKind::Sendable));
+
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
@@ -6900,13 +6917,16 @@ bool swift::checkSendableConformance(
     return false;
   }
 
+  // An implied conformance is generated when you state a conformance to
+  // a protocol P that inherits from Sendable.
+  bool wasImplied = (conformance->getSourceKind() ==
+                     ConformanceEntryKind::Implied);
+
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   SendableCheckContext checkContext(conformanceDC, check);
   DiagnosticBehavior behavior = checkContext.defaultDiagnosticBehavior();
-  if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
-      conformance->getProtocol()->isSpecificProtocol(
-          KnownProtocolKind::Sendable)) {
+  if (wasImplied) {
     if (auto optBehavior = checkContext.preconcurrencyBehavior(
             nominal, /*ignoreExplicitConformance=*/true))
       behavior = *optBehavior;
@@ -6915,12 +6935,14 @@ bool swift::checkSendableConformance(
   if (conformanceDC->getOutermostParentSourceFile() &&
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
-    conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
-                              nominal)
-      .limitBehaviorUntilSwiftVersion(behavior, 6);
+    if (!(nominal->hasClangNode() && wasImplied)) {
+      conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
+                                nominal)
+        .limitBehaviorUntilSwiftVersion(behavior, 6);
 
-    if (behavior == DiagnosticBehavior::Unspecified)
-      return true;
+      if (behavior == DiagnosticBehavior::Unspecified)
+        return true;
+    }
   }
 
   if (classDecl && classDecl->getParentSourceFile()) {
@@ -6958,7 +6980,7 @@ bool swift::checkSendableConformance(
   // a Sendable conformance. The implied conformance is unconditional, so check
   // the storage for sendability as if the conformance was declared on the nominal,
   // and not some (possibly constrained) extension.
-  if (conformance->getSourceKind() == ConformanceEntryKind::Implied)
+  if (wasImplied)
     conformanceDC = nominal;
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }

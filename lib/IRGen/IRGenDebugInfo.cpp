@@ -279,8 +279,16 @@ public:
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
                                      std::optional<SILLocation> Loc);
+
+  void emitArtificialVariable(IRGenFunction &IGF, llvm::Value *Metadata,
+                              StringRef Name, StringRef Identifier);
+
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        unsigned Depth, unsigned Index, StringRef Name);
+                        GenericTypeParamType *Type);
+
+  void emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
+                        StringRef Name, ProtocolDecl *protocol);
+
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
 
@@ -1066,34 +1074,34 @@ private:
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
       if (!Reconstructed) {
-        llvm::errs() << "Failed to reconstruct type for " << SugaredName
-                     << "\n";
-        llvm::errs() << "Original type:\n";
-        Ty->dump(llvm::errs());
-        if (Sig)
-          llvm::errs() << "Generic signature: " << Sig << "\n";
-        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
-          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
-             "this assertion.\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Failed to reconstruct type for " << SugaredName << "\n";
+          out << "Original type:\n";
+          Ty->dump(out);
+          if (Sig)
+            out << "Generic signature: " << Sig << "\n";
+          out << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+              << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+                 "this assertion.";
+        });
       } else if (!Reconstructed->isEqual(Ty) &&
                  // FIXME: Some existential types are reconstructed without
                  // an explicit ExistentialType wrapping the constraint.
                  !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
-        llvm::errs() << "Incorrect reconstructed type for " << SugaredName
-                     << "\n";
-        llvm::errs() << "Original type:\n";
-        Ty->dump(llvm::errs());
-        llvm::errs() << "Reconstructed type:\n";
-        Reconstructed->dump(llvm::errs());
-        if (Sig)
-          llvm::errs() << "Generic signature: " << Sig << "\n";
-        llvm::errs() << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
-          << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
-             "this assertion.\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Incorrect reconstructed type for " << SugaredName << "\n";
+          out << "Original type:\n";
+          Ty->dump(out);
+          out << "Reconstructed type:\n";
+          Reconstructed->dump(out);
+          if (Sig)
+            out << "Generic signature: " << Sig << "\n";
+          out << SWIFT_CRASH_BUG_REPORT_MESSAGE << "\n"
+              << "Pass '-Xfrontend -disable-round-trip-debug-types' to disable "
+                 "this assertion.";
+        });
       }
     }
 
@@ -3904,9 +3912,10 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     Var->addDebugInfo(GV);
 }
 
-void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
-                                          llvm::Value *Metadata, unsigned Depth,
-                                          unsigned Index, StringRef Name) {
+void IRGenDebugInfoImpl::emitArtificialVariable(IRGenFunction &IGF,
+                                                llvm::Value *Metadata,
+                                                StringRef Name,
+                                                StringRef Identifier) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -3915,23 +3924,44 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  llvm::SmallString<8> Buf;
-  static const char *Tau = SWIFT_UTF8("\u03C4");
-  llvm::raw_svector_ostream OS(Buf);
-  OS << '$' << Tau << '_' << Depth << '_' << Index;
-  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+  uint64_t PtrWidthInBits =
+      CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
   assert(PtrWidthInBits % 8 == 0);
   auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          {}, {OS.str().str(), 0, false},
-                          // swift.type is already a pointer type,
-                          // having a shadow copy doesn't add another
-                          // layer of indirection.
-                          IGF.isAsync() ? CoroDirectValue : DirectValue,
-                          ArtificialValue);
+  emitVariableDeclaration(
+      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {},
+      {Identifier, 0, false}, // swift.type is already a pointer type,
+                              // having a shadow copy doesn't add another
+                              // layer of indirection.
+      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
+}
+
+void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Value *Metadata,
+                                          GenericTypeParamType *Type) {
+  llvm::SmallString<8> Buf;
+  llvm::raw_svector_ostream OS(Buf);
+  OS << "$" << Type->getCanonicalName().str();
+  auto Name = Type->getName().str();
+
+  emitArtificialVariable(IGF, Metadata, Name, OS.str());
+}
+
+void IRGenDebugInfoImpl::emitWitnessTable(IRGenFunction &IGF,
+                                          llvm::Value *Metadata, StringRef Name,
+                                          ProtocolDecl *protocol) {
+  llvm::SmallString<32> Buf;
+  llvm::raw_svector_ostream OS(Buf);
+  DebugTypeInfo DbgTy(protocol->getDeclaredType());
+  auto MangledName = getMangledName(DbgTy).Canonical;
+  OS << "$WT" << Name << "$$" << MangledName;;
+  // Make sure this ID lives long enough.
+  auto Id = IGF.getSwiftModule()->getASTContext().getIdentifier(OS.str());
+
+  emitArtificialVariable(IGF, Metadata, Name, Id.str());
 }
 
 void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
@@ -4070,10 +4100,15 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                                      unsigned Depth, unsigned Index,
-                                      StringRef Name) {
+                                      GenericTypeParamType *Type) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(IGF, Metadata,
-                                                            Depth, Index, Name);
+                                                            Type);
+}
+
+void IRGenDebugInfo::emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
+                                      StringRef Name, ProtocolDecl *protocol) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitWitnessTable(IGF, Metadata, Name,
+                                                            protocol);
 }
 
 void IRGenDebugInfo::emitPackCountParameter(IRGenFunction &IGF,

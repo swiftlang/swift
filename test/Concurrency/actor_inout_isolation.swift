@@ -119,7 +119,7 @@ extension TestActor {
   func passStateIntoDifferentClassMethod() async {
     let other = NonAsyncClass()
     let otherCurry = other.modifyOtherAsync
-    // expected-targeted-complete-tns-warning @-1 {{non-sendable type 'NonAsyncClass' cannot exit actor-isolated context in call to nonisolated instance method 'modifyOtherAsync'}}
+    // expected-targeted-complete-tns-warning @-1 {{non-Sendable type 'NonAsyncClass' cannot exit actor-isolated context in call to nonisolated instance method 'modifyOtherAsync'}}
     await other.modifyOtherAsync(&value2)
     // expected-error @-1 {{actor-isolated property 'value2' cannot be passed 'inout' to 'async' function call}}
 
@@ -288,11 +288,11 @@ actor ProtectArray {
   func test() async {
     // FIXME: this is invalid too!
     _ = await array.mutateAsynchronously
-    // expected-targeted-complete-tns-warning@-1 {{non-sendable type '@lvalue [Int]' cannot exit actor-isolated context in call to nonisolated property 'mutateAsynchronously'}}
+    // expected-targeted-complete-tns-warning@-1 {{non-Sendable type '@lvalue [Int]' cannot exit actor-isolated context in call to nonisolated property 'mutateAsynchronously'}}
 
     _ = await array[mutateAsynchronously: 0]
     // expected-error@-1 {{actor-isolated property 'array' cannot be passed 'inout' to 'async' function call}}
-    // expected-targeted-complete-tns-warning@-2 {{non-sendable type 'inout Array<Int>' cannot exit actor-isolated context in call to nonisolated subscript 'subscript(mutateAsynchronously:)'}}
+    // expected-targeted-complete-tns-warning@-2 {{non-Sendable type 'inout Array<Int>' cannot exit actor-isolated context in call to nonisolated subscript 'subscript(mutateAsynchronously:)'}}
 
     await passToAsync(array[0])
 

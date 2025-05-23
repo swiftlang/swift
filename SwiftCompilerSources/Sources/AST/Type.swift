@@ -61,8 +61,6 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var builtinVectorElementType: Type { Type(bridged: bridged.getBuiltinVectorElementType()) }
 
-  public var builtinFixedArrayElementType: Type { Type(bridged: bridged.getBuiltinFixedArrayElementType()) }
-
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
@@ -82,8 +80,6 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
   public var superClassType: CanonicalType? { rawType.superClassType?.canonical }
 
   public var builtinVectorElementType: CanonicalType { rawType.builtinVectorElementType.canonical }
-
-  public var builtinFixedArrayElementType: CanonicalType { rawType.builtinFixedArrayElementType.canonical }
 
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return rawType.subst(with: substitutionMap).canonical
@@ -193,6 +189,23 @@ extension TypeProperties {
 
   public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {
     rawType.bridged.getRepresentationOfMetatype().representation
+  }
+
+  public var builtinFixedArrayElementType: CanonicalType {
+    CanonicalType(bridged: rawType.bridged.getBuiltinFixedArrayElementType())
+  }
+  public var builtinFixedArraySizeType: CanonicalType {
+    CanonicalType(bridged: rawType.bridged.getBuiltinFixedArraySizeType())
+  }
+
+  /// Returns the value of an integer value type (see `isInteger`).
+  /// Returns nil if the value is not representable in an `Int`.
+  public var valueOfInteger: Int? {
+    let optionalInt = rawType.bridged.getValueOfIntegerType()
+    if optionalInt.hasValue {
+      return optionalInt.value
+    }
+    return nil
   }
 
   /// Assumes this is a nominal type. Returns a substitution map that sends each

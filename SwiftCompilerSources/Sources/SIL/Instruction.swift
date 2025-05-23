@@ -647,11 +647,7 @@ extension Deallocation {
 }
 
 
-final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
@@ -862,8 +858,12 @@ final public class TypeValueInst: SingleValueInstruction, UnaryInstruction {
     CanonicalType(bridged: bridged.TypeValueInst_getParamType())
   }
 
-  public var value: Int {
-    bridged.TypeValueInst_getValue()
+  /// Returns the value of the Integer type is known and fits into an `Int`.
+  public var value: Int? {
+    if paramType.isInteger {
+      return paramType.valueOfInteger
+    }
+    return nil
   }
 }
 

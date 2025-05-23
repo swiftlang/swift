@@ -17,7 +17,7 @@ final class B: NSObject, Sendable {
 class C { } // expected-note{{class 'C' does not conform to the 'Sendable' protocol}}
 
 final class D: NSObject, Sendable {
-  let c: C = C() // expected-warning{{stored property 'c' of 'Sendable'-conforming class 'D' has non-sendable type 'C'}}
+  let c: C = C() // expected-warning{{stored property 'c' of 'Sendable'-conforming class 'D' has non-Sendable type 'C'}}
 }
 
 

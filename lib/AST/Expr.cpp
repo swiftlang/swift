@@ -1991,9 +1991,10 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   }
 
   if (getRawDiscriminator() == InvalidDiscriminator) {
-    llvm::errs() << "Closure does not have an assigned discriminator:\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Closure does not have an assigned discriminator:\n";
+      this->dump(out);
+    });
   }
 
   return getRawDiscriminator();

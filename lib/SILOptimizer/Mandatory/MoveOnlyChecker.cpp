@@ -122,14 +122,14 @@ void MoveOnlyChecker::checkObjects() {
 
 void MoveOnlyChecker::completeObjectLifetimes(
     ArrayRef<MarkUnresolvedNonCopyableValueInst *> insts) {
-// TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup.
-OSSALifetimeCompletion completion(fn, domTree, *deba->get(fn));
+  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup.
+  OSSALifetimeCompletion completion(fn, domTree, *deba->get(fn));
 
-// Collect all values derived from each mark_unresolved_non_copyable_value
-// instruction via ownership instructions and phis.
-ValueWorklist transitiveValues(fn);
-for (auto *inst : insts) {
-  transitiveValues.push(inst);
+  // Collect all values derived from each mark_unresolved_non_copyable_value
+  // instruction via ownership instructions and phis.
+  ValueWorklist transitiveValues(fn);
+  for (auto *inst : insts) {
+    transitiveValues.push(inst);
   }
   while (auto value = transitiveValues.pop()) {
     for (auto *use : value->getUses()) {
@@ -163,6 +163,10 @@ for (auto *inst : insts) {
   for (auto *block : poa->get(fn)->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        if (llvm::any_of(result->getUsers(),
+                         [](auto *user) { return isa<BranchInst>(user); })) {
+          continue;
+        }
         if (!transitiveValues.isVisited(result))
           continue;
         if (completion.completeOSSALifetime(
@@ -173,7 +177,9 @@ for (auto *inst : insts) {
       }
     }
     for (SILArgument *arg : block->getArguments()) {
-      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (arg->isReborrow()) {
+        continue;
+      }
       if (!transitiveValues.isVisited(arg))
         continue;
       if (completion.completeOSSALifetime(

@@ -128,19 +128,6 @@ public:
   performDependencyScan(ModuleDependencyID rootModuleID,
                         ModuleDependenciesCache &cache);
 
-  /// Query the module dependency info for the Clang module with the given name.
-  /// Explicit by-name lookups are useful for batch mode scanning.
-  std::optional<const ModuleDependencyInfo *>
-  getNamedClangModuleDependencyInfo(StringRef moduleName,
-                                    ModuleDependenciesCache &cache,
-                                    ModuleDependencyIDSetVector &discoveredClangModules);
-
-  /// Query the module dependency info for the Swift module with the given name.
-  /// Explicit by-name lookups are useful for batch mode scanning.
-  std::optional<const ModuleDependencyInfo *>
-  getNamedSwiftModuleDependencyInfo(StringRef moduleName,
-                                    ModuleDependenciesCache &cache);
-
   /// How many filesystem lookups were performed by the scanner
   unsigned getNumLookups() { return NumLookups; }
 

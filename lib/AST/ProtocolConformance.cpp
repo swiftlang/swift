@@ -739,6 +739,13 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
   return entry->second;
 }
 
+ProtocolConformanceRef
+SelfProtocolConformance::getAssociatedConformance(Type assocType,
+                                                  ProtocolDecl *protocol) const {
+  ASSERT(assocType->isEqual(protocol->getSelfInterfaceType()));
+  return lookupConformance(getType(), protocol);
+}
+
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
   return Witness(requirement, SubstitutionMap(), nullptr, SubstitutionMap(),
                  GenericSignature(), std::nullopt);

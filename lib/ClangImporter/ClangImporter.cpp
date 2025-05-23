@@ -90,6 +90,7 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Serialization/ObjectFilePCHContainerReader.h"
+#include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
@@ -4232,11 +4233,12 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   PPOpts.MacroIncludes.clear();
   PPOpts.Includes.clear();
 
-  // CodeGenOptions.
-  auto &CGOpts = instance.getCodeGenOpts();
-  CGOpts.DebugCompilationDir.clear();
+  // Clear benign CodeGenOptions.
+  clang::tooling::dependencies::resetBenignCodeGenOptions(
+      clang::frontend::ActionKind::GenerateModule, instance.getLangOpts(),
+      instance.getCodeGenOpts());
 
-    // FileSystemOptions.
+  // FileSystemOptions.
   auto &FSOpts = instance.getFileSystemOpts();
   FSOpts.WorkingDir.clear();
 
