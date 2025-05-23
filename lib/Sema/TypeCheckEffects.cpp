@@ -4718,6 +4718,12 @@ private:
           return diag.downgradeToWarning;
         });
 
+    // If there is a single problem, let's attempt to produce a tailed
+    // diagnostic about accessing isolated values outside of their actors.
+    if (errors.size() == 1 &&
+        diagnoseAccessOutsideOfIsolationContext(anchor, errors.front()))
+      return;
+
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
       .warnUntilSwiftVersionIf(downgradeToWarning, 6)
       .fixItInsert(loc, insertText)
@@ -4798,6 +4804,76 @@ private:
         }
       }
     }
+  }
+
+  /// Check whether the given error points to an attempt to access
+  /// an isolated value or call an isolated function from outside
+  /// its actor and diagnose if so.
+  /// \returns true if problem was diagnosed, false otherwise.
+  bool diagnoseAccessOutsideOfIsolationContext(
+      const Expr *anchor, const DiagnosticInfo &errorInfo) const {
+    auto diagnoseAccessOutsideOfActor = [&](SourceLoc loc,
+                                            ConcreteDeclRef declRef,
+                                            bool isCall = false) {
+      auto declIsolation = getActorIsolation(declRef.getDecl());
+
+      // If the access is to a unspecified/nonisolated value, let's diagnose
+      // it with a generic error/warning about expression being `async`.
+      if (declIsolation.isUnspecified() || declIsolation.isNonisolated())
+        return false;
+
+      const auto &[fixItLoc, insertText] =
+          getFixItForUncoveredSite(anchor, "await");
+
+      Ctx.Diags
+          .diagnose(loc, diag::actor_isolated_access_outside_of_actor_context,
+                    declIsolation, declRef.getDecl(), isCall)
+          .warnUntilSwiftVersionIf(errorInfo.downgradeToWarning, 6)
+          .fixItInsert(fixItLoc, insertText)
+          .highlight(anchor->getSourceRange());
+      return true;
+    };
+
+    switch (errorInfo.reason.getKind()) {
+    case PotentialEffectReason::Kind::AsyncLet:
+    case PotentialEffectReason::Kind::PropertyAccess:
+    case PotentialEffectReason::Kind::SubscriptAccess:
+      if (auto *declRef = dyn_cast<DeclRefExpr>(&errorInfo.expr)) {
+        return diagnoseAccessOutsideOfActor(declRef->getLoc(),
+                                            declRef->getDecl());
+      }
+
+      if (auto *memberRef = dyn_cast<MemberRefExpr>(&errorInfo.expr)) {
+        return diagnoseAccessOutsideOfActor(memberRef->getLoc(),
+                                            memberRef->getDecl());
+      }
+
+      if (auto *lookupExpr = dyn_cast<LookupExpr>(&errorInfo.expr)) {
+        return diagnoseAccessOutsideOfActor(lookupExpr->getLoc(),
+                                            lookupExpr->getMember());
+      }
+
+      break;
+
+    case PotentialEffectReason::Kind::Apply: {
+      auto *call = dyn_cast<ApplyExpr>(&errorInfo.expr);
+      if (call && call->getIsolationCrossing()) {
+        if (auto callee =
+                call->getCalledValue(/*skipFunctionConversions=*/true)) {
+          return diagnoseAccessOutsideOfActor(call->getLoc(), callee,
+                                              /*isCall=*/true);
+        }
+      }
+      break;
+    }
+
+    case PotentialEffectReason::Kind::ByClosure:
+    case PotentialEffectReason::Kind::ByDefaultClosure:
+    case PotentialEffectReason::Kind::ByConformance:
+      break;
+    }
+
+    return false;
   }
 
   void diagnoseUncoveredUnsafeSite(
