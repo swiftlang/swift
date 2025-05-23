@@ -914,11 +914,10 @@ diagnoseMissingImportsForMember(const ValueDecl *decl,
   ASSERT(count > 0);
 
   if (count > 1) {
-    ctx.Diags.diagnose(loc, diag::candidate_from_missing_imports_2_or_more,
-                       decl, bool(count > 2), modulesToImport[0],
-                       modulesToImport[1]);
+    ctx.Diags.diagnose(loc, diag::member_from_missing_imports_2_or_more, decl,
+                       bool(count > 2), modulesToImport[0], modulesToImport[1]);
   } else {
-    ctx.Diags.diagnose(loc, diag::candidate_from_missing_import, decl,
+    ctx.Diags.diagnose(loc, diag::member_from_missing_import, decl,
                        modulesToImport.front());
   }
 }

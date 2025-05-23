@@ -2698,7 +2698,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       increaseScore(SK_Unavailable, locator);
 
     // If the declaration is from a module that hasn't been imported, note that.
-    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                            /*allowMigration=*/true)) {
       if (!useDC->isDeclImported(decl))
         increaseScore(SK_MissingImport, locator);
     }

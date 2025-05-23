@@ -2371,7 +2371,9 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
 /// the given context.
 static bool shouldRequireImportsInContext(const DeclContext *lookupContext) {
   auto &ctx = lookupContext->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return false;
 
   // Code outside of the main module (which is often synthesized) isn't subject
@@ -3591,7 +3593,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   // inaccessible due to missing imports. The missing imports will be diagnosed
   // elsewhere.
   if (referenced.first.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
                                              ext->getParent(), options);
