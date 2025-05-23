@@ -5192,10 +5192,13 @@ ERROR(isolated_any_conversion_to_synchronous_func,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
-WARNING(implicit_nonstrong_to_strong_capture,none,
-      "%0 capture list item %base1 implicitly captured as strong reference in outer scope",
-      (ReferenceOwnership, const Decl *))
-NOTE(implicit_nonstrong_to_strong_capture_loc,none,
+WARNING(implicit_weak_to_strong_capture,none,
+      "%0 capture implicitly captures %base1 as strong reference in outer scope",
+      (ReferenceOwnership, const VarDecl *))
+WARNING(implicit_weak_to_strong_capture_new_name,none,
+      "%0 capture %base1 implicitly captures %base2 as strong reference in outer scope",
+      (ReferenceOwnership, const VarDecl *, const ValueDecl *))
+NOTE(implicit_weak_to_strong_capture_loc,none,
      "%base0 implicitly captured here",(const Decl *))
 
 //------------------------------------------------------------------------------
