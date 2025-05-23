@@ -60,7 +60,7 @@ func testAsync() async {
 class C { // expected-complete-tns-note {{class 'C' does not conform to the 'Sendable' protocol}}
   func test() {
     f(arg: 5, withFn: { [weak self] () -> OtherHandler? in
-        _ = self // expected-complete-tns-warning {{capture of 'self' with non-sendable type 'C?' in a '@Sendable' closure}}
+        _ = self // expected-complete-tns-warning {{capture of 'self' with non-Sendable type 'C?' in a '@Sendable' closure}}
         return nil
       })
   }
