@@ -682,3 +682,24 @@ bb3:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on allock_stack_inline_array_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value: %2 = vector_base_addr %1
+// CHECK: end running test 1 of 1 on allock_stack_inline_array_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allock_stack_inline_array_test : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %0 = alloc_stack $InlineArray<1, UInt8>
+  %1 = struct_element_addr %0: $*InlineArray<1, UInt8>, #InlineArray._storage
+  %2 = vector_base_addr %1 : $*Builtin.FixedArray<1, UInt8>
+  %3 = integer_literal $Builtin.Int8, 0
+  %4 = struct $UInt8 (%3)
+  store %4 to [trivial] %2
+  %6 = load [trivial] %0
+  dealloc_stack %0
+  debug_value [trace] %2
+
+  %7 = tuple ()
+  return %7 : $()
+}
