@@ -54,9 +54,8 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'name: String? = nil',
-%     'executorPreference taskExecutor: (any TaskExecutor)? = nil',
+%     'executorPreference taskExecutor: (any TaskExecutor)?',
 %     'priority: TaskPriority? = nil',
-%     # '@_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success',
 %     'operation: sending @escaping () async throws -> Success',
 %   ]),
 %   # ==== --------------------------------------------------------------------
@@ -70,7 +69,7 @@ import Swift
 %   ],
 %   [ # PARAMS
 %     'name: String? = nil',
-%     'executorPreference taskExecutor: (any TaskExecutor)? = nil',
+%     'executorPreference taskExecutor: (any TaskExecutor)?',
 %     'priority: TaskPriority? = nil',
 %     'operation: sending @escaping () async throws -> Success',
 %   ]),

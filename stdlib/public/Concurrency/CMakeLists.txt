@@ -208,7 +208,7 @@ set(LLVM_OPTIONAL_SOURCES
 set(SWIFT_CONCURRENCY_GYB_SOURCES
   Task+init.swift.gyb
   TaskGroup+addTask.swift.gyb
-  Task+immediate
+  Task+immediate.swift.gyb
 )
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
