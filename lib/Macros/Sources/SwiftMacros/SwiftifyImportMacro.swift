@@ -643,6 +643,9 @@ extension PointerBoundsThunkBuilder {
       return try transformType(oldType, generateSpan, isSizedBy, isParameter)
     }
   }
+  var countLabel: String {
+    return isSizedBy && generateSpan ? "byteCount" : "count"
+  }
 }
 
 protocol ParamBoundsThunkBuilder: BoundsThunkBuilder {
@@ -699,26 +702,28 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
         "start"
       }
     var cast = try newType
+    var expr: ExprSyntax
     if nullable {
       if let optType = cast.as(OptionalTypeSyntax.self) {
         cast = optType.wrappedType
       }
-      return """
-      { () in
-        let _resultValue = \(call)
-        if unsafe _resultValue == nil {
-          return nil
-        } else {
-          return unsafe \(raw: cast)(\(raw: startLabel): _resultValue!, count: Int(\(countExpr)))
-        }
-      }()
-      """
+      expr =
+        """
+        { () in
+          let _resultValue = \(call)
+          if unsafe _resultValue == nil {
+            return nil
+          } else {
+            return unsafe _swiftifyOverrideLifetime(\(raw: cast)(\(raw: startLabel): _resultValue!, \(raw: countLabel): Int(\(countExpr))), copying: ())
+          }
+        }()
+        """
+    } else {
+      expr =
+        """
+        \(raw: cast)(\(raw: startLabel): \(call), \(raw: countLabel): Int(\(countExpr)))
+        """
     }
-    var expr = ExprSyntax(
-      """
-      \(raw: cast)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
-      """
-    )
     if generateSpan {
       expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
     }
@@ -823,11 +828,10 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func getCount() -> ExprSyntax {
-    let countName = isSizedBy && generateSpan ? "byteCount" : "count"
     if nullable {
-      return ExprSyntax("\(name)?.\(raw: countName) ?? 0")
+      return ExprSyntax("\(name)?.\(raw: countLabel) ?? 0")
     }
-    return ExprSyntax("\(name).\(raw: countName)")
+    return ExprSyntax("\(name).\(raw: countLabel)")
   }
 
   func peelOptionalType(_ type: TypeSyntax) -> TypeSyntax {
