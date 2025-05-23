@@ -340,7 +340,7 @@ extension OutputRawSpan {
     ) throws(E) -> R
   ) throws(E) -> R {
     guard let start = unsafe _pointer, capacity > 0 else {
-      let buffer = unsafe UnsafeMutableRawBufferPointer(start: nil, count: 0)
+      let buffer = UnsafeMutableRawBufferPointer(_empty: ())
       var initializedCount = 0
       defer {
         _precondition(initializedCount == 0, "OutputRawSpan capacity overflow")
@@ -348,7 +348,7 @@ extension OutputRawSpan {
       return unsafe try body(buffer, &initializedCount)
     }
     let buffer = unsafe UnsafeMutableRawBufferPointer(
-      start: start, count: capacity
+      _uncheckedStart: start, count: capacity
     )
     var initializedCount = _count
     defer {
