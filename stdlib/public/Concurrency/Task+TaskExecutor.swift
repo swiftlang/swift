@@ -226,9 +226,9 @@ extension Task where Failure == Never {
   /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
   @discardableResult
   @_alwaysEmitIntoClient
-  public init(
+  public init( // Task.init where Failure == Never (TaskExecutor)
     name: String? = nil,
-    executorPreference taskExecutor: consuming (any TaskExecutor)? = nil,
+    executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: sending @escaping () async -> Success
   ) {
@@ -315,7 +315,7 @@ extension Task where Failure == Error {
   /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
   @discardableResult
   @_alwaysEmitIntoClient
-  public init(
+  public init( // Task.init where Failure == Error (TaskExecutor)
     name: String? = nil,
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
