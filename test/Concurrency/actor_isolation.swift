@@ -1210,6 +1210,8 @@ actor MyServer : Server {
 func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
 @available(SwiftStdlib 5.1, *)
 func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
+@available(SwiftStdlib 5.1, *)
+func acceptAsyncSendableClosureInheritingAlways<T>(@_inheritActorContext(always) _: @Sendable () async -> T) { }
 
 @available(SwiftStdlib 5.1, *)
 extension MyActor {
@@ -1237,6 +1239,10 @@ extension MyActor {
       _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
       counter += 1 // okay
     }
+
+    acceptAsyncSendableClosureInheritingAlways {
+      counter += 1 // Ok
+    }
   }
 }
 
@@ -1256,6 +1262,32 @@ func testGlobalActorInheritance() {
 
   acceptAsyncSendableClosureInheriting {
     counter += 1 // ok
+  }
+
+  acceptAsyncSendableClosureInheritingAlways {
+    counter += 1 // ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testIsolatedParameter1(_: isolated any Actor, v: inout Int) {
+  acceptAsyncSendableClosureInheriting {
+    v += 1 // expected-warning {{mutable capture of 'inout' parameter 'v' is not allowed in concurrently-executing code}}
+  }
+
+  acceptAsyncSendableClosureInheritingAlways {
+    v += 1 // Ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testIsolatedParameter2(_: isolated (any Actor)? = #isolation, v: inout Int) {
+  acceptAsyncSendableClosureInheriting {
+    v += 1 // expected-warning {{mutable capture of 'inout' parameter 'v' is not allowed in concurrently-executing code}}
+  }
+
+  acceptAsyncSendableClosureInheritingAlways {
+    v += 1 // Ok
   }
 }
 

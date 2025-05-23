@@ -1406,15 +1406,18 @@ func nonEphemeral2(_: UnsafeRawPointer) {}
 @abi(func disfavoredOverload3(_: UnsafeRawPointer))
 func nonEphemeral3(@_nonEphemeral _: UnsafeRawPointer) {}
 
-// @_inheritActorContext -- banned in @abi
-@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+// @_inheritActorContext
+@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void))
 func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
 
-@abi(func inheritActorContext2(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+@abi(func inheritActorContext2(@_inheritActorContext fn: @Sendable @escaping () async -> Void))
 func inheritActorContext2(fn: @Sendable @escaping () async -> Void) {}
 
 @abi(func inheritActorContext3(fn: @Sendable @escaping () async -> Void))
 func inheritActorContext3(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
+
+@abi(func inheritActorContext4(@_inheritActorContext(always) fn: @Sendable @escaping () async -> Void))
+func inheritActorContext4(fn: @Sendable @escaping () async -> Void) {}
 
 // @excusivity(checked/unchecked) -- banned in @abi
 class Exclusivity {

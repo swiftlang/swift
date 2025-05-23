@@ -4801,6 +4801,16 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
       if (checkIsolatedCapture) {
         if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
           return ActorIsolation::forActorInstanceCapture(param);
+
+        auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
+        // @_inheritActorContext(always) forces the isolation capture.
+        if (explicitClosure && explicitClosure->alwaysInheritsActorContext()) {
+          if (parentIsolation.isActorInstanceIsolated()) {
+            if (auto *param = parentIsolation.getActorInstance())
+              return ActorIsolation::forActorInstanceCapture(param);
+          }
+          return parentIsolation;
+        }
       } else {
         // If we don't have capture information during code completion, assume
         // that the closure captures the `isolated` parameter from the parent
