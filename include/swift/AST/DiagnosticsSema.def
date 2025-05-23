@@ -167,15 +167,20 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|package|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
 
-ERROR(candidate_from_missing_import,none,
+GROUPED_ERROR(member_from_missing_import,MemberImportVisibility,none,
       "%kind0 is not available due to missing import of defining module %1",
       (const ValueDecl *, const ModuleDecl *))
-ERROR(candidate_from_missing_imports_2_or_more,none,
+GROUPED_ERROR(member_from_missing_imports_2_or_more,MemberImportVisibility,none,
       "%kind0 is not available due to missing imports of defining modules "
       "%2%select{ and|, }1 %3%select{|, and others}1",
       (const ValueDecl *, bool, const ModuleDecl *, const ModuleDecl *))
 NOTE(candidate_add_import,none,
      "add import of module %0", (const ModuleDecl *))
+
+GROUPED_WARNING(add_required_import_for_member,MemberImportVisibility,none,
+     "import of module %0 is required", (const ModuleDecl *))
+NOTE(decl_from_module_used_here,none,
+     "%kind0 from %1 used here", (const ValueDecl *, const ModuleDecl *))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
