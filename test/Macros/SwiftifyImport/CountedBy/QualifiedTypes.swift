@@ -19,5 +19,3 @@ func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
 // CHECK-NEXT: func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
 // CHECK-NEXT:     return unsafe bar(ptr.baseAddress!, ptr.count)
 // CHECK-NEXT: }
-
-
