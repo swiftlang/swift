@@ -340,8 +340,10 @@ bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
   if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageVersion())
-    return isSwiftVersionAtLeast(*version);
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version))
+      return true;
+  }
 
   if (allowMigration && state.isEnabledForMigration())
     return true;
