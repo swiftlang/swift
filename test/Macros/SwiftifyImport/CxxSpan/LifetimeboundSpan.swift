@@ -57,6 +57,10 @@ func myFunc8(_ ptr: UnsafeRawPointer, _ span: SpanOfInt, _ count: CInt, _ size: 
 func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 }
 
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), typeMappings: ["MutableSpanOfInt" : "std.span<CInt>"])
+func myFunc10(_ self: MutableSpanOfInt) -> MutableSpanOfInt {
+}
+
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc(SpanOfInt(span))), copying: ())
@@ -119,5 +123,12 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT: func myFunc9(_ span: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
 // CHECK-NEXT:         return unsafe myFunc9(MutableSpanOfInt(_spanPtr))
+// CHECK-NEXT:    }), copying: ())
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy `self`) @lifetime(`self`: copy `self`)
+// CHECK-NEXT: func myFunc10(_ `self`: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe `self`.withUnsafeMutableBufferPointer { _selfPtr in
+// CHECK-NEXT:         return unsafe myFunc10(MutableSpanOfInt(_selfPtr))
 // CHECK-NEXT:    }), copying: ())
 // CHECK-NEXT: }
