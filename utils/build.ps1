@@ -643,6 +643,9 @@ enum Project {
   ClangRuntime
   SwiftInspect
   ExperimentalRuntime
+  ExperimentalOverlay
+  ExperimentalStringProcessing
+  ExperimentalSynchronization
   StaticFoundation
 }
 
@@ -2276,8 +2279,60 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        # NOTE(compnerd) we can get away with this currently because we only
+        # use the C portion of the dispatch build, which is always built
+        # dynamically.
         dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
         SwiftCore_ENABLE_CONCURRENCY = "YES";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Overlay `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalOverlay) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\StringProcessing `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStringProcessing) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Synchronization `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalSynchronization) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
       }
   }
 }
