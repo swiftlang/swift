@@ -5582,6 +5582,9 @@ ERROR(actor_isolated_non_self_reference,none,
         "from a nonisolated autoclosure}2",
         (const ValueDecl *, unsigned, unsigned, Type,
          ActorIsolation))
+ERROR(actor_isolated_access_outside_of_actor_context,none,
+      "%0 %kind1 cannot be %select{accessed|called}2 from outside of the actor",
+      (ActorIsolation, const ValueDecl *, bool))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "nonisolated context",
