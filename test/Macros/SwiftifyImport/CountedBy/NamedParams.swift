@@ -55,4 +55,3 @@ func allNamedOther(buf ptr: UnsafePointer<CInt>, count len: CInt) {
 // CHECK-NEXT: func allNamedOther(buf ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe allNamedOther(buf: ptr.baseAddress!, count: CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
-

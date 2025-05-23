@@ -67,4 +67,3 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 // CHECK-NEXT:         return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
-
