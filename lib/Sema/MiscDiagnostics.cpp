@@ -467,6 +467,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             diag::copy_expression_cannot_be_used_with_noncopyable_types);
       }
 
+      /// FIXME: there really is no reason for the restriction on copy not being
+      ///   permitted on fields, other than needing tests to ensure it works.
+      if (Ctx.LangOpts.hasFeature(ManualOwnership))
+        return;
+
       // We only allow for copy_expr to be applied directly to lvalues. We do
       // not allow currently for it to be applied to fields.
       auto *subExpr = copyExpr->getSubExpr();
@@ -479,6 +484,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkBorrowExpr(BorrowExpr *borrowExpr) {
+      // FIXME: revisit whether the restrictions are needed for explicit borrows
+      if (Ctx.LangOpts.hasFeature(ManualOwnership))
+        return;
+
       // Allow for a chain of member_ref exprs that end in a decl_ref expr.
       auto *subExpr = borrowExpr->getSubExpr();
       while (auto *memberRef = dyn_cast<MemberRefExpr>(subExpr))
