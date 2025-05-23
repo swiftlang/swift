@@ -14,4 +14,3 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ size: CInt, _ count: CInt) {
 // CHECK-NEXT:     }
 // CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, size, count)
 // CHECK-NEXT: }
-
