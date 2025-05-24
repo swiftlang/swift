@@ -803,11 +803,9 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
-  BRIDGED_INLINE void MarkDependenceInst_resolveToNonEscaping() const;
-  BRIDGED_INLINE void MarkDependenceInst_settleToEscaping() const;
+  BRIDGED_INLINE void MarkDependenceInstruction_resolveToNonEscaping() const;
+  BRIDGED_INLINE void MarkDependenceInstruction_settleToEscaping() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceAddrInst_dependenceKind() const;
-  BRIDGED_INLINE void MarkDependenceAddrInst_resolveToNonEscaping() const;
-  BRIDGED_INLINE void MarkDependenceAddrInst_settleToEscaping() const;
   BRIDGED_INLINE SwiftInt BeginAccessInst_getAccessKind() const;
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;

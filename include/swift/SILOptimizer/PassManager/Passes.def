@@ -140,6 +140,8 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(UpdateBorrowedFrom, "update-borrowed-from",
      "Test pass for update borrowed-from instructions")
+PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
+     "Mandatory remove short-lived immutable temporary copies")
 PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
 

@@ -44,12 +44,8 @@ public func testClosureToBlock() {
 
 // CHECK: sil private [thunk] @$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_To : $@convention(c) (@in_cxx NonTrivial) -> () {
 // CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
-// CHECK: %[[V1:.*]] = alloc_stack $NonTrivial
-// CHECK: copy_addr %[[V0]] to [init] %[[V1]] : $*NonTrivial
 // CHECK: %[[V3:.*]] = function_ref @$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_ : $@convention(thin) (@in_guaranteed NonTrivial) -> ()
-// CHECK: %[[V4:.*]] = apply %[[V3]](%[[V1]]) : $@convention(thin) (@in_guaranteed NonTrivial) -> ()
-// CHECK: destroy_addr %[[V1]] : $*NonTrivial
-// CHECK: dealloc_stack %[[V1]] : $*NonTrivial
+// CHECK: %[[V4:.*]] = apply %[[V3]](%[[V0]]) : $@convention(thin) (@in_guaranteed NonTrivial) -> ()
 // CHECK: return %[[V4]] : $()
 
 public func testClosureToFuncPtr() {
