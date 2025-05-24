@@ -2396,7 +2396,7 @@ function Build-ExperimentalRuntime {
   }
 }
 
-function Write-SDKSettings([OS] $OS) {
+function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
   $SDKSettings = @{
     CanonicalName = $OS.ToString().ToLowerInvariant()
     DisplayName = $OS.ToString()
@@ -2432,8 +2432,8 @@ function Write-SDKSettings([OS] $OS) {
       $SDKSettings.SupportedTargets.android.Archs = $AndroidSDKPlatforms | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
   }
-  $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS)\SDKSettings.json"
-  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS)\SDKSettings.plist"
+  $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK $OS -Identifier $Identifier)\SDKSettings.json"
+  Write-PList -Settings $SDKSettings -Path "$(Get-SwiftSDK $OS -Identifier $Identifier)\SDKSettings.plist"
 }
 
 function Build-Dispatch([Hashtable] $Platform) {
@@ -3337,6 +3337,7 @@ if (-not $SkipBuild) {
   Install-Platform $WindowsSDKPlatforms Windows
   Write-PlatformInfoPlist Windows
   Write-SDKSettings Windows
+  Write-SDKSettings Windows -Identifier WindowsExperimental
 
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
@@ -3352,6 +3353,7 @@ if (-not $SkipBuild) {
     Install-Platform $AndroidSDKPlatforms Android
     Write-PlatformInfoPlist Android
     Write-SDKSettings Android
+    Write-SDKSettings Android -Identifier AndroidExperimental
 
     # Android swift-inspect only supports 64-bit platforms.
     $AndroidSDKPlatforms | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
