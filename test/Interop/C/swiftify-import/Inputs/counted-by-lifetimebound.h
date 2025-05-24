@@ -19,3 +19,5 @@ typedef struct foo opaque_t;
 opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * __counted_by(len2) __lifetimebound p);
 
 int * __counted_by(len) noncountedLifetime(int len, int * __lifetimebound p);
+
+int * __counted_by(13) _Nullable constant(int * __counted_by(13) __lifetimebound _Nullable p);

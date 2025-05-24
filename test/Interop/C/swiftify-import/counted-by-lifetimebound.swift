@@ -15,7 +15,13 @@ import CountedByLifetimeboundClang
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ len2: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
+
+// CHECK:      /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @lifetime(copy p)
+// CHECK-NEXT: @lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>?
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -44,7 +50,7 @@ import CountedByLifetimeboundClang
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -56,7 +62,7 @@ import CountedByLifetimeboundClang
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callComplexExpr(_ p: inout MutableSpan<CInt>) {
-  let _: MutableSpan<CInt> = complexExpr(73, 37, 42, &p)
+  let _: MutableSpan<CInt> = complexExpr(73, 37, &p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -80,7 +86,7 @@ public func callNullable(_ p: inout MutableSpan<CInt>?) {
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callShared(_ p: inout MutableSpan<CInt>) {
-  let _: MutableSpan<CInt> = shared(CInt(p.count), &p)
+  let _: MutableSpan<CInt> = shared(&p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -93,4 +99,10 @@ public func callSimple(_ p: inout MutableSpan<CInt>) {
 @inlinable
 public func callNoncountedLifetime(_ p: UnsafeMutablePointer<CInt>) {
   let _: MutableSpan<CInt> = noncountedLifetime(73, p)
+}
+
+@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@inlinable
+public func callConstant(_ p: inout MutableSpan<CInt>?) {
+  let _: MutableSpan<CInt>? = constant(&p)
 }

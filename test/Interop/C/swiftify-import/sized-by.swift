@@ -29,7 +29,7 @@ import SizedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeMutableRawBufferPointer
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simple(_  p: UnsafeMutableRawBufferPointer)
@@ -70,7 +70,7 @@ public func callReturnPointer() {
 
 @inlinable
 public func callShared(_ p: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
-  shared(CInt(p.count), p, p2)
+  shared(p, p2)
 }
 
 @inlinable
