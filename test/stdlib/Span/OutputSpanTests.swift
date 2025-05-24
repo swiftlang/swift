@@ -330,19 +330,16 @@ suite.test("InlineArray initialization")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
-  var a: [Int] = []
-
   let i = InlineArray<10, Int> {
     (o: inout OutputSpan<Int>) in
-    for _ in 0..<o.capacity {
-      let r = Int.random(in: 10...99)
-      a.append(r)
-      o.append(r)
+    expectEqual(o.count, 0)
+    for i in 0..<o.capacity {
+      o.append(i)
     }
+    expectEqual(o.freeCapacity, 0)
   }
-  expectEqual(a.count, i.count)
   for j in i.indices {
-    expectEqual(a[j], i[j])
+    expectEqual(j, i[j])
   }
 }
 
