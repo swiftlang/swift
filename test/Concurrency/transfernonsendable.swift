@@ -93,6 +93,12 @@ struct SendableGenericStruct : Sendable {
   var x = SendableKlass()
 }
 
+enum MyEnum<T> {
+    case none
+    indirect case some(NonSendableKlass)
+    case more(T)
+}
+
 ////////////////////////////
 // MARK: Actor Self Tests //
 ////////////////////////////
@@ -2053,4 +2059,16 @@ func sendIsolatedValueToItsOwnIsolationDomain() {
       funcParam?.useValue()
     }
   }
+}
+
+// We used to crash on this since we were not looking finding underlying objects
+// hard enough.
+func indirectEnumTestCase<T>(_ e: MyEnum<T>) async -> Bool {
+    switch e {
+    case .some(let x):
+      _ = x
+      return true
+    default:
+        return false
+    }
 }
