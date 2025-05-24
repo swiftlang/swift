@@ -266,6 +266,7 @@ LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatyp
 SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
 LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
+LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)

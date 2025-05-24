@@ -916,6 +916,47 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
     return;
   }
+  
+  if (Builtin.ID == BuiltinValueKind::Interleave) {
+    using namespace llvm;
+    
+    auto src0 = args.claimNext();
+    auto src1 = args.claimNext();
+    
+    int n = Builtin.Types[0]->getAs<BuiltinVectorType>()->getNumElements();
+    SmallVector<int> shuffleLo(n);
+    SmallVector<int> shuffleHi(n);
+    for (int i=0; i<n/2; ++i) {
+      shuffleLo[2*i] = i;
+      shuffleHi[2*i] = n/2 + i;
+      shuffleLo[2*i+1] = n + i;
+      shuffleHi[2*i+1] = 3*n/2 + i;
+    }
+    
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleLo));
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleHi));
+    return;
+  }
+  
+  
+  if (Builtin.ID == BuiltinValueKind::Deinterleave) {
+    using namespace llvm;
+    
+    auto src0 = args.claimNext();
+    auto src1 = args.claimNext();
+    
+    int n = Builtin.Types[0]->getAs<BuiltinVectorType>()->getNumElements();
+    SmallVector<int> shuffleEven(n);
+    SmallVector<int> shuffleOdd(n);
+    for (int i=0; i<n; ++i) {
+      shuffleEven[i] = 2*i;
+      shuffleOdd[i]  = 2*i + 1;
+    }
+    
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleEven));
+    out.add(IGF.Builder.CreateShuffleVector(src0, src1, shuffleOdd));
+    return;
+  }
 
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
