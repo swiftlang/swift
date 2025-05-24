@@ -1,11 +1,11 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature LifetimeDependence -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by __noescape parameters.
 
@@ -14,90 +14,90 @@ import CountedByNoEscapeClang
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_anonymous_param1: copy _anonymous_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func anonymous(_ _anonymous_param1: inout MutableSpan<Int32>?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func anonymous(_ _anonymous_param1: inout MutableSpan<Int32>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(func: copy func)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func clash(func: inout MutableSpan<Int32>?, clash where: Int32)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func clash(func: inout MutableSpan<Int32>?, clash where: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_clash2_param1: copy _clash2_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func clash2(func _clash2_param1: inout MutableSpan<Int32>?, clash2 _clash2_param2: Int32)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func clash2(func _clash2_param1: inout MutableSpan<Int32>?, clash2 _clash2_param2: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_func_param1: copy _func_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func `func`(_ _func_param1: inout MutableSpan<Int32>?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func `func`(_ _func_param1: inout MutableSpan<Int32>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(borrow extension)
 // CHECK-NEXT: @lifetime(func: copy func)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func funcRenamed(func: inout MutableSpan<Int32>?, extension: Int32, init: Int32, open: Int32, var: Int32, is: Int32, as: Int32, in: Int32, guard: Int32, where: Int32) -> UnsafeMutableRawPointer!
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcRenamed(func: inout MutableSpan<Int32>?, extension: Int32, init: Int32, open: Int32, var: Int32, is: Int32, as: Int32, in: Int32, guard: Int32, where: Int32) -> UnsafeMutableRawPointer!
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(borrow _funcRenamedAnon_param2)
 // CHECK-NEXT: @lifetime(_funcRenamedAnon_param1: copy _funcRenamedAnon_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func funcRenamedAnon(func _funcRenamedAnon_param1: inout MutableSpan<Int32>?, extension _funcRenamedAnon_param2: Int32, init _funcRenamedAnon_param3: Int32, open _funcRenamedAnon_param4: Int32, var _funcRenamedAnon_param5: Int32, is _funcRenamedAnon_param6: Int32, as _funcRenamedAnon_param7: Int32, in _funcRenamedAnon_param8: Int32, guard _funcRenamedAnon_param9: Int32, where _funcRenamedAnon_param10: Int32) -> UnsafeMutableRawPointer!
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcRenamedAnon(func _funcRenamedAnon_param1: inout MutableSpan<Int32>?, extension _funcRenamedAnon_param2: Int32, init _funcRenamedAnon_param3: Int32, open _funcRenamedAnon_param4: Int32, var _funcRenamedAnon_param5: Int32, is _funcRenamedAnon_param6: Int32, as _funcRenamedAnon_param7: Int32, in _funcRenamedAnon_param8: Int32, guard _funcRenamedAnon_param9: Int32, where _funcRenamedAnon_param10: Int32) -> UnsafeMutableRawPointer!
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_in_param1: copy _in_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func `in`(func _in_param1: inout MutableSpan<Int32>?, in _in_param2: Int32)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func `in`(func _in_param1: inout MutableSpan<Int32>?, in _in_param2: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(func: copy func)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func keyword(_ func: inout MutableSpan<Int32>?, _ extension: Int32, _ init: Int32, _ open: Int32, _ var: Int32, _ is: Int32, _ as: Int32, _ in: Int32, _ guard: Int32, _ where: Int32)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func keyword(_ func: inout MutableSpan<Int32>?, _ extension: Int32, _ init: Int32, _ open: Int32, _ var: Int32, _ is: Int32, _ as: Int32, _ in: Int32, _ guard: Int32, _ where: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func keywordType(_ p: inout MutableSpan<actor?>, _ p2: actor) -> actor
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func keywordType(_ p: inout MutableSpan<actor?>, _ p2: actor) -> actor
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_lenName_param2: copy _lenName_param2)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func lenName(_ _lenName_param0: Int32, _ _lenName_param1: Int32, _ _lenName_param2: inout MutableSpan<Int32>?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func lenName(_ _lenName_param0: Int32, _ _lenName_param1: Int32, _ _lenName_param2: inout MutableSpan<Int32>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_ p: inout MutableSpan<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: inout MutableSpan<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullable(_ p: inout MutableSpan<Int32>?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: inout MutableSpan<Int32>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(func: copy func)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func open(func: inout MutableSpan<Int32>?, open where: Int32)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func open(func: inout MutableSpan<Int32>?, open where: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(_pointerName_param1: copy _pointerName_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func pointerName(_ _pointerName_param1: inout MutableSpan<Int32>?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func pointerName(_ _pointerName_param1: inout MutableSpan<Int32>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func returnLifetimeBound(_ len1: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnLifetimeBound(_ len1: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32>
@@ -106,17 +106,17 @@ import CountedByNoEscapeClang
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p1: copy p1)
 // CHECK-NEXT: @lifetime(p2: copy p2)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int32, _ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ p: inout MutableSpan<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_ p: inout MutableSpan<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_ p: inout MutableSpan<Int32>)
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @lifetime(p: copy p)
@@ -150,14 +150,14 @@ public func callNullable(_ p: inout MutableSpan<CInt>?) {
 @lifetime(p: copy p)
 @inlinable
 public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
-  let a: MutableSpan<CInt> = returnLifetimeBound(2, &p)
+  let _: MutableSpan<CInt> = returnLifetimeBound(2, &p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callReturnPointer() {
-  let a: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
-  let b: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
+  let _: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -165,7 +165,7 @@ public func callReturnPointer() {
 @lifetime(p2: copy p2)
 @inlinable
 public func callShared(_ p: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>) {
-  shared(CInt(p.count), &p, &p2)
+  shared(&p, &p2)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -207,7 +207,7 @@ public func callFunc(_ p: inout MutableSpan<CInt>?) {
 @lifetime(p: copy p)
 @inlinable
 public func callFuncRenameKeyword(_ p: inout MutableSpan<CInt>?) {
-  funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
+  let _ = funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
