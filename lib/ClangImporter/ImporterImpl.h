@@ -1061,8 +1061,9 @@ public:
 
   /// Retrieve the placeholder source file for use in parsing Swift attributes
   /// in the given module.
-  SourceFile &getClangSwiftAttrSourceFile(
-      ModuleDecl &module, StringRef attributeText, bool cached);
+  SourceFile &getClangSwiftAttrSourceFile(ModuleDecl &module,
+                                          SourceRange originalRange,
+                                          StringRef attributeText, bool cached);
 
   /// Create attribute with given text and attach it to decl, creating or
   /// retrieving a chached source file as needed.
