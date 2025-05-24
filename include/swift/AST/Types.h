@@ -5210,12 +5210,12 @@ public:
   /// Given an existing ExtInfo, and a set of interface parameters and results
   /// destined for a new SILFunctionType, return a new ExtInfo with only the
   /// lifetime dependencies relevant after substitution.
-  static ExtInfo
-  getSubstLifetimeDependencies(GenericSignature genericSig,
-                               ExtInfo origExtInfo,
-                               ArrayRef<SILParameterInfo> params,
-                               ArrayRef<SILYieldInfo> yields,
-                               ArrayRef<SILResultInfo> results);
+  static ExtInfo getSubstLifetimeDependencies(GenericSignature genericSig,
+                                              ExtInfo origExtInfo,
+                                              ASTContext &context,
+                                              ArrayRef<SILParameterInfo> params,
+                                              ArrayRef<SILYieldInfo> yields,
+                                              ArrayRef<SILResultInfo> results);
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.
