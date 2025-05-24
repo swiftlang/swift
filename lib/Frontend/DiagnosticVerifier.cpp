@@ -1289,15 +1289,17 @@ bool DiagnosticVerifier::finishProcessing() {
 
   SmallVector<unsigned, 4> additionalBufferIDs;
   for (auto path : AdditionalFilePaths) {
-    auto bufferID = SM.getIDForBufferIdentifier(path);
+    llvm::SmallString<261> buffer{path};
+    llvm::sys::path::make_preferred(buffer);
+    auto bufferID = SM.getIDForBufferIdentifier(buffer);
     if (!bufferID) {
       // Still need to scan this file for expectations.
-      auto result = SM.getFileSystem()->getBufferForFile(path);
+      auto result = SM.getFileSystem()->getBufferForFile(buffer);
       if (!result) {
         auto message = SM.GetMessage(
            SourceLoc(), llvm::SourceMgr::DiagKind::DK_Error,
            llvm::Twine("unable to open file in '-verify-additional-file ") +
-           path + "': " + result.getError().message(), {}, {});
+           buffer + "': " + result.getError().message(), {}, {});
         printDiagnostic(message);
         Result.HadError |= true;
         continue;
