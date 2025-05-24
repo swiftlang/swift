@@ -222,7 +222,7 @@ def TypedBinaryFunctions():
 // Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux)))
 %  end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -234,23 +234,6 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 
 % end
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-// Unary intrinsic functions
-// Note these have a corresponding LLVM intrinsic
-% for T, ufunc in TypedUnaryIntrinsicFunctions():
-%  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
-%  end
-@_transparent
-public func ${ufunc}(_ x: ${T}) -> ${T} {
-  return _${ufunc}(x)
-}
-%  if T == 'Float80':
-#endif
-%  end
-
-% end
-#else
 // FIXME: As of now, we cannot declare 64-bit (Double/CDouble) overlays here.
 // Since CoreFoundation also exports libc functions, they will conflict with
 // Swift overlays when building Foundation. For now, just like normal
@@ -258,7 +241,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 % for ufunc in UnaryIntrinsicFunctions:
 %  for T, CT, f in OverlayFloatTypes():
 %   if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux)))
 %   end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -269,13 +252,12 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 %   end
 %  end
 % end
-#endif
 
 // Binary functions
 
 % for T, CT, f, bfunc in TypedBinaryFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux)))
 %  end
 @_transparent
 public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
@@ -290,7 +272,7 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || os(OpenBSD) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || os(OpenBSD) || ($Embedded && !os(Linux)))
 %  else:
 //  lgamma not available on Windows, apparently?
 #if !os(Windows)
@@ -308,7 +290,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux)))
 %  end
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
@@ -324,7 +306,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 
 % for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS))))
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android) || ($Embedded && !os(Linux)))
 %  end
 @available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message:
            "use ${T}(nan: ${T}.RawSignificand).")
