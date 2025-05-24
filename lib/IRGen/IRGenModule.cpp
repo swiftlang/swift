@@ -1170,10 +1170,15 @@ llvm::Constant *swift::getRuntimeFn(
 
     if (IGM && useDllStorage(IGM->Triple) && IsExternal) {
       bool bIsImported = true;
+      swift::ASTContext &Context = IGM->Context;
       if (IGM->getSwiftModule()->getPublicModuleName(true).str() == ModuleName)
         bIsImported = false;
-      else if (ModuleDecl *MD = IGM->Context.getModuleByName(ModuleName))
+      else if (ModuleDecl *MD = Context.getModuleByName(ModuleName))
         bIsImported = !MD->isStaticLibrary();
+      else if (strcmp(ModuleName, "BlocksRuntime") == 0)
+        bIsImported =
+            !static_cast<ClangImporter *>(Context.getClangModuleLoader())
+                ->getCodeGenOpts().StaticClosure;
 
       if (bIsImported)
         fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);

@@ -78,8 +78,10 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
@@ -2749,14 +2751,17 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
     = IGF.getTypeInfoForLowered(blockTy).as<BlockStorageTypeInfo>();
 
   Address headerAddr = storageTL.projectBlockHeader(IGF, storage);
-  
+
   //
   // Initialize the "isa" pointer, which is _NSConcreteStackBlock.
   auto NSConcreteStackBlock =
       IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
                                              IGF.IGM.ObjCClassStructTy);
-  ApplyIRLinkage(IRLinkage::ExternalImport)
-      .to(cast<llvm::GlobalVariable>(NSConcreteStackBlock));
+  swift::ClangImporter *CI =
+      static_cast<ClangImporter *>(IGF.IGM.Context.getClangModuleLoader());
+  if (!CI->getCodeGenOpts().StaticClosure)
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(NSConcreteStackBlock));
 
   //
   // Set the flags.
