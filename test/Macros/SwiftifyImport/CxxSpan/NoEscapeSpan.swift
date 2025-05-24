@@ -25,26 +25,26 @@ func myFunc3(_ span: MutableSpanOfInt, _ secondSpan: SpanOfInt) {
 func myFunc4(_ span: MutableSpanOfInt, _ secondSpan: MutableSpanOfInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>, _ secondSpan: SpanOfInt) {
 // CHECK-NEXT:     return unsafe myFunc(SpanOfInt(span), secondSpan)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(span: copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(span: copy span) @_disfavoredOverload
 // CHECK-NEXT: func myFunc2(_ span: inout MutableSpan<CInt>, _ secondSpan: MutableSpanOfInt) {
 // CHECK-NEXT:     return unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
 // CHECK-NEXT:         return unsafe myFunc2(MutableSpanOfInt(_spanPtr), secondSpan)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(span: copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(span: copy span) @_disfavoredOverload
 // CHECK-NEXT: func myFunc3(_ span: inout MutableSpan<CInt>, _ secondSpan: Span<CInt>) {
 // CHECK-NEXT:     return unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
 // CHECK-NEXT:         return unsafe myFunc3(MutableSpanOfInt(_spanPtr), SpanOfInt(secondSpan))
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(span: copy span) @lifetime(secondSpan: copy secondSpan)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(span: copy span) @lifetime(secondSpan: copy secondSpan) @_disfavoredOverload
 // CHECK-NEXT: func myFunc4(_ span: inout MutableSpan<CInt>, _ secondSpan: inout MutableSpan<CInt>) {
 // CHECK-NEXT:     return unsafe secondSpan.withUnsafeMutableBufferPointer { _secondSpanPtr in
 // CHECK-NEXT:         return unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
