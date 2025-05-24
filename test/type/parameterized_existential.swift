@@ -82,16 +82,6 @@ func typeExpr() {
   _ = (any Sequence<Int>).self
 }
 
-/// Not supported as a protocol composition term for now
-
-protocol SomeProto {}
-
-func protocolCompositionNotSupported1(_: SomeProto & Sequence<Int>) {}
-// expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
-
-func protocolCompositionNotSupported2(_: any SomeProto & Sequence<Int>) {}
-// expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
-
 func increment(_ n : any Collection<Float>) {
   for value in n {
       _ = value + 1
