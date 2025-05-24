@@ -5,7 +5,6 @@
 
 # Swift Programming Language
 
-
 | | **Architecture** | **Build** |
 |---|:---:|:---:|
 | **macOS**        | Universal |[![Build Status](https://ci.swift.org/job/oss-swift-package-macos/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-macos)|
