@@ -758,10 +758,11 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+
 
 _ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
 _ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
