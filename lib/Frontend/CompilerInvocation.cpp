@@ -312,7 +312,8 @@ updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
   if (LangOpts.Target.isOSDarwin()) {
     if (!SearchPathOpts.SkipSDKImportPaths &&
         !SearchPathOpts.getSDKPath().empty()) {
-      StringRef SDKPath = SearchPathOpts.getSDKPath();
+      SmallString<128> SDKPath(SearchPathOpts.getSDKPath());
+
       SmallString<128> systemFrameworksScratch(SDKPath);
       llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
                               "Frameworks");
@@ -321,6 +322,7 @@ updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
                               "SubFrameworks");
       SmallString<128> frameworksScratch(SDKPath);
       llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
+
       ImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
                                       systemSubFrameworksScratch.str().str(),
                                       frameworksScratch.str().str()};
