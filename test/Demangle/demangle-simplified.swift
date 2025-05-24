@@ -6,5 +6,5 @@ RUN: sed -ne '/--->/s/ *--->.*$//p' < %S/Inputs/simplified-manglings.txt > %t.in
 %t.check: "A ---> B" ==> "B"
 RUN: sed -ne '/--->/s/^.*---> *//p' < %S/Inputs/simplified-manglings.txt > %t.check
 
-RUN: swift-demangle -simplified < %t.input > %t.output
+RUN: swift-demangle -simplified -no-colors < %t.input > %t.output
 RUN: diff %t.check %t.output
