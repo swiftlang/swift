@@ -132,6 +132,13 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     Int(ctx.langOptsTargetPointerBitWidth)
   }
 
+  func isActiveTargetObjectFileFormat(name: String) throws -> Bool {
+    var name = name
+    return name.withBridgedString { nameRef in
+      ctx.langOptsIsActiveTargetObjectFileFormat(nameRef)
+    }
+  }
+
   var targetAtomicBitWidths: [Int] {
     var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetTargetAtomicBitWidths(&bitWidthsBuf)
