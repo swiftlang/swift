@@ -4553,7 +4553,8 @@ private:
     if (classification.hasUnsafe()) {
       // If there is no such effect, complain.
       if (S->getUnsafeLoc().isInvalid() &&
-          Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+          Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                                  /*allowMigration=*/true)) {
         auto insertionLoc = S->getPattern()->getStartLoc();
         Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
           .fixItInsert(insertionLoc, "unsafe ");
@@ -4880,7 +4881,7 @@ private:
 
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
-    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
+    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
       return;
 
     const auto &[loc, insertText] = getFixItForUncoveredSite(anchor, "unsafe");
