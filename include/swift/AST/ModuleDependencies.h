@@ -1097,13 +1097,8 @@ public:
     return SwiftDependencyTracker(CAS, Mapper.get(), CI);
   }
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {
-    if (CAS)
-      return llvm::cas::createCASProvidingFileSystem(
-          CAS, llvm::vfs::createPhysicalFileSystem());
-
-    return llvm::vfs::createPhysicalFileSystem();
-  }
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  getClangScanningFS(ASTContext &ctx) const;
 
   bool hasPathMapping() const {
     return Mapper && !Mapper->getMappings().empty();

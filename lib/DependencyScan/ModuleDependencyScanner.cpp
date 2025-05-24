@@ -31,6 +31,7 @@
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -267,7 +268,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
     : clangScanningTool(*globalScanningService.ClangScanningService,
-                        globalScanningService.getClangScanningFS()) {
+                        globalScanningService.getClangScanningFS(ScanASTContext)) {
   // Create a scanner-specific Invocation and ASTContext.
   workerCompilerInvocation =
       std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
