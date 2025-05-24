@@ -595,14 +595,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
        {}, buildCommands, {}, {}, {});
 
-  if (ScanASTContext.CASOpts.EnableCaching) {
-    std::vector<std::string> clangDependencyFiles;
-    clangImporter->addClangInvovcationDependencies(clangDependencyFiles);
-    llvm::for_each(clangDependencyFiles, [&](std::string &file) {
-      mainDependencies.addAuxiliaryFile(file);
-    });
-  }
-
   llvm::StringSet<> alreadyAddedModules;
   // Compute Implicit dependencies of the main module
   {

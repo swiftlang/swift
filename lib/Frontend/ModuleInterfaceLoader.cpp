@@ -1815,13 +1815,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
         casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
         [&](StringRef Arg) { GenericArgs.push_back(ArgSaver.save(Arg)); });
-    // ClangIncludeTree is default on when caching is enabled.
-    genericSubInvocation.getClangImporterOptions().UseClangIncludeTree = true;
-  }
-
-  if (!clangImporterOpts.UseClangIncludeTree) {
-    genericSubInvocation.getClangImporterOptions().UseClangIncludeTree = false;
-    GenericArgs.push_back("-no-clang-include-tree");
   }
 }
 
@@ -2521,8 +2514,7 @@ struct ExplicitCASModuleLoader::Implementation {
     };
     for (auto &entry : ExplicitClangModuleMap) {
       const auto &moduleMapPath = entry.getValue().moduleMapPath;
-      if (!moduleMapPath.empty() &&
-          !Ctx.ClangImporterOpts.UseClangIncludeTree &&
+      if (!moduleMapPath.empty() && !Ctx.CASOpts.EnableCaching &&
           moduleMapsSeen.find(moduleMapPath) == moduleMapsSeen.end()) {
         moduleMapsSeen.insert(moduleMapPath);
         extraClangArgs.push_back(

@@ -25,7 +25,6 @@
 #include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -602,13 +601,16 @@ swift::dependencies::registerBackDeployLibraries(
 }
 
 SwiftDependencyTracker::SwiftDependencyTracker(
-    llvm::cas::CachingOnDiskFileSystem &FS, llvm::PrefixMapper *Mapper,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
     const CompilerInvocation &CI)
-    : FS(FS.createProxyFS()), Mapper(Mapper) {
+    : CAS(CAS), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
 
+  FS = llvm::cas::createCASProvidingFileSystem(
+      CAS, llvm::vfs::createPhysicalFileSystem());
+
   auto addCommonFile = [&](StringRef path) {
-    auto file = FS.openFileForRead(path);
+    auto file = FS->openFileForRead(path);
     if (!file)
       return;
     auto status = (*file)->status();
@@ -679,7 +681,7 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   llvm::SmallVector<clang::cas::IncludeTree::FileList::FileEntry> Files;
   for (auto &file : TrackedFiles) {
     auto includeTreeFile = clang::cas::IncludeTree::File::create(
-        FS->getCAS(), file.first, file.second.FileRef);
+        *CAS, file.first, file.second.FileRef);
     if (!includeTreeFile) {
       return llvm::createStringError("CASFS createTree failed for " +
                                      file.first + ": " +
@@ -691,7 +693,7 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   }
 
   auto includeTreeList =
-      clang::cas::IncludeTree::FileList::create(FS->getCAS(), Files, {});
+      clang::cas::IncludeTree::FileList::create(*CAS, Files, {});
   if (!includeTreeList)
     return llvm::createStringError("casfs include-tree filelist error: " +
                                    toString(includeTreeList.takeError()));
@@ -719,14 +721,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CAS = Instance.getSharedCASInstance();
   ActionCache = Instance.getSharedCacheInstance();
 
-  auto CachingFS =
-      llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
-  if (!CachingFS) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_fs_creation,
-                                 toString(CachingFS.takeError()));
-    return true;
-  }
-  CacheFS = std::move(*CachingFS);
+  CacheFS = llvm::cas::createCASProvidingFileSystem(
+      CAS, llvm::vfs::createPhysicalFileSystem());
 
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
@@ -744,19 +740,14 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     Mapper->sort();
   }
 
-  UseClangIncludeTree =
-      Instance.getInvocation().getClangImporterOptions().UseClangIncludeTree;
   const clang::tooling::dependencies::ScanningOutputFormat ClangScanningFormat =
-      UseClangIncludeTree
-          ? clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree
-          : clang::tooling::dependencies::ScanningOutputFormat::FullTree;
+      clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree;
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      ClangScanningFormat,
-      Instance.getInvocation().getCASOptions().CASOpts,
+      ClangScanningFormat, Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS,
+      /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
       // consistent with the non-CAS case.
