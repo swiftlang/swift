@@ -19,8 +19,8 @@ class C3 { }
 extension C3: Sendable { }
 
 struct S1: Sendable {
-  let c1: C1 // expected-warning{{stored property 'c1' of 'Sendable'-conforming struct 'S1' has non-sendable type 'C1'}}
-  let c2: C2 // expected-warning{{stored property 'c2' of 'Sendable'-conforming struct 'S1' has non-sendable type 'C2'}}
+  let c1: C1 // expected-warning{{stored property 'c1' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'C1'}}
+  let c2: C2 // expected-warning{{stored property 'c2' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'C2'}}
   let c3: C3 // expected-warning{{stored property 'c3'}}
 }
 
@@ -42,22 +42,22 @@ func passSendable(
 ) async {
   // Don't warn about implicitly non-Sendable types when minimal is
   // enabled... but do when we are doing targeted
-  takeSendable { print(c1) } // expected-targeted-warning {{capture of 'c1' with non-sendable type 'C1' in a '@Sendable' closure}}
-  takeSendable { print(fn) } // expected-targeted-warning {{capture of 'fn' with non-sendable type '() -> Void' in a '@Sendable' closure}}
+  takeSendable { print(c1) } // expected-targeted-warning {{capture of 'c1' with non-Sendable type 'C1' in a '@Sendable' closure}}
+  takeSendable { print(fn) } // expected-targeted-warning {{capture of 'fn' with non-Sendable type '() -> Void' in a '@Sendable' closure}}
   // expected-targeted-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   // Warn about explicitly non-Sendable types
-  takeSendable { print(c2) } // expected-warning {{capture of 'c2' with non-sendable type 'C2' in a '@Sendable' closure}}
-  takeSendable { print(c3) } // expected-warning {{capture of 'c3' with non-sendable type 'C3' in a '@Sendable' closure}}
+  takeSendable { print(c2) } // expected-warning {{capture of 'c2' with non-Sendable type 'C2' in a '@Sendable' closure}}
+  takeSendable { print(c3) } // expected-warning {{capture of 'c3' with non-Sendable type 'C3' in a '@Sendable' closure}}
 
   // Don't warn about explicitly Sendable type, even when it's wrong.
   takeSendable { print(s1) }
 
   // Don't warn when we wrapped an implicitly non-Sendable type in a struct unless we are >= targeted
-  takeSendable { print(s2) } // expected-targeted-warning {{capture of 's2' with non-sendable type 'S2' in a '@Sendable' closure}}
+  takeSendable { print(s2) } // expected-targeted-warning {{capture of 's2' with non-Sendable type 'S2' in a '@Sendable' closure}}
 
   // FIXME: Ideally, we would warn about cases where a type in this module is
   // inferred to be non-Sendable based on something explicitly non-Sendable,
   // like in the case below. We do warn about it with >= targeted.
-  takeSendable { print(s3) } // expected-targeted-warning {{capture of 's3' with non-sendable type 'S3' in a '@Sendable' closure}}
+  takeSendable { print(s3) } // expected-targeted-warning {{capture of 's3' with non-Sendable type 'S3' in a '@Sendable' closure}}
 }

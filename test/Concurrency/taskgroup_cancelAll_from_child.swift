@@ -17,14 +17,14 @@ func test_taskGroup_cancelAll() async {
        }
 
        group.spawn { // expected-error {{escaping closure captures 'inout' parameter 'group'}}
-         group.cancelAll() //expected-warning{{capture of 'group' with non-sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
+         group.cancelAll() //expected-warning{{capture of 'group' with non-Sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
          //expected-warning@-1{{mutable capture of 'inout' parameter 'group' is not allowed in concurrently-executing code; this is an error in the Swift 6 language mode}}
          // expected-note@-2 {{captured here}}
 
          return 0
        }
        group.spawn { [group] in
-         group.cancelAll() //expected-warning{{capture of 'group' with non-sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
+         group.cancelAll() //expected-warning{{capture of 'group' with non-Sendable type 'TaskGroup<Int>' in a '@Sendable' closure}}
          return 0
        }
        _ = await group.next()

@@ -5,7 +5,7 @@
 
 /*
  This file tests the experimental TransferNonSendable feature. This feature causes the passing
- of non-sendable values to isolation-crossing calls to not yield diagnostics during AST passes,
+ of non-Sendable values to isolation-crossing calls to not yield diagnostics during AST passes,
  but to instead emit them later during a mandatory SIL pass. This file in particular checks that
  isolation crossing via argument passing is deferred, but that isolation crossing via returned
  results is not deferred. This is done because flow-sensitive "region" checking
@@ -46,7 +46,7 @@ actor A {
         // Non-sendable value passed from nonisolated to actor isolated
 
         await takesNS(ns)
-        //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' outside of actor-isolated context may introduce data races}}
+        //deferred-warning@-1{{passing argument of non-Sendable type 'NonSendable' outside of actor-isolated context may introduce data races}}
 
         _ = await retsNS()
     }
@@ -55,7 +55,7 @@ actor A {
         // Non-sendable value passed between the isolation of two different actors
 
         await a.actorTakesNS(ns)
-        //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
+        //deferred-warning@-1{{passing argument of non-Sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
         _ = await a.actorRetsNS()
     }
