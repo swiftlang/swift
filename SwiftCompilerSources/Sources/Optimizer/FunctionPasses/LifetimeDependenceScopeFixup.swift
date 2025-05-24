@@ -329,7 +329,7 @@ private struct ScopeExtension {
 // violation, and that subsequent optimizations do not shrink the inner access `%a1`.
 extension ScopeExtension {
   mutating func extendScopes(dependence: LifetimeDependence) -> Bool {
-    log("Scope fixup for lifetime dependent instructions: \(dependence)")
+    log("Scope fixup for lifetime dependent instructions:\n\(dependence)")
 
     gatherExtensions(dependence: dependence)
 
@@ -1012,8 +1012,10 @@ private extension BeginApplyInst {
 ///
 /// Set 'dependsOnCaller' if a use escapes the function.
 private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
-  let function: Function
   let context: Context
+  let function: Function
+  let destructorAnalysis: DestructorAnalysis
+
   let visitor: (Operand) -> WalkResult
   let localReachabilityCache: LocalVariableReachabilityCache
   var visitedValues: ValueSet
@@ -1021,10 +1023,11 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   /// Set to true if the dependence is returned from the current function.
   var dependsOnCaller = false
 
-  init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: Context,
+  init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: FunctionPassContext,
        visitor: @escaping (Operand) -> WalkResult) {
-    self.function = function
     self.context = context
+    self.function = function
+    self.destructorAnalysis = context.destructorAnalysis
     self.visitor = visitor
     self.localReachabilityCache = localReachabilityCache
     self.visitedValues = ValueSet(context)
