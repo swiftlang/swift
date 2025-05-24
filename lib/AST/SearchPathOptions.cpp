@@ -58,14 +58,10 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
                                 Entry.value().IsSystem, Entry.index());
   }
 
-  // Apple platforms have extra implicit framework search paths:
-  // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  if (IsOSDarwin) {
-    for (auto Entry : llvm::enumerate(Opts->getDarwinImplicitFrameworkSearchPaths())) {
-      addFilesInPathToLookupTable(FS, Entry.value(),
-                                  ModuleSearchPathKind::DarwinImplicitFramework,
-                                  /*isSystem=*/true, Entry.index());
-    }
+  for (auto Entry : llvm::enumerate(Opts->getImplicitFrameworkSearchPaths())) {
+    addFilesInPathToLookupTable(FS, Entry.value(),
+                                ModuleSearchPathKind::ImplicitFramework,
+                                /*isSystem=*/true, Entry.index());
   }
 
   for (auto Entry : llvm::enumerate(Opts->getRuntimeLibraryImportPaths())) {
@@ -123,12 +119,9 @@ void SearchPathOptions::dump(bool isDarwin) const {
                  << Entry.value().Path << "\n";
   }
 
-  if (isDarwin) {
-    llvm::errs() << "Darwin implicit framework search paths:\n";
-    for (auto Entry :
-         llvm::enumerate(getDarwinImplicitFrameworkSearchPaths())) {
-      llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
-    }
+  llvm::errs() << "Implicit framework search paths:\n";
+  for (auto Entry : llvm::enumerate(getImplicitFrameworkSearchPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
   }
 
   llvm::errs() << "Runtime library import search paths:\n";

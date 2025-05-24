@@ -2198,12 +2198,6 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
   return value.first;
 }
 
-std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
-const {
-  assert(LangOpts.Target.isOSDarwin());
-  return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
-}
-
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
   PrettyStackTraceDecl stackTrace("loading extensions for", nominal);
