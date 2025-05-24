@@ -6,10 +6,13 @@
    <FileRef location = "group:../../../../sourcekit-lsp"></FileRef>
    <FileRef location = "group:../../../../swift-argument-parser"></FileRef>
    <FileRef location = "group:../../../../swift-collections"></FileRef>
+   <FileRef location = "group:../../../../swift-corelibs-foundation"></FileRef>
    <FileRef location = "group:../../../../swift-crypto"></FileRef>
    <FileRef location = "group:../../../../swift-docc"></FileRef>
    <FileRef location = "group:../../../../swift-driver"></FileRef>
    <FileRef location = "group:../../../../swift-format"></FileRef>
+   <FileRef location = "group:../../../../swift-foundation"></FileRef>
+   <FileRef location = "group:../../../../swift-foundation-icu"></FileRef>
    <FileRef location = "group:../../../../swift-stress-tester/SourceKitStressTester"></FileRef>
    <FileRef location = "group:../../../../swift-syntax"></FileRef>
    <FileRef location = "group:../../../../swift-syntax/CodeGeneration"></FileRef>
