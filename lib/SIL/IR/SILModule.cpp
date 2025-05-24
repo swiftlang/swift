@@ -501,6 +501,33 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *gv) {
   getSILGlobalList().erase(gv);
 }
 
+void SILModule::eraseDifferentiabilityWittness(SILDifferentiabilityWitness *dw) {
+  getSILLoader()->invalidateDifferentiabilityWitness(dw);
+
+  Mangle::ASTMangler mangler(getASTContext());
+  auto *originalFunction = dw->getOriginalFunction();
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+    originalFunction->getName(), dw->getKind(), dw->getConfig());
+  DifferentiabilityWitnessMap.erase(mangledKey);
+  llvm::erase(DifferentiabilityWitnessesByFunction[originalFunction->getName()], dw);
+
+  getDifferentiabilityWitnessList().erase(dw);
+}
+
+void SILModule::eraseAllDifferentiabilityWittnesses(SILFunction *f) {
+  Mangle::ASTMangler mangler(getASTContext());
+
+  for (auto *dw : DifferentiabilityWitnessesByFunction.at(f->getName())) {
+    getSILLoader()->invalidateDifferentiabilityWitness(dw);
+    auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      f->getName(), dw->getKind(), dw->getConfig());
+    DifferentiabilityWitnessMap.erase(mangledKey);
+    getDifferentiabilityWitnessList().erase(dw);
+  }
+
+  DifferentiabilityWitnessesByFunction.erase(f->getName());
+}
+
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
                                    bool deserializeLazily) {
   if (!C)
