@@ -6,6 +6,13 @@ import StdlibUnittest
 
 var InheritedMemberTestSuite = TestSuite("Test if inherited lookup works")
 
+struct HasOne {
+  let one: One
+  let iOne: IOne
+  let iiOne: IIOne
+  let iiiOne: IIIOne
+}
+
 InheritedMemberTestSuite.test("Regular methods resolve to base classes") {
   // No inheritance (sanity check)
   let one = One()

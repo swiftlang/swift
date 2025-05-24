@@ -6311,7 +6311,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
          cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
       auto namedMember = dyn_cast<ValueDecl>(member);
       if (!namedMember || !namedMember->hasName() ||
-          namedMember->getName().getBaseName() != name)
+          namedMember->getName().getBaseName() != name ||
+          clangModuleLoader->isClonedBaseMemberDecl(namedMember))
         continue;
 
       auto *imported = clangModuleLoader->importBaseMemberDecl(
@@ -7661,12 +7662,26 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
   auto known = clonedBaseMembers.find(key);
+
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
     known = clonedBaseMembers.insert({key, cloned}).first;
   }
 
   return known->second;
+}
+
+bool ClangImporter::Implementation::isClonedBaseMemberDecl(ValueDecl *decl) {
+
+  // If this is a cloned decl, we don't want to reclone it
+  if (!decl->hasClangNode()) {
+    for (auto &CBM : clonedBaseMembers) {
+      if (decl == CBM.second)
+        return true;
+    }
+  }
+
+  return false;
 }
 
 size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
@@ -7683,6 +7698,10 @@ ValueDecl *
 ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                     ClangInheritanceInfo inheritance) {
   return Impl.importBaseMemberDecl(decl, newContext, inheritance);
+}
+
+bool ClangImporter::isClonedBaseMemberDecl(ValueDecl *decl) {
+  return Impl.isClonedBaseMemberDecl(decl);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
