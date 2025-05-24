@@ -905,7 +905,7 @@ public:
   }
 };
 
-static void
+static bool
 diagnoseMissingImportsForMember(const ValueDecl *decl,
                                 SmallVectorImpl<ModuleDecl *> &modulesToImport,
                                 SourceFile *sf, SourceLoc loc) {
@@ -913,14 +913,23 @@ diagnoseMissingImportsForMember(const ValueDecl *decl,
   auto count = modulesToImport.size();
   ASSERT(count > 0);
 
+  bool isMigrating =
+      ctx.LangOpts.getFeatureState(Feature::MemberImportVisibility)
+          .isEnabledForMigration();
+
   if (count > 1) {
-    ctx.Diags.diagnose(loc, diag::candidate_from_missing_imports_2_or_more,
-                       decl, bool(count > 2), modulesToImport[0],
-                       modulesToImport[1]);
+    ctx.Diags
+        .diagnose(loc, diag::member_from_missing_imports_2_or_more, decl,
+                  bool(count > 2), modulesToImport[0], modulesToImport[1])
+        .limitBehaviorIf(isMigrating, DiagnosticBehavior::Warning);
   } else {
-    ctx.Diags.diagnose(loc, diag::candidate_from_missing_import, decl,
-                       modulesToImport.front());
+    ctx.Diags
+        .diagnose(loc, diag::member_from_missing_import, decl,
+                  modulesToImport.front())
+        .limitBehaviorIf(isMigrating, DiagnosticBehavior::Warning);
   }
+
+  return !isMigrating;
 }
 
 static void emitMissingImportFixIt(SourceLoc loc,
@@ -1024,8 +1033,7 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
     if (modulesToImport.empty())
       return false;
 
-    diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc);
-    return true;
+    return diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc);
   }
 
   sf->addDelayedMissingImportForMemberDiagnostic(decl, loc);
