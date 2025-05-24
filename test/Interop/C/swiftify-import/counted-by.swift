@@ -12,58 +12,58 @@ import CountedByClang
 
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func bitshift(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bitshift(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func bitwise(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bitwise(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func constFloatCastedToInt(_ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func constFloatCastedToInt(_ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func constInt(_ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func constInt(_ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullable(_  p: UnsafeMutableBufferPointer<Int{{.*}}>?)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_  p: UnsafeMutableBufferPointer<Int{{.*}}>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func offByOne(_ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func offByOne(_ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func offBySome(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func offBySome(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_  len: Int{{.*}}) -> UnsafeMutableBufferPointer<Int{{.*}}>
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func scalar(_ m: Int32, _ n: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func scalar(_ m: Int32, _ n: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableBufferPointer<Int{{.*}}>, _ p2: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableBufferPointer<Int{{.*}}>, _ p2: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simple(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func simpleFlipped(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simpleFlipped(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func sizeofParam(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func sizeofType(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func sizeofType(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 @inlinable
 public func callComplexExpr(_ p: UnsafeMutableBufferPointer<CInt>) {
@@ -114,6 +114,18 @@ public func callShared(_ p: UnsafeMutableBufferPointer<CInt>, _ p2: UnsafeMutabl
 @inlinable
 public func callSimple(_ p: UnsafeMutableBufferPointer<CInt>) {
   simple(p)
+}
+
+@inlinable
+public func callSimpleIndirectOriginal(_ p: UnsafeMutablePointer<CInt>) {
+  let f = simple
+  f(13, p)
+}
+
+@inlinable
+public func callSimpleIndirectOverload(_ p: UnsafeMutableBufferPointer<CInt>) {
+  let f: (UnsafeMutableBufferPointer<CInt>) -> Void = simple
+  f(p)
 }
 
 @inlinable
