@@ -1755,8 +1755,7 @@ public:
     //   guard let self = self else { return }
     //   method() // <- implicit self is not allowed
     //
-    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
-                                        /*requireLoadExpr*/ true);
+    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
   }
 
   static bool
@@ -4002,11 +4001,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
-    
-    // If this variable has WeakStorageType, then it can be mutated in ways we
-    // don't know.
-    if (var->getInterfaceType()->is<WeakStorageType>())
-      access |= RK_Written;
     
     // Diagnose variables that were never used (other than their
     // initialization).

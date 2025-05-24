@@ -87,8 +87,10 @@ var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warni
 
 class SomeClass {}
 
-// <rdar://problem/16877304> weak let's should be rejected
-weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
+weak let V = SomeClass() // ok since SE-0481
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
+// expected-note@-2 {{'V' declared here}}
+// expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
 
 let a = b ; let b = a
 // expected-error@-1 {{circular reference}}
