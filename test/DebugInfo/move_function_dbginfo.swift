@@ -237,6 +237,12 @@ public func copyableVarArgTest(_ k: inout Klass) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 //
 // DWARF: DW_TAG_variable
+// DWARF: DW_AT_location    
+// DWARF: DW_AT_name    ("$WT\317\204_0_0$$$s3out1P_pD")
+// DWARF: DW_AT_type    (
+// DWARF: DW_AT_artificial  (true)
+//
+// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // DWARF-NEXT: DW_AT_name      ("k")
@@ -668,3 +674,4 @@ public func addressOnlyVarArgTestCCFlowReinitInBlockTest<T : P>(_ k: inout (any 
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_COPYABLE_LET_CCFLOW_METADATA]] = !DILocalVariable(name: "k",
+
