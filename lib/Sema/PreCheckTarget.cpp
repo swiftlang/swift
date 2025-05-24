@@ -558,8 +558,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       }
     }
 
-    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
-    LookupName = DeclNameRef(lookupName);
+    LookupName = Name.withArgumentLabels(context, lookupLabels);
   }
 
   // Perform standard value name lookup.
@@ -576,8 +575,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
-    ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               LookupName.getFullName(), Loc,
+    ASTScope::lookupLocalDecls(DC->getParentSourceFile(), LookupName, Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -635,6 +633,52 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         diagnoseOperatorJuxtaposition(UDRE, DC) ||
         diagnoseNonexistentPowerOperator(Context.Diags, UDRE, DC)) {
       return errorResult();
+    }
+
+    // Is there an incorrect module selector?
+    if (Name.hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(LookupName.getFullName());
+      auto anyModuleResults = TypeChecker::lookupUnqualified(DC, anyModuleName,
+                                                             Loc,
+                                                             lookupOptions);
+      if (!anyModuleResults.empty()) {
+        Context.Diags.diagnose(UDRE->getNameLoc(), diag::decl_not_in_module,
+                               LookupName.getFullName(),
+                               LookupName.getModuleSelector());
+
+        SourceLoc moduleSelectorLoc = UDRE->getNameLoc().getModuleSelectorLoc();
+
+        for (auto result : anyModuleResults) {
+          ValueDecl * decl = result.getValueDecl();
+          Identifier moduleName = decl->getModuleContext()->getName();
+
+          if (moduleName != Name.getModuleSelector()) {
+            SmallString<64> replacement;
+            if (decl->isInstanceMember())
+              replacement += "self.";
+            replacement += moduleName.str();
+
+            Context.Diags.diagnose(moduleSelectorLoc,
+                                   diag::note_change_module_selector,
+                                   moduleName)
+                .fixItReplace(moduleSelectorLoc, replacement);
+          } else {
+            // It's just something we need to pick up contextually.
+            if (decl->getDeclContext()->getLocalContext())
+              decl->diagnose(diag::note_remove_module_selector)
+                  .fixItRemoveChars(moduleSelectorLoc,
+                                    UDRE->getNameLoc().getBaseNameLoc());
+
+            if (decl->isInstanceMember())
+              Context.Diags.diagnose(moduleSelectorLoc,
+                  diag::note_add_explicit_self_with_module_selector)
+                  .fixItInsert(moduleSelectorLoc, "self.");
+          }
+        }
+
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return new (Context) ErrorExpr(UDRE->getSourceRange());
+      }
     }
 
     // Try ignoring access control.
@@ -2080,8 +2124,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                     Ctx.Id_self, Loc);
+  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(
+                                   DC->getParentSourceFile(),
+                                   DeclNameRef::createSelf(Ctx), Loc);
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.

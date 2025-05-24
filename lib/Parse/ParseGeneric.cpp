@@ -76,6 +76,8 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       LetLoc = consumeToken();
     }
 
+    parseModuleSelector(ModuleSelectorReason::GenericParamDecl);
+
     // Parse the name of the parameter.
     Identifier Name;
     SourceLoc NameLoc;

@@ -487,9 +487,8 @@ public:
   /// \returns the value returned by \c f
   /// \note When calling, you may need to specify the \c Val type
   ///       explicitly as a type parameter.
-  template <typename Val>
-  Val lookahead(unsigned char K,
-                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+  template <typename Fn>
+  decltype(auto) lookahead(unsigned char K, Fn f) {
     CancellableBacktrackingScope backtrackScope(*this);
 
     for (unsigned char i = 0; i < K; ++i)
@@ -763,6 +762,17 @@ public:
   SourceLoc
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
                                          size_t Len = 1);
+
+  /// If the next token is \c tok::colon, consume it; if the next token is
+  /// \c tok::colon_colon, split it into two \c tok::colons and consume the
+  /// first; otherwise, do nothing and return false.
+  bool consumeIfColonSplittingDoubles() {
+    if (!Tok.isAny(tok::colon, tok::colon_colon))
+      return false;
+
+    consumeStartingCharacterOfCurrentToken(tok::colon);
+    return true;
+  }
 
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
@@ -1055,7 +1065,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityRange *SILAvailability,
+      DeclNameLoc &targetFunctionLoc, AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
@@ -1796,6 +1806,89 @@ public:
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
                                   bool isAttr = false);
 
+  /// The reason we are trying to parse a module selector. Other than
+  /// \c Allowed and \c InvalidOnly, all reasons indicate an error should be
+  /// emitted.
+  enum class ModuleSelectorReason : uint8_t {
+    /// Use of a module selector is allowed.
+    Allowed,
+
+    /// Only parse (and diagnose) invalid module selectors here; if the module
+    /// selector is valid, return \c None and leave it for later.
+    InvalidOnly,
+
+    /// Not allowed; this is the name of a declaration. The string parameter
+    /// describes the declaration in question (e.g. a class, struct, etc.).
+    ///
+    /// If a Decl subclass also cannot have its name prefixed at its use sites
+    /// (like ParamDecls), it will have a separate reason from this one.
+    NameInDecl,
+
+    /// Not allowed; this the name of a variable being captured. Has a special
+    /// fix-it transforming `Mod::foo` into `foo = Mod::foo`.
+    Capture,
+
+    /// Not allowed; this is the name of a parameter being declared.
+    ParamDecl,
+
+    /// Not allowed; this is the name of a generic parameter being declared.
+    GenericParamDecl,
+
+    /// Not allowed; this is an argument label at either a declaration or
+    /// use site.
+    ArgumentLabel,
+
+    /// Not allowed; this is the name of an SPI group for the @_spi attribute.
+    SPIGroup,
+
+    /// Not allowed; this is an Objective-C selector or class name, so it will
+    /// be used at runtime where the module selector would have no effect.
+    ObjCName,
+
+    /// Not allowed; this is the name of a sibling to the current declaration
+    /// and has some kind of special contextual lookup.
+    ///
+    /// It may be possible to support module selectors on these in the future,
+    /// but at the moment these are all compiler-internal attributes and it
+    /// doesn't seem worth the effort.
+    SiblingDeclName,
+
+    /// Not allowed; this is the name of a precedence group, either at its
+    /// declaration site (where it makes no sense to use a module selector) or
+    /// at a use site (where it might make sense, but is not currently
+    /// implemented).
+    PrecedenceGroup,
+
+    /// Not allowed; this is a specially-handled keyword or identifier in an
+    /// attribute's argument list.
+    AttrParameter,
+  };
+
+  /// Attempts to parse a \c module-selector if one is present.
+  ///
+  /// \verbatim
+  ///   module-selector: identifier '::'
+  /// \endverbatim
+  ///
+  /// At most use sites, this is actually called to parse a module selector
+  /// which should \em not be present in the source code, but which users might
+  /// plausibly write incorrectly. The \p reason argument indicates what the
+  /// name that is about to be parsed is, and therefore why there should not be
+  /// a module selector there.
+  ///
+  /// \param reason If not \c Allowed, gives a reason why a \c module-selector
+  ///        should not be present in the source here.
+  /// \param declKindName For \c ModuleSelectorReason::NameInDecl, the kind of
+  ///        declaration whose name we are parsing. Otherwise unused.
+  ///
+  /// \return \c None if no selector is present or a selector is present but
+  ///         is not allowed; an instance with an empty \c Identifier if a
+  ///         selector is present but has no valid identifier; an instance with
+  ///         a valid \c Identifier if a selector is present and includes a
+  ///         module name.
+  std::optional<Located<Identifier>>
+  parseModuleSelector(ModuleSelectorReason reason, StringRef declKindName = "");
+
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
     AllowOperators = 1 << 0,
@@ -1819,6 +1912,9 @@ public:
     /// cases this doesn't actually make sense but we need to accept them for
     /// backwards compatibility.
     AllowLowercaseAndUppercaseSelf = 1 << 6,
+
+    /// If passed, `$0` etc. are allowed.
+    AllowAnonymousParamNames = 1 << 7,
   };
   using DeclNameOptions = OptionSet<DeclNameFlag>;
 
@@ -1826,6 +1922,9 @@ public:
     return DeclNameOptions(flag1) | flag2;
   }
 
+  /// Parse a declaration name that results in a `DeclNameRef` in the syntax
+  /// tree.
+  /// 
   /// Without \c DeclNameFlag::AllowCompoundNames, parse an
   /// unqualified-decl-base-name.
   ///
@@ -1836,8 +1935,9 @@ public:
   ///   unqualified-decl-name:
   ///     unqualified-decl-base-name
   ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
-  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, DiagRef diag,
-                               DeclNameOptions flags);
+  DeclNameRef parseDeclNameRef(
+       DeclNameLoc &loc, DiagRef diag, DeclNameOptions flags,
+       ModuleSelectorReason modSelReason = ModuleSelectorReason::Allowed);
 
   /// Parse macro expansion.
   ///
