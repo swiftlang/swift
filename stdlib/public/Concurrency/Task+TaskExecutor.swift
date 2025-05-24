@@ -202,10 +202,10 @@ extension Task where Failure == Never {
   ///
   /// Use this function when creating asynchronous work
   /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
+  /// Like `Task.detached(name:priority:operation:)`,
   /// this function creates a separate, top-level task.
-  /// Unlike `Task.detached(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
+  /// Unlike `Task.detached(name:priority:operation:)`,
+  /// the task created by `Task.init(name:priority:operation:)`
   /// inherits the priority and actor context of the caller,
   /// so the operation is treated more like an asynchronous extension
   /// to the synchronous operation.
@@ -226,34 +226,60 @@ extension Task where Failure == Never {
   /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
   @discardableResult
   @_alwaysEmitIntoClient
-  public init(
+  public init( // Task.init where Failure == Never (TaskExecutor)
+    name: String? = nil,
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: sending @escaping () async -> Success
   ) {
-    guard let taskExecutor else {
-      self = Self.init(priority: priority, operation: operation)
-      return
-    }
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
-#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
-    let (task, _) = Builtin.createTask(
-      flags: flags,
-      initialTaskExecutorConsuming: taskExecutor,
-      operation: operation)
-#else
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-#endif
-    self._task = task
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+
+    #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil {
+      task = Builtin.createTask(
+        flags: flags,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+    }
+    #else // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil, let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task = Builtin.createAsyncTaskWithExecutor(
+        flags, executorBuiltin, operation).0
+    }
+    #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+
+    if task == nil {
+      assert(taskExecutor == nil)
+      task = Builtin.createAsyncTask(flags, operation).0
+    }
+
+    assert(task != nil, "Task must have been initialized by now")
+    self._task = task!
   }
 }
 
@@ -265,10 +291,10 @@ extension Task where Failure == Error {
   ///
   /// Use this function when creating asynchronous work
   /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
+  /// Like `Task.detached(name:priority:operation:)`,
   /// this function creates a separate, top-level task.
   /// Unlike `detach(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
+  /// the task created by `Task.init(name:priority:operation:)`
   /// inherits the priority and actor context of the caller,
   /// so the operation is treated more like an asynchronous extension
   /// to the synchronous operation.
@@ -289,34 +315,60 @@ extension Task where Failure == Error {
   /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
   @discardableResult
   @_alwaysEmitIntoClient
-  public init(
+  public init( // Task.init where Failure == Error (TaskExecutor)
+    name: String? = nil,
     executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: sending @escaping () async throws -> Success
   ) {
-    guard let taskExecutor else {
-      self = Self.init(priority: priority, operation: operation)
-      return
-    }
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
-#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
-    let (task, _) = Builtin.createTask(
-      flags: flags,
-      initialTaskExecutorConsuming: taskExecutor,
-      operation: operation)
-#else
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-#endif
-    self._task = task
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+
+    #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil {
+      task = Builtin.createTask(
+        flags: flags,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+    }
+    #else // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil, let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task = Builtin.createAsyncTaskWithExecutor(
+        flags, executorBuiltin, operation).0
+    }
+    #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+
+    if task == nil {
+      assert(taskExecutor == nil)
+      task = Builtin.createAsyncTask(flags, operation).0
+    }
+
+    assert(task != nil, "Task must have been initialized by now")
+    self._task = task!
   }
 }
 
@@ -352,32 +404,59 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func detached(
+    name: String? = nil,
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
-    guard let taskExecutor else {
-      return Self.detached(priority: priority, operation: operation)
-    }
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
-#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
-    let (task, _) = Builtin.createTask(
-      flags: flags,
-      initialTaskExecutorConsuming: taskExecutor,
-      operation: operation)
-#else
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-#endif
-    return Task(task)
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+
+    #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil {
+      task = Builtin.createTask(
+        flags: flags,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+    }
+    #else // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil, let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task = Builtin.createAsyncTaskWithExecutor(
+        flags, executorBuiltin, operation).0
+    }
+    #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+
+    if task == nil {
+      assert(taskExecutor == nil)
+      task = Builtin.createAsyncTask(flags, operation).0
+    }
+
+    assert(task != nil, "Task must have been initialized by now")
+    return Task(task!)
   }
 }
 
@@ -413,32 +492,58 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func detached(
+    name: String? = nil,
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
-    guard let taskExecutor else {
-      return Self.detached(priority: priority, operation: operation)
-    }
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
-#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
-    let (task, _) = Builtin.createTask(
-      flags: flags,
-      initialTaskExecutorConsuming: taskExecutor,
-      operation: operation)
-#else
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-#endif
-    return Task(task)
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+
+    #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil {
+      task = Builtin.createTask(
+        flags: flags,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+    }
+    #else // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    if task == nil, let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task = Builtin.createAsyncTaskWithExecutor(
+        flags, executorBuiltin, operation).0
+    }
+    #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+
+    if task == nil {
+      assert(taskExecutor == nil)
+      task = Builtin.createAsyncTask(flags, operation).0
+    }
+
+    return Task(task!)
   }
 }
 
