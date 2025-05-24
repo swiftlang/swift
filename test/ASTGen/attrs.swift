@@ -170,6 +170,9 @@ struct ProjectedValueStruct {
 @_specialize(where X: _TrivialStride(16), Y: _Trivial(32, 4), Z: _Class)
 func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
 
+@specialized(where X == Int, Y == Float, Z == Double)
+func testSpecializePublic<X, Y, Z>(x: X, y: Y, z: Z) {}
+
 @_spi(SPIName) public func spiFn() {}
 
 struct StorageRestrctionTest {

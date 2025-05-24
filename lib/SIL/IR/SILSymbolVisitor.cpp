@@ -472,7 +472,7 @@ public:
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     // Add exported prespecialized symbols.
-    for (auto *attr : AFD->getAttrs().getAttributes<SpecializeAttr>()) {
+    for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
         continue;
 

@@ -891,12 +891,15 @@ static bool parseDeclSILOptional(
       SpecAttr.requirements = {};
       SpecAttr.exported = false;
       SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
-      SpecializeAttr *Attr;
+      AbstractSpecializeAttr *Attr;
       StringRef targetFunctionName;
       ModuleDecl *module = nullptr;
+      bool isPublic = false; // In SIL we don't care to disambiguate @specialize
+                             // and @_specialize. We use the "more permissive"
+                             // non-public version when parsing SIL.
       AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
       if (!SP.P.parseSpecializeAttribute(
-              tok::r_square, AtLoc, Loc, Attr, &availability,
+              tok::r_square, AtLoc, Loc, isPublic, Attr, &availability,
               [&targetFunctionName](Parser &P) -> bool {
                 if (P.Tok.getKind() != tok::string_literal) {
                   P.diagnose(P.Tok, diag::expected_in_attribute_list);

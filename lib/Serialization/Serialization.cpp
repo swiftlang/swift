@@ -3201,9 +3201,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Specialized:
     case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-      auto attr = cast<SpecializeAttr>(DA);
+      auto attr = cast<AbstractSpecializeAttr>(DA);
       auto *afd = cast<AbstractFunctionDecl>(D);
       auto *targetFunDecl = attr->getTargetFunctionDecl(afd);
 
@@ -3223,7 +3224,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       auto numAvailabilityAttrs = attr->getAvailableAttrs().size();
       SpecializeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
+          S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isPublic(),
+          (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
           S.addGenericSignatureRef(attr->getSpecializedSignature(afd)),
           S.addDeclRef(targetFunDecl), numSPIGroups, numAvailabilityAttrs,
@@ -4140,8 +4142,8 @@ public:
 
   void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
     bool hasNoted = false;
-    for (auto *A : afd->getAttrs().getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
+    for (auto *A : afd->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
+      auto *SA = cast<AbstractSpecializeAttr>(A);
       if (!SA->isExported())
         continue;
       if (SA->getTargetFunctionDecl(afd)) {

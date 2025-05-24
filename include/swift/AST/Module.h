@@ -969,7 +969,7 @@ public:
                             SmallVectorImpl<AvailabilityDomain> &results) const;
 
   // Is \p attr accessible as an explicitly imported SPI from this module?
-  bool isImportedAsSPI(const SpecializeAttr *attr,
+  bool isImportedAsSPI(const AbstractSpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
 
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
