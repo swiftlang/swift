@@ -589,6 +589,15 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   return numFields;
 }
 
+bool irgen::isExportableField(Field field) {
+  if (field.getKind() == Field::Kind::Var &&
+      field.getVarDecl()->getClangDecl() &&
+      field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
+    return false;
+  // All other fields are exportable
+  return true;
+}
+
 void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
@@ -608,6 +617,17 @@ void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
       fn(cast<MissingMemberDecl>(decl));
     }
   }
+}
+
+unsigned irgen::countExportableFields(IRGenModule &IGM,
+                                      const NominalTypeDecl *type) {
+  // Don't count private C++ fields that were imported as private Swift fields
+  unsigned exportableFieldCount = 0;
+  forEachField(IGM, type, [&](Field field) {
+    if (isExportableField(field))
+      ++exportableFieldCount;
+  });
+  return exportableFieldCount;
 }
 
 SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
