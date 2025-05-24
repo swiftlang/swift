@@ -1578,6 +1578,39 @@ extension Array {
       initializingWith: initializer)
   }
 
+  //FIXME: typed throws
+  /// Creates an array with the specified capacity, then calls the given
+  /// closure with an OutputSpan covering the array's uninitialized memory.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the `OutputSpan` passed to the closure will cover
+  ///   exactly the requested number of elements.
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with room
+  ///         for the specified number of elements.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.2, *)
+  public init(
+    capacity: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws -> Void
+  ) rethrows {
+    try unsafe self.init(
+      unsafeUninitializedCapacity: capacity,
+      initializingWith: { (buffer, count) in
+        var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+        try initializer(&output)
+        count = unsafe output.finalize(for: buffer)
+      }
+    )
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @usableFromInline

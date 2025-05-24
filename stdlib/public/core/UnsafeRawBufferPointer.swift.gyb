@@ -100,6 +100,17 @@ public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
 
+  // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
+  @_alwaysEmitIntoClient
+  internal init(
+    @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}RawPointer?,
+    count: Int
+  ) {
+    unsafe _position = start
+    unsafe _end = start.map { unsafe $0 + _assumeNonNegative(count) }
+  }
+
   /// Creates a buffer over the specified number of contiguous bytes starting
   /// at the given pointer.
   ///
@@ -116,9 +127,14 @@ public struct Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(count >= 0, "${Self} with negative count")
     _debugPrecondition(unsafe count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
+    unsafe self.init(_uncheckedStart: start, count: count)
+  }
 
-    unsafe _position = start
-    unsafe _end = start.map { unsafe $0 + _assumeNonNegative(count) }
+  @safe
+  @_alwaysEmitIntoClient
+  public init(_empty: ()) {
+    unsafe _position = nil
+    unsafe _end = nil
   }
 }
 
