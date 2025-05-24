@@ -3397,7 +3397,11 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
   
   // Upcast a class instance to the property's declared type if necessary.
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
-    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+    if (auto selfType = baseType->getAs<DynamicSelfType>())
+      baseType = selfType->getSelfType()->getCanonicalType();
+    auto baseClass = baseType->getClassOrBoundGenericClass();
+
+    if (baseClass != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)
         ->getCanonicalType();
       paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
