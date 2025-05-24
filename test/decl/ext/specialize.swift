@@ -32,6 +32,66 @@ extension IntFoo where U == Int {
 
 Foo(x: "test", y: 1).hello()
 
+
+struct Field<Tag,Value> {
+  let tag: Tag
+  let value: Value
+}
+
+typealias IntField<Tag> = Field<Tag,Int>
+
+extension IntField {
+  func adding(_ value: Int) -> Self {
+    Field(tag: tag, value: self.value + value)
+  }
+}
+
+struct S<X, Y> {}
+typealias InferredSpecializedNestedTypes<X> = S<X, (Int, [Int]?)>
+extension InferredSpecializedNestedTypes {
+    func returnTuple(value: Y) -> (Int, [Int]?) {
+        return value
+    }
+}
+
+
+struct S2<X,Y,Z> {
+  let x: X
+  let y: Y
+  let z: Z
+}
+
+typealias A2<Y,X> = S2<Int,X,Y>
+
+extension A2 {
+  func adding(_ x: Int) -> Self {
+    S2(x: self.x + x, y: y, z: z) // expected-error {{binary operator '+' cannot be applied to operands of type 'X' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int)}}
+  }
+}
+
+
+struct S4<A, B> {
+  // Generic parameters: <A, B, C>
+  // Depth:               0  0  1
+  struct Nested<C> {
+      let c: C
+  }
+}
+
+struct S5<A> {
+  // Generic parameters: <A, B, C>
+  // Depth:               0  1  1
+  typealias Alias<B, C> = S4<A, B>.Nested<C>
+
+}
+
+extension S5.Alias{
+  func adding(_ c: Int) -> Self {
+        S4.Nested(c: self.c + c) //expected-error {{binary operator '+' cannot be applied to operands of type 'C' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int)}}
+    }
+}
+
+
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
