@@ -108,6 +108,8 @@ class BuildScriptInvocation(object):
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
+            "--swift-stdlib-enable-strict-availability", str(
+                args.swift_stdlib_strict_availability).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
             "--llbuild-enable-assertions", str(
