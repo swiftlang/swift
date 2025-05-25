@@ -2481,18 +2481,40 @@ function Build-Foundation {
     Get-ProjectBinaryCache $Platform DynamicFoundation
   }
 
+  $InstallRoot = if ($Static) {
+    "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr"
+  } else {
+    "$(Get-SwiftSDK $Platform.OS)\usr"
+  }
+
+  $SwiftFlags = if ($Static) {
+    # FIXME(compnerd) use `-Xfrontend -use-static-resource-dir` to workaround merge module job failure
+    # FIXME(compnerd) use `-Xcc -DSWIFT_STATIC_STDLIB` to workaround ClangImporter setup limitation
+    # FIXME(compnerd) we do not pass `-Xcc -static-libclosure` as we do nto build aganst a static libdispatch yet
+    @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir", "-Xcc", "-DSWIFT_STATIC_STDLIB")
+  } else {
+    @()
+  }
+
+  $SwiftSDK = if ($Static) {
+    Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS.ToString())Experimental"
+  } else {
+    Get-SwiftSDK $Platform.OS
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-foundation `
     -Bin $FoundationBinaryCache `
-    -InstallTo $(if ($Static) { "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" } else { "$(Get-SwiftSDK $Platform.OS)\usr" }) `
+    -InstallTo $InstallRoot `
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX,Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK $SwiftSDK `
     -Defines @{
       BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
