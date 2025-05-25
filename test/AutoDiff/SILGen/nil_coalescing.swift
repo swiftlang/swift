@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify %s | %FileCheck %s
+/// Note: -primary-file prevents non_abi->shared linkage change in `removeSerializedFlagFromAllFunctions`
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -verify -primary-file %s | %FileCheck %s
 
 import _Differentiation
 
-// CHECK: sil @test_nil_coalescing
+// CHECK: sil non_abi @test_nil_coalescing
 // CHECK: bb0(%{{.*}} : $*T, %[[ARG_OPT:.*]] : $*Optional<T>, %[[ARG_PB:.*]] :
 // CHECK:    $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>):
 // CHECK: %[[ALLOC_OPT:.*]] = alloc_stack [lexical] $Optional<T>
@@ -15,7 +16,7 @@ import _Differentiation
 //
 @_silgen_name("test_nil_coalescing")
 @derivative(of: ??)
-@usableFromInline
+@_alwaysEmitIntoClient
 func nilCoalescing<T: Differentiable>(optional: T?, defaultValue: @autoclosure () throws -> T)
  rethrows -> (value: T, pullback: (T.TangentVector) -> Optional<T>.TangentVector)
 {

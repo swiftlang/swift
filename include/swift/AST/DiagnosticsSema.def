@@ -4367,6 +4367,9 @@ NOTE(derivative_attr_fix_access,none,
      "mark the derivative function as "
      "'%select{private|fileprivate|internal|package|@usableFromInline|@usableFromInline}0' "
      "to match the original function", (AccessLevel))
+ERROR(derivative_attr_always_emit_into_client_mismatch,none,
+      "either both or none of derivative and original function must have "
+      "@alwaysEmitIntoClient attribute", ())
 ERROR(derivative_attr_static_method_mismatch_original,none,
       "unexpected derivative function declaration; "
       "%0 requires the derivative function %1 to be %select{an instance|a 'static'}2 method",
