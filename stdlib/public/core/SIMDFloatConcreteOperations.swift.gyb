@@ -29,11 +29,38 @@ vectorscalarCounts = storagescalarCounts + [3]
 @available(SwiftStdlib 5.3, *)
 %  end
 extension SIMD${n} where Scalar == ${Scalar} {
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
   
+  @_alwaysEmitIntoClient @_transparent
+  public init(repeating scalar: ${Scalar}) {
+    let asVector = Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
+      Builtin.zeroInitializer(), scalar._value, Builtin.zeroInitializer()
+    )
+    let repeated = Builtin.shufflevector_${Builtin}_Vec${storageN}xInt32(
+      asVector, Builtin.zeroInitializer(), Builtin.zeroInitializer()
+    )
+%if n != 3:
+    self.init(repeated)
+%else:
+    self.init(Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
+      repeated, Builtin.zeroInitializer(), Int32(3)._value
+    ))
+%end
+  }
+  
+%  if n >= 4:
+  @_alwaysEmitIntoClient @_transparent
+  public init(
+    lowHalf: SIMD${n//2}<${Scalar}>,
+    highHalf: SIMD${n//2}<${Scalar}>
+  ) {
+    self = unsafe unsafeBitCast((lowHalf, highHalf), to: Self.self)
+  }
+  
+%  end
   /// A vector mask with the result of a pointwise equality comparison.
   @_alwaysEmitIntoClient
   public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
