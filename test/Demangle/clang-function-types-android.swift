@@ -9,7 +9,7 @@
 // RUN: sed -ne '/--->/s/ *--->.*$//p' < %S/Inputs/manglings-with-clang-types.txt > %t.input
 // %t.check: "A ---> B" ==> "B"
 // RUN: sed -ne '/--->/s/^.*---> *//p' < %S/Inputs/manglings-with-clang-types.txt > %t.check
-// RUN: swift-demangle -classify < %t.input > %t.output
+// RUN: swift-demangle -classify -no-colors < %t.input > %t.output
 // RUN: diff %t.check %t.output
 
 // REQUIRES: OS=linux-android || OS=linux-androideabi
