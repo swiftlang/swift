@@ -2,6 +2,7 @@
 
 func escape(_ closure: @escaping () -> Void) {}
 func noescape(_ closure: () -> Void) {}
+func autoescape<T>(_ e: @autoclosure @escaping () -> T) {}
 
 class SomeClass {}
 
@@ -71,10 +72,9 @@ class TestImplicitWeakToStrongCaptures {
   }
 
   func test_multiple_nesting_levels() {
-    // TODO: where in this chain should the warning appear?
-    escape {
+    escape { // expected-note {{'self' implicitly captured here}}
       escape {
-        escape { // expected-note {{'self' implicitly captured here}}
+        escape {
           escape { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
         }
       }
@@ -126,7 +126,7 @@ class TestImplicitWeakToStrongCaptures {
     }
 
     // Explicit capture item in non-escaping intermediate closure
-    // TODO: this case seems odd... how should it be handled?
+    // TODO: this case seems odd... should it be treated differently?
     escape {
       noescape { [self] in // no warning since there is an explicit capture
         escape { [weak self] in _ = self }
@@ -191,8 +191,8 @@ class TestImplicitWeakToStrongCaptures {
     var closureProp: (() -> Void)?
 
     func setupClosure() {
-      closureProp = {
-        escape { // expected-note {{'self' implicitly captured here}}
+      closureProp = { // expected-note {{'self' implicitly captured here}}
+        escape {
           escape { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
         }
       }
@@ -202,11 +202,27 @@ class TestImplicitWeakToStrongCaptures {
 
   // TODO: how to deal with @_implicitSelfCapture and isolated captures?
   func test_async_context() async {
-    escape {
-      Task { // expected-note {{'self' implicitly captured here}}
-        Task { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
-      }
+    Task { // expected-note {{'self' implicitly captured here}}
+      Task { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
     }
+  }
+
+  func test_async_let() async {
+    final class S: Sendable {}
+    let s = S()
+    // TODO: why doesn't this trigger the diagnostic?
+    async let b: Bool = { [weak s] in
+      s != nil
+    }()
+    _ = await b
+  }
+
+  func test_autoclosure() {
+    autoescape(
+      escape { [weak self] in
+        _ = self
+      }
+    )
   }
 }
 
