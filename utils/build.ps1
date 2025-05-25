@@ -2407,7 +2407,7 @@ function Write-SDKSettings([OS] $OS) {
     LibrarySearchPaths = @();
     Toolchains = @( "${ToolchainIdentifier}" );
     DefaultProperties = @{
-      PLATFORM_NAME = $OS.ToString()
+      PLATFORM_NAME = $OS.ToString().ToLowerInvariant()
       DEFAULT_COMPILER = "${ToolchainIdentifier}"
     }
     SupportedTargets = @{
