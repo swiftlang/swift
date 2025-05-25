@@ -94,7 +94,10 @@ SIMDTests.test("SubscriptSetter") {
   expectEqual(SIMD4<Float>(2, 4, 6, 8), val2)
   expectEqual(SIMD4<Float>(2, 2, 2, 2), pb2(ones))
 }
-
+// FIXME(TF-1103): Derivative registration does not yet support
+// https://github.com/swiftlang/swift/issues/54445
+// `@_alwaysEmitIntoClient` original functions like operators, `SIMD.sum()`.
+/*
 SIMDTests.test("Addition") {
   let a = SIMD4<Float>(1, 2, 3, 4)
   let g = SIMD4<Float>(1, 1, 1, 1)
@@ -216,6 +219,7 @@ SIMDTests.test("Division") {
   expectEqual(5 / a, val3)
   expectEqual((dlhs3, drhs3), pb3(g))
 }
+*/
 
 SIMDTests.test("Generics") {
   let a = SIMD3<Double>(1, 2, 3)
@@ -234,6 +238,10 @@ SIMDTests.test("Generics") {
   expectEqual(SIMD3<Double>(10, 10, 10), val1)
   expectEqual(3, pb1(g))
 
+  // FIXME(TF-1103): Derivative registration does not yet support
+  // https://github.com/swiftlang/swift/issues/54445
+  // `@_alwaysEmitIntoClient` original functions like operators, `SIMD.sum()`.
+  /*
   // SIMDType + SIMDType
   func testAddition<Scalar, SIMDType: SIMD>(lhs: SIMDType, rhs: SIMDType)
     -> SIMDType
