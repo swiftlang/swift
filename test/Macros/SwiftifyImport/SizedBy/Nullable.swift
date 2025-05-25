@@ -20,66 +20,67 @@ func myFunc4(_ ptr: UnsafeMutableRawPointer?, _ len: CInt) -> UnsafeMutableRawPo
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer?) {
-// CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr?.count ?? 0)!
+// CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, size)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func myFunc2(_ ptr: inout MutableRawSpan?) {
-// CHECK-NEXT:     return   { () in
+// CHECK-NEXT:     let len = CInt(exactly: ptr?.byteCount ?? 0)!
+// CHECK-NEXT:     return { () in
 // CHECK-NEXT:         return if ptr == nil {
-// CHECK-NEXT:               unsafe myFunc2(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
-// CHECK-NEXT:             } else {
-// CHECK-NEXT:                 unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:                   return unsafe myFunc2(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!)
-// CHECK-NEXT:                 }
+// CHECK-NEXT:             unsafe myFunc2(nil, len)
+// CHECK-NEXT:           } else {
+// CHECK-NEXT:             unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
+// CHECK-NEXT:               return unsafe myFunc2(_ptrPtr.baseAddress, len)
 // CHECK-NEXT:             }
+// CHECK-NEXT:           }
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @lifetime(ptr2: copy ptr2) @_disfavoredOverload
 // CHECK-NEXT: func myFunc3(_ ptr: inout MutableRawSpan?, _ ptr2: inout MutableRawSpan?) {
-// CHECK-NEXT:     return   { () in
+// CHECK-NEXT:     let len = CInt(exactly: ptr?.byteCount ?? 0)!
+// CHECK-NEXT:     let len2 = CInt(exactly: ptr2?.byteCount ?? 0)!
+// CHECK-NEXT:     return { () in
 // CHECK-NEXT:         return if ptr2 == nil {
-// CHECK-NEXT:                 { () in
-// CHECK-NEXT:                     return if ptr == nil {
-// CHECK-NEXT:                                 unsafe myFunc3(nil, CInt(exactly: ptr?.byteCount ?? 0)!, nil, CInt(exactly: ptr2?.byteCount ?? 0)!)
-// CHECK-NEXT:                               } else {
-// CHECK-NEXT:                                   unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:                                     return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!, nil, CInt(exactly: ptr2?.byteCount ?? 0)!)
-// CHECK-NEXT:                                   }
-// CHECK-NEXT:                               }
-// CHECK-NEXT:                 }()
-// CHECK-NEXT:             } else {
-// CHECK-NEXT:                 unsafe ptr2!.withUnsafeMutableBytes { _ptr2Ptr in
-// CHECK-NEXT:                   return   { () in
-// CHECK-NEXT:                       return if ptr == nil {
-// CHECK-NEXT:                                   unsafe myFunc3(nil, CInt(exactly: ptr?.byteCount ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: _ptr2Ptr.count)!)
-// CHECK-NEXT:                                 } else {
-// CHECK-NEXT:                                     unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:                                       return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!, _ptr2Ptr.baseAddress, CInt(exactly: _ptr2Ptr.count)!)
-// CHECK-NEXT:                                     }
-// CHECK-NEXT:                                 }
-// CHECK-NEXT:                   }()
-// CHECK-NEXT:                 }
+// CHECK-NEXT:             { () in
+// CHECK-NEXT:                 return if ptr == nil {
+// CHECK-NEXT:                         unsafe myFunc3(nil, len, nil, len2)
+// CHECK-NEXT:                       } else {
+// CHECK-NEXT:                         unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
+// CHECK-NEXT:                           return unsafe myFunc3(_ptrPtr.baseAddress, len, nil, len2)
+// CHECK-NEXT:                         }
+// CHECK-NEXT:                       }
+// CHECK-NEXT:             }()
+// CHECK-NEXT:           } else {
+// CHECK-NEXT:             unsafe ptr2!.withUnsafeMutableBytes { _ptr2Ptr in
+// CHECK-NEXT:               return { () in
+// CHECK-NEXT:                   return if ptr == nil {
+// CHECK-NEXT:                           unsafe myFunc3(nil, len, _ptr2Ptr.baseAddress, len2)
+// CHECK-NEXT:                         } else {
+// CHECK-NEXT:                           unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
+// CHECK-NEXT:                             return unsafe myFunc3(_ptrPtr.baseAddress, len, _ptr2Ptr.baseAddress, len2)
+// CHECK-NEXT:                           }
+// CHECK-NEXT:                         }
+// CHECK-NEXT:               }()
 // CHECK-NEXT:             }
+// CHECK-NEXT:           }
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func myFunc4(_ ptr: inout MutableRawSpan?, _ len: CInt) -> MutableRawSpan? {
-// CHECK-NEXT:     let _ptrCount: some BinaryInteger = len
-// CHECK-NEXT:       if ptr?.byteCount ?? 0 < _ptrCount || _ptrCount < 0 {
-// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
-// CHECK-NEXT:       }
+// CHECK-NEXT: func myFunc4(_ ptr: inout MutableRawSpan?) -> MutableRawSpan? {
+// CHECK-NEXT:     let len = CInt(exactly: ptr?.byteCount ?? 0)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime({ () in
-// CHECK-NEXT:       let _resultValue =   { () in
+// CHECK-NEXT:       let _resultValue = { () in
 // CHECK-NEXT:               return if ptr == nil {
-// CHECK-NEXT:                     unsafe myFunc4(nil, len)
-// CHECK-NEXT:                   } else {
-// CHECK-NEXT:                       unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:                         return unsafe myFunc4(_ptrPtr.baseAddress, len)
-// CHECK-NEXT:                       }
+// CHECK-NEXT:                   unsafe myFunc4(nil, len)
+// CHECK-NEXT:                 } else {
+// CHECK-NEXT:                   unsafe ptr!.withUnsafeMutableBytes { _ptrPtr in
+// CHECK-NEXT:                     return unsafe myFunc4(_ptrPtr.baseAddress, len)
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 }
 // CHECK-NEXT:           }()
 // CHECK-NEXT:       if unsafe _resultValue == nil {
 // CHECK-NEXT:         return nil
