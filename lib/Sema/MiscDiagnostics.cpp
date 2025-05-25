@@ -2672,17 +2672,6 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
     static bool isEscapingClosure(const AbstractClosureExpr *ACE) {
       return !ACE->getType()->isNoEscape();
     }
-
-    static bool
-    isDeclACaptureListItemOfClosure(const Decl *D,
-                                    const AbstractClosureExpr *ACE) {
-      if (auto VD = dyn_cast<VarDecl>(D))
-        if (auto CLE = VD->getParentCaptureList())
-          if (CLE->getClosureBody() == ACE)
-            return true;
-
-      return false;
-    }
   };
 
   /// Info regarding weak/unowned capture list items that have simple inits
@@ -2706,17 +2695,14 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
     ImplicitWeakToStrongCaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
 
     /// Stack for tracking the current (escaping) closure expression.
-    llvm::SmallVector<AbstractClosureExpr *, 8> EscapingClosureStack;
+    llvm::SmallSetVector<AbstractClosureExpr *, 8> EscapingClosureStack;
 
     /// Strong capture item Decls from escaping closures.
     llvm::SmallSetVector<ValueDecl *, 8> EscapingStrongCaptureDecls;
 
     // We're looking for captures like [weak a], [unowned a = b]
-    // here, where the bound DeclRef has strong ownership. If we find a
-    // candidate pattern, dig out a DeclRefExpr from some expected locations
-    // and record it. These will be used to diagnose capture list entries that
-    // bind a weak/unowned var but in so doing induce an implicit strong
-    // capture of the associated Decl in an ancestor escaping closure.
+    // here, where the bound Decl has strong ownership. We'll also
+    // keep track of capture list items  formed for escaping closures.
     void recordOrDiagnoseDeclIfNeeded(Decl *D) {
 
       // We only care about pattern bindings
@@ -2765,27 +2751,34 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 
       WeakToStrongCaptureItemInfo captureInfo = {VD, itemReferent, itemInit,
                                                  ownership};
-      auto nearestEscapingClosure = EscapingClosureStack.back();
-
-      diagnoseCaptureIfNeeded(captureInfo, nearestEscapingClosure);
+      diagnoseCaptureIfNeeded(captureInfo);
     }
 
-    void diagnoseCaptureIfNeeded(WeakToStrongCaptureItemInfo captureItem,
-                                 AbstractClosureExpr *ancestorEscapingClosure) {
-      const auto captureListItemReferent = captureItem.itemReferent;
-
+    void diagnoseCaptureIfNeeded(WeakToStrongCaptureItemInfo captureItem) {
       // If an escaping closure contains the 'weakified' referent, as an
       // explicit strong capture list item then we don't need to diagnose
       // anything. We rely on the AST walk visiting ancestor DCs before
       // their children here.
-      if (EscapingStrongCaptureDecls.contains(captureListItemReferent))
+      if (EscapingStrongCaptureDecls.contains(captureItem.itemReferent))
         return;
 
-      // If the DC of the capture item's referent is an ancestor of the nearest
-      // escaping closure, then that implies it's captured, and per the earlier
-      // check, we know it must be implicitly captured.
-      DeclContext *referentDC = captureListItemReferent->getDeclContext();
-      if (!ancestorEscapingClosure->isChildContextOf(referentDC))
+      // Walk up the DC hierarchy to see if we find an escaping closure that
+      // sits between the capture item and its re-bound Decl. We look for the
+      // outermost such closure for reporting purposes.
+      DeclContext *currentDC = captureItem.itemDecl->getDeclContext();
+      DeclContext *itemReferentDC = captureItem.itemReferent->getDeclContext();
+      std::optional<AbstractClosureExpr *> outermostCapturingClosure;
+
+      while (currentDC && currentDC != itemReferentDC) {
+        SWIFT_DEFER { currentDC = currentDC->getParent(); };
+
+        if (auto ACE = dyn_cast<AbstractClosureExpr>(currentDC))
+          if (EscapingClosureStack.contains(ACE))
+            outermostCapturingClosure = ACE;
+      }
+
+      // No outer capturing closure found, so don't diagnose
+      if (!outermostCapturingClosure)
         return;
 
       if (captureItem.itemDecl->getName() !=
@@ -2800,7 +2793,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
                            captureItem.itemDeclOwnership, captureItem.itemDecl);
       }
 
-      Ctx.Diags.diagnose(ancestorEscapingClosure->getLoc(),
+      Ctx.Diags.diagnose(outermostCapturingClosure.value()->getLoc(),
                          diag::implicit_weak_to_strong_capture_loc,
                          captureItem.itemReferent);
     }
@@ -2813,7 +2806,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 
       if (auto ACE = dyn_cast<AbstractClosureExpr>(E))
         if (Util::isEscapingClosure(ACE)) {
-          EscapingClosureStack.push_back(ACE);
+          EscapingClosureStack.insert(ACE);
         }
 
       return Action::Continue(E);
