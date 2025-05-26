@@ -5883,6 +5883,24 @@ bool ConstraintSystem::repairFailures(
       if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
         break;
 
+      if (auto *typeVar =
+              lhs->getOptionalObjectType()->getAs<TypeVariableType>()) {
+        auto *argLoc = typeVar->getImpl().getLocator();
+        if (argLoc->directlyAt<OptionalEvaluationExpr>()) {
+          auto OEE = castToExpr<OptionalEvaluationExpr>(argLoc->getAnchor());
+          // If the optional chain in the argument position is invalid
+          // let's unwrap optional and re-introduce the constraint to
+          // be solved later once both sides are sufficiently resolved,
+          // this would allow to diagnose not only the invalid unwrap
+          // but an invalid conversion (if any) as well.
+          if (hasFixFor(getConstraintLocator(OEE->getSubExpr()),
+                        FixKind::RemoveUnwrap)) {
+            addConstraint(matchKind, typeVar, rhs, loc);
+            return true;
+          }
+        }
+      }
+
       auto result = matchTypes(lhs->getOptionalObjectType(), rhs, matchKind,
                                TMF_ApplyingFix, locator);
 
