@@ -11438,6 +11438,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
+          } else if (locator->getAnchor().is<Expr *>() &&
+                     !getSemanticsProvidingParentExpr(
+                         getAsExpr(locator->getAnchor()))) {
+            // If there are no contextual expressions that could provide
+            // a type for the member type variable, let's default it to
+            // a placeholder eagerly so it could be propagated to the
+            // pattern if necessary.
+            recordTypeVariablesAsHoles(memberTypeVar);
           } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
             // Let's handle member patterns specifically because they use
             // equality instead of argument application constraint, so allowing

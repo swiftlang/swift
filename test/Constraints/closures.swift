@@ -803,7 +803,6 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
 func not_overloaded(_ handler: () -> Int) {}
-// expected-note@-1 {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -1346,4 +1345,24 @@ do {
 
   let _ = V(value: { [Int]() }) // expected-error {{add () to forward '@autoclosure' parameter}} {{31-31=()}}
   let _ = V(other: { [Int]() }) // expected-error {{cannot convert value of type '[Int]' to closure result type 'String'}}
+}
+
+// https://github.com/swiftlang/swift/issues/81770
+do {
+  func test(_: Int) {}
+  func test(_: Int = 42, _: (Int) -> Void) {}
+
+  test {
+    if let _ = $0.missing { // expected-error {{value of type 'Int' has no member 'missing'}}
+    }
+  }
+
+  test {
+    if let _ = (($0.missing)) { // expected-error {{value of type 'Int' has no member 'missing'}}
+    }
+  }
+
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+    try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
+  }
 }
