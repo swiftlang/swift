@@ -2702,13 +2702,14 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
 
     // We're looking for captures like [weak a], [unowned a = b]
     // here, where the bound Decl has strong ownership. We'll also
-    // keep track of capture list items  formed for escaping closures.
+    // keep track of capture list items formed for escaping closures.
     void recordOrDiagnoseDeclIfNeeded(Decl *D) {
 
       // We only care about pattern bindings
-      auto PBD = dyn_cast<PatternBindingDecl>(D);
-      if (!PBD)
+      if (!isa<PatternBindingDecl>(D))
         return;
+
+      auto PBD = cast<PatternBindingDecl>(D);
 
       // We only handle single variable bindings currently
       auto VD = PBD->getSingleVar();
@@ -2772,9 +2773,11 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       while (currentDC && currentDC != itemReferentDC) {
         SWIFT_DEFER { currentDC = currentDC->getParent(); };
 
-        if (auto ACE = dyn_cast<AbstractClosureExpr>(currentDC))
+        if (isa<AbstractClosureExpr>(currentDC)) {
+          AbstractClosureExpr *ACE = cast<AbstractClosureExpr>(currentDC);
           if (EscapingClosureStack.contains(ACE))
             outermostCapturingClosure = ACE;
+        }
       }
 
       // No outer capturing closure found, so don't diagnose
