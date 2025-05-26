@@ -78,17 +78,14 @@ func unsafePointerConversionAvailability(
 
   _ = UnsafeMutablePointer<Int>(rp) // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
   _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
-  // Two candidates here: OpaquePointer? and UnsafeMutablePointer<Int>?
+  // This is ambiguous because we have failable and non-failable initializers that accept the same argument type.
   _ = UnsafeMutablePointer<Int>(orp) // expected-error {{no exact matches in call to initializer}}
-  // Two candidates here: OpaquePointer? and UnsafeMutablePointer<Int>?
-  _ = UnsafeMutablePointer<Int>(omrp) // expected-error {{no exact matches in call to initializer}}
+  _ = UnsafeMutablePointer<Int>(omrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
 
   _ = UnsafePointer<Int>(rp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafePointer<Int>'}}
   _ = UnsafePointer<Int>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafePointer<Int>'}}
-  // Two candidates here: OpaquePointer? and UnsafeMutablePointer<Int>?
-  _ = UnsafePointer<Int>(orp)  // expected-error {{no exact matches in call to initializer}}
-  // Two candidates here: OpaquePointer? and UnsafeMutablePointer<Int>?
-  _ = UnsafePointer<Int>(omrp) // expected-error {{no exact matches in call to initializer}}
+  _ = UnsafePointer<Int>(orp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafePointer<Int>'}}
+  _ = UnsafePointer<Int>(omrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafePointer<Int>'}}
 
   _ = UnsafePointer<Int>(ups) // expected-error {{cannot convert value of type 'UnsafePointer<String>' to expected argument type 'UnsafePointer<Int>'}}
   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('String' and 'Int') are expected to be equal}}

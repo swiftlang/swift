@@ -6884,9 +6884,28 @@ bool ConstraintSystem::repairFailures(
     if (!path.empty() && path.back().is<LocatorPathElt::PackElement>())
       path.pop_back();
 
-    if (!path.empty() && path.back().is<LocatorPathElt::AnyRequirement>()) {
-      return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
-                            getConstraintLocator(anchor, path));
+    if (!path.empty()) {
+      if (path.back().is<LocatorPathElt::AnyRequirement>()) {
+        return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
+                              getConstraintLocator(anchor, path));
+      }
+
+      if (auto argConv = path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
+        auto argIdx = argConv->getArgIdx();
+        auto paramIdx = argConv->getParamIdx();
+
+        auto *argLoc = getConstraintLocator(anchor, path);
+        if (auto overload = findSelectedOverloadFor(getCalleeLocator(argLoc))) {
+          auto *overloadTy =
+              simplifyType(overload->boundType)->castTo<FunctionType>();
+          auto *argList = getArgumentList(argLoc);
+          ASSERT(argList);
+          conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+              *this, getType(argList->getExpr(argIdx)),
+              overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
+          return true;
+        }
+      }
     }
 
     // When the solver sets `TMF_MatchingGenericArguments` it means
