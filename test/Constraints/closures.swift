@@ -1337,3 +1337,13 @@ func rdar143338891() {
     }
   }
 }
+
+do {
+  struct V {
+    init(value: @autoclosure @escaping () -> any Hashable) { }
+    init(other: @autoclosure @escaping () -> String) { }
+  }
+
+  let _ = V(value: { [Int]() }) // expected-error {{add () to forward '@autoclosure' parameter}} {{31-31=()}}
+  let _ = V(other: { [Int]() }) // expected-error {{cannot convert value of type '[Int]' to closure result type 'String'}}
+}

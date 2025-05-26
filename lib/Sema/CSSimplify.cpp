@@ -4282,7 +4282,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         if (!path.empty()) {
           auto last = path.back();
 
-          if (last.is<LocatorPathElt::ApplyArgToParam>()) {
+          if (last.is<LocatorPathElt::ApplyArgToParam>() ||
+              last.is<LocatorPathElt::AutoclosureResult>()) {
             auto proto = protoDecl->getDeclaredInterfaceType();
             // Impact is 2 here because there are two failures
             // 1 - missing conformance and 2 - incorrect argument type.
