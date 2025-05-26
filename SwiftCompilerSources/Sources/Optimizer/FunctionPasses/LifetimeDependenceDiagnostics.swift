@@ -69,7 +69,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       // mark_dependence will hanceforth be treated as an unknown use by the optimizer.  In the future, we should not
       // need to set this flag during diagnostics because, for escapable types, mark_dependence [unresolved] will all be
       // settled during an early LifetimeNormalization pass.
-      markDep.settleToEscaping()
+      markDep.settleToEscaping(context)
       continue
     }
     if let apply = instruction as? FullApplySite {

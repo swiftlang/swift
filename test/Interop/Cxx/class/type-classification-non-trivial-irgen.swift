@@ -27,9 +27,10 @@ public func testStructWithCopyConstructorAndValue() -> Bool {
 // CHECK: [[MEMBER:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: [[OBJ:%.*]] = alloca %TSo42StructWithSubobjectCopyConstructorAndValueV
 // CHECK: alloca %TSo33StructWithCopyConstructorAndValueV
-// CHECK: [[TMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)Ei|"\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z"}}(ptr {{(noalias )?}}[[MEMBER]], i32 42)
-// CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[TMP]], i32 0, i32 0
+// CHECK: getelementptr inbounds{{.*}} %TSo42StructWithSubobjectCopyConstructorAndValueV, ptr [[OBJ]]
+// CHECK: [[M1:%.*]] = getelementptr inbounds{{.*}} %TSo42StructWithSubobjectCopyConstructorAndValueV, ptr [[OBJ]], i32 0, i32 0
+// CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[M1]], i32 0, i32 0
 // CHECK: [[TEMP_MEMBER_VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[TEMP_MEMBER]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, ptr [[TEMP_MEMBER_VALUE]]
 // CHECK: [[OUT:%.*]] = icmp eq i32 [[LHS]], 42
@@ -44,11 +45,11 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 // CHECK: [[MEMBER:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: [[OBJ:%.*]] = alloca %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV
 // CHECK: [[TEMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
-// CHECK: [[TEMP2:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)Ei|"\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z"}}(ptr {{(noalias )?}}[[MEMBER]], i32 42)
 // CHECK: call {{.*}}@{{_ZN33StructWithCopyConstructorAndValueC(1|2)ERKS_|"\?\?0StructWithCopyConstructorAndValue@@QEAA@AEBU0@@Z"}}(ptr [[TEMP]], ptr [[MEMBER]])
 // CHECK: call {{.*}}@{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC(1|2)E33StructWithCopyConstructorAndValue|"\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z"}}(ptr {{(noalias )?}}[[OBJ]], ptr [[TEMP]])
-// CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[TEMP2]], i32 0, i32 0
+// CHECK: [[M1:%.*]] = getelementptr inbounds{{.*}} %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV, ptr [[OBJ]], i32 0, i32 0
+// CHECK: [[TEMP_MEMBER:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[M1]], i32 0, i32 0
 // CHECK: [[TEMP_MEMBER_VAL:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[TEMP_MEMBER]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, ptr [[TEMP_MEMBER_VAL]]
 // CHECK: [[OUT:%.*]] = icmp eq i32 [[LHS]], 42
@@ -73,9 +74,8 @@ public func test(obj: StructWithCopyConstructorAndValue) -> Bool {
 }
 
 // CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo42StructWithSubobjectCopyConstructorAndValueV_tF"(ptr noalias dereferenceable(4) %0)
-// CHECK: [[TMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
 // CHECK: [[MEMBER:%.*]] = getelementptr inbounds{{.*}} %TSo42StructWithSubobjectCopyConstructorAndValueV, ptr %0, i32 0, i32 0
-// CHECK: [[VAL:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[TMP]], i32 0, i32 0
+// CHECK: [[VAL:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[MEMBER]], i32 0, i32 0
 // CHECK: [[VAL_VAL:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[VAL]], i32 0, i32 0
 // CHECK: [[LHS:%.*]] = load i32, ptr [[VAL_VAL]]
 // CHECK: [[OUT:%.*]] = icmp eq i32 [[LHS]], 42
@@ -85,7 +85,7 @@ public func test(obj: StructWithSubobjectCopyConstructorAndValue) -> Bool {
 }
 
 // CHECK-LABEL: define {{.*}}i1 @"$s4main4test3objSbSo037StructWithCopyConstructorAndSubobjectfgH5ValueV_tF"(ptr noalias dereferenceable(4) %0)
-// CHECK:[[TEMP:%.*]] = alloca %TSo33StructWithCopyConstructorAndValueV
+// CHECK:[[TEMP:%.*]] = getelementptr inbounds{{.*}} %TSo037StructWithCopyConstructorAndSubobjectcdE5ValueV, ptr %0, i32 0, i32 0
 // CHECK:[[VAL:%.*]] = getelementptr inbounds{{.*}} %TSo33StructWithCopyConstructorAndValueV, ptr [[TEMP]], i32 0, i32 0
 // CHECK:[[VAL_VAL:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[VAL]], i32 0, i32 0
 // CHECK:[[LHS:%.*]] = load i32, ptr [[VAL_VAL]]

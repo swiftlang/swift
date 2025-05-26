@@ -29,6 +29,7 @@ swift_compiler_sources(Optimizer
   SimplifyInitEnumDataAddr.swift
   SimplifyKeyPath.swift
   SimplifyLoad.swift
+  SimplifyMarkDependence.swift
   SimplifyMisc.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift

@@ -776,6 +776,20 @@ extension CopyAddrInst {
   }
 }
 
+extension MarkDependenceInstruction {
+  func resolveToNonEscaping(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.MarkDependenceInstruction_resolveToNonEscaping()
+    context.notifyInstructionChanged(self)
+  }
+
+  func settleToEscaping(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.MarkDependenceInstruction_settleToEscaping()
+    context.notifyInstructionChanged(self)
+  }
+}
+
 extension TermInst {
   func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyBranchesChanged()
