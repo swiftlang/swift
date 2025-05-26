@@ -607,3 +607,14 @@ func testExtraQuestionMark(action: () -> Void, v: Int) {
   // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> Void'}}
   // expected-error@-2 {{cannot use optional chaining on non-optional value of type 'Int'}}
 }
+
+func testPassingOptionalChainAsWrongArgument() {
+  class Test {
+    func fn(_ asdType: String?) {
+    }
+  }
+
+  func test(test: Test, arr: [Int]?) {
+    test.fn(arr?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String?'}}
+  }
+}
