@@ -2714,9 +2714,11 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       while (currentDC && currentDC != itemReferentDC) {
         SWIFT_DEFER { currentDC = currentDC->getParent(); };
 
-        if (auto ACE = dyn_cast<AbstractClosureExpr>(currentDC))
+        if (isa<AbstractClosureExpr>(currentDC)) {
+          AbstractClosureExpr *ACE = cast<AbstractClosureExpr>(currentDC);
           if (EscapingClosureStack.contains(ACE))
             outermostCapturingClosure = ACE;
+        }
       }
 
       // No outer capturing closure found, so don't diagnose
