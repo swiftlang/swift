@@ -4311,6 +4311,15 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             break;
           }
 
+          if ((isExpr<ArrayExpr>(anchor) || isExpr<DictionaryExpr>(anchor)) &&
+              last.is<LocatorPathElt::TupleElement>()) {
+            auto *fix = CollectionElementContextualMismatch::create(
+                *this, type1, type2, getConstraintLocator(anchor, path));
+            if (recordFix(fix, /*impact=*/2))
+              return getTypeMatchFailure(locator);
+            break;
+          }
+
           // TODO(diagnostics): If there are any requirement failures associated
           // with result types which are part of a function type conversion,
           // let's record general conversion mismatch in order for it to capture
