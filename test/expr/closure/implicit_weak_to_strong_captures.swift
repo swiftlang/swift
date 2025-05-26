@@ -128,7 +128,7 @@ class TestImplicitWeakToStrongCaptures {
     // Explicit capture item in non-escaping intermediate closure
     // TODO: this case seems odd... should it be treated differently?
     escape {
-      noescape { [self] in // no warning since there is an explicit capture
+      noescape { [self] in // no warning since the capture's Decl is local to the parent closure
         escape { [weak self] in _ = self }
       }
     }
