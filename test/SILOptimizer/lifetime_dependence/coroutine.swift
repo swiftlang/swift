@@ -86,8 +86,7 @@ func use(_ o : borrowing View) {}
 //       let wrapper = nc.wrapper
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] [[NC]]
 // CHECK:   [[NCVAL:%.*]] = load [[ACCESS]] 
-// CHECK:   ([[YIELD1:%.*]], [[TOKEN1:%.*]]) = begin_apply %{{.*}}([[NCVAL]]) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
-// CHECK:   [[WRAPPER:%.*]] = mark_dependence [nonescaping] [[YIELD1]] on [[TOKEN1]]
+// CHECK:   ([[WRAPPER:%.*]], [[TOKEN1:%.*]]) = begin_apply %{{.*}}([[NCVAL]]) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
 // CHECK:   retain_value [[WRAPPER]]
 // CHECK:   debug_value [[WRAPPER]], let, name "wrapper"
 //       let view = wrapper.view
@@ -99,7 +98,7 @@ func use(_ o : borrowing View) {}
 // CHECK:   apply %{{.*}}([[VIEW]]) : $@convention(thin) (@guaranteed View) -> ()
 // CHECK:   release_value [[VIEW]]
 // CHECK:   release_value [[WRAPPER]]
-// CHECK:   %24 = end_apply [[TOKEN1]] as $()
+// CHECK:   end_apply [[TOKEN1]] as $()
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   destroy_addr [[NC]]
 // CHECK-LABEL: } // end sil function '$s9coroutine20testDoubleNestedRead2ncyAA11NCContainerVn_tF'

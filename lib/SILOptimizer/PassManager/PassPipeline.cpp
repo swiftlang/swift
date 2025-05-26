@@ -1082,6 +1082,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
 
+  // Even at Onone it's important to remove copies of structs, especially if they are large.
+  P.addMandatoryTempRValueElimination();
+
   // If we are asked to stop optimizing before lowering ownership, do so now.
   if (P.Options.StopOptimizationBeforeLoweringOwnership)
     return P;
