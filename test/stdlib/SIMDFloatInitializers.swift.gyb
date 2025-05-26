@@ -53,7 +53,7 @@ func repeating${n}x${bits}(_ scalar: ${scalar}) -> SIMD${n}<${scalar}> {
 func concat4x16(_ a: SIMD4<Float16>, _ b: SIMD4<Float16>) -> SIMD8<Float16> {
   SIMD8(lowHalf: a, highHalf: b)
 }
-// CHECK-arm64: _$s21SIMDFloatInitializers10concat4x16ys5SIMD8Vys7Float16VGs5SIMD4VyAFG_AJtF:
+// CHECK-arm64: s21SIMDFloatInitializers10concat4x16ys5SIMD8Vys7Float16VGs5SIMD4VyAFG_AJtF:
 // CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
 // CHECKO-arm64-NEXT: ret
 
@@ -61,25 +61,25 @@ func concat4x16(_ a: SIMD4<Float16>, _ b: SIMD4<Float16>) -> SIMD8<Float16> {
 func concat8x16(_ a: SIMD8<Float16>, _ b: SIMD8<Float16>) -> SIMD16<Float16> {
   SIMD16(lowHalf: a, highHalf: b)
 }
-// CHECK-arm64: _$s21SIMDFloatInitializers10concat8x16ys6SIMD16Vys7Float16VGs5SIMD8VyAFG_AJtF:
+// CHECK-arm64: s21SIMDFloatInitializers10concat8x16ys6SIMD16Vys7Float16VGs5SIMD8VyAFG_AJtF:
 // CHECKO-arm64-NEXT: ret
 #endif
 
 func concat2x32(_ a: SIMD2<Float>, _ b: SIMD2<Float>) -> SIMD4<Float> {
   SIMD4(lowHalf: a, highHalf: b)
 }
-// CHECK: _$s21SIMDFloatInitializers10concat2x32ys5SIMD4VySfGs5SIMD2VySfG_AHtF:
+// CHECK: s21SIMDFloatInitializers10concat2x32ys5SIMD4VySfGs5SIMD2VySfG_AHtF:
 // CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
 // CHECKO-arm64-NEXT: ret
 
 func concat4x32(_ a: SIMD4<Float>, _ b: SIMD4<Float>) -> SIMD8<Float> {
   SIMD8(lowHalf: a, highHalf: b)
 }
-// CHECK: _$s21SIMDFloatInitializers10concat4x32ys5SIMD8VySfGs5SIMD4VySfG_AHtF:
+// CHECK: s21SIMDFloatInitializers10concat4x32ys5SIMD8VySfGs5SIMD4VySfG_AHtF:
 // CHECKO-arm64-NEXT: ret
 
 func concat2x64(_ a: SIMD2<Double>, _ b: SIMD2<Double>) -> SIMD4<Double> {
   SIMD4(lowHalf: a, highHalf: b)
 }
-// CHECK: _$s21SIMDFloatInitializers10concat2x64ys5SIMD4VySdGs5SIMD2VySdG_AHtF:
+// CHECK: s21SIMDFloatInitializers10concat2x64ys5SIMD4VySdGs5SIMD2VySdG_AHtF:
 // CHECKO-arm64-NEXT: ret
