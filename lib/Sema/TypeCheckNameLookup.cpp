@@ -850,6 +850,7 @@ struct MissingImportFixItInfo {
 class MissingImportFixItCache {
   SourceFile &sf;
   llvm::DenseMap<const ModuleDecl *, MissingImportFixItInfo> infos;
+  bool internalImportsByDefaultEnabled;
 
   MissingImportFixItInfo getFixItInfo(ModuleDecl *mod) {
     auto existing = infos.find(mod);
@@ -881,15 +882,29 @@ class MissingImportFixItCache {
 
     // Add an appropriate access level as long as it would not conflict with
     // existing imports that lack access levels.
-    if (!foundImport || anyImportHasAccessLevel)
-      info.accessLevel = sf.getMaxAccessLevelUsingImport(mod);
+    auto accessLevelForImport = [&]() -> std::optional<AccessLevel> {
+      auto maxAccessLevel = sf.getMaxAccessLevelUsingImport(mod);
+      if (internalImportsByDefaultEnabled) {
+        if (!foundImport && maxAccessLevel <= AccessLevel::Internal)
+          return std::nullopt;
+      }
 
+      if (foundImport && !anyImportHasAccessLevel)
+        return std::nullopt;
+
+      return maxAccessLevel;
+    };
+
+    info.accessLevel = accessLevelForImport();
     infos[mod] = info;
     return info;
   }
 
 public:
-  MissingImportFixItCache(SourceFile &sf) : sf(sf) {};
+  MissingImportFixItCache(SourceFile &sf) : sf(sf) {
+    internalImportsByDefaultEnabled = sf.getASTContext().LangOpts.hasFeature(
+        Feature::InternalImportsByDefault);
+  };
 
   std::pair<SmallVector<ModuleDecl *, 2>,
             SmallVector<MissingImportFixItInfo, 2>>
