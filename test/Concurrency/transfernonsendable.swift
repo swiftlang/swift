@@ -1773,7 +1773,7 @@ extension MyActor {
         _ = sc
 
         Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(priority:operation:)' risks causing races in between local and caller code}}
+          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
           _ = sc
         }
 
@@ -1981,7 +1981,7 @@ func mutableLocalCaptureDataRace() async {
   _ = x
 
   Task.detached { x = 1 } // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
 
   x = 2 // expected-tns-note {{access can happen concurrently}}
 }
@@ -1991,7 +1991,7 @@ func mutableLocalCaptureDataRace2() async {
   x = 0
 
   Task.detached { x = 1 } // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(priority:operation:)' risks causing races in between local and caller code}}
+  // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
 
   print(x) // expected-tns-note {{access can happen concurrently}}
 }
