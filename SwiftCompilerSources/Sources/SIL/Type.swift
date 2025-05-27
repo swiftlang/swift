@@ -105,6 +105,19 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.isAddressableForDeps(function.bridged)
   }
 
+  public enum CustomDeinitProperty {
+    case HasOnlyDefaultDeinit
+    case MayHaveCustomDeinit
+  }
+
+  /// True if a value of this type can have its address taken by a lifetime-dependent value.
+  public func hasCustomDeinit(in function: Function) -> CustomDeinitProperty {
+    if bridged.hasCustomDeinit(function.bridged) {
+      return .MayHaveCustomDeinit
+    }
+    return .HasOnlyDefaultDeinit
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//

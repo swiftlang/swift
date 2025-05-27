@@ -380,6 +380,15 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
   return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
+bool BridgedType::hasCustomDeinit(BridgedFunction f) const {
+  switch (unbridged().hasCustomDeinit(*f.getFunction())) {
+  case swift::HasOnlyDefaultDeinit:
+    return false;
+  case swift::MayHaveCustomDeinit:
+    return true;
+  }
+}
+
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
 }
