@@ -845,6 +845,14 @@ std::string mangledNameForTypeMetadataAccessor(
     llvm::StringRef moduleName, llvm::StringRef typeName, Node::Kind typeKind,
     Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
 
+/// Base class for printing a Swift demangled node tree.
+///
+/// NodePrinter is used to convert demangled Swift symbol nodes into
+/// human-readable string representations. It handles formatting, indentation,
+/// and Swift-specific syntax.
+///
+/// The virtual methods in this class are meant to be overriden to allow external
+/// consumers (e.g lldb) to track the ranges of components of the demangled name.
 class NodePrinter {
 protected:
   DemanglerPrinter Printer;
