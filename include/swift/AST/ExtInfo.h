@@ -740,11 +740,18 @@ public:
                              globalActor, thrownError, lifetimeDependencies);
   }
 
+  /// \p lifetimeDependencies should be arena allocated and not a temporary
+  /// Function types are allocated on the are arena and their ExtInfo should be
+  /// valid throughout their lifetime.
   [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
       llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) const {
     return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
                              lifetimeDependencies);
   }
+
+  [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
+      SmallVectorImpl<LifetimeDependenceInfo> lifetimeDependencies) const =
+      delete;
 
   [[nodiscard]]
   ASTExtInfoBuilder withIsolation(FunctionTypeIsolation isolation) const {
@@ -920,10 +927,17 @@ public:
       .build();
   }
 
+  /// \p lifetimeDependencies should be arena allocated and not a temporary
+  /// Function types are allocated on the are arena and their ExtInfo should be
+  /// valid throughout their lifetime.
   [[nodiscard]] ASTExtInfo withLifetimeDependencies(
       ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) const {
     return builder.withLifetimeDependencies(lifetimeDependencies).build();
   }
+
+  [[nodiscard]] ASTExtInfo withLifetimeDependencies(
+      SmallVectorImpl<LifetimeDependenceInfo> lifetimeDependencies) const =
+      delete;
 
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 
@@ -1227,10 +1241,18 @@ public:
     return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical(),
                              lifetimeDependencies);
   }
+
+  /// \p lifetimeDependencies should be arena allocated and not a temporary
+  /// Function types are allocated on the are arena and their ExtInfo should be
+  /// valid throughout their lifetime.
   [[nodiscard]] SILExtInfoBuilder withLifetimeDependencies(
       ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo) const {
     return SILExtInfoBuilder(bits, clangTypeInfo, lifetimeDependenceInfo);
   }
+
+  [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
+      SmallVectorImpl<LifetimeDependenceInfo> lifetimeDependencies) const =
+      delete;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(bits);
@@ -1368,10 +1390,16 @@ public:
     return builder.withUnimplementable(isUnimplementable).build();
   }
 
+  /// \p lifetimeDependencies should be arena allocated and not a temporary
+  /// Function types are allocated on the are arena and their ExtInfo should be
+  /// valid throughout their lifetime.
   SILExtInfo withLifetimeDependencies(
       ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) const {
     return builder.withLifetimeDependencies(lifetimeDependencies);
   }
+
+  SILExtInfo withLifetimeDependencies(SmallVectorImpl<LifetimeDependenceInfo>
+                                          lifetimeDependencies) const = delete;
 
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 
