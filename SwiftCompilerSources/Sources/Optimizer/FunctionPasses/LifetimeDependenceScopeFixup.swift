@@ -329,7 +329,7 @@ private struct ScopeExtension {
 // violation, and that subsequent optimizations do not shrink the inner access `%a1`.
 extension ScopeExtension {
   mutating func extendScopes(dependence: LifetimeDependence) -> Bool {
-    log("Scope fixup for lifetime dependent instructions: \(dependence)")
+    log("Scope fixup for lifetime dependent instructions:\n\(dependence)")
 
     gatherExtensions(dependence: dependence)
 
