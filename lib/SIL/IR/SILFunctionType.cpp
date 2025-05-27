@@ -59,12 +59,10 @@ SILType SILFunctionType::substInterfaceType(SILModule &M,
   return interfaceType;
 }
 
-SILFunctionType::ExtInfo
-SILFunctionType::getSubstLifetimeDependencies(GenericSignature genericSig,
-                                              ExtInfo origExtInfo,
-                                              ArrayRef<SILParameterInfo> params,
-                                              ArrayRef<SILYieldInfo> yields,
-                                              ArrayRef<SILResultInfo> results) {
+SILFunctionType::ExtInfo SILFunctionType::getSubstLifetimeDependencies(
+    GenericSignature genericSig, ExtInfo origExtInfo, ASTContext &context,
+    ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
+    ArrayRef<SILResultInfo> results) {
   if (origExtInfo.getLifetimeDependencies().empty()) {
     return origExtInfo;
   }
@@ -87,7 +85,8 @@ SILFunctionType::getSubstLifetimeDependencies(GenericSignature genericSig,
       }
     });
   if (didRemoveLifetimeDependencies) {
-    return origExtInfo.withLifetimeDependencies(substLifetimeDependencies);
+    return origExtInfo.withLifetimeDependencies(
+        context.AllocateCopy(substLifetimeDependencies));
   }
   return origExtInfo;
 }
@@ -131,10 +130,10 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
 
   auto signature = isPolymorphic() ? getInvocationGenericSignature()
                                    : CanGenericSignature();
-  
-  auto extInfo = getSubstLifetimeDependencies(signature, getExtInfo(),
-                                              params, yields, results);
-  
+
+  auto extInfo = getSubstLifetimeDependencies(
+      signature, getExtInfo(), getASTContext(), params, yields, results);
+
   return SILFunctionType::get(signature,
                               extInfo,
                               getCoroutineKind(),
@@ -2855,7 +2854,7 @@ static CanSILFunctionType getSILFunctionType(
           .withSendable(isSendable)
           .withAsync(isAsync)
           .withUnimplementable(unimplementable)
-          .withLifetimeDependencies(loweredLifetimes)
+          .withLifetimeDependencies(TC.Context.AllocateCopy(loweredLifetimes))
           .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
