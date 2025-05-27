@@ -322,11 +322,12 @@ BridgedDifferentiableAttr BridgedDifferentiableAttr_createParsed(
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
-    BridgedDeclNameRef cReplacedFunction, BridgedSourceLoc cRParenLoc) {
+    BridgedDeclNameRef cReplacedFunction,
+    BridgedDeclNameLoc cReplacedFunctionLoc, BridgedSourceLoc cRParenLoc) {
   return DynamicReplacementAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cAttrNameLoc.unbridged(),
       cLParenLoc.unbridged(), cReplacedFunction.unbridged(),
-      cRParenLoc.unbridged());
+      cReplacedFunctionLoc.unbridged(), cRParenLoc.unbridged());
 }
 
 BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
@@ -853,8 +854,8 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs) {
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
   SmallVector<Identifier, 2> spiGroups;
   for (auto bridging : cSPIGroups.unbridged<BridgedIdentifier>())
     spiGroups.push_back(bridging.unbridged());
@@ -865,7 +866,8 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
   return SpecializeAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       cWhereClause.unbridged(), exported, unbridge(cKind),
-      cTargetFunction.unbridged(), spiGroups, availableAttrs);
+      cTargetFunction.unbridged(), cTargetFunctionLoc.unbridged(),
+      spiGroups, availableAttrs);
 }
 
 BridgedSPIAccessControlAttr BridgedSPIAccessControlAttr_createParsed(
