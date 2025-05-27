@@ -12,13 +12,14 @@ func unrollLetArrayLiteralTest() {
   // CHECK: [[LIT2:%[0-9]+]] = integer_literal $Builtin.Int64, 27
   // CHECK: [[INT2:%[0-9]+]] = struct $Int64 ([[LIT2]] : $Builtin.Int64)
   // CHECK-NOT: forEach
+  // CHECK: [[NEVER:%[0-9]+]] = alloc_stack $Never
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $Int64
   // CHECK: store [[INT1]] to [[STACK]]
-  // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[NEVER]], [[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[INT2]] to [[STACK]] : $*Int64
-  // CHECK: try_apply {{.*}}([[STACK]])
+  // CHECK: try_apply {{.*}}([[NEVER]], [[STACK]])
 }
 
 // CHECK-LABEL: sil hidden @$s25for_each_loop_unroll_test0D35LetArrayLiteralWithVariableElements1x1yys5Int64V_AFtF
@@ -26,13 +27,14 @@ func unrollLetArrayLiteralWithVariableElements(x: Int64, y: Int64) {
   let a = [x, y]
   a.forEach { print($0) }
   // CHECK-NOT: forEach
+  // CHECK: [[NEVER:%[0-9]+]] = alloc_stack $Never
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $Int64
   // CHECK: store %0 to [[STACK]]
-  // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[NEVER]], [[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store %1 to [[STACK]] : $*Int64
-  // CHECK: try_apply {{.*}}([[STACK]])
+  // CHECK: try_apply {{.*}}([[NEVER]], [[STACK]])
 }
 
 // CHECK-LABEL: sil hidden @$s25for_each_loop_unroll_test0D37LetArrayLiteralWithNonTrivialElementsyyF
@@ -48,13 +50,14 @@ func unrollLetArrayLiteralWithNonTrivialElements() {
   // CHECK: [[STRING2:%[0-9]+]] = apply [[STRING_INIT2]]([[LIT2]],
 
   // CHECK-NOT: forEach
+  // CHECK: [[NEVER:%[0-9]+]] = alloc_stack $Never
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $String
   // CHECK: store [[STRING1]] to [[STACK]] : $*String
-  // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[NEVER]], [[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[STRING2]] to [[STACK]] : $*String
-  // CHECK: try_apply {{.*}}([[STACK]])
+  // CHECK: try_apply {{.*}}([[NEVER]], [[STACK]])
 }
 
 // This test mimics the array literal and forEach created by the OSLogOptimization pass.
@@ -73,13 +76,14 @@ func unrollLetArrayLiteralWithClosures(i: Int32, j: Int32) {
   // CHECK: store [[CLOSURE2:%[0-9]+]] to [[INDEX1]]
   
   // CHECK-NOT: forEach
+  // CHECK: [[NEVER:%[0-9]+]] = alloc_stack $Never
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack
   // CHECK: store [[CLOSURE1]] to [[STACK]]
-  // CHECK: try_apply %{{.*}}([[STACK]]) : ${{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+  // CHECK: try_apply %{{.*}}([[NEVER]], [[STACK]]) : ${{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[CLOSURE2]] to [[STACK]]
-  // CHECK: try_apply {{.*}}([[STACK]])
+  // CHECK: try_apply {{.*}}([[NEVER]], [[STACK]])
 }
 
 // CHECK-LABEL: sil hidden @$s25for_each_loop_unroll_test0E16NoUnrollScenarioyyF
