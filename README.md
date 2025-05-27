@@ -19,7 +19,6 @@
 | **wasm32-unknown-wasi** |[![wasm32-unknown-wasi Build Status](https://ci.swift.org/job/oss-swift-pr-test-crosscompile-wasm-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-pr-test-crosscompile-wasm-ubuntu-20_04)|
 |**Community-Hosted CI Platforms**||
 |**[Android](https://github.com/swiftlang/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_24_04_android.json)** | [![Android x86_64 Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build) [![Android aarch64 Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64)|
-|**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019_VS2019.json)** | [![Windows 2019 x86_64 Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019)|
 
 ## Welcome to Swift
 
