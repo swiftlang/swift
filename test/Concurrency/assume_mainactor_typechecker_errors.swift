@@ -55,14 +55,14 @@ func unspecifiedFunctionTest2() async {
 nonisolated func nonisolatedFunctionTest() async {
   let k = await StructContainingKlass()
   await unspecifiedAsync(k.k)
-  // expected-swift5-warning@-1 {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
-  // expected-swift6-error@-2 {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
+  // expected-swift5-warning@-1 {{non-Sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
+  // expected-swift6-error@-2 {{non-Sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
   await nonisolatedAsync(k.k)
-  // expected-swift5-warning@-1 {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
-  // expected-swift6-error@-2 {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
+  // expected-swift5-warning@-1 {{non-Sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
+  // expected-swift6-error@-2 {{non-Sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
   await mainActorAsync(k.k)
-  // expected-swift5-warning@-1 {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
-  // expected-swift6-error@-2 {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
+  // expected-swift5-warning@-1 {{non-Sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
+  // expected-swift6-error@-2 {{non-Sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
 }
 
 func testTask() async {
