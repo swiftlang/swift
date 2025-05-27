@@ -1810,6 +1810,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
@@ -3328,7 +3329,6 @@ if (-not $SkipBuild) {
 
   foreach ($Platform in $WindowsSDKPlatforms) {
     Invoke-BuildStep Build-SDK $Platform
-    Invoke-BuildStep Build-ExperimentalSDK $Platform
 
     Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
       Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
@@ -3338,16 +3338,25 @@ if (-not $SkipBuild) {
     Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
   }
 
-  Write-PlatformInfoPlist Windows
   Install-SDK $WindowsSDKPlatforms
   Write-SDKSettings Windows
+
+  foreach ($Platform in $WindowsSDKPlatforms) {
+    Invoke-BuildStep Build-ExperimentalSDK $Platform
+    Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+    }
+  }
+
   Install-SDK $WindowsSDKPlatforms -Identifier WindowsExperimental
   Write-SDKSettings Windows -Identifier WindowsExperimental
+
+  Write-PlatformInfoPlist Windows
 
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
       Invoke-BuildStep Build-SDK $Platform
-      Invoke-BuildStep Build-ExperimentalSDK $Platform
 
       Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
         Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
@@ -3355,11 +3364,21 @@ if (-not $SkipBuild) {
       }
     }
 
-    Write-PlatformInfoPlist Android
     Install-SDK $AndroidSDKPlatforms
     Write-SDKSettings Android
-    Install-SDK $AndroidSDKPlatforms -Identifiers AndroidExperimental
+
+    foreach ($Platform in $AndroidSDKPlatforms) {
+      Invoke-BuildStep Build-ExperimentalSDK $Platform
+      Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android\$($Platform.Architecture.LLVMName)\" | Out-Null
+      }
+    }
+
+    Install-SDK $AndroidSDKPlatforms -Identifier AndroidExperimental
     Write-SDKSettings Android -Identifier AndroidExperimental
+
+    Write-PlatformInfoPlist Android
 
     # Android swift-inspect only supports 64-bit platforms.
     $AndroidSDKPlatforms | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
