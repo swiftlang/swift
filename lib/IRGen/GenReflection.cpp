@@ -946,35 +946,13 @@ private:
     B.addInt16(uint16_t(kind));
     B.addInt16(FieldRecordSize);
 
-    // Filter to select which fields we'll export FieldDescriptors for.
-    auto exportable_field =
-      [](Field field) {
-        // Don't export private C++ fields that were imported as private Swift fields.
-        // The type of a private field might not have all the type witness
-        // operations that Swift requires, for instance,
-        // `std::unique_ptr<IncompleteType>` would not have a destructor.
-        if (field.getKind() == Field::Kind::Var &&
-            field.getVarDecl()->getClangDecl() &&
-            field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
-          return false;
-        // All other fields are exportable
-        return true;
-      };
-
-    // Count exportable fields
-    int exportableFieldCount = 0;
-    forEachField(IGM, NTD, [&](Field field) {
-      if (exportable_field(field)) {
-        ++exportableFieldCount;
-      }
-    });
-
     // Emit exportable fields, prefixed with a count
-    B.addInt32(exportableFieldCount);
+    B.addInt32(countExportableFields(IGM, NTD));
+
+    // Filter to select which fields we'll export FieldDescriptor for.
     forEachField(IGM, NTD, [&](Field field) {
-      if (exportable_field(field)) {
+      if (isExportableField(field))
         addField(field);
-      }
     });
   }
 
