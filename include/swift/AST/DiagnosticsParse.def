@@ -2187,5 +2187,12 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
+//------------------------------------------------------------------------------
+// MARK: using @<attribute> or using <identifier>
+//------------------------------------------------------------------------------
+ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
+      "'using' declaration does not support %0 %select{modifier|attribute}1",
+      (Identifier, bool))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
