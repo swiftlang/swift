@@ -973,7 +973,7 @@ private:
 
   /// Return the DIFile that is the ancestor of Scope.
   llvm::DIFile *getFile(llvm::DIScope *Scope) {
-    while (!isa<llvm::DIFile>(Scope)) {
+    while (Scope && !isa<llvm::DIFile>(Scope)) {
       switch (Scope->getTag()) {
       case llvm::dwarf::DW_TAG_lexical_block:
         Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
@@ -987,7 +987,10 @@ private:
       if (Scope)
         return MainFile;
     }
-    return cast<llvm::DIFile>(Scope);
+    if (Scope)
+      return cast<llvm::DIFile>(Scope);
+
+    return MainFile;
   }
 
   static unsigned getStorageSizeInBits(const llvm::DataLayout &DL,
@@ -3201,6 +3204,11 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
       Name = getName(DS->Loc);
   }
 
+  llvm::DISubprogram *ReplaceableType = DBuilder.createTempFunctionFwdDecl(
+      nullptr, Name, LinkageName, 0, 0, nullptr, 0);
+  auto FwdDecl = llvm::TempDISubprogram(ReplaceableType);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(FwdDecl.get());
+
   /// The source line used for the function prologue.
   unsigned ScopeLine = 0;
   FileAndLocation L;
@@ -3329,6 +3337,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (!DS)
     return nullptr;
 
+  DBuilder.replaceTemporary(std::move(FwdDecl), SP);
   ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
