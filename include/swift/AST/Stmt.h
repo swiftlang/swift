@@ -727,8 +727,6 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-  ///    the self condition is a `LoadExpr`.
   bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false) const;
 
   SourceLoc getStartLoc() const;
@@ -838,8 +836,6 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-  ///    the self condition is a `LoadExpr`.
   bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false) const;
 
   static bool classof(const Stmt *S) {
