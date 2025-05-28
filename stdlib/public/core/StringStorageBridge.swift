@@ -96,19 +96,19 @@ extension _AbstractStringStorage {
   }
   
   @_effects(readonly)
-  internal func _maximumLengthOfBytes(using encoding: UInt) -> Int {
+  internal func _maximumLengthOfBytes(using encoding: UInt) -> UInt {
     switch encoding {
     case _cocoaASCIIEncoding, _cocoaMacRomanEncoding:
-      if isASCII) {
-        return count
+      if isASCII {
+        return UInt(count)
       }
-      return UTF16Count // This is weird but it's what NSString does
+      return UInt(UTF16Length) // This is weird but it's what NSString does
     case _cocoaUTF8Encoding:
-      return count
+      return UInt(count)
     case _cocoaUTF16Encoding:
       // Worst case scenario for UTF8 -> UTF16 is ASCII, 1 byte -> 2 bytes
-      let (overflow, len) = count.multipliedReportingOverflow(by: 2)
-      return overflow ? 0 : len
+      let (len, overflow) = count.multipliedReportingOverflow(by: 2)
+      return overflow ? 0 : UInt(len)
     default:
       return _cocoaMaximumLengthForEncodingTrampoline(self, encoding)
     }
@@ -118,17 +118,17 @@ extension _AbstractStringStorage {
   internal func _lengthOfBytes(using encoding: UInt) -> UInt {
     switch encoding {
     case _cocoaASCIIEncoding, _cocoaMacRomanEncoding:
-      if isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
-        return count
+      if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return UInt(count)
       }
       return 0
     case _cocoaUTF8Encoding:
-      return count
+      return UInt(count)
     case _cocoaUTF16Encoding:
-      return UTF16Count
+      return UInt(UTF16Length)
     case _cocoaMacRomanEncoding:
-      if isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
-        return count
+      if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return UInt(count)
       }
       fallthrough
     default:
@@ -280,7 +280,7 @@ extension __StringStorage {
   
   @objc(maximumLengthOfBytesUsingEncoding:)
   @_effects(readonly)
-  final internal func maximumLengthOfBytes(using encoding: UInt) -> Int {
+  final internal func maximumLengthOfBytes(using encoding: UInt) -> UInt {
     _maximumLengthOfBytes(using: encoding)
   }
   
@@ -357,7 +357,7 @@ extension __SharedStringStorage {
   
   @objc(maximumLengthOfBytesUsingEncoding:)
   @_effects(readonly)
-  final internal func maximumLengthOfBytes(using encoding: UInt) -> Int {
+  final internal func maximumLengthOfBytes(using encoding: UInt) -> UInt {
     _maximumLengthOfBytes(using: encoding)
   }
   
