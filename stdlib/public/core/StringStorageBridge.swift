@@ -16,6 +16,8 @@ import SwiftShims
 
 internal var _cocoaASCIIEncoding:UInt { 1 } /* NSASCIIStringEncoding */
 internal var _cocoaUTF8Encoding:UInt { 4 } /* NSUTF8StringEncoding */
+internal var _cocoaUTF16Encoding:UInt { 10 } /* NSUTF16StringEncoding and NSUnicodeStringEncoding*/
+internal var _cocoaMacRomanEncoding:UInt { 30 } /* NSMacOSRomanStringEncoding */
 
 extension String {
   @available(SwiftStdlib 5.6, *)
@@ -69,13 +71,14 @@ extension _AbstractStringStorage {
   ) -> Int8 {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
+         (_cocoaMacRomanEncoding, true),
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       unsafe outputPtr.initialize(from: start, count: count)
       unsafe outputPtr[count] = 0
       return 1
     default:
-      return  unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
+      return unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
     }
   }
 
@@ -84,10 +87,52 @@ extension _AbstractStringStorage {
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
+         (_cocoaMacRomanEncoding, true),
          (_cocoaUTF8Encoding, _):
       return unsafe start
     default:
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @_effects(readonly)
+  internal func _maximumLengthOfBytes(using encoding: UInt) -> Int {
+    switch encoding {
+    case _cocoaASCIIEncoding, _cocoaMacRomanEncoding:
+      if isASCII) {
+        return count
+      }
+      return UTF16Count // This is weird but it's what NSString does
+    case _cocoaUTF8Encoding:
+      return count
+    case _cocoaUTF16Encoding:
+      // Worst case scenario for UTF8 -> UTF16 is ASCII, 1 byte -> 2 bytes
+      let (overflow, len) = count.multipliedReportingOverflow(by: 2)
+      return overflow ? 0 : len
+    default:
+      return _cocoaMaximumLengthForEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @_effects(readonly)
+  internal func _lengthOfBytes(using encoding: UInt) -> UInt {
+    switch encoding {
+    case _cocoaASCIIEncoding, _cocoaMacRomanEncoding:
+      if isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return count
+      }
+      return 0
+    case _cocoaUTF8Encoding:
+      return count
+    case _cocoaUTF16Encoding:
+      return UTF16Count
+    case _cocoaMacRomanEncoding:
+      if isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return count
+      }
+      fallthrough
+    default:
+      return _cocoaLengthOfBytesInEncodingTrampoline(self, encoding)
     }
   }
 
@@ -232,6 +277,18 @@ extension __StringStorage {
       return _cocoaUTF8Encoding
     }
   }
+  
+  @objc(maximumLengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func maximumLengthOfBytes(using encoding: UInt) -> Int {
+    _maximumLengthOfBytes(using: encoding)
+  }
+  
+  @objc(lengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func lengthOfBytes(using encoding: UInt) -> UInt {
+    _lengthOfBytes(using: encoding)
+  }
 
   @objc(isEqualToString:)
   @_effects(readonly)
@@ -296,6 +353,18 @@ extension __SharedStringStorage {
       }
       return _cocoaUTF8Encoding
     }
+  }
+  
+  @objc(maximumLengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func maximumLengthOfBytes(using encoding: UInt) -> Int {
+    _maximumLengthOfBytes(using: encoding)
+  }
+  
+  @objc(lengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func lengthOfBytes(using encoding: UInt) -> UInt {
+    _lengthOfBytes(using: encoding)
   }
 
   @objc(_fastCStringContents:)

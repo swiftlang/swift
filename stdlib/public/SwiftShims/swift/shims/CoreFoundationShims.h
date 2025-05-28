@@ -29,9 +29,11 @@ extern "C" {
 #ifdef __OBJC2__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
+typedef unsigned long long _swift_shims_NSUInteger;
 typedef signed long long _swift_shims_CFIndex;
 #else
 typedef unsigned long _swift_shims_CFHashCode;
+typedef unsigned long _swift_shims_NSUInteger;
 typedef signed long _swift_shims_CFIndex;
 #endif
 
@@ -79,6 +81,16 @@ SWIFT_RUNTIME_STDLIB_API
 const void * _Nullable
 _swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t * _Nonnull bytes,
                                                 _swift_shims_CFIndex len);
+
+SWIFT_RUNTIME_STDLIB_API
+const _swift_shims_NSUInteger
+_swift_stdlib_NSStringMaximumLengthForEncodingTrampoline(id _Nonnull obj,
+                                                         unsigned long encoding);
+
+SWIFT_RUNTIME_STDLIB_API
+const _swift_shims_NSUInteger
+_swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
+                                                        unsigned long encoding);
 
 #endif // __OBJC2__
 
