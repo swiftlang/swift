@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 #define SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 
+#include "Field.h"
 #include "NominalMetadataVisitor.h"
 #include "swift/AST/IRGenOptions.h"
 
@@ -64,8 +65,7 @@ public:
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
     for (VarDecl *prop : Target->getStoredProperties()) {
-      if (!(prop->getClangDecl() &&
-            prop->getFormalAccess() == AccessLevel::Private))
+      if (isExportableField(prop))
         asImpl().addFieldOffset(prop);
     }
 

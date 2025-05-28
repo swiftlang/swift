@@ -148,7 +148,7 @@ static bool isPackage(Type ty) {
 
 static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
   // Add exported prespecialized symbols.
-  for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
+  for (auto *attr : vd->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
     if (!attr->isExported())
       continue;
     if (attr->getTargetFunctionDecl(vd))

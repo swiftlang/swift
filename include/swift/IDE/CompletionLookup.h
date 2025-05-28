@@ -458,6 +458,8 @@ public:
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
+  void addMacroCallArguments(const MacroDecl *MD, DeclVisibilityKind Reason,
+                             bool forTrivialTrailingClosure = false);
   void addMacroExpansion(const MacroDecl *MD, DeclVisibilityKind Reason);
 
   void addKeyword(

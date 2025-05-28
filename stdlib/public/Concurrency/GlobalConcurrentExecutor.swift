@@ -35,7 +35,7 @@ import Swift
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
     if #available(SwiftStdlib 6.2, *) {
-      return Task._defaultExecutor
+      return Task.defaultExecutor
     } else {
       return _DefaultGlobalConcurrentExecutor.shared
     }

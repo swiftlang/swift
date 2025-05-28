@@ -3109,7 +3109,7 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
-bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
+bool ModuleDecl::isImportedAsSPI(const AbstractSpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto declSPIGroups = attr->getSPIGroups();
   if (shouldImplicitImportAsSPI(declSPIGroups))

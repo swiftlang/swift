@@ -472,7 +472,7 @@ public:
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     // Add exported prespecialized symbols.
-    for (auto *attr : AFD->getAttrs().getAttributes<SpecializeAttr>()) {
+    for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
         continue;
 
@@ -569,7 +569,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     // Add the property descriptor if the decl needs it.
-    if (ASD->exportsPropertyDescriptor()) {
+    if (ASD->getPropertyDescriptorGenericSignature()) {
       Visitor.addPropertyDescriptor(ASD);
     }
 

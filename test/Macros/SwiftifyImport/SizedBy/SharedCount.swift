@@ -6,15 +6,11 @@
 func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
-// CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer, _ size: CInt) {
-// CHECK-NEXT:     let _ptrCount: some BinaryInteger = size
-// CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
-// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
-// CHECK-NEXT:     }
-// CHECK-NEXT:     let _ptr2Count: some BinaryInteger = size
-// CHECK-NEXT:     if ptr2.count < _ptr2Count || _ptr2Count < 0 {
-// CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer) {
+// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr.count)!
+// CHECK-NEXT:     if unsafe ptr2.count != size {
+// CHECK-NEXT:       fatalError("bounds check failure in myFunc: expected \(size) but got \(unsafe ptr2.count)")
 // CHECK-NEXT:     }
 // CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, size)
 // CHECK-NEXT: }

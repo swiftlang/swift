@@ -13,7 +13,7 @@
 import Swift
 
 @available(SwiftStdlib 6.2, *)
-public struct _PlatformExecutorFactory: _ExecutorFactory {
-  public static let mainExecutor: any _MainExecutor = _DummyMainExecutor()
-  public static let defaultExecutor: any TaskExecutor = _DummyTaskExecutor()
+public struct PlatformExecutorFactory: ExecutorFactory {
+  public static let mainExecutor: any MainExecutor = DummyMainExecutor()
+  public static let defaultExecutor: any TaskExecutor = DummyTaskExecutor()
 }

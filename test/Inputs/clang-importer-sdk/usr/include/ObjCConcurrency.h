@@ -260,7 +260,7 @@ typedef NS_ERROR_ENUM(unsigned, SendableErrorCode, SendableErrorDomain) {
 typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
   NonSendableErrorCodeFoo, NonSendableErrorCodeBar
 } NONSENDABLE;
-// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
+// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-Sendable because Swift errors are always sendable}}
 
 UI_ACTOR
 @interface PictureFrame : NSObject

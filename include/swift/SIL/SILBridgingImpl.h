@@ -1425,24 +1425,24 @@ BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceInst_de
   return (MarkDependenceKind)getAs<swift::MarkDependenceInst>()->dependenceKind();
 }
 
-void BridgedInstruction::MarkDependenceInst_resolveToNonEscaping() const {
-  getAs<swift::MarkDependenceInst>()->resolveToNonEscaping();
+void BridgedInstruction::MarkDependenceInstruction_resolveToNonEscaping() const {
+  if (auto *mdi = llvm::dyn_cast<swift::MarkDependenceInst>(unbridged())) {
+    mdi->resolveToNonEscaping();
+  } else {
+    getAs<swift::MarkDependenceAddrInst>()->resolveToNonEscaping();
+  }
 }
 
-void BridgedInstruction::MarkDependenceInst_settleToEscaping() const {
-  getAs<swift::MarkDependenceInst>()->settleToEscaping();
+void BridgedInstruction::MarkDependenceInstruction_settleToEscaping() const {
+  if (auto *mdi = llvm::dyn_cast<swift::MarkDependenceInst>(unbridged())) {
+    mdi->settleToEscaping();
+  } else {
+    getAs<swift::MarkDependenceAddrInst>()->settleToEscaping();
+  }
 }
 
 BridgedInstruction::MarkDependenceKind BridgedInstruction::MarkDependenceAddrInst_dependenceKind() const {
   return (MarkDependenceKind)getAs<swift::MarkDependenceAddrInst>()->dependenceKind();
-}
-
-void BridgedInstruction::MarkDependenceAddrInst_resolveToNonEscaping() const {
-  getAs<swift::MarkDependenceAddrInst>()->resolveToNonEscaping();
-}
-
-void BridgedInstruction::MarkDependenceAddrInst_settleToEscaping() const {
-  getAs<swift::MarkDependenceAddrInst>()->settleToEscaping();
 }
 
 SwiftInt BridgedInstruction::BeginAccessInst_getAccessKind() const {
