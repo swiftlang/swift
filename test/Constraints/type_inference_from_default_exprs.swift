@@ -170,8 +170,9 @@ func main() {
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
   
   testS72199_2(x: 0)
-  testS72199_3(ys: 1, 1)
+  testS72199_3(xs: 0, 0)
   testS72199_4(x: 0)
+  testS72199_5(x: 0)
 }
 
 func test_magic_defaults() {
@@ -281,7 +282,9 @@ enum S72199_1 {
 }
 
 func testS72199_2<T: P>(x: T.X, y: T = S()) { } // Ok
-func testS72199_3<each T: P>(xs: (repeat each T) = (S(), S()), ys: repeat (each T).X) {} // Ok?
+func testS72199_3<each T: P>(xs: repeat (each T).X, ys: (repeat each T) = (S(), S())) {} // Ok
 
 typealias S72199_4<T> = Int
-func testS72199_4<T>(x: S72199_4<T>, y: T = "") {}
+func testS72199_4<T>(x: S72199_4<T>, y: T = "") {} // Ok
+
+func testS72199_5<T: P>(x: T, y: (T, T.X) = (S(), 0)) {} // Ok

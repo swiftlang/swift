@@ -645,7 +645,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       collectReferencedGenericParams(anchorTy->getParams()[i].getPlainType(), referencedGenericParams);
 
       for (auto can : referencedGenericParams) {
-        if (inferrableParams.contains(can)) {
+        if (can->is<GenericTypeParamType>() && inferrableParams.contains(can)) {
           affectedParams.push_back(i);
           break;
         }
