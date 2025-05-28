@@ -1076,7 +1076,7 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   }
 
   mutating func yieldedDependence(result: Operand) -> WalkResult {
-    return .continueWalk
+    return visitor(result)
   }
 
   mutating func storeToYieldDependence(address: Value, of operand: Operand) -> WalkResult {
