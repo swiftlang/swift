@@ -687,88 +687,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   return mainDependencies;
 }
 
-/// Retrieve the module dependencies for the Clang module with the given name.
-std::optional<const ModuleDependencyInfo *>
-ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
-    StringRef moduleName, ModuleDependenciesCache &cache,
-    ModuleDependencyIDSetVector &discoveredClangModules) {
-  // Check whether we've cached this result.
-  auto moduleID = ModuleDependencyID{moduleName.str(),
-                                     ModuleDependencyKind::Clang};
-  if (auto found = cache.findDependency(moduleID)) {
-    discoveredClangModules.insert(moduleID);
-    auto directClangDeps = cache.getImportedClangDependencies(moduleID);
-    ModuleDependencyIDSetVector reachableClangModules;
-    reachableClangModules.insert(directClangDeps.begin(),
-                                 directClangDeps.end());
-    for (unsigned currentModuleIdx = 0;
-         currentModuleIdx < reachableClangModules.size();
-         ++currentModuleIdx) {
-      auto moduleID = reachableClangModules[currentModuleIdx];
-      auto dependencies =
-        cache.findKnownDependency(moduleID).getImportedClangDependencies();
-      reachableClangModules.insert(dependencies.begin(), dependencies.end());
-    }
-    discoveredClangModules.insert(reachableClangModules.begin(),
-                                  reachableClangModules.end());
-    return found;
-  }
-
-  // Otherwise perform filesystem scan
-  auto moduleIdentifier = getModuleImportIdentifier(moduleName);
-  auto moduleDependencies = withDependencyScanningWorker(
-      [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
-        return ScanningWorker->scanFilesystemForClangModuleDependency(
-          moduleIdentifier, cache.getModuleOutputPath(),
-          cache.getSDKModuleOutputPath(),
-          cache.getAlreadySeenClangModules(),
-          cache.getScanService().getPrefixMapper());
-      });
-  if (moduleDependencies.empty())
-    return std::nullopt;
-
-  discoveredClangModules.insert(moduleID);
-  for (const auto &dep : moduleDependencies)
-    discoveredClangModules.insert(dep.first);
-
-  cache.recordDependencies(moduleDependencies, Diagnostics);
-  return cache.findDependency(moduleID);
-}
-
-/// Retrieve the module dependencies for the Swift module with the given name.
-std::optional<const ModuleDependencyInfo *>
-ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
-    StringRef moduleName, ModuleDependenciesCache &cache) {
-  // Check whether we've cached this result.
-  if (auto found =
-          cache.findDependency(moduleName, ModuleDependencyKind::SwiftSource))
-    return found;
-  if (auto found = cache.findDependency(moduleName,
-                                        ModuleDependencyKind::SwiftInterface))
-    return found;
-  if (auto found =
-          cache.findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
-    return found;
-  if (auto found = cache.findDependency(moduleName,
-                                        ModuleDependencyKind::SwiftPlaceholder))
-    return found;
-
-  // Otherwise perform filesystem scan
-  auto moduleIdentifier = getModuleImportIdentifier(moduleName);
-  auto moduleDependencies = withDependencyScanningWorker(
-      [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
-        return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-          moduleIdentifier, cache.getModuleOutputPath(),
-          cache.getSDKModuleOutputPath(),
-          cache.getScanService().getPrefixMapper());
-      });
-  if (moduleDependencies.empty())
-    return std::nullopt;
-
-  cache.recordDependencies(moduleDependencies, Diagnostics);
-  return cache.findDependency(moduleName);
-}
-
 /// For the dependency set of the main module, discover all
 /// cross-import overlays and their corresponding '.swiftcrossimport'
 /// files. Cross-import overlay dependencies are required when
@@ -1080,19 +998,38 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
       // We need to query the Clang dependency scanner for this module's
       // unresolved imports
       llvm::StringSet<> resolvedImportIdentifiers;
-      for (const auto &resolvedDep : moduleDependencyInfo.getImportedSwiftDependencies())
+      for (const auto &resolvedDep :
+           moduleDependencyInfo.getImportedSwiftDependencies())
         resolvedImportIdentifiers.insert(resolvedDep.ModuleName);
 
+      // When querying a *clang* module 'CxxStdlib' we must
+      // instead expect a module called 'std'...
+      auto addCanonicalClangModuleImport =
+          [this](const ScannerImportStatementInfo &importInfo,
+                 std::vector<ScannerImportStatementInfo> &unresolvedImports,
+                 llvm::StringSet<> &unresolvedImportIdentifiers) {
+            if (importInfo.importIdentifier ==
+                ScanASTContext.Id_CxxStdlib.str()) {
+              auto canonicalImportInfo = ScannerImportStatementInfo(
+                  "std", importInfo.isExported, importInfo.importLocations);
+              unresolvedImports.push_back(canonicalImportInfo);
+              unresolvedImportIdentifiers.insert(
+                  canonicalImportInfo.importIdentifier);
+            } else {
+              unresolvedImports.push_back(importInfo);
+              unresolvedImportIdentifiers.insert(importInfo.importIdentifier);
+            }
+          };
+
       for (const auto &depImport : moduleDependencyInfo.getModuleImports())
-        if (!resolvedImportIdentifiers.contains(depImport.importIdentifier)) {
-          unresolvedImports->push_back(depImport);
-          unresolvedImportIdentifiers.insert(depImport.importIdentifier);
-        }
-      for (const auto &depImport : moduleDependencyInfo.getOptionalModuleImports())
-        if (!resolvedImportIdentifiers.contains(depImport.importIdentifier)) {
-          unresolvedOptionalImports->push_back(depImport);
-          unresolvedOptionalImportIdentifiers.insert(depImport.importIdentifier);
-        }
+        if (!resolvedImportIdentifiers.contains(depImport.importIdentifier))
+          addCanonicalClangModuleImport(depImport, *unresolvedImports,
+                                        unresolvedImportIdentifiers);
+      for (const auto &depImport :
+           moduleDependencyInfo.getOptionalModuleImports())
+        if (!resolvedImportIdentifiers.contains(depImport.importIdentifier))
+          addCanonicalClangModuleImport(depImport, *unresolvedOptionalImports,
+                                        unresolvedOptionalImportIdentifiers);
     }
   }
 

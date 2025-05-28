@@ -1396,6 +1396,15 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
     BridgedArrayRef cAvailableAttrs);
 
+SWIFT_NAME("BridgedSpecializedAttr.createParsed(_:atLoc:range:whereClause:"
+           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
+    bool exported, BridgedSpecializationKind cKind,
+    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs);
+
 SWIFT_NAME(
     "BridgedSPIAccessControlAttr.createParsed(_:atLoc:range:spiGroupName:)")
 BridgedSPIAccessControlAttr BridgedSPIAccessControlAttr_createParsed(

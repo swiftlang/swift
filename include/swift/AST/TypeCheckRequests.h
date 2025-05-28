@@ -64,7 +64,7 @@ struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class ReturnStmt;
-class SpecializeAttr;
+class AbstractSpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
@@ -648,7 +648,7 @@ struct WhereClauseOwner {
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
   llvm::PointerUnion<GenericParamList *, TrailingWhereClause *,
-                     SpecializeAttr *, DifferentiableAttr *>
+                     AbstractSpecializeAttr *, DifferentiableAttr *>
       source;
 
   WhereClauseOwner() : dc(nullptr) {}
@@ -662,7 +662,7 @@ struct WhereClauseOwner {
   WhereClauseOwner(DeclContext *dc, TrailingWhereClause *where)
       : dc(dc), source(where) {}
 
-  WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+  WhereClauseOwner(DeclContext *dc, AbstractSpecializeAttr *attr)
       : dc(dc), source(attr) {}
 
   WhereClauseOwner(DeclContext *dc, DifferentiableAttr *attr)
@@ -3311,7 +3311,7 @@ public:
 
 class SpecializeAttrTargetDeclRequest
     : public SimpleRequest<SpecializeAttrTargetDeclRequest,
-                           ValueDecl *(const ValueDecl *, SpecializeAttr *),
+                           ValueDecl *(const ValueDecl *, AbstractSpecializeAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3321,7 +3321,7 @@ private:
 
   // Evaluation.
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *vd,
-                      SpecializeAttr *attr) const;
+                      AbstractSpecializeAttr *attr) const;
 
 public:
   // Caching.
@@ -4956,7 +4956,7 @@ public:
 class SerializeAttrGenericSignatureRequest
     : public SimpleRequest<SerializeAttrGenericSignatureRequest,
                            GenericSignature(const AbstractFunctionDecl *,
-                                            SpecializeAttr *),
+                                            AbstractSpecializeAttr *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4966,7 +4966,7 @@ private:
 
   GenericSignature evaluate(Evaluator &evaluator,
                             const AbstractFunctionDecl *decl,
-                            SpecializeAttr *attr) const;
+                            AbstractSpecializeAttr *attr) const;
 
 public:
   // Separate caching.

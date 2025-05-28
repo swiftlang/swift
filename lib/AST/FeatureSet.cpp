@@ -408,6 +408,10 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
+static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
@@ -638,6 +642,8 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
 
   return false;
 }
+
+UNINTERESTING_FEATURE(BuiltinSelect)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

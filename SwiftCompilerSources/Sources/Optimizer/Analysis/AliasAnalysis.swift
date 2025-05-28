@@ -253,8 +253,17 @@ struct AliasAnalysis {
     case let storeBorrow as StoreBorrowInst:
       return memLoc.mayAlias(with: storeBorrow.destination, self) ? .init(write: true) : .noEffects
 
-    case let mdi as MarkDependenceInstruction:
+    case let mdi as MarkDependenceInst:
       if mdi.base.type.isAddress && memLoc.mayAlias(with: mdi.base, self) {
+        return .init(read: true)
+      }
+      return .noEffects
+
+    case let mdai as MarkDependenceAddrInst:
+      if memLoc.mayAlias(with: mdai.address, self) {
+        return .init(read: true, write: true)
+      }
+      if mdai.base.type.isAddress && memLoc.mayAlias(with: mdai.base, self) {
         return .init(read: true)
       }
       return .noEffects
@@ -613,6 +622,14 @@ private enum ImmutableScope {
       if beginAccess.isUnsafe {
         return nil
       }
+
+      // This is a workaround for a bug in the move-only checker: rdar://151841926.
+      // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
+      // TODO: remove this once the bug is fixed.
+      if beginAccess.isStatic {
+        return nil
+      }
+
       switch beginAccess.accessKind {
       case .read:
         self = .readAccess(beginAccess)

@@ -42,8 +42,9 @@ public:
                                 NodePointer Parent) {
     DemangleInitRAII state(*this, MangledSpecialization, nullptr);
     if (!parseAndPushNodes()) {
-      llvm::errs() << "Can't demangle: " << MangledSpecialization << '\n';
-      abort();
+      ABORT([&](auto &out) {
+        out << "Can't demangle: " << MangledSpecialization;
+      });
     }
     for (Node *Nd : NodeStack) {
       addChild(Parent, Nd);

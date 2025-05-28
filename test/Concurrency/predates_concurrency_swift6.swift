@@ -73,15 +73,13 @@ func testCalls(x: X) {
 }
 
 func testCallsWithAsync() async {
-  onMainActorAlways() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
+  onMainActorAlways() // expected-error{{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}} {{3-3=await }}
 
   let _: () -> Void = onMainActorAlways // expected-error{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   let c = MyModelClass() // okay, synthesized init() is 'nonisolated'
 
-  c.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  c.f() // expected-error{{main actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{3-3=await }}
 }
 
 // ---------------------------------------------------------------------------
@@ -93,15 +91,15 @@ protocol Q: P { }
 class NS { } // expected-note 3{{class 'NS' does not conform to the 'Sendable' protocol}}
 
 struct S1: P {
-  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S1' has non-sendable type 'NS'}}
+  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'NS'}}
 }
 
 struct S2: Q {
-  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S2' has non-sendable type 'NS'}}
+  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S2' has non-Sendable type 'NS'}}
 }
 
 struct S3: Q, Sendable {
-  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-sendable type 'NS'}}
+  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-Sendable type 'NS'}}
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +187,7 @@ func withSendableClosure(_: @Sendable () -> Void) {}
 func conversionDowngrade() {
   let ns: () -> Void = {}
   withSendableClosure(ns)
-  // expected-warning@-1 {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+  // expected-warning@-1 {{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 }
 
 @preconcurrency

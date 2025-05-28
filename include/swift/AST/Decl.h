@@ -6276,9 +6276,12 @@ public:
   /// Otherwise, its override must be referenced.
   bool isValidKeyPathComponent() const;
 
-  /// True if the storage exports a property descriptor for key paths in
-  /// other modules.
-  bool exportsPropertyDescriptor() const;
+  /// If the storage exports a property descriptor for key paths in other
+  /// modules, this returns the generic signature in which its member methods
+  /// are emitted. If the storage does not export a property descriptor,
+  /// returns `std::nullopt`.
+  std::optional<GenericSignature>
+  getPropertyDescriptorGenericSignature() const;
 
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;

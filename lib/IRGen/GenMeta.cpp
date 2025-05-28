@@ -1840,7 +1840,7 @@ namespace {
     
     void addLayoutInfo() {
       // uint32_t NumFields;
-      B.addInt32(getNumFields(getType()));
+      B.addInt32(countExportableFields(IGM, getType()));
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());

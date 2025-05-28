@@ -13,7 +13,6 @@ public struct S1 { // expected-warning{{public struct 'S1' does not specify whet
 
 class C { }
 
-// expected-note@+2{{add '@unchecked Sendable' conformance to struct 'S2' if this type manually implements concurrency safety}}{{18-18=: @unchecked Sendable}}
 // expected-note@+1{{make struct 'S2' explicitly non-Sendable to suppress this warning}}{{+2:2-2=\n\n@available(*, unavailable)\nextension S2: Sendable { \}\n}}
 public struct S2 { // expected-warning{{public struct 'S2' does not specify whether it is 'Sendable' or not}}
   var c: C
@@ -25,7 +24,6 @@ final public class C1: P { // expected-warning{{public class 'C1' does not speci
   let str: String = ""
 }
 
-// expected-note@+2{{add '@unchecked Sendable' conformance to class 'C2' if this type manually implements concurrency safety}}{{17-17=: @unchecked Sendable}}
 // expected-note@+1{{make class 'C2' explicitly non-Sendable to suppress this warning}}{{+2:2-2=\n\n@available(*, unavailable)\nextension C2: Sendable { \}\n}}
 public class C2 { // expected-warning{{public class 'C2' does not specify whether it is 'Sendable' or not}}
   var str: String = ""
@@ -37,7 +35,6 @@ public struct S3<T> { // expected-warning{{public generic struct 'S3' does not s
   var t: T
 }
 
-// expected-note@+2{{add '@unchecked Sendable' conformance to generic struct 'S4' if this type manually implements concurrency safety}}{{+3:2-2=\n\nextension S4: @unchecked Sendable where T: Sendable { \}\n}}
 // expected-note@+1{{make generic struct 'S4' explicitly non-Sendable to suppress this warning}}{{+3:2-2=\n\n@available(*, unavailable)\nextension S4: Sendable { \}\n}}
 public struct S4<T> { // expected-warning{{public generic struct 'S4' does not specify whether it is 'Sendable' or not}}
   var t: T
@@ -92,13 +89,12 @@ public struct S9<T: P2 & Hashable> {
 }
 
 public struct S10 { // expected-warning{{public struct 'S10' does not specify whether it is 'Sendable' or not}}
-  // expected-note@-1{{add '@unchecked Sendable' conformance to struct 'S10' if this type manually implements concurrency safety}}
-  // expected-note@-2{{make struct 'S10' explicitly non-Sendable to suppress this warning}}
+  // expected-note@-1{{make struct 'S10' explicitly non-Sendable to suppress this warning}}
   var s7: S7
 }
 
 struct S11: Sendable {
-  var s7: S7 // expected-warning{{stored property 's7' of 'Sendable'-conforming struct 'S11' has non-sendable type 'S7'}}
+  var s7: S7 // expected-warning{{stored property 's7' of 'Sendable'-conforming struct 'S11' has non-Sendable type 'S7'}}
 }
 
 @_nonSendable public struct S12 { }

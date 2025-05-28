@@ -986,13 +986,12 @@ RegionAnalysisValueMap::getUnderlyingTrackedValueHelperAddress(
     // occur in the underlying DenseMap that backs getUnderlyingTrackedValue()
     // if we insert another entry into the DenseMap.
     if (!visitor.value)
-      return UnderlyingTrackedValueInfo(
-          getUnderlyingTrackedValueHelperObject(base));
+      return UnderlyingTrackedValueInfo(getUnderlyingTrackedValueHelper(base));
 
     // TODO: Should we us the base or value from
     // getUnderlyingTrackedValueHelperObject as our base?
     return UnderlyingTrackedValueInfo(
-        visitor.value, getUnderlyingTrackedValueHelperObject(base).value);
+        visitor.value, getUnderlyingTrackedValueHelper(base).value);
   }
 
   // Otherwise, we return the actorIsolation that our visitor found.
@@ -2504,7 +2503,8 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
+        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 

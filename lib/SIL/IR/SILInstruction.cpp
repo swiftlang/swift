@@ -1009,7 +1009,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
     // Handle Swift builtin functions.
     const BuiltinInfo &BInfo = BI->getBuiltinInfo();
-    if (BInfo.ID == BuiltinValueKind::ZeroInitializer) {
+    if (BInfo.ID == BuiltinValueKind::ZeroInitializer ||
+        BInfo.ID == BuiltinValueKind::PrepareInitialization) {
       // The address form of `zeroInitializer` writes to its argument to
       // initialize it. The value form has no side effects.
       return BI->getArguments().size() > 0
@@ -1096,8 +1097,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
-  if (auto mdi = MarkDependenceInstruction(this)) {
-    if (mdi.getBase()->getType().isAddress())
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
+    if (mdi->getBase()->getType().isAddress())
       return MemoryBehavior::MayRead;
     return MemoryBehavior::None;
   }
@@ -1353,7 +1354,7 @@ bool SILInstruction::isDeallocatingStack() const {
 }
 
 static bool typeOrLayoutInvolvesPack(SILType ty, SILFunction const &F) {
-  return ty.hasAnyPack() || ty.isOrContainsPack(F);
+  return ty.isOrContainsPack(F);
 }
 
 bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {

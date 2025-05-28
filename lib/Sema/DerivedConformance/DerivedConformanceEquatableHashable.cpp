@@ -394,10 +394,12 @@ deriveEquatable_eq(
   auto boolTy = C.getBoolType();
 
   Identifier generatedIdentifier;
+  bool isDerivedEnumEquals = false;
   if (parentDC->getParentModule()->isResilient()) {
     generatedIdentifier = C.Id_EqualsOperator;
   } else if (selfIfaceTy->getEnumOrBoundGenericEnum()) {
     generatedIdentifier = C.Id_derived_enum_equals;
+    isDerivedEnumEquals = true;
   } else {
     assert(selfIfaceTy->getStructOrBoundGenericStruct());
     generatedIdentifier = C.Id_derived_struct_equals;
@@ -411,6 +413,9 @@ deriveEquatable_eq(
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
   eqDecl->setSynthesized();
+  if (isDerivedEnumEquals) {
+    eqDecl->getAttrs().add(new (C) SemanticsAttr("derived_enum_equals", SourceLoc(), SourceRange(), /*Implicit=*/true));
+  }
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {

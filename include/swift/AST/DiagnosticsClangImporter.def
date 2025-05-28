@@ -92,7 +92,7 @@ GROUPED_WARNING(clang_swift_attr_unhandled, ClangDeclarationImport, none,
         "ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
 GROUPED_WARNING(clang_error_code_must_be_sendable, ClangDeclarationImport, none,
-        "cannot make error code type '%0' non-sendable because Swift errors "
+        "cannot make error code type '%0' non-Sendable because Swift errors "
         "are always sendable", (StringRef))
 
 GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,

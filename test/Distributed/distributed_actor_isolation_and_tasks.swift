@@ -54,8 +54,7 @@ distributed actor Philosopher {
       // because we KNOW this is a local call -- and there is no system in
       // between that will throw.
       _ = await self.dist() // notice lack of 'try' even though 'distributed func'
-      _ = self.variable_fromDetach // expected-error{{expression is 'async' but is not marked with 'await'}}
-      // expected-note@-1{{property access is 'async'}}
+      _ = self.variable_fromDetach // expected-error{{actor-isolated property 'variable_fromDetach' cannot be accessed from outside of the actor}} {{11-11=await }}
       _ = await self.variable_fromDetach // okay, we know we're on the local node
     }
   }

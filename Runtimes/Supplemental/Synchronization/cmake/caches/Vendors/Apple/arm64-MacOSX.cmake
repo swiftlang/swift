@@ -1,0 +1,18 @@
+if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+  message(SEND_ERROR "CMAKE_OSX_DEPLOYMENT_TARGET not defined")
+endif()
+
+if(NOT DEFINED SwiftSynchronization_TARGET_VARIANT_DEPLOYMENT_TARGET)
+  message(SEND_ERROR "SwiftSynchronization_TARGET_VARIANT_DEPLOYMENT_TARGET not defined")
+endif()
+
+set(CMAKE_C_COMPILER_TARGET "arm64-apple-macosx${CMAKE_OSX_DEPLOYMENT_TARGET}" CACHE STRING "")
+set(CMAKE_CXX_COMPILER_TARGET "arm64-apple-macosx${CMAKE_OSX_DEPLOYMENT_TARGET}" CACHE STRING "")
+set(CMAKE_Swift_COMPILER_TARGET "arm64-apple-macosx${CMAKE_OSX_DEPLOYMENT_TARGET}" CACHE STRING "")
+
+set(SwiftSynchronization_ARCH_SUBDIR arm64 CACHE STRING "")
+set(SwiftSynchronization_PLATFORM_SUBDIR macosx CACHE STRING "")
+
+set(SwiftSynchronization_COMPILER_VARIANT_TARGET "arm64-apple-ios${SwiftSynchronization_TARGET_VARIANT_DEPLOYMENT_TARGET}-macabi" CACHE STRING "")
+
+include("${CMAKE_CURRENT_LIST_DIR}/apple-common.cmake")

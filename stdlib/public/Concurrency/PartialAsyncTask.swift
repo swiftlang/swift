@@ -323,7 +323,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   ///
   /// Returns the result of executing the closure.
   @available(SwiftStdlib 6.2, *)
-  public func _withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
+  public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
@@ -333,7 +333,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// Kinds of schedulable jobs
   @available(SwiftStdlib 6.2, *)
   @frozen
-  public struct _Kind: Sendable, RawRepresentable {
+  public struct Kind: Sendable, RawRepresentable {
     public typealias RawValue = UInt8
 
     /// The raw job kind value.
@@ -345,16 +345,16 @@ public struct ExecutorJob: Sendable, ~Copyable {
     }
 
     /// A task.
-    public static let task = _Kind(rawValue: RawValue(0))!
+    public static let task = Kind(rawValue: RawValue(0))!
 
     // Job kinds >= 192 are private to the implementation.
-    public static let firstReserved = _Kind(rawValue: RawValue(192))!
+    public static let firstReserved = Kind(rawValue: RawValue(192))!
   }
 
   /// What kind of job this is.
   @available(SwiftStdlib 6.2, *)
-  public var _kind: _Kind {
-    return _Kind(rawValue: _jobGetKind(self.context))!
+  public var kind: Kind {
+    return Kind(rawValue: _jobGetKind(self.context))!
   }
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
@@ -455,7 +455,7 @@ extension ExecutorJob {
   ///
   /// If the job does not support allocation, this property will be `nil`.
   public var allocator: LocalAllocator? {
-    guard self._kind == .task else {
+    guard self.kind == .task else {
       return nil
     }
 

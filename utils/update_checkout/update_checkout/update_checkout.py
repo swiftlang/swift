@@ -100,8 +100,15 @@ def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    refspec_exists = True
+    try:
+        shell.run(["git", "rev-parse", "--verify", refspec])
+    except Exception:
+        refspec_exists = False
     args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp, refspec]
+            '--before=' + timestamp]
+    if refspec_exists:
+        args.append(refspec)
     rev = shell.capture(args).strip()
     if rev:
         return rev

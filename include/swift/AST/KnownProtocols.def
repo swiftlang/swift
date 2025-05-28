@@ -97,7 +97,7 @@ PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
 PROTOCOL(TaskExecutor)
 PROTOCOL(GlobalActor)
-PROTOCOL_(ExecutorFactory)
+PROTOCOL(ExecutorFactory)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)

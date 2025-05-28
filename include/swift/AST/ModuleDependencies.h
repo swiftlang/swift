@@ -164,6 +164,11 @@ struct ScannerImportStatementInfo {
       : importLocations({location}), importIdentifier(importIdentifier),
         isExported(isExported) {}
 
+  ScannerImportStatementInfo(std::string importIdentifier, bool isExported,
+                             SmallVector<ImportDiagnosticLocationInfo, 4> locations)
+      : importLocations(locations), importIdentifier(importIdentifier),
+        isExported(isExported) {}
+
   void addImportLocation(ImportDiagnosticLocationInfo location) {
     importLocations.push_back(location);
   }

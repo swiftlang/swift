@@ -18,6 +18,7 @@
 #include "CFTypeInfo.h"
 #include "ClangClassTemplateNamePrinter.h"
 #include "ClangDiagnosticConsumer.h"
+#include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
@@ -1877,15 +1878,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // imported into Swift to avoid having two types with the same name, which
   // cause subtle name lookup issues.
   if (swiftCtx.LangOpts.EnableCXXInterop &&
-      isUnavailableInSwift(D, nullptr, true)) {
-    auto loc = D->getEndLoc();
-    if (loc.isMacroID()) {
-      StringRef macroName =
-          clangSema.getPreprocessor().getImmediateMacroName(loc);
-      if (isCFOptionsMacro(macroName))
-        return ImportedName();
-    }
-  }
+      isUnavailableInSwift(D, nullptr, true) &&
+      isCFOptionsMacro(D, clangSema.getPreprocessor()))
+    return ImportedName();
 
   /// Whether the result is a function name.
   bool isFunction = false;

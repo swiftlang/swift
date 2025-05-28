@@ -18,7 +18,7 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
   var clockID: _ClockID
   if #available(SwiftStdlib 6.2, *) {
-    if clock._traits.contains(.continuous) {
+    if clock.traits.contains(.continuous) {
       clockID = .continuous
     } else {
       clockID = .suspending
@@ -35,7 +35,7 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
 
   let delta: Swift.Duration
   if #available(SwiftStdlib 6.2, *) {
-    delta = clock._convert(from: clock.now.duration(to: instant))!
+    delta = clock.convert(from: clock.now.duration(to: instant))!
   } else {
     Builtin.unreachable()
   }
@@ -99,11 +99,11 @@ extension Task where Success == Never, Failure == Never {
 
               if #available(SwiftStdlib 6.2, *) {
                 #if !$Embedded
-                if let executor = Task._currentSchedulableExecutor {
-                  executor._enqueue(ExecutorJob(context: job),
-                                    at: instant,
-                                    tolerance: tolerance,
-                                    clock: clock)
+                if let executor = Task.currentSchedulableExecutor {
+                  executor.enqueue(ExecutorJob(context: job),
+                                   at: instant,
+                                   tolerance: tolerance,
+                                   clock: clock)
                   return
                 }
                 #endif
@@ -119,7 +119,7 @@ extension Task where Success == Never, Failure == Never {
               let toleranceNanoseconds: Int64
               if #available(SwiftStdlib 6.2, *) {
                 if let tolerance = tolerance,
-                   let components = clock._convert(from: tolerance)?.components {
+                   let components = clock.convert(from: tolerance)?.components {
                   toleranceSeconds = components.seconds
                   toleranceNanoseconds = components.attoseconds / 1_000_000_000
                 } else {

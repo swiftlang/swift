@@ -59,12 +59,10 @@ func nonisolatedCaller() {
 }
 
 func nonisolatedAsyncCaller() async {
-  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{calls to global function 'mainActorDefaultArg(value:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@+1 {{main actor-isolated global function 'mainActorDefaultArg(value:)' cannot be called from outside of the actor}} {{3-3=await }}
   mainActorDefaultArg()
 
-  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{calls to global function 'mainActorClosure(closure:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@+1 {{main actor-isolated global function 'mainActorClosure(closure:)' cannot be called from outside of the actor}} {{3-3=await }}
   mainActorClosure()
 
   await mainActorDefaultArg(value: requiresMainActor())
@@ -216,8 +214,7 @@ class C3 {
 
 class C4 {
   let task1 = Task {
-    // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
-    // expected-note@+1 {{calls to global function 'requiresMainActor()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{main actor-isolated global function 'requiresMainActor()' cannot be called from outside of the actor}} {{5-5=await }}
     requiresMainActor()
   }
 
@@ -265,8 +262,7 @@ struct UseRequiresMain {
 }
 
 nonisolated func test() async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
-  // expected-note@+1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  // expected-warning@+1 {{main actor-isolated initializer 'init()' cannot be called from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
   _ = UseRequiresMain()
 }
 

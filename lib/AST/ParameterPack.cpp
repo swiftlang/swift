@@ -380,10 +380,11 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
     remappedIndex -= substCount;
   }
 
-  llvm::errs() << "Invalid substituted argument index: " << substIndex << "\n";
-  subMap.dump(llvm::errs());
-  dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Invalid substituted argument index: " << substIndex << "\n";
+    subMap.dump(out);
+    dump(out);
+  });
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}

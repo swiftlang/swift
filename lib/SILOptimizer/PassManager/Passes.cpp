@@ -239,8 +239,9 @@ static void runBridgedModulePass(BridgedModulePassRunFn &runFunction,
     runFunction = bridgedModulePassRunFunctions[passName];
     if (!runFunction) {
       if (passesRegistered) {
-        llvm::errs() << "Swift pass " << passName << " is not registered\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Swift pass " << passName << " is not registered";
+        });
       }
       return;
     }
@@ -259,15 +260,15 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
     runFunction = bridgedFunctionPassRunFunctions[passName];
     if (!runFunction) {
       if (passesRegistered) {
-        llvm::errs() << "Swift pass " << passName << " is not registered\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Swift pass " << passName << " is not registered";
+        });
       }
       return;
     }
   }
   if (!f->isBridged()) {
-    llvm::errs() << "SILFunction metatype is not registered\n";
-    abort();
+    ABORT("SILFunction metatype is not registered");
   }
   runFunction({{f}, {passManager->getSwiftPassInvocation()}});
 }

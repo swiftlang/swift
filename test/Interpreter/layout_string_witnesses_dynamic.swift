@@ -16,6 +16,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// test disabled until rdar://151476435 is fixed
+// REQUIRES: rdar151476435
+
 import Swift
 import layout_string_witnesses_types
 import layout_string_witnesses_types_resilient

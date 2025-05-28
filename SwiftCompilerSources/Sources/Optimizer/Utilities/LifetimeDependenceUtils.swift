@@ -226,9 +226,9 @@ extension LifetimeDependence {
     return scope.computeRange(context)
   }
 
-  func resolve(_ context: some Context) {
+  func resolve(_ context: some MutatingContext) {
     if let mdi = markDepInst {
-      mdi.resolveToNonEscaping()
+      mdi.resolveToNonEscaping(context)
     }
   }
 }

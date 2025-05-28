@@ -6,8 +6,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnly.swift
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlyDefaultedImport.swift
 // RUN: %target-swift-frontend -emit-module -o %t %t/MixedUses.swift
+// RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyReexported.swift
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyTransitivelyImported.swift
-// RUN: %target-swift-frontend -emit-module -o %t %t/Exports.swift -I %t
+// RUN: %target-swift-frontend -emit-module -o %t %t/ImportsOtherModules.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlySPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyDefaultedImportSPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
@@ -46,20 +47,23 @@ import Swift // Just here to anchor the fix-its
 // expected-note@-3   {{add import of module 'PublicUsesOnly'}}{{1-1=public import PublicUsesOnly\n}}
 // expected-note@-4   {{add import of module 'PublicUsesOnlyDefaultedImport'}}{{1-1=import PublicUsesOnlyDefaultedImport\n}}
 // expected-note@-5 3 {{add import of module 'MixedUses'}}{{1-1=public import MixedUses\n}}
-// expected-note@-6   {{add import of module 'InternalUsesOnlyTransitivelyImported'}}{{1-1=internal import InternalUsesOnlyTransitivelyImported\n}}
-// expected-note@-7   {{add import of module 'InternalUsesOnlySPIOnly'}}{{1-1=internal import InternalUsesOnlySPIOnly\n}}
-// expected-public-by-default-note@-8     {{add import of module 'InternalUsesOnlyDefaultedImportSPIOnly'}}{{1-1=@_spiOnly import InternalUsesOnlyDefaultedImportSPIOnly\n}}
-// expected-internal-by-default-note@-9   {{add import of module 'InternalUsesOnlyDefaultedImportSPIOnly'}}{{1-1=import InternalUsesOnlyDefaultedImportSPIOnly\n}}
-// expected-note@-10  {{add import of module 'PublicUsesOnlySPIOnly'}}{{1-1=@_spiOnly public import PublicUsesOnlySPIOnly\n}}
-
+// expected-public-by-default-note@-6   {{add import of module 'InternalUsesOnlyReexported'}}{{1-1=internal import InternalUsesOnlyReexported\n}}
+// expected-internal-by-default-note@-7   {{add import of module 'InternalUsesOnlyReexported'}}{{1-1=import InternalUsesOnlyReexported\n}}
+// expected-public-by-default-note@-8   {{add import of module 'InternalUsesOnlyTransitivelyImported'}}{{1-1=internal import InternalUsesOnlyTransitivelyImported\n}}
+// expected-internal-by-default-note@-9   {{add import of module 'InternalUsesOnlyTransitivelyImported'}}{{1-1=import InternalUsesOnlyTransitivelyImported\n}}
+// expected-note@-10   {{add import of module 'InternalUsesOnlySPIOnly'}}{{1-1=internal import InternalUsesOnlySPIOnly\n}}
+// expected-public-by-default-note@-11     {{add import of module 'InternalUsesOnlyDefaultedImportSPIOnly'}}{{1-1=@_spiOnly import InternalUsesOnlyDefaultedImportSPIOnly\n}}
+// expected-internal-by-default-note@-12   {{add import of module 'InternalUsesOnlyDefaultedImportSPIOnly'}}{{1-1=import InternalUsesOnlyDefaultedImportSPIOnly\n}}
+// expected-note@-13  {{add import of module 'PublicUsesOnlySPIOnly'}}{{1-1=@_spiOnly public import PublicUsesOnlySPIOnly\n}}
 
 func internalFunc(_ x: Int) {
   _ = x.memberInInternalUsesOnly // expected-error {{property 'memberInInternalUsesOnly' is not available due to missing import of defining module 'InternalUsesOnly'}}
   _ = x.memberInInternalUsesOnlyDefaultedImport // expected-error {{property 'memberInInternalUsesOnlyDefaultedImport' is not available due to missing import of defining module 'InternalUsesOnlyDefaultedImport'}}
   _ = x.memberInMixedUses // expected-error {{property 'memberInMixedUses' is not available due to missing import of defining module 'MixedUses'}}
-  _ = x.memberInInternalUsesOnlyTransitivelyImported // expected-error {{property 'memberInInternalUsesOnlyTransitivelyImported' is not available due to missing import of defining module 'InternalUsesOnlyTransitivelyImported'}}
+  _ = x.memberInInternalUsesOnlyReexported // expected-error {{property 'memberInInternalUsesOnlyReexported' is not available due to missing import of defining module 'InternalUsesOnlyReexported'}}
   _ = x.memberInInternalUsesOnlySPIOnly // expected-error {{property 'memberInInternalUsesOnlySPIOnly' is not available due to missing import of defining module 'InternalUsesOnlySPIOnly'}}
   _ = x.memberInInternalUsesOnlyDefaultedImportSPIOnly // expected-error {{property 'memberInInternalUsesOnlyDefaultedImportSPIOnly' is not available due to missing import of defining module 'InternalUsesOnlyDefaultedImportSPIOnly'}}
+  _ = x.memberInInternalUsesOnlyTransitivelyImported // expected-error {{property 'memberInInternalUsesOnlyTransitivelyImported' is not available due to missing import of defining module 'InternalUsesOnlyTransitivelyImported'}}
 }
 
 @inlinable package func packageInlinableFunc(_ x: Int) {
@@ -146,7 +150,7 @@ internal import PackageUsesOnly
 internal import PublicUsesOnly
 import PublicUsesOnlyDefaultedImport
 internal import MixedUses
-internal import Exports
+internal import ImportsOtherModules
 @_spiOnly public import InternalUsesOnlySPIOnly
 @_spiOnly import InternalUsesOnlyDefaultedImportSPIOnly
 @_spiOnly public import PublicUsesOnlySPIOnly
@@ -199,6 +203,14 @@ extension Int {
   public var memberInMixedUses: Int { return self }
 }
 
+//--- InternalUsesOnlyReexported.swift
+
+extension Int {
+  public typealias TypealiasInInternalUsesOnlyReexported = Self
+  public struct NestedInInternalUsesOnlyReexported {}
+  public var memberInInternalUsesOnlyReexported: Int { return self }
+}
+
 //--- InternalUsesOnlyTransitivelyImported.swift
 
 extension Int {
@@ -207,9 +219,10 @@ extension Int {
   public var memberInInternalUsesOnlyTransitivelyImported: Int { return self }
 }
 
-//--- Exports.swift
+//--- ImportsOtherModules.swift
 
-@_exported import InternalUsesOnlyTransitivelyImported
+@_exported import InternalUsesOnlyReexported
+import InternalUsesOnlyTransitivelyImported
 
 //--- InternalUsesOnlySPIOnly.swift
 

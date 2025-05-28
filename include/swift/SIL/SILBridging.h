@@ -587,6 +587,7 @@ struct BridgedGlobalVar {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void setLet(bool value) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getType() const;
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
   BRIDGED_INLINE bool isPossiblyUsedExternally() const;
@@ -802,11 +803,9 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;
-  BRIDGED_INLINE void MarkDependenceInst_resolveToNonEscaping() const;
-  BRIDGED_INLINE void MarkDependenceInst_settleToEscaping() const;
+  BRIDGED_INLINE void MarkDependenceInstruction_resolveToNonEscaping() const;
+  BRIDGED_INLINE void MarkDependenceInstruction_settleToEscaping() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceAddrInst_dependenceKind() const;
-  BRIDGED_INLINE void MarkDependenceAddrInst_resolveToNonEscaping() const;
-  BRIDGED_INLINE void MarkDependenceAddrInst_settleToEscaping() const;
   BRIDGED_INLINE SwiftInt BeginAccessInst_getAccessKind() const;
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;

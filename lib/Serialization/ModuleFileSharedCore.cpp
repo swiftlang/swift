@@ -695,7 +695,7 @@ std::string ModuleFileSharedCore::Dependency::getPrettyPrintedPath() const {
 }
 
 void ModuleFileSharedCore::fatal(llvm::Error error) const {
-  abortWithPrettyStackTraceMessage([&](auto &out) {
+  ABORT([&](auto &out) {
     out << "*** DESERIALIZATION FAILURE ***\n";
     out << "*** If any module named here was modified in the SDK, please delete the ***\n";
     out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";

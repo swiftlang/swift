@@ -256,7 +256,7 @@ private extension Deallocation {
 
 private extension DeallocStackInst {
   func isStackDeallocation(of base: AccessBase) -> Bool {
-    if case .stack(let allocStack) = base, allocstack == allocStack {
+    if case .stack(let allocStack) = base, operand.value == allocStack {
       return true
     }
     return false

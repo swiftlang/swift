@@ -2624,8 +2624,7 @@ public:
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
-      ThunkGenOptions options = {});
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

@@ -6336,7 +6336,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
-                                            bool isExprStmt) {
+                                            bool isExprStmt,
+                                            bool isConstInitExpr) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6353,6 +6354,9 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
+      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
+    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);

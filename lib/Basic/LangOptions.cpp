@@ -335,12 +335,16 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   return state;
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (featureStates.getState(feature).isEnabled())
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
   if (auto version = feature.getLanguageVersion())
     return isSwiftVersionAtLeast(*version);
+
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }

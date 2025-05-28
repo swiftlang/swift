@@ -5,37 +5,20 @@
 
 # Swift Programming Language
 
-
-| | **Architecture** | **Build** |
-|---|:---:|:---:|
-| **macOS**        | Universal |[![Build Status](https://ci.swift.org/job/oss-swift-package-macos/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-macos)|
-| **Ubuntu 20.04** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04)|
-| **Ubuntu 20.04** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04-aarch64)|
-| **Ubuntu 22.04** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04)|
-| **Ubuntu 22.04** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04-aarch64)|
-| **Ubuntu 24.04** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04)|
-| **Ubuntu 24.04** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04-aarch64)|
-| **Amazon Linux 2** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2)|
-| **Amazon Linux 2** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64)|
-| **Universal Base Image 9** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-ubi-9/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-ubi-9)|
-| **Debian 12** | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-debian-12/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-debian-12)|
-| **Debian 12** | AArch64 |[![Build Status](https://ci.swift.org/job/oss-swift-package-debian-12-aarch64/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-debian-12-aarch64)|
-| **Windows 10** | x86_64 |[![Build Status](https://ci-external.swift.org/job/swift-main-windows-toolchain/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/swift-main-windows-toolchain)|
-| **Windows 10** | ARM64 |[![Build Status](https://ci-external.swift.org/job/swift-main-windows-toolchain-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/swift-main-windows-toolchain-arm64)|
-
-**Cross-Compilation Targets**
-
-| **Target** | **Build** |
-|:---:|:---:|
-| **wasm32-unknown-wasi** |[![Build Status](https://ci.swift.org/job/oss-swift-pr-test-crosscompile-wasm-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-pr-test-crosscompile-wasm-ubuntu-20_04)|
-
-**Swift Community-Hosted CI Platforms**
-
-| **OS** | **Architecture** | **Build** |
-|---|:---:|:---:|
-|**[Android](https://github.com/swiftlang/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_24_04_android.json)** | X86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build)|
-|**[Android](https://github.com/swiftlang/swift-community-hosted-continuous-integration/blob/main/nodes/aarch64_ubuntu_24_04_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64)|
-|**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019_VS2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019)|
+| **OS** | **Status** |
+|---:|:---:|
+| macOS        | [![macOS Universal Build Status](https://ci.swift.org/job/oss-swift-package-macos/lastCompletedBuild/badge/icon?subject=universal)](https://ci.swift.org/job/oss-swift-package-macos)|
+| Ubuntu 20.04 | [![Ubuntu 20.04 x86_64 Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04) [![Ubuntu 20.04 aarch64 Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04-aarch64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci.swift.org/job/oss-swift-package-ubuntu-20_04-aarch64)|
+| Ubuntu 22.04 | [![Ubuntu 22.04 x86_64 Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04) [![Ubuntu 22.04 aarch64 Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04-aarch64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci.swift.org/job/oss-swift-package-ubuntu-22_04-aarch64)|
+| Ubuntu 24.04 | [![Ubuntu 24.04 x86_64 Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04) [![Ubuntu 24.04 aarch64 Build Status](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04-aarch64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci.swift.org/job/oss-swift-package-ubuntu-24_04-aarch64)|
+| Amazon Linux 2 | [![Amazon Linux 2 x86_64 Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2) [![Amazon Linux 2 aarch64 Build Status](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci.swift.org/job/oss-swift-package-amazon-linux-2-aarch64)|
+| Debian 12 | [![Debian 12 x86_64 Build Status](https://ci.swift.org/job/oss-swift-package-debian-12/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci.swift.org/job/oss-swift-package-debian-12) [![Debian 12 aarch64 Build Status](https://ci.swift.org/job/oss-swift-package-debian-12-aarch64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci.swift.org/job/oss-swift-package-debian-12-aarch64)|
+| Windows 10 | [![Windows 10 x86_64 Build Status](https://ci-external.swift.org/job/swift-main-windows-toolchain/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci-external.swift.org/job/swift-main-windows-toolchain) [![Windows 10 arm64 Build Status](https://ci-external.swift.org/job/swift-main-windows-toolchain-arm64/lastCompletedBuild/badge/icon?subject=arm64)](https://ci-external.swift.org/job/swift-main-windows-toolchain-arm64)|
+| Universal Base Image 9 | [![Universal Base Image 9 x86_64 Build Status](https://ci.swift.org/job/oss-swift-package-ubi-9/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci.swift.org/job/oss-swift-package-ubi-9)|
+|**Cross-Compilation Targets**||
+| wasm32-unknown-wasi |[![wasm32-unknown-wasi Build Status](https://ci.swift.org/job/oss-swift-pr-test-crosscompile-wasm-ubuntu-20_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-pr-test-crosscompile-wasm-ubuntu-20_04)|
+|**Community-Hosted CI Platforms**||
+|[Android](https://github.com/swiftlang/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_ubuntu_24_04_android.json) | [![Android x86_64 Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build/lastCompletedBuild/badge/icon?subject=x86_64)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-build) [![Android aarch64 Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64/lastCompletedBuild/badge/icon?subject=aarch64)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-24.04-android-arm64)|
 
 ## Welcome to Swift
 

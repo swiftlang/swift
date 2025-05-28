@@ -26,6 +26,10 @@ struct GenS<T> {
   var x: Int
 }
 
+enum E: String {
+  case a, b, c, d, e
+}
+
 sil @cl : $@convention(thin) () -> Int
 
 // CHECK-LABEL: sil [ossa] @thick_to_thin :
@@ -163,5 +167,33 @@ bb0(%0 : @guaranteed $Array<Any>):
   %1 = function_ref @cast_any_int_array : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
   %2 = apply %1(%0) : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
   return %2
+}
+
+sil [_semantics "rawrepresentable.is_equal"] @rawrepresentable_is_equal : $@convention(thin) <T where T : RawRepresentable, T.RawValue : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool
+sil [_semantics "rawrepresentable.is_equal"] @rawrepresentable_is_equal_wrong_convention : $@convention(thin) (E, E) -> Bool
+
+// CHECK-LABEL: sil [ossa] @string_enum_is_equal :
+// CHECK:         %2 = builtin "getEnumTag"<E>(%0) : $Builtin.Int32
+// CHECK:         %3 = builtin "getEnumTag"<E>(%1) : $Builtin.Int32
+// CHECK:         %4 = builtin "cmp_eq_Int32"(%2, %3) : $Builtin.Int1
+// CHECK:         %5 = struct $Bool (%4)
+// CHECK:         return %5
+// CHECK:       } // end sil function 'string_enum_is_equal'
+sil [ossa] @string_enum_is_equal : $@convention(thin) (@in_guaranteed E, @in_guaranteed E) -> Bool {
+bb0(%0 : $*E, %1 : $*E):
+  %2 = function_ref @rawrepresentable_is_equal : $@convention(thin) <T where T : RawRepresentable, T.RawValue : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool
+  %3 = apply %2<E>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @string_enum_is_equal_wrong_convention :
+// CHECK:         function_ref
+// CHECK:         apply
+// CHECK:       } // end sil function 'string_enum_is_equal_wrong_convention'
+sil [ossa] @string_enum_is_equal_wrong_convention : $@convention(thin) (E, E) -> Bool {
+bb0(%0 : $E, %1 : $E):
+  %2 = function_ref @rawrepresentable_is_equal_wrong_convention : $@convention(thin) (E, E) -> Bool
+  %3 = apply %2(%0, %1) : $@convention(thin) (E, E) -> Bool
+  return %3
 }
 

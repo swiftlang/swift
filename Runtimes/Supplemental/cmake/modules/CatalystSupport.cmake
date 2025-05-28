@@ -1,3 +1,5 @@
+include(CheckCompilerFlag)
+
 # Add flags for generating the zippered target variant in the build
 
 # Initialize `${PROJECT_NAME}_VARIANT_MODULE_TRIPLE` if the driver is able to emit

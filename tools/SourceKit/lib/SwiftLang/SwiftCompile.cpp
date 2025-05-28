@@ -31,10 +31,9 @@ compile::SessionManager::getSession(StringRef name) {
   }
 
   bool inserted = false;
-  std::tie(i, inserted) =
-      sessions.try_emplace(name, std::make_shared<compile::Session>(
-                                     SwiftExecutablePath, RuntimeResourcePath,
-                                     DiagnosticDocumentationPath, Plugins));
+  std::tie(i, inserted) = sessions.try_emplace(
+      name, std::make_shared<compile::Session>(SwiftExecutablePath,
+                                               RuntimeResourcePath, Plugins));
   assert(inserted);
   return i->second;
 }

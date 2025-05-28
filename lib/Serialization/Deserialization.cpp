@@ -6188,6 +6188,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Specialize_DECL_ATTR: {
+        unsigned isPublic;
         unsigned exported;
         SpecializeAttr::SpecializationKind specializationKind;
         unsigned specializationKindVal;
@@ -6199,7 +6200,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         DeclID targetFunID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-            scratch, exported, specializationKindVal, specializedSigID,
+            scratch, isPublic, exported, specializationKindVal, specializedSigID,
             targetFunID, numSPIGroups, numAvailabilityAttrs, rawTrailingIDs);
 
         specializationKind = specializationKindVal
@@ -6250,8 +6251,13 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
         // Read target function DeclNameRef, if present.
         DeclNameRef targetFunName = deserializeDeclNameRefIfPresent();
-
-        Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
+        if (isPublic)
+          Attr = SpecializedAttr::create(ctx, exported != 0, specializationKind,
+                                      spis, availabilityAttrs, typeErasedParams,
+                                      specializedSig, targetFunName, &MF,
+                                      targetFunID);
+        else
+          Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
                                       spis, availabilityAttrs, typeErasedParams,
                                       specializedSig, targetFunName, &MF,
                                       targetFunID);
@@ -8817,8 +8823,9 @@ ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
   return cast<AbstractFunctionDecl>(getDecl(contextData));
 }
 
-ValueDecl *ModuleFile::loadTargetFunctionDecl(const SpecializeAttr *attr,
-                                              uint64_t contextData) {
+ValueDecl *ModuleFile::loadTargetFunctionDecl(
+  const AbstractSpecializeAttr *attr,
+  uint64_t contextData) {
   if (contextData == 0)
     return nullptr;
   return cast<AbstractFunctionDecl>(getDecl(contextData));

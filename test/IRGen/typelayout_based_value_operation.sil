@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s
-// RUNx: %target-swift-frontend -disable-type-layout %s -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
+// RUN: %target-swift-frontend -enable-type-layout %s -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -emit-ir -sil-verify-all | %FileCheck %s
+// RUNx: %target-swift-frontend -disable-type-layout %s -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=NOTYPELAYOUT
 
 sil_stage canonical
 import Builtin

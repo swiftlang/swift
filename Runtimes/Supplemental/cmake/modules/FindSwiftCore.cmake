@@ -10,7 +10,7 @@ Imported Targets
 
 The following :prop_tgt:`IMPORTED` TARGETS may be defined:
 
- ``SwiftCore``
+ ``swiftCore``
 
 Hint Variables
 ^^^^^^^^^^^^^^
@@ -63,8 +63,8 @@ if(APPLE)
     NAMES "libswiftCore.tbd"
     HINTS
       "${CMAKE_OSX_SYSROOT}/usr/lib/swift")
-  add_library(SwiftCore SHARED IMPORTED GLOBAL)
-  set_target_properties(SwiftCore PROPERTIES
+  add_library(swiftCore SHARED IMPORTED GLOBAL)
+  set_target_properties(swiftCore PROPERTIES
     IMPORTED_IMPLIB "${SwiftCore_IMPLIB}"
     INTERFACE_INCLUDE_DIRECTORIES "${SwiftCore_INCLUDE_DIR}")
   find_package_handle_standard_args(SwiftCore DEFAULT_MSG
@@ -78,7 +78,7 @@ elseif(LINUX)
     find_library(SwiftCore_LIBRARY
       NAMES "libswiftCore.a"
       HINTS "${Swift_SDKROOT}/usr/lib/swift_static/linux-static")
-    add_library(SwiftCore STATIC IMPORTED GLOBAL)
+    add_library(swiftCore STATIC IMPORTED GLOBAL)
   else()
     find_path(SwiftCore_INCLUDE_DIR
       "Swift.swiftmodule"
@@ -87,9 +87,9 @@ elseif(LINUX)
     find_library(SwiftCore_LIBRARY
       NAMES "libswiftCore.so"
       HINTS "${Swift_SDKROOT}/usr/lib/swift/linux")
-    add_library(SwiftCore SHARED IMPORTED GLOBAL)
+    add_library(swiftCore SHARED IMPORTED GLOBAL)
   endif()
-  set_target_properties(SwiftCore PROPERTIES
+  set_target_properties(swiftCore PROPERTIES
     IMPORTED_LOCATION "${SwiftCore_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${SwiftCore_INCLUDE_DIR}")
   find_package_handle_standard_args(SwiftCore DEFAULT_MSG
@@ -108,8 +108,8 @@ elseif(WIN32)
       "$ENV{SDKROOT}/usr/lib/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
       "$ENV{SDKROOT}/usr/lib/swift")
 
-  add_library(SwiftCore SHARED IMPORTED GLOBAL)
-  set_target_properties(SwiftCore PROPERTIES
+  add_library(swiftCore SHARED IMPORTED GLOBAL)
+  set_target_properties(swiftCore PROPERTIES
     IMPORTED_IMPLIB "${SwiftCore_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${SwiftCore_INCLUDE_DIR}")
   find_package_handle_standard_args(SwiftCore DEFAULT_MSG

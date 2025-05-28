@@ -647,11 +647,7 @@ extension Deallocation {
 }
 
 
-final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {
-  public var allocstack: AllocStackInst {
-    return operand.value as! AllocStackInst
-  }
-}
+final public class DeallocStackInst : Instruction, UnaryInstruction, Deallocation {}
 
 final public class DeallocStackRefInst : Instruction, UnaryInstruction, Deallocation {
   public var allocRef: AllocRefInstBase { operand.value as! AllocRefInstBase }
@@ -1128,34 +1124,25 @@ public enum MarkDependenceKind: Int32 {
 }
 
 public protocol MarkDependenceInstruction: Instruction {
-  var baseOperand: Operand { get }
-  var base: Value { get }
   var dependenceKind: MarkDependenceKind { get }
-  func resolveToNonEscaping()
-  func settleToEscaping()
 }
 
 extension MarkDependenceInstruction {
   public var isNonEscaping: Bool { dependenceKind == .NonEscaping }
   public var isUnresolved: Bool { dependenceKind == .Unresolved }
+
+  public var valueOrAddressOperand: Operand { operands[0] }
+  public var valueOrAddress: Value { valueOrAddressOperand.value }
+  public var baseOperand: Operand { operands[1] }
+  public var base: Value { baseOperand.value }
 }
 
 final public class MarkDependenceInst : SingleValueInstruction, MarkDependenceInstruction {
-  public var valueOperand: Operand { operands[0] }
-  public var baseOperand: Operand { operands[1] }
+  public var valueOperand: Operand { valueOrAddressOperand }
   public var value: Value { return valueOperand.value }
-  public var base: Value { return baseOperand.value }
 
   public var dependenceKind: MarkDependenceKind {
     MarkDependenceKind(rawValue: bridged.MarkDependenceInst_dependenceKind().rawValue)!
-  }
-
-  public func resolveToNonEscaping() {
-    bridged.MarkDependenceInst_resolveToNonEscaping()
-  }
-
-  public func settleToEscaping() {
-    bridged.MarkDependenceInst_settleToEscaping()
   }
 
   public var hasScopedLifetime: Bool {
@@ -1164,21 +1151,11 @@ final public class MarkDependenceInst : SingleValueInstruction, MarkDependenceIn
 }
 
 final public class MarkDependenceAddrInst : Instruction, MarkDependenceInstruction {
-  public var addressOperand: Operand { operands[0] }
-  public var baseOperand: Operand { operands[1] }
+  public var addressOperand: Operand { valueOrAddressOperand }
   public var address: Value { return addressOperand.value }
-  public var base: Value { return baseOperand.value }
 
   public var dependenceKind: MarkDependenceKind {
     MarkDependenceKind(rawValue: bridged.MarkDependenceAddrInst_dependenceKind().rawValue)!
-  }
-
-  public func resolveToNonEscaping() {
-    bridged.MarkDependenceAddrInst_resolveToNonEscaping()
-  }
-
-  public func settleToEscaping() {
-    bridged.MarkDependenceAddrInst_settleToEscaping()
   }
 }
 

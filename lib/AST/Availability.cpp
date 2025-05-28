@@ -744,7 +744,7 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
 }
 
 AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
-    const Decl *D, const SpecializeAttr *attr, ASTContext &ctx) {
+    const Decl *D, const AbstractSpecializeAttr *attr, ASTContext &ctx) {
   std::optional<SemanticAvailableAttr> bestAvailAttr;
 
   for (auto *availAttr : attr->getAvailableAttrs()) {

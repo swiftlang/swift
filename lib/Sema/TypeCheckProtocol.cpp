@@ -2646,7 +2646,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // If we're enforcing strict memory safety and this conformance hasn't
   // opted out, look for safe/unsafe witness mismatches.
   if (conformance->getExplicitSafety() == ExplicitSafety::Unspecified &&
-      Context.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+      Context.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                                  /*allowMigration=*/true)) {
     // Collect all of the unsafe uses for this conformance.
     SmallVector<UnsafeUse, 2> unsafeUses;
     for (auto requirement: Proto->getMembers()) {
@@ -6672,6 +6673,49 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   for (auto *member : idc->getMembers()) {
     if (auto *valueDecl = dyn_cast<ValueDecl>(member)) {
       (void)getActorIsolation(valueDecl);
+    }
+  }
+
+  // If we are migrating to InferIsolatedConformances, and the
+  // nominal type is global-actor-isolated, look for conformances
+  // that are nonisolated but were not explicitly marked as such.
+  // These conformances will need to be marked 'nonisolated' to
+  // retain their current behavior.
+  if (Context.LangOpts
+          .getFeatureState(Feature::InferIsolatedConformances)
+            .isEnabledForMigration() &&
+      getActorIsolation(const_cast<NominalTypeDecl *>(nominal))
+          .isGlobalActor()) {
+    for (auto conformance : conformances) {
+      auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+      if (!normal)
+        continue;
+
+      // Explicit nonisolated and @preconcurrency suppress this.
+      auto options = normal->getOptions();
+      if (options.contains(ProtocolConformanceFlags::Nonisolated) ||
+          options.contains(ProtocolConformanceFlags::Preconcurrency))
+        continue;
+
+      // Only consider conformances that were explicitly written in the source.
+      if (normal->getSourceKind() != ConformanceEntryKind::Explicit)
+        continue;
+
+      // Only consider conformances to non-marker, nonisolated protocols.
+      auto proto = normal->getProtocol();
+      if (proto->isMarkerProtocol() || getActorIsolation(proto).isActorIsolated())
+        continue;
+
+      // Only nonisolated conformances can be affected.
+      if (!conformance->getIsolation().isNonisolated())
+        continue;
+
+      auto nameLoc = normal->getProtocolNameLoc();
+      if (nameLoc.isValid()) {
+        Context.Diags.diagnose(
+            nameLoc, diag::isolated_conformance_will_become_nonisolated, nominal, proto)
+          .fixItInsert(nameLoc, "nonisolated ");
+      }
     }
   }
 

@@ -2657,6 +2657,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
+    case BuiltinValueKind::PrepareInitialization:
       if (builtin->getAllOperands().size() > 0) {
         visitor(&builtin->getAllOperands()[0]);
       }

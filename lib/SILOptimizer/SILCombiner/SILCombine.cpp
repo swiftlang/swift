@@ -613,28 +613,29 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
   passesRegistered = true;
 }
 
-#define _RUN_SWIFT_SIMPLIFICATON(INST) \
-  static BridgedInstructionPassRunFn runFunction = nullptr;                \
-  static bool passDisabled = false;                                        \
-  if (!runFunction) {                                                      \
-    runFunction = swiftInstPasses[#INST];                                  \
-    if (!runFunction) {                                                    \
-      if (passesRegistered) {                                              \
-        llvm::errs() << "Swift pass " << #INST << " is not registered\n";  \
-        abort();                                                           \
-      } else {                                                             \
-        return nullptr;                                                    \
-      }                                                                    \
-    }                                                                      \
-    StringRef instName = getSILInstructionName(SILInstructionKind::INST);  \
-    passDisabled = SILPassManager::isInstructionPassDisabled(instName);    \
-  }                                                                        \
-  if (passDisabled &&                                                      \
-      SILPassManager::disablePassesForFunction(inst->getFunction())) {     \
-    return nullptr;                                                        \
-  }                                                                        \
-  runSwiftInstructionPass(inst, runFunction);                              \
-  return nullptr;                                                          \
+#define _RUN_SWIFT_SIMPLIFICATON(INST)                                         \
+  static BridgedInstructionPassRunFn runFunction = nullptr;                    \
+  static bool passDisabled = false;                                            \
+  if (!runFunction) {                                                          \
+    runFunction = swiftInstPasses[#INST];                                      \
+    if (!runFunction) {                                                        \
+      if (passesRegistered) {                                                  \
+        ABORT([&](auto &out) {                                                 \
+          out << "Swift pass " << #INST << " is not registered";               \
+        });                                                                    \
+      } else {                                                                 \
+        return nullptr;                                                        \
+      }                                                                        \
+    }                                                                          \
+    StringRef instName = getSILInstructionName(SILInstructionKind::INST);      \
+    passDisabled = SILPassManager::isInstructionPassDisabled(instName);        \
+  }                                                                            \
+  if (passDisabled &&                                                          \
+      SILPassManager::disablePassesForFunction(inst->getFunction())) {         \
+    return nullptr;                                                            \
+  }                                                                            \
+  runSwiftInstructionPass(inst, runFunction);                                  \
+  return nullptr;
 
 #define INSTRUCTION_SIMPLIFICATION(INST) \
 SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \

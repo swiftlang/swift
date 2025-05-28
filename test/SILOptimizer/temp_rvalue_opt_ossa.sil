@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -temp-rvalue-elimination | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
 // REQUIRES: swift_in_compiler
 
@@ -134,6 +135,7 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @copy_from_temp
 // CHECK:      bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:   builtin
 // CHECK-NEXT:   copy_addr %1 to [init] %0 : $*GS<B>
 // CHECK-NEXT:   tuple
@@ -152,6 +154,7 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
 
 // CHECK-LABEL: sil [ossa] @copy_back_to_src
 // CHECK:      bb0(%0 : $*GS<B>, %1 : $*GS<B>):
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:   struct_element_addr %1
 // CHECK-NEXT:   load
 // CHECK-NEXT:   builtin
@@ -210,6 +213,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @copy_with_take_and_copy_from_src
 // CHECK:       bb0({{.*}}):
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    copy_addr [take] %1 to [init] %0
 // CHECK-NEXT:    tuple
@@ -339,6 +343,7 @@ bb1:
 // CHECK-LABEL: sil [ossa] @store_after_load
 // CHECK:      bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
 // CHECK-NEXT:   [[A1:%.*]] = struct_element_addr %1
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:   [[A2:%.*]] = struct_element_addr %1
 // CHECK-NEXT:   load [trivial] [[A2]]
 // CHECK-NEXT:   store %2 to [trivial] [[A1]]
@@ -363,6 +368,7 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
 // CHECK-LABEL: sil [ossa] @store_after_two_loads
 // CHECK:      bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
 // CHECK-NEXT:   [[A1:%.*]] = struct_element_addr %1
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:   [[A2:%.*]] = struct_element_addr %1
 // CHECK-NEXT:   load [trivial] [[A2]]
 // CHECK-NEXT:   load [trivial] [[A2]]
@@ -476,6 +482,7 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>, %2 : $Builtin.Int64):
 // Test temp RValue elimination on switches.
 // CHECK-LABEL: sil [ossa] @rvalueSwitch
 // CHECK:      bb1:
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:   struct_element_addr %1
 // CHECK-NEXT:   load
 // CHECK-NOT: alloc_stack $UnfoldSequence
@@ -607,6 +614,8 @@ bb0(%0 : $*Klass):
 // CHECK-LABEL: sil [ossa] @non_overlapping_lifetime : $@convention(thin) (@in Klass) -> () {
 // CHECK:      bb0([[ARG:%.*]] : $*Klass):
 // CHECK-NEXT:   [[TMP:%.*]] = alloc_stack $Klass
+// CHECK-ONONE-NEXT:   debug_step
+// CHECK-ONONE-NEXT:   debug_step
 // CHECK-NEXT:   copy_addr [[ARG]] to [init] [[TMP]]
 // CHECK-NEXT:   destroy_addr [[ARG]]
 // CHECK:        apply %{{[0-9]*}}([[TMP]])
@@ -1370,9 +1379,10 @@ bb1(%6 : @guaranteed $Klass):
 // Lexical alloc_stacks can still be eliminated if their sources are guaranteed
 // function arguments (because those are lexical and have a live range that
 // contains the live range of the value stored into the alloc stack).
-// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : {{.*}} {
-// CHECK-NOT:     alloc_stack
-// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg'
+// CHECK-LABEL:   sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : {{.*}} {
+// CHECK-OPT-NOT:   alloc_stack
+// CHECK-ONONE:     alloc_stack
+// CHECK-LABEL:   } // end sil function 'copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg'
 sil [ossa] @copy_addr__lexical_alloc_stack_temporary__guaranteed_function_arg : $@convention(thin) (@guaranteed OtherClass) -> () {
 entry(%instance : @guaranteed $OtherClass):
   %field_ptr = ref_element_addr %instance : $OtherClass, #OtherClass.klass
@@ -1384,9 +1394,10 @@ entry(%instance : @guaranteed $OtherClass):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary_in_guaranteed_function_arg : {{.*}} {
-// CHECK-NOT:     alloc_stack
-// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary_in_guaranteed_function_arg'
+// CHECK-LABEL:   sil [ossa] @copy_addr__lexical_alloc_stack_temporary_in_guaranteed_function_arg : {{.*}} {
+// CHECK-OPT-NOT:   alloc_stack
+// CHECK-ONONE:     alloc_stack
+// CHECK-LABEL:   } // end sil function 'copy_addr__lexical_alloc_stack_temporary_in_guaranteed_function_arg'
 sil [ossa] @copy_addr__lexical_alloc_stack_temporary_in_guaranteed_function_arg : $@convention(thin) (@in_guaranteed Klass) -> () {
 entry(%instance : $*Klass):
   %addr = alloc_stack [lexical] $Klass
@@ -1397,9 +1408,24 @@ entry(%instance : $*Klass):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : {{.*}} {
-// CHECK-NOT:     alloc_stack
-// CHECK-LABEL: } // end sil function 'copy_addr__lexical_alloc_stack_temporary__inout_function_arg'
+// CHECK-LABEL:   sil [ossa] @copy_addr__vardecl_alloc_stack_temporary_in_guaranteed_function_arg : {{.*}} {
+// CHECK-OPT-NOT:   alloc_stack
+// CHECK-ONONE:     alloc_stack
+// CHECK-LABEL:   } // end sil function 'copy_addr__vardecl_alloc_stack_temporary_in_guaranteed_function_arg'
+sil [ossa] @copy_addr__vardecl_alloc_stack_temporary_in_guaranteed_function_arg : $@convention(thin) (@in_guaranteed Klass) -> () {
+entry(%instance : $*Klass):
+  %addr = alloc_stack [var_decl] $Klass
+  copy_addr %instance to [init] %addr : $*Klass
+  destroy_addr %addr : $*Klass
+  dealloc_stack %addr : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : {{.*}} {
+// CHECK-OPT-NOT:   alloc_stack
+// CHECK-ONONE:     alloc_stack
+// CHECK-LABEL:   } // end sil function 'copy_addr__lexical_alloc_stack_temporary__inout_function_arg'
 sil [ossa] @copy_addr__lexical_alloc_stack_temporary__inout_function_arg : $@convention(thin) (@inout NonTrivialStruct) -> () {
 entry(%instance : $*NonTrivialStruct):
   %field_ptr = struct_element_addr %instance : $*NonTrivialStruct, #NonTrivialStruct.val
@@ -1474,8 +1500,10 @@ bb0(%0 : $*P):
 }
 
 // CHECK-LABEL: sil [ossa] @store_to_temp :
-// CHECK:         %1 = load [copy] %0
-// CHECK-NEXT:    return %1
+// CHECK:       bb0(%0 : $*Klass):
+// CHECK-ONONE-NEXT:   debug_step
+// CHECK-NEXT:    [[L:%.*]] = load [copy] %0
+// CHECK-NEXT:    return [[L]]
 // CHECK-LABEL: } // end sil function 'store_to_temp'
 sil [ossa] @store_to_temp : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
 bb0(%0 : $*Klass):
@@ -1489,9 +1517,11 @@ bb0(%0 : $*Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @store_to_temp_take :
-// CHECK:         %1 = load [copy] %0
+// CHECK:       bb0(%0 : $*Klass):
+// CHECK-ONONE-NEXT:   debug_step
+// CHECK-NEXT:    [[L:%.*]] = load [copy] %0
 // CHECK-NEXT:    destroy_addr %0
-// CHECK-NEXT:    return %1
+// CHECK-NEXT:    return [[L]]
 // CHECK-LABEL: } // end sil function 'store_to_temp_take'
 sil [ossa] @store_to_temp_take : $@convention(thin) (@in Klass) -> @owned Klass {
 bb0(%0 : $*Klass):
@@ -1505,8 +1535,10 @@ bb0(%0 : $*Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @store_to_temp_trivial :
-// CHECK:         %1 = load [trivial] %0
-// CHECK-NEXT:    return %1
+// CHECK:       bb0(%0 : $*Int):
+// CHECK-ONONE-NEXT:   debug_step
+// CHECK-NEXT:    [[L:%.*]] = load [trivial] %0
+// CHECK-NEXT:    return [[L]]
 // CHECK-LABEL: } // end sil function 'store_to_temp_trivial'
 sil [ossa] @store_to_temp_trivial : $@convention(thin) (@in_guaranteed Int) -> @owned Int {
 bb0(%0 : $*Int):

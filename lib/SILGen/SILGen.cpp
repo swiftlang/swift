@@ -515,7 +515,7 @@ Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
   // Look in the main module for a typealias
-  Type factory = ctx.getNamedSwiftType(ctx.MainModule, "_DefaultExecutorFactory");
+  Type factory = ctx.getNamedSwiftType(ctx.MainModule, "DefaultExecutorFactory");
 
   // If we don't find it, fall back to _Concurrency.PlatformExecutorFactory
   if (!factory)
@@ -531,7 +531,7 @@ Type SILGenModule::getDefaultExecutorFactory() {
   if (!module)
     return Type();
 
-  return ctx.getNamedSwiftType(module, "_DefaultExecutorFactory");
+  return ctx.getNamedSwiftType(module, "DefaultExecutorFactory");
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
@@ -1435,14 +1435,19 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
     // Differentiability witnesses have the same linkage as the original
-    // function, stripping external.
-    auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
+    // function, stripping external. For @_alwaysEmitIntoClient original
+    // functions, force PublicNonABI linkage of the differentiability witness so
+    // we can serialize it (the original function itself might be HiddenExternal
+    // in this case if we only have declaration without definition).
+    auto linkage =
+        originalFunction->markedAsAlwaysEmitIntoClient()
+            ? SILLinkage::PublicNonABI
+            : stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
         M, linkage, originalFunction, diffKind, silConfig.parameterIndices,
         silConfig.resultIndices, config.derivativeGenericSignature,
         /*jvp*/ nullptr, /*vjp*/ nullptr,
-        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
-        attr);
+        /*isSerialized*/ hasPublicVisibility(linkage), attr);
   }
 
   // Set derivative function in differentiability witness.
@@ -2070,17 +2075,16 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
   
-  if (!decl->exportsPropertyDescriptor())
+  auto descriptorContext = decl->getPropertyDescriptorGenericSignature();
+  if (!descriptorContext)
     return;
 
   PrettyStackTraceDecl stackTrace("emitting property descriptor for", decl);
 
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
-
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
-                 ->getReducedType(decl->getInnermostDeclContext()
-                                      ->getGenericSignatureOfContext());
+                 ->getReducedType(*descriptorContext);
     
     if (decl->isStatic()) {
       baseTy = MetatypeType::get(baseTy);
@@ -2091,8 +2095,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     llvm_unreachable("should not export a property descriptor yet");
   }
 
-  auto genericEnv = decl->getInnermostDeclContext()
-                        ->getGenericEnvironmentOfContext();
+  auto genericEnv = descriptorContext->getGenericEnvironment();
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
   
@@ -2102,8 +2105,16 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   }
   
   SubstitutionMap subs;
-  if (genericEnv)
-    subs = genericEnv->getForwardingSubstitutionMap();
+  if (genericEnv) {
+    // The substitutions are used when invoking the underlying accessors, so
+    // we get these from the original declaration generic environment, even if
+    // `getPropertyDescriptorGenericSignature` computed a different generic
+    // environment, since the accessors will not need the extra Copyable or
+    // Escapable requirements.
+    subs = SubstitutionMap::get(decl->getInnermostDeclContext()
+                                    ->getGenericSignatureOfContext(),
+      genericEnv->getForwardingSubstitutionMap());
+  }
   
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,

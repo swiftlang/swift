@@ -44,7 +44,7 @@ public protocol Clock<Duration>: Sendable {
 
   /// The traits associated with this clock instance.
   @available(SwiftStdlib 6.2, *)
-  var _traits: _ClockTraits { get }
+  var traits: ClockTraits { get }
 
   /// Convert a Clock-specific Duration to a Swift Duration
   ///
@@ -60,7 +60,7 @@ public protocol Clock<Duration>: Sendable {
   /// Returns: A `Swift.Duration` representing the equivalent duration, or
   ///          `nil` if this function is not supported.
   @available(SwiftStdlib 6.2, *)
-  func _convert(from duration: Duration) -> Swift.Duration?
+  func convert(from duration: Duration) -> Swift.Duration?
 
   /// Convert a Swift Duration to a Clock-specific Duration
   ///
@@ -71,7 +71,7 @@ public protocol Clock<Duration>: Sendable {
   /// Returns: A `Duration` representing the equivalent duration, or
   ///          `nil` if this function is not supported.
   @available(SwiftStdlib 6.2, *)
-  func _convert(from duration: Swift.Duration) -> Duration?
+  func convert(from duration: Swift.Duration) -> Duration?
 
   /// Convert an `Instant` from some other clock's `Instant`
   ///
@@ -83,8 +83,8 @@ public protocol Clock<Duration>: Sendable {
   /// Returns: An `Instant` representing the equivalent instant, or
   ///          `nil` if this function is not supported.
   @available(SwiftStdlib 6.2, *)
-  func _convert<OtherClock: Clock>(instant: OtherClock.Instant,
-                                   from clock: OtherClock) -> Instant?
+  func convert<OtherClock: Clock>(instant: OtherClock.Instant,
+                                  from clock: OtherClock) -> Instant?
 }
 
 @available(SwiftStdlib 5.7, *)
@@ -143,27 +143,27 @@ extension Clock {
 @available(SwiftStdlib 6.2, *)
 extension Clock {
   // For compatibility, return `nil` if this is not implemented
-  public func _convert(from duration: Duration) -> Swift.Duration? {
+  public func convert(from duration: Duration) -> Swift.Duration? {
     return nil
   }
 
-  public func _convert(from duration: Swift.Duration) -> Duration? {
+  public func convert(from duration: Swift.Duration) -> Duration? {
     return nil
   }
 
-  public func _convert<OtherClock: Clock>(instant: OtherClock.Instant,
-                                          from clock: OtherClock) -> Instant? {
+  public func convert<OtherClock: Clock>(instant: OtherClock.Instant,
+                                  from clock: OtherClock) -> Instant? {
     let ourNow = now
     let otherNow = clock.now
     let otherDuration = otherNow.duration(to: instant)
 
     // Convert to `Swift.Duration`
-    guard let duration = clock._convert(from: otherDuration) else {
+    guard let duration = clock.convert(from: otherDuration) else {
       return nil
     }
 
     // Convert from `Swift.Duration`
-    guard let ourDuration = _convert(from: duration) else {
+    guard let ourDuration = convert(from: duration) else {
       return nil
     }
 
@@ -173,7 +173,7 @@ extension Clock {
 
 @available(SwiftStdlib 6.2, *)
 extension Clock where Duration == Swift.Duration {
-  public func _convert(from duration: Duration) -> Duration? {
+  public func convert(from duration: Duration) -> Duration? {
     return duration
   }
 }
@@ -208,7 +208,7 @@ extension Clock {
 /// time or delay in.  Executors are expected to do this on a best effort
 /// basis.
 @available(SwiftStdlib 6.2, *)
-public struct _ClockTraits: OptionSet {
+public struct ClockTraits: OptionSet {
   public let rawValue: UInt32
 
   public init(rawValue: UInt32) {
@@ -216,20 +216,20 @@ public struct _ClockTraits: OptionSet {
   }
 
   /// Clocks with this trait continue running while the machine is asleep.
-  public static let continuous = _ClockTraits(rawValue: 1 << 0)
+  public static let continuous = ClockTraits(rawValue: 1 << 0)
 
   /// Indicates that a clock's time will only ever increase.
-  public static let monotonic = _ClockTraits(rawValue: 1 << 1)
+  public static let monotonic = ClockTraits(rawValue: 1 << 1)
 
   /// Clocks with this trait are tied to "wall time".
-  public static let wallTime = _ClockTraits(rawValue: 1 << 2)
+  public static let wallTime = ClockTraits(rawValue: 1 << 2)
 }
 
 @available(SwiftStdlib 6.2, *)
 extension Clock {
   /// The traits associated with this clock instance.
   @available(SwiftStdlib 6.2, *)
-  public var _traits: _ClockTraits {
+  public var traits: ClockTraits {
     return []
   }
 }
