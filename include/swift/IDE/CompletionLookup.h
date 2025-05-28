@@ -325,6 +325,8 @@ public:
 
   void addImportModuleNames();
 
+  void addUsingSpecifiers();
+
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo);
