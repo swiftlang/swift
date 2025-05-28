@@ -2075,17 +2075,16 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
   
-  if (!decl->exportsPropertyDescriptor())
+  auto descriptorContext = decl->getPropertyDescriptorGenericSignature();
+  if (!descriptorContext)
     return;
 
   PrettyStackTraceDecl stackTrace("emitting property descriptor for", decl);
 
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
-
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
-                 ->getReducedType(decl->getInnermostDeclContext()
-                                      ->getGenericSignatureOfContext());
+                 ->getReducedType(*descriptorContext);
     
     if (decl->isStatic()) {
       baseTy = MetatypeType::get(baseTy);
@@ -2096,8 +2095,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     llvm_unreachable("should not export a property descriptor yet");
   }
 
-  auto genericEnv = decl->getInnermostDeclContext()
-                        ->getGenericEnvironmentOfContext();
+  auto genericEnv = descriptorContext->getGenericEnvironment();
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
   
@@ -2107,8 +2105,16 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   }
   
   SubstitutionMap subs;
-  if (genericEnv)
-    subs = genericEnv->getForwardingSubstitutionMap();
+  if (genericEnv) {
+    // The substitutions are used when invoking the underlying accessors, so
+    // we get these from the original declaration generic environment, even if
+    // `getPropertyDescriptorGenericSignature` computed a different generic
+    // environment, since the accessors will not need the extra Copyable or
+    // Escapable requirements.
+    subs = SubstitutionMap::get(decl->getInnermostDeclContext()
+                                    ->getGenericSignatureOfContext(),
+      genericEnv->getForwardingSubstitutionMap());
+  }
   
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
