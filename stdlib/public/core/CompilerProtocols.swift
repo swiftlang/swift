@@ -149,7 +149,6 @@ public protocol RawRepresentable<RawValue> {
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
 @inlinable // trivial-implementation
-@_semantics("rawrepresentable.is_equal")
 public func == <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue: Equatable {
   return lhs.rawValue == rhs.rawValue
