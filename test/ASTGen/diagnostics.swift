@@ -4,6 +4,7 @@
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
+
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -66,3 +67,12 @@ func misisngPatternTest(arr: [Int]) {
   for {} // expected-error {{expected pattern, 'in', and expression in 'for' statement}}
          // expected-note@-1 {{insert pattern, 'in', and expression}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
 }
+
+using @MainActor // expected-note {{default isolation was previously declared here}}
+using nonisolated // expected-error {{invalid redeclaration of file-level default actor isolation}}
+
+using @Test
+// expected-error@-1 {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
+
+using test
+// expected-error@-1 {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
