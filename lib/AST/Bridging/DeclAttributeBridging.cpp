@@ -842,9 +842,9 @@ static SpecializeAttr::SpecializationKind
 unbridge(BridgedSpecializationKind kind) {
   switch (kind) {
   case BridgedSpecializationKindFull:
-    return SpecializeAttr::SpecializationKind::Full;
+    return AbstractSpecializeAttr::SpecializationKind::Full;
   case BridgedSpecializationKindPartial:
-    return SpecializeAttr::SpecializationKind::Partial;
+    return AbstractSpecializeAttr::SpecializationKind::Partial;
   }
   llvm_unreachable("unhandled kind");
 }
@@ -863,6 +863,25 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     availableAttrs.push_back(bridging.unbridged());
 
   return SpecializeAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      cWhereClause.unbridged(), exported, unbridge(cKind),
+      cTargetFunction.unbridged(), spiGroups, availableAttrs);
+}
+
+BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
+    bool exported, BridgedSpecializationKind cKind,
+    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
+  SmallVector<Identifier, 2> spiGroups;
+  for (auto bridging : cSPIGroups.unbridged<BridgedIdentifier>())
+    spiGroups.push_back(bridging.unbridged());
+  SmallVector<AvailableAttr *, 2> availableAttrs;
+  for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
+    availableAttrs.push_back(bridging.unbridged());
+
+  return SpecializedAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       cWhereClause.unbridged(), exported, unbridge(cKind),
       cTargetFunction.unbridged(), spiGroups, availableAttrs);

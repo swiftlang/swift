@@ -940,7 +940,7 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
-  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                             uint64_t contextData) override;
   virtual AbstractFunctionDecl *
   loadReferencedFunctionDecl(const DerivativeAttr *DA,

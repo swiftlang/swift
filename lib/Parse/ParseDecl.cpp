@@ -560,7 +560,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 }
 
 bool Parser::parseSpecializeAttributeArguments(
-    swift::tok ClosingBrace, bool &DiscardAttribute,
+    swift::tok ClosingBrace, bool isPublic, bool &DiscardAttribute,
     std::optional<bool> &Exported,
     std::optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
@@ -580,11 +580,22 @@ bool Parser::parseSpecializeAttributeArguments(
           ParamLabel != "spiModule" && ParamLabel != "availability" &&
           (!isSIL || ParamLabel != "available")) {
         diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
-                 ParamLabel);
+                 ParamLabel, isPublic);
       }
+
+      // The non-underscored '@specialize' mode currently does not support any
+      // parameters.
+      if (isPublic) {
+        diagnose(Tok.getLoc(), diag::attr_specialize_unsupported_parameter_name,
+                 ParamLabel);
+        DiscardAttribute = true;
+        return false;
+      }
+
       auto AtLoc = consumeToken();
       if (!consumeIf(tok::colon)) {
-        diagnose(Tok.getLoc(), diag::attr_specialize_missing_colon, ParamLabel);
+        diagnose(Tok.getLoc(), diag::attr_specialize_missing_colon, ParamLabel,
+                 isPublic);
         skipUntil(tok::comma, tok::kw_where);
         if (Tok.is(ClosingBrace))
           break;
@@ -602,7 +613,7 @@ bool Parser::parseSpecializeAttributeArguments(
           (ParamLabel == "kind" && Kind.has_value()) ||
           (ParamLabel == "spi" && !spiGroups.empty())) {
         diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
-                 ParamLabel);
+                 ParamLabel, isPublic);
       }
       if (ParamLabel == "available") {
         SourceRange range;
@@ -628,7 +639,7 @@ bool Parser::parseSpecializeAttributeArguments(
         bool isTrue = consumeIf(tok::kw_true);
         bool isFalse = consumeIf(tok::kw_false);
         if (!isTrue && !isFalse) {
-          diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value);
+          diagnose(Tok.getLoc(), diag::attr_specialize_expected_bool_value, isPublic);
           skipUntil(tok::comma, tok::kw_where);
           if (Tok.is(ClosingBrace))
             break;
@@ -678,7 +689,7 @@ bool Parser::parseSpecializeAttributeArguments(
       if (ParamLabel == "spiModule") {
         if (!parseSILSIPModule(*this)) {
           diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
-                   ParamLabel);
+                   ParamLabel, isPublic);
           return false;
         }
       }
@@ -693,7 +704,7 @@ bool Parser::parseSpecializeAttributeArguments(
         consumeToken();
       }
       if (!isAvailability && !consumeIf(tok::comma)) {
-        diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma);
+        diagnose(Tok.getLoc(), diag::attr_specialize_missing_comma, isPublic);
         skipUntil(tok::comma, tok::kw_where);
         if (Tok.is(ClosingBrace))
           break;
@@ -710,6 +721,7 @@ bool Parser::parseSpecializeAttributeArguments(
       continue;
     }
     diagnose(Tok.getLoc(),
+             isPublic ?  diag::attr_specialized_missing_where_clause :
              diag::attr_specialize_missing_parameter_label_or_where_clause);
     DiscardAttribute = true;
     return false;
@@ -719,8 +731,8 @@ bool Parser::parseSpecializeAttributeArguments(
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc, endLoc;
     SmallVector<RequirementRepr, 4> requirements;
-    parseGenericWhereClause(whereLoc, endLoc, requirements,
-                            /* AllowLayoutConstraints */ true);
+    auto status = parseGenericWhereClause(whereLoc, endLoc, requirements,
+                            /* AllowLayoutConstraints */ !isPublic);
     TrailingWhereClause =
         TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
   }
@@ -858,8 +870,8 @@ bool Parser::parseAvailability(
 }
 
 bool Parser::parseSpecializeAttribute(
-    swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-    SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
+    swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc, bool isPublic,
+    AbstractSpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
@@ -873,7 +885,7 @@ bool Parser::parseSpecializeAttribute(
     lParenLoc = consumeToken();
   }
   bool DiscardAttribute = false;
-  StringRef AttrName = "_specialize";
+  StringRef AttrName = isPublic ? "specialized" : "_specialize";
 
   std::optional<bool> exported;
   std::optional<SpecializeAttr::SpecializationKind> kind;
@@ -884,7 +896,8 @@ bool Parser::parseSpecializeAttribute(
   SmallVector<Identifier, 4> spiGroups;
   SmallVector<AvailableAttr *, 4> availableAttrs;
   if (!parseSpecializeAttributeArguments(
-          ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
+          ClosingBrace, isPublic, DiscardAttribute, exported, kind,
+          trailingWhereClause,
           targetFunction, SILAvailability, spiGroups, availableAttrs,
           parseSILTargetName, parseSILSIPModule)) {
     return false;
@@ -914,10 +927,17 @@ bool Parser::parseSpecializeAttribute(
   }  
 
   // Store the attribute.
-  Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                                trailingWhereClause, exported.value(),
-                                kind.value(), targetFunction, spiGroups,
-                                availableAttrs);
+  if (isPublic)
+    Attr = SpecializedAttr::create(Context, AtLoc,
+                                  SourceRange(Loc, rParenLoc),
+                                  trailingWhereClause, exported.value(),
+                                  kind.value(), targetFunction, spiGroups,
+                                  availableAttrs);
+  else
+    Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
+                                  trailingWhereClause, exported.value(),
+                                  kind.value(), targetFunction, spiGroups,
+                                  availableAttrs);
   return true;
 }
 
@@ -3587,14 +3607,17 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::Specialize: {
+  case DeclAttrKind::Specialize:
+  case DeclAttrKind::Specialized: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
     }
-    SpecializeAttr *Attr;
-    if (!parseSpecializeAttribute(tok::r_paren, AtLoc, Loc, Attr, nullptr))
+    AbstractSpecializeAttr *Attr;
+    if (!parseSpecializeAttribute(tok::r_paren, AtLoc, Loc,
+                                  DK == DeclAttrKind::Specialized, Attr,
+                                  nullptr))
       return makeParserSuccess();
 
     Attributes.add(Attr);
