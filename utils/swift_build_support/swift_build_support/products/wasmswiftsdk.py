@@ -120,11 +120,13 @@ class WasmSwiftSDK(product.Product):
         #    and header paths from the sysroot
         #    https://github.com/llvm/llvm-project/blob/73ef397fcba35b7b4239c00bf3e0b4e689ca0add/clang/lib/Driver/ToolChains/WebAssembly.cpp#L29-L36
         # 3. short_triple: The triple used by build-script to name the build directory
-        for swift_host_triple, clang_multiarch_triple, short_triple, build_basename in [
-            ('wasm32-unknown-wasi', 'wasm32-wasi', 'wasi-wasm32', 'wasmstdlib'),
-            # TODO: Enable threads stdlib once sdk-generator supports multi-target SDK
-            # ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
-            #  'wasip1-threads-wasm32', 'wasmthreadsstdlib'),
+        for swift_host_triple, clang_multiarch_triple, short_triple, build_basename, build_sdk in [
+            ('wasm32-unknown-wasi', 'wasm32-wasi',
+             'wasi-wasm32', 'wasmstdlib', True),
+            # FIXME: Enable build_sdk for threads once we will be able to
+            # unify Swift SDK archive for threads and non-threads.
+            ('wasm32-unknown-wasip1-threads', 'wasm32-wasip1-threads',
+             'wasip1-threads-wasm32', 'wasmthreadsstdlib', False),
         ]:
             stdlib_build_path = os.path.join(
                 build_root, '%s-%s' % (build_basename, host_target))
@@ -133,7 +135,8 @@ class WasmSwiftSDK(product.Product):
             package_path = self._build_target_package(
                 swift_host_triple, short_triple, stdlib_build_path,
                 llvm_runtime_libs_build_path, wasi_sysroot)
-            target_packages.append((swift_host_triple, wasi_sysroot, package_path))
+            if build_sdk:
+                target_packages.append((swift_host_triple, wasi_sysroot, package_path))
 
         swiftc_path = os.path.abspath(self.toolchain.swiftc)
         toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
