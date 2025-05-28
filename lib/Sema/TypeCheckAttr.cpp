@@ -22,6 +22,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -3081,6 +3082,37 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
   return std::make_pair(body, /*typechecked=*/false);
 }
 
+llvm::SmallString<128> generateMainFunctionText(ASTContext &C, Decl *decl,
+                                                bool isThrows, bool isAsync) {
+  // Prepare the indent (same as `printRequirementStub`)
+  StringRef ExtraIndent;
+  StringRef CurrentIndent = Lexer::getIndentationForLine(
+      C.SourceMgr, decl->getStartLoc(), &ExtraIndent);
+
+  llvm::SmallString<128> Text;
+  llvm::raw_svector_ostream OS(Text);
+  ExtraIndentStreamPrinter Printer(OS, CurrentIndent);
+
+  Printer.printNewline();
+  Printer.printIndent();
+
+  Printer << ExtraIndent << "static func main() ";
+  if (isAsync)
+    Printer << "async ";
+  if (isThrows)
+    Printer << "throws ";
+
+  /// Print the "{ <#code#> }" placeholder body
+  Printer << "{\n";
+  Printer.printIndent();
+  Printer << ExtraIndent << ExtraIndent << getCodePlaceholder();
+  Printer.printNewline();
+  Printer.printIndent();
+  Printer << ExtraIndent << "}\n";
+
+  return Text;
+}
+
 FuncDecl *
 SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
                                         Decl *D) const {
@@ -3210,9 +3242,33 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     const bool hasAsyncSupport =
         AvailabilityRange::forDeploymentTarget(context).isContainedIn(
             context.getBackDeployedConcurrencyAvailability());
-    context.Diags.diagnose(attr->getLocation(),
-                           diag::attr_MainType_without_main,
-                           nominal, hasAsyncSupport);
+
+    auto location = attr->getLocation();
+    auto fixLocation = braces.Start;
+
+    context.Diags.diagnose(location, diag::attr_MainType_without_main, nominal,
+                           hasAsyncSupport);
+
+    context.Diags.diagnose(location, diag::note_add_main_sync)
+        .fixItInsertAfter(
+            fixLocation,
+            generateMainFunctionText(context, nominal, false, false).str());
+    context.Diags.diagnose(location, diag::note_add_main_sync_throws)
+        .fixItInsertAfter(
+            fixLocation,
+            generateMainFunctionText(context, nominal, true, false).str());
+
+    if (hasAsyncSupport) {
+      context.Diags.diagnose(location, diag::note_add_main_async)
+          .fixItInsertAfter(
+              fixLocation,
+              generateMainFunctionText(context, nominal, false, true).str());
+      context.Diags.diagnose(location, diag::note_add_main_async_throws)
+          .fixItInsertAfter(
+              fixLocation,
+              generateMainFunctionText(context, nominal, true, true).str());
+    }
+
     attr->setInvalid();
     return nullptr;
   }
