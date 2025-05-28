@@ -2151,6 +2151,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Using:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -5267,6 +5268,10 @@ public:
 
   void visitImportDecl(const ImportDecl *) {
     llvm_unreachable("import decls should not be serialized");
+  }
+
+  void visitUsingDecl(const UsingDecl *) {
+    llvm_unreachable("using decls should not be serialized");
   }
 
   void visitEnumCaseDecl(const EnumCaseDecl *) {
