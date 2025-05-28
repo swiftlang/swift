@@ -2506,6 +2506,10 @@ public:
     }
   }
 
+  void visitUsingDecl(UsingDecl *UD) {
+    // Nothing to validate yet.
+  }
+
   void visitOperatorDecl(OperatorDecl *OD) {
     TypeChecker::checkDeclAttributes(OD);
     checkRedeclaration(OD);

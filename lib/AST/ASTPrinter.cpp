@@ -3052,6 +3052,11 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
+void PrintAST::visitUsingDecl(UsingDecl *decl) {
+  Printer.printIntroducerKeyword("using", Options, " ");
+  Printer << decl->getSpecifierName();
+}
+
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   bool OldFullyQualifiedTypesIfAmbiguous =
     Options.FullyQualifiedTypesIfAmbiguous;
