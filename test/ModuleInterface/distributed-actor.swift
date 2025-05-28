@@ -45,7 +45,7 @@ public distributed actor DA {
   // CHECK-NEXT:    get
   // CHECK-NEXT:  }
   // CHECK:       public init(actorSystem system: Library.DA.ActorSystem)
-  // CHECK:       @available(iOS 16.0, tvOS 16.0, watchOS 9.0, macOS 13.0, *)
+  // CHECK:       @available(_SwiftToolchain 5.1, iOS 16.0, tvOS 16.0, watchOS 9.0, macOS 13.0, *)
   // CHECK-NEXT:  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
   // CHECK-NEXT:    get
   // CHECK-NEXT:  }
@@ -67,7 +67,7 @@ public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSys
 // CHECK:   get
 // CHECK: }
 // CHECK: public init(actorSystem system: ActorSystem)
-// CHECK: @available(iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, macOS 15.0, *)
+// CHECK: @available(_SwiftToolchain 5.1, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, macOS 15.0, *)
 // CHECK: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
 // CHECK:   get
 // CHECK: }
