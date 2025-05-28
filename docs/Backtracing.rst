@@ -113,6 +113,10 @@ follows:
 |                 |         | Otherwise, Swift will locate the binary relative |
 |                 |         | to the runtime library, or using ``SWIFT_ROOT``. |
 +-----------------+---------+--------------------------------------------------+
+| warnings        | enabled | Set to ``suppressed`` to disable warning output  |
+|                 |         | related to the state of the backtracer.  This is |
+|                 |         | sometimes useful for testing.                    |
++-----------------+---------+--------------------------------------------------+
 
 (*) On macOS, this defaults to ``no`` rather than ``yes``.
 
