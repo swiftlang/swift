@@ -1,5 +1,6 @@
 add_subdirectory(InternalShims)
 
+gyb_expand(Task+init.swift.gyb Task+init.swift)
 gyb_expand(TaskGroup+addTask.swift.gyb TaskGroup+addTask.swift)
 gyb_expand(Task+immediate.swift.gyb Task+immediate.swift)
 
@@ -92,10 +93,10 @@ add_library(swift_Concurrency
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+Embedded.swift
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
+  "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
 
