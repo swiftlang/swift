@@ -35,6 +35,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/WithColor.h"
@@ -2473,7 +2474,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
   for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
-    Opts.ScannerPrefixMapper.push_back(Opt.str());
+    if (auto Mapping = llvm::MappedPrefix::getFromJoined(Opt)) {
+      Opts.ScannerPrefixMapper.push_back({Mapping->Old, Mapping->New});
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_prefix_mapping, Opt);
+    }
   }
 
   Opts.ResolvedPluginVerification |=

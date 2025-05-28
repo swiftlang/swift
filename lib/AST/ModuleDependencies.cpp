@@ -755,12 +755,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!ScannerPrefixMapper.empty()) {
     Mapper = std::make_unique<llvm::PrefixMapper>();
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
-    if (auto E = llvm::MappedPrefix::transformJoined(ScannerPrefixMapper,
-                                                     Prefixes)) {
-      Instance.getDiags().diagnose(SourceLoc(), diag::error_prefix_mapping,
-                                   toString(std::move(E)));
-      return true;
-    }
+    llvm::MappedPrefix::transformPairs(ScannerPrefixMapper,
+                                       Prefixes);
     Mapper->addRange(Prefixes);
     Mapper->sort();
   }
