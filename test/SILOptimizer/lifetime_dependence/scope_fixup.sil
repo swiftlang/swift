@@ -99,12 +99,12 @@ sil @yieldInoutNE : $@yield_once @convention(method) (@inout Holder) -> @lifetim
 // CHECK:   [[WRAPPER:%.*]] = apply %{{.*}}([[CP]], %{{.*}}) : $@convention(method) (@owned NE, @thin Wrapper.Type) -> @lifetime(copy 0) @owned Wrapper
 // CHECK:   yield [[WRAPPER]], resume bb1, unwind bb2
 // CHECK: bb1:
-// CHECK:   destroy_value [[WRAPPER]]
 // CHECK:   end_apply [[TOKEN]] as $()
+// CHECK:   destroy_value [[WRAPPER]]
 // CHECK:   return
 // CHECK: bb2:
-// CHECK:   destroy_value [[WRAPPER]]
 // CHECK:   end_apply [[TOKEN]] as $()
+// CHECK:   destroy_value [[WRAPPER]]
 // CHECK:   unwind
 // CHECK-LABEL: } // end sil function 'NCContainer_wrapper_read'
 sil hidden [ossa] @NCContainer_wrapper_read : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper {
@@ -185,10 +185,10 @@ sil [ossa] @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @life
 // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[APPLY]] on [[SB]]
 // CHECK: [[MV:%.*]] = move_value [var_decl] [[MD]]
 // CHECK: apply %{{.*}}([[MV]]) : $@convention(thin) (@guaranteed NE) -> ()
-// CHECK: destroy_value [[MV]]
 // CHECK: end_borrow [[SB]]
 // CHECK: end_borrow [[BORROWB]]
 // CHECK: end_borrow [[BORROWA]]
+// CHECK: destroy_value [[MV]]
 // CHECK: dealloc_stack [[ALLOC]]
 // CHECK-LABEL: } // end sil function 'testAddressableArg'
 sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
@@ -265,13 +265,13 @@ bb0(%0 : @guaranteed $Holder):
 // CHECK: mark_dependence [unresolved]
 // CHECK: [[NE:%.*]] = move_value [var_decl]
 // CHECK: apply %{{.*}}(%{{.*}}) : $@convention(thin) (@guaranteed NE) -> ()
-// CHECK: destroy_value [[NE]]
 // CHECK: end_access [[ACCESS]]
 // CHECK: end_apply [[TOKEN2]] as $()
 // CHECK: end_apply [[TOKEN1]] as $()
 // CHECK-DAG: end_borrow [[BORROW0C]]
 // CHECK-DAG: end_borrow [[BORROW0B]]
 // CHECK-DAG: end_borrow [[BORROW0A]]
+// CHECK: destroy_value [[NE]]
 // CHECK-LABEL: } // end sil function 'testIndirectYield'
 sil hidden [ossa] @testIndirectYield : $@convention(thin) (@guaranteed Holder) -> () {
 bb0(%0 : @guaranteed $Holder):
@@ -308,8 +308,8 @@ bb0(%0 : @guaranteed $Holder):
 // CHECK:   [[MD:%.*]] = mark_dependence [unresolved]
 // CHECK:   [[CP:%.*]] = copy_value [[MD]]
 // CHECK:   apply %{{.*}}([[CP]]) : $@convention(thin) (@guaranteed RawSpan) -> ()
-// CHECK:   destroy_value [[CP]]
 // CHECK:   end_apply
+// CHECK:   destroy_value [[CP]]
 // CHECK:   destroy_addr
 // CHECK-LABEL: } // end sil function 'testYieldSpan'
 sil [ossa] @testYieldSpan : $@convention(thin) (@in A) -> () {
@@ -347,9 +347,9 @@ bb0(%0 : $*A):
 // CHECK: end_access [[A1]]
 // CHECK: (%{{.*}}, [[TOKEN:%.*]]) = begin_apply %13([[LD]]) : $@yield_once @convention(method) (@guaranteed Holder) -> @lifetime(borrow 0) @yields @guaranteed NE
 // CHECK: ignored_use [[DEP:%[0-9]+]]
-// CHECK: destroy_value [[DEP]]
 // CHECK: end_apply [[TOKEN]] as $()
 // CHECK: destroy_value [[LD]]
+// CHECK: destroy_value [[DEP]]
 // CHECK: end_borrow [[BORROW]]
 // CHECK-LABEL: } // end sil function 'testNestedCoro'
 sil hidden [ossa] @testNestedCoro : $@convention(thin) () -> () {
