@@ -7279,23 +7279,25 @@ ERROR(resilient_associated_type_less_available_requires_default,none,
 //------------------------------------------------------------------------------
 
 ERROR(specialize_attr_nongeneric_trailing_where,none,
-      "trailing 'where' clause in '_specialize' attribute of non-generic function %0", (DeclName))
+      "trailing 'where' clause in %select{'_specialize'|'specialized'}1 attribute of non-generic function %0", (DeclName, bool))
 ERROR(specialize_missing_where_clause,none,
-      "missing 'where' clause in '_specialize' attribute", ())
+      "missing 'where' clause in %select{'_specialize'|'specialized'}0 attribute", (bool))
 ERROR(specialize_empty_where_clause,none,
-      "empty 'where' clause in '_specialize' attribute", ())
+      "empty 'where' clause in %select{'_specialize'|'specialized'}0 attribute", (bool))
 ERROR(specialize_attr_non_concrete_same_type_req,none,
-      "only concrete type same-type requirements are supported by '_specialize' attribute", ())
+      "only concrete type same-type requirements are supported by %select{'_specialize'|'specialized'}0 attribute", (bool))
 ERROR(specialize_attr_only_generic_param_req,none,
-      "only requirements on generic parameters are supported by '_specialize' attribute", ())
+      "only requirements on generic parameters are supported by %select{'_specialize'|'specialized'}0 attribute", (bool))
 ERROR(specialize_attr_type_parameter_count_mismatch,none,
       "too few generic parameters are specified "
-      "in '_specialize' attribute (got %0, but expected %1)",
-      (unsigned, unsigned))
+      "in %select{'_specialize'|'specialized'}2 attribute (got %0, but expected %1)",
+      (unsigned, unsigned, bool))
 NOTE(specialize_attr_missing_constraint,none,
-      "missing constraint for %0 in '_specialize' attribute", (DeclName))
+      "missing constraint for %0 in %select{'_specialize'|'specialized'}1 attribute", (DeclName, bool))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
       "only same-type and layout requirements are supported by '_specialize' attribute", ())
+ERROR(specialized_attr_unsupported_kind_of_req,none,
+      "only same-type are supported by 'specialized' attribute", ())
 ERROR(specialize_target_function_not_found, none,
      "target function %0 could not be found", (DeclNameRef))
 ERROR(specialize_target_function_of_type_not_found, none,

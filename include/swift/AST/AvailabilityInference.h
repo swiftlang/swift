@@ -57,7 +57,7 @@ public:
   annotatedAvailableRange(const Decl *D);
 
   static AvailabilityRange
-  annotatedAvailableRangeForAttr(const Decl *D, const SpecializeAttr *attr,
+  annotatedAvailableRangeForAttr(const Decl *D, const AbstractSpecializeAttr *attr,
                                  ASTContext &ctx);
 
   /// For the attribute's introduction version, update the platform and version
