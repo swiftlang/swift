@@ -287,4 +287,6 @@ func testS72199_3<each T: P>(xs: repeat (each T).X, ys: (repeat each T) = (S(), 
 typealias S72199_4<T> = Int
 func testS72199_4<T>(x: S72199_4<T>, y: T = "") {} // Ok
 
-func testS72199_5<T: P>(x: T, y: (T, T.X) = (S(), 0)) {} // Ok
+func testS72199_5<T: P>(x: T.X, y: (T, T.X) = (S(), 0)) {} // Ok
+func testS72199_6<T: P>(x: T, y: (T, T.X) = (S(), 0)) {}
+// expected-error@-1 {{cannot use default expression for inference of '(T, T.X)' because it is inferrable from parameters #0, #1}}
