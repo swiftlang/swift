@@ -28,6 +28,9 @@ extension ApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
     if tryRemoveArrayCast(apply: self, context) {
       return
     }
+    if tryOptimizeEnumComparison(apply: self, context) {
+      return
+    }
     if !context.preserveDebugInfo {
       _ = tryReplaceExistentialArchetype(of: self, context)
     }
@@ -107,6 +110,48 @@ private func tryRemoveArrayCast(apply: ApplyInst, _ context: SimplifyContext) ->
   let copiedArray = builder.createCopyValue(operand: apply.arguments[0])
   let optional = builder.createEnum(caseIndex: 1, payload: copiedArray, enumType: apply.type)
   apply.replace(with: optional, context)
+  return true
+}
+
+/// Optimize (the very inefficient) RawRepresentable comparison to a simple compare of enum tags.
+/// For example,
+/// ```
+///   enum E: String {
+///     case  a, b, c
+///   }
+/// ```
+/// is compared by getting the raw values of both operands and doing a string compare.
+/// This peephole optimizations replaces the call to such a comparison function with a direct compare of
+/// the enum tags, which boils down to a single integer comparison instruction.
+///
+private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyContext) -> Bool {
+  guard let callee = apply.referencedFunction,
+        apply.arguments.count == 2,
+        callee.hasSemanticsAttribute("rawrepresentable.is_equal"),
+        apply.type.isStruct
+  else {
+    return false
+  }
+  let lhs = apply.arguments[0]
+  let rhs = apply.arguments[1]
+  guard let enumDecl = lhs.type.nominal as? EnumDecl,
+        !enumDecl.isResilient(in: apply.parentFunction),
+        !enumDecl.hasClangNode,
+        lhs.type.isAddress,
+        lhs.type == rhs.type
+  else {
+    return false
+  }
+  let builder = Builder(before: apply, context)
+  let tagType = context.getBuiltinIntegerType(bitWidth: 32)
+  let lhsTag = builder.createBuiltin(name: "getEnumTag", type: tagType,
+                                     substitutions: apply.substitutionMap, arguments: [lhs])
+  let rhsTag = builder.createBuiltin(name: "getEnumTag", type: tagType,
+                                     substitutions: apply.substitutionMap, arguments: [rhs])
+  let builtinBoolType = context.getBuiltinIntegerType(bitWidth: 1)
+  let cmp = builder.createBuiltin(name: "cmp_eq_Int32", type: builtinBoolType, arguments: [lhsTag, rhsTag])
+  let booleanResult = builder.createStruct(type: apply.type, elements: [cmp])
+  apply.replace(with: booleanResult, context)
   return true
 }
 
