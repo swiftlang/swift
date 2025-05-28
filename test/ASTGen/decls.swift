@@ -31,6 +31,10 @@ import protocol Swift.Sequence
 import func Swift.max
 import var Swift._playgroundPrintHook
 
+
+using @MainActor
+// FIXME: cannot add `using nonisolated` here because it's a re-declaration
+
 func
 test1
 (
