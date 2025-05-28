@@ -4264,6 +4264,14 @@ ERROR(attr_MainType_without_main,none,
       "%0 is annotated with '@main' and must provide a main static function "
       "of type %" SELECT_APPLICATION_MAIN_TYPES "1",
       (const ValueDecl *, bool))
+NOTE(note_add_main_sync,none,
+     "add 'static func main()'", ())
+NOTE(note_add_main_sync_throws,none,
+     "add 'static func main() throws'", ())
+NOTE(note_add_main_async,none,
+     "add 'static func main() async'", ())
+NOTE(note_add_main_async_throws,none,
+     "add 'static func main() async throws'", ())
 
 #undef SELECT_APPLICATION_MAIN_TYPES
 #undef SELECT_APPLICATION_MAIN
