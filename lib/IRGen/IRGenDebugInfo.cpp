@@ -978,7 +978,10 @@ private:
       if (Scope)
         return MainFile;
     }
-    return cast<llvm::DIFile>(Scope);
+    if (Scope)
+      return cast<llvm::DIFile>(Scope);
+
+    return MainFile;
   }
 
   static unsigned getStorageSizeInBits(const llvm::DataLayout &DL,
@@ -3222,6 +3225,11 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
     Name = LinkageName;
   }
 
+  llvm::DISubprogram *ReplaceableType = DBuilder.createTempFunctionFwdDecl(
+      Scope, Name, LinkageName, File, Line, /*Type=*/nullptr, ScopeLine);
+  auto FwdDecl = llvm::TempDISubprogram(ReplaceableType);
+  ScopeCache[DS] = llvm::TrackingMDNodeRef(FwdDecl.get());
+
   CanSILFunctionType FnTy = getFunctionType(SILTy);
   auto Params = Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables
                     ? createParameterTypes(SILTy)
@@ -3321,6 +3329,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (!DS)
     return nullptr;
 
+  DBuilder.replaceTemporary(std::move(FwdDecl), SP);
   ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
