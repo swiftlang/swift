@@ -114,7 +114,7 @@ _swift_stdlib_NSStringMaximumLengthForEncodingTrampoline(id _Nonnull obj,
                                                          SEL,
                                                          unsigned long);
   SEL sel = @selector(maximumLengthOfBytesUsingEncoding:);
-  getCStringImplPtr imp = (getMaxLengthImplPtr)class_getMethodImplementation([obj superclass], sel);
+  getMaxLengthImplPtr imp = (getMaxLengthImplPtr)class_getMethodImplementation([obj superclass], sel);
   
   return imp(obj, sel, encoding);
 }
@@ -127,7 +127,7 @@ _swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
                                                       SEL,
                                                       unsigned long);
   SEL sel = @selector(lengthOfBytesUsingEncoding:);
-  getCStringImplPtr imp = (getLengthImplPtr)class_getMethodImplementation([obj superclass], sel);
+  getLengthImplPtr imp = (getLengthImplPtr)class_getMethodImplementation([obj superclass], sel);
   
   return imp(obj, sel, encoding);
 }
