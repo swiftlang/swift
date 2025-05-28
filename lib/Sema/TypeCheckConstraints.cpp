@@ -631,46 +631,25 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // the anchor's signature.
   {
     auto anchorTy = anchor->getInterfaceType()->castTo<AnyFunctionType>();
-    
+
     if (anchor->hasCurriedSelf())
       anchorTy = anchorTy->getResult()->castTo<AnyFunctionType>();
-    
-    auto containsTypesButDependent = [&](Type type) -> bool {
 
-      class Walker: public TypeWalker {
-        llvm::function_ref<TypeVariableType *(GenericTypeParamType *)> findParamFn;
-      public:
-        explicit Walker(llvm::function_ref<TypeVariableType *(GenericTypeParamType *)> findParam) : findParamFn(findParam) {}
-
-        Action walkToTypePre(Type ty) override {
-          if (auto *GP = ty->getAs<GenericTypeParamType>()) {
-            if (findParamFn(GP)) {
-              return Action::Stop;
-            }
-          }
-          if (auto *DMT = ty->getAs<DependentMemberType>()) {
-            if (auto *baseGP = DMT->getBase()->getAs<GenericTypeParamType>()) {
-              if (findParamFn(baseGP)) {
-                return Action::SkipNode;
-              }
-            }
-          }
-          return Action::Continue;
-        }
-      };
-
-      return type.walk(Walker(findParam));
-    };
-    
-    // Reject if generic parameters are used in multiple different positions
-    // in the parameter list.
+    SmallPtrSet<CanType, 4> inferrableParams;
+    collectReferencedGenericParams(paramInterfaceTy, inferrableParams);
 
     llvm::SmallVector<unsigned, 2> affectedParams;
     for (unsigned i : indices(anchorTy->getParams())) {
-      const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypesButDependent(param.getPlainType()))
-        affectedParams.push_back(i);
+      SmallPtrSet<CanType, 4> referencedGenericParams;
+      collectReferencedGenericParams(anchorTy->getParams()[i].getPlainType(), referencedGenericParams);
+
+      for (auto can : referencedGenericParams) {
+        if (inferrableParams.contains(can)) {
+          affectedParams.push_back(i);
+          break;
+        }
+      }
     }
 
     if (affectedParams.size() > 1) {

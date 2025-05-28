@@ -168,6 +168,10 @@ func main() {
   takesCircle(.init()) // Ok
   takesRectangle(.init())
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
+  
+  testS72199_2(x: 0)
+  testS72199_3(ys: 1, 1)
+  testS72199_4(x: 0)
 }
 
 func test_magic_defaults() {
@@ -272,28 +276,12 @@ func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x 
 
 // https://github.com/swiftlang/swift/issues/72199
 enum S72199_1 {
-  func testInferFromOtherPos<T>(_: T = 42, _: [T]) {}
+  func testS72199_1<T>(_: T = 42, _: [T]) {}
   // expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
 }
 
-protocol S72199_DurationProtocol {
-  
-}
+func testS72199_2<T: P>(x: T.X, y: T = S()) { } // Ok
+func testS72199_3<each T: P>(xs: (repeat each T) = (S(), S()), ys: repeat (each T).X) {} // Ok?
 
-protocol S72199_InstantProtocol {
-  associatedtype Duration: S72199_DurationProtocol
-}
-
-protocol S72199_ClockProtocol {
-  associatedtype Instant: S72199_InstantProtocol
-}
-
-struct S72199_Duration: S72199_DurationProtocol {}
-struct S72199_Instant: S72199_InstantProtocol {
-  typealias Duration = S72199_Duration
-}
-struct S72199_Clock: S72199_ClockProtocol {
-  typealias Instant = S72199_Instant
-}
-
-func testS72199_2<T: S72199_ClockProtocol>(_: T.Instant, _: T.Instant.Duration, _: T = S72199_Clock()) {} // Ok
+typealias S72199_4<T> = Int
+func testS72199_4<T>(x: S72199_4<T>, y: T = "") {}
