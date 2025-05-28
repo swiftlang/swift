@@ -29,16 +29,8 @@ public struct NEImmortal: ~Escapable {
 
 class C {}
 
-// Test diagnostics on keypath getter.
-//
-// rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
-//
-// This produces the error:
-// <unknown>:0: error: unexpected error produced: lifetime-dependent value returned by generated thunk
-// '$s4test17ImplicitAccessorsV10neComputedAA10NEImmortalVvpACTK'
-//
-// Since this error has no source file, we can't verify the diagnostic!
-/*
+// Test that we don't implicitly try to create a keypath getter, since
+// ~Escapable types are not yet supported by keypaths.
 public struct ImplicitAccessors {
   let c: C
 
@@ -50,7 +42,6 @@ public struct ImplicitAccessors {
     }
   }
 }
- */
 
 public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
