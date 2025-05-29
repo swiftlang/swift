@@ -100,13 +100,43 @@ module vcruntime [system] {
 
   header "vcruntime.h"
 
+  module iso646 {
+    header "iso646.h"
+    export *
+  }
+
+  module limits {
+    header "limits.h"
+    export *
+  }
+
   module setjmp {
     header "setjmp.h"
     export *
   }
 
+  module stdarg {
+    header "stdarg.h"
+    export *
+  }
+
+  module stdbool {
+    header "stdbool.h"
+    export  *
+  }
+
   module stdint {
     header "stdint.h"
+    export *
+  }
+
+  module string {
+    header "vcruntime_string.h"
+    export *
+  }
+
+  module vadefs {
+    header "vadefs.h"
     export *
   }
 }
