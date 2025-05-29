@@ -191,6 +191,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   if (auto *CD = T->getClassOrBoundGenericClass()) {
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
+          .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
@@ -232,6 +233,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     // No protocol is representable in C.
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_protocols)
+          .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
