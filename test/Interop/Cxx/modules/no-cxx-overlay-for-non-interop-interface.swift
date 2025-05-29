@@ -6,8 +6,13 @@
 // RUN: %target-swift-frontend -typecheck %t/clientWithInteropDep.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/interop_dep.txt
 // RUN: cat %t/interop_dep.txt | %FileCheck %s -check-prefix=ENABLE-CHECK
 
-// RUN: %target-swift-frontend -typecheck -o %t/deps_no_interop_dep.json %t/clientNoInteropDep.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/no_interop_dep.txt
+// RUN: %empty-directory(%t/module-cache)
+// RUN: %target-swift-frontend -typecheck %t/clientNoInteropDep.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/no_interop_dep.txt
 // RUN: cat %t/no_interop_dep.txt | %FileCheck %s -check-prefix=DISABLE-CHECK
+
+// RUN: %empty-directory(%t/module-cache)
+// RUN: %target-swift-frontend -typecheck %t/clientDarwin.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/darwin_dep.txt
+// RUN: cat %t/darwin_dep.txt | %FileCheck %s -check-prefix=DISABLE-CHECK
 
 // ENABLE-CHECK: remark: loaded module 'CxxStdlib' (overlay for a clang dependency)
 // DISABLE-CHECK-NOT: remark: loaded module 'CxxStdlib' (overlay for a clang dependency)
@@ -43,9 +48,19 @@ public struct Foo1 {}
 import Bar
 public struct Foo2 {}
 
+//--- deps/Darwin.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Darwin -enable-library-evolution
+// swift-module-flags-ignorable: -Rmodule-loading
+import Bar
+public struct Foo2 {}
+
 //--- clientWithInteropDep.swift
 import Foo
 
 //--- clientNoInteropDep.swift
 import FooNoInterop
+
+//--- clientDarwin.swift
+import Darwin
 
