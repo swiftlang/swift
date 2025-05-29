@@ -58,7 +58,9 @@ public class NominalTypeDecl: GenericTypeDecl {
   }
 }
 
-final public class EnumDecl: NominalTypeDecl {}
+final public class EnumDecl: NominalTypeDecl {
+  public var hasRawType: Bool { bridged.Enum_hasRawType() }
+}
 
 final public class StructDecl: NominalTypeDecl {
   public var hasUnreferenceableStorage: Bool { bridged.Struct_hasUnreferenceableStorage() }
