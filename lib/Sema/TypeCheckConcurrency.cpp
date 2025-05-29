@@ -7873,6 +7873,19 @@ ActorReferenceResult ActorReferenceResult::forReference(
         (!actorInstance || actorInstance->isSelf())) {
       auto type = fromDC->mapTypeIntoContext(decl->getInterfaceType());
       if (!type->isSendableType()) {
+        // If we have an actor instance and our declIsolation is global actor
+        // isolated, but our context isolation is nonisolated... defer to flow
+        // isolation for additional checking.
+        //
+        // NOTE: We also require this to pass additional restrictions validated
+        // by checkedByFlowIsolation (e.x.: the initializer's nominal type has
+        // to be isolated).
+        if (actorInstance &&
+            declIsolation.isGlobalActor() && contextIsolation.isNonisolated() &&
+            checkedByFlowIsolation(fromDC, *actorInstance, decl, declRefLoc, useKind)) {
+          return forSameConcurrencyDomain(declIsolation, options);
+        }
+
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
         // Swift 5.9 compiler.
