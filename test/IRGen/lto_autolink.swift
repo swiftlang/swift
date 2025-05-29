@@ -43,4 +43,5 @@ import AutolinkElfCPragma
 import AutolinkModuleMapLink
 #endif
 
+// UNSUPPORTED: OS=watchos && (CPU=arm64_32 || CPU=armv7k)
 // UNSUPPORTED: CPU=wasm32
