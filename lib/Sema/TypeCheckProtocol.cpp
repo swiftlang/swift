@@ -3639,13 +3639,12 @@ public:
 /// Helper function for diagnostics when a witness needs to be seated at a
 /// required access level.
 static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
-                                                      ValueDecl *decl,
+                                                      ConstructorDecl *decl,
                                                       AccessLevel requiredAccess,
                                                       NormalProtocolConformance *conformance) {
   DeclContext *DC = decl->getDeclContext();
   NominalTypeDecl *typeDecl = dyn_cast<NominalTypeDecl>(DC->getAsDecl());
   SourceRange typeBraces = typeDecl->getBraces();
-  auto *ctor = dyn_cast<ConstructorDecl>(decl);
 
   ASTContext &Ctx = decl->getASTContext();
   StringRef ExtraIndent;
@@ -3669,7 +3668,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
   Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
     Printer << " {";
     Printer.printNewline();
-    for (auto var : *ctor->getParameters()) {
+    for (auto var : *decl->getParameters()) {
       Printer << ExtraIndent << "self." << var->getParameterName() << " = " << var->getParameterName();
       Printer.printNewline();
     }
@@ -3682,7 +3681,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
 
   decl->overwriteAccess(AccessLevel::Public);
 
-  ctor->print(Printer, Options);
+  decl->print(Printer, Options);
 
   auto fixItDiag = diags.diagnose(conformance->getLoc(),
                                   diag::implicit_init_witness_fix_access,
@@ -4491,7 +4490,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        proto);
 
         if (ctor && ctor->isSynthesized()) {
-          diagnoseImplicitInitWitnessFixAccessLevel(diags, witness, requiredAccess, conformance);
+          diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, conformance);
         } else if (decl && decl->isSynthesized()) {
           return;
         } else {
