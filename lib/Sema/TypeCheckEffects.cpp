@@ -386,7 +386,7 @@ public:
   Type getType() const {
     switch (getKind()) {
     case Kind::Opaque:
-      return getOpaqueFunction()->getType()->lookThroughSingleOptionalType();
+      return getOpaqueFunction()->getType()->lookThroughAllOptionalTypes();
     case Kind::Function: {
       auto *AFD = getFunction();
       if (AFD->hasImplicitSelfDecl() && AppliedSelf)
@@ -395,8 +395,7 @@ public:
     }
     case Kind::Closure: return getClosure()->getType();
     case Kind::Parameter:
-      return getParameter()->getInterfaceType()
-          ->lookThroughSingleOptionalType();
+      return getParameter()->getInterfaceType()->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");
   }
