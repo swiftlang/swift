@@ -940,8 +940,7 @@ diagnoseMissingImportsForMember(const ValueDecl *decl,
 
 static void emitMissingImportFixIt(SourceLoc loc,
                                    const MissingImportFixItInfo &fixItInfo,
-                                   const ValueDecl *decl) {
-  ASTContext &ctx = decl->getASTContext();
+                                   ASTContext &ctx) {
   llvm::SmallString<64> importText;
 
   // Add flags that must be used consistently on every import in every file.
@@ -960,16 +959,6 @@ static void emitMissingImportFixIt(SourceLoc loc,
   if (isPublicImport) {
     if (fixItInfo.flags.contains(ImportFlags::SPIOnly))
       importText += "@_spiOnly ";
-  }
-
-  // Add @_spi groups if needed for the declaration.
-  if (decl->isSPI()) {
-    auto spiGroups = decl->getSPIGroups();
-    if (!spiGroups.empty()) {
-      importText += "@_spi(";
-      importText += spiGroups[0].str();
-      importText += ") ";
-    }
   }
 
   if (explicitAccessLevel) {
@@ -1006,7 +995,7 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
     return;
 
   for (auto &fixItInfo : fixItInfos) {
-    emitMissingImportFixIt(bestLoc, fixItInfo, decl);
+    emitMissingImportFixIt(bestLoc, fixItInfo, ctx);
   }
 }
 
