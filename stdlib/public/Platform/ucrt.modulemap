@@ -26,23 +26,40 @@ module _complex [system] [no_undeclared_includes] {
 }
 
 module _stddef [system] [no_undeclared_includes] {
-  header "stddef.h"
-  export *
+  use corecrt
+  textual header "stddef.h"
 }
 
 module _stdlib [system] [no_undeclared_includes] {
   use corecrt
+  use vcruntime
   header "stdlib.h"
   export *
 }
+
+module _ctype [system] [no_undeclared_includes] {
+  use corecrt
+  textual header "ctype.h"
+}
+
+module _errno [system] [no_undeclared_includes] {
+  use corecrt
+  textual header "errno.h"
+}
+
+module _stdnoreturn [system] [no_undeclared_includes] {
+  use corecrt
+  textual header "stdnoreturn.h"
+}
+
 
 module ucrt [system] {
   export _malloc
 
   module C {
     export _complex
-    export _stddef
     export _stdlib
+
 
     module ctype {
       header "ctype.h"
@@ -50,7 +67,7 @@ module ucrt [system] {
     }
 
     module errno {
-      header "errno.h"
+      textual header "errno.h"
       export *
     }
 
@@ -84,6 +101,11 @@ module ucrt [system] {
       export *
     }
 
+    module stdalign {
+      header "stdalign.h"
+      export  *
+    }
+
     module stdio {
       header "stdio.h"
       export *
@@ -98,6 +120,11 @@ module ucrt [system] {
 
     module stdlib {
       header "stdlib.h"
+      export *
+    }
+
+    module stdnoreturn {
+      textual header "stdnoreturn.h"
       export *
     }
 
@@ -175,6 +202,11 @@ module ucrt [system] {
   }
 }
 
+module _corecrt_memcpy_s [system] [no_undeclared_includes] {
+  textual header "corecrt_memcpy_s.h"
+  export *
+}
+
 module corecrt [system] {
   use vcruntime
 
@@ -187,8 +219,14 @@ module corecrt [system] {
     export *
   }
 
+  module direct {
+    header "corecrt_wdirect.h"
+    export *
+  }
+
   module io {
     header "corecrt_io.h"
+    header "corecrt_wio.h"
     export *
   }
 
@@ -202,8 +240,32 @@ module corecrt [system] {
     export *
   }
 
+  module memory {
+    header "corecrt_memory.h"
+    export *
+  }
+
+  module memcpy {
+    textual header "corecrt_memcpy_s.h"
+  }
+
+  module process {
+    header "corecrt_wprocess.h"
+    export *
+  }
+
+  module search {
+    header "corecrt_search.h"
+    export *
+  }
+
   module share {
     header "corecrt_share.h"
+    export *
+  }
+
+  module ctype {
+    header "corecrt_wctype.h"
     export *
   }
 
@@ -227,4 +289,3 @@ module corecrt [system] {
     export *
   }
 }
-
