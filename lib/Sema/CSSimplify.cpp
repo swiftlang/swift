@@ -5785,6 +5785,41 @@ bool ConstraintSystem::repairFailures(
         break;
       }
 
+      // There is no subtyping between object types of inout argument/parameter.
+      if (auto argConv = path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
+        // Attempt conversions first.
+        if (hasAnyRestriction())
+          break;
+
+        // Unwraps are allowed to preserve l-valueness so we can suggest
+        // them here.
+        if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                    conversionsOrFixes, locator))
+          return true;
+
+        auto *loc = getConstraintLocator(locator);
+
+        auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
+                                 TMF_ApplyingFix, locator);
+
+        ConstraintFix *fix = nullptr;
+        if (result.isFailure()) {
+          // If this is a "destination" argument to a mutating operator
+          // like `+=`, let's consider it contextual and only attempt
+          // to fix type mismatch on the "source" right-hand side of
+          // such operators.
+          if (isOperatorArgument(loc) && argConv->getArgIdx() == 0)
+            break;
+
+          fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
+        } else {
+          fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
+        }
+
+        conversionsOrFixes.push_back(fix);
+        break;
+      }
+
       // If this is a problem with result type of a subscript setter,
       // let's re-attempt to repair without l-value conversion in the
       // locator to fix underlying type mismatch.
@@ -5804,7 +5839,7 @@ bool ConstraintSystem::repairFailures(
         break;
     }
 
-    LLVM_FALLTHROUGH;
+    break;
   }
 
   case ConstraintLocator::ApplyArgToParam: {
@@ -5920,33 +5955,6 @@ bool ConstraintSystem::repairFailures(
         break;
       }
     }
-
-    // There is no subtyping between object types of inout argument/parameter.
-    if (elt.getKind() == ConstraintLocator::LValueConversion) {
-      auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
-                               TMF_ApplyingFix, locator);
-
-      ConstraintFix *fix = nullptr;
-      if (result.isFailure()) {
-        // If this is a "destination" argument to a mutating operator
-        // like `+=`, let's consider it contextual and only attempt
-        // to fix type mismatch on the "source" right-hand side of
-        // such operators.
-        if (isOperatorArgument(loc) &&
-            loc->findLast<LocatorPathElt::ApplyArgToParam>()->getArgIdx() == 0)
-          break;
-
-        fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
-      } else {
-        fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
-      }
-
-      conversionsOrFixes.push_back(fix);
-      break;
-    }
-
-    if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
-      break;
 
     // If argument in l-value type and parameter is `inout` or a pointer,
     // let's see if it's generic parameter matches and suggest adding explicit
