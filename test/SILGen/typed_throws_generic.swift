@@ -387,3 +387,10 @@ extension ReducedError where T == MyError {
     throw MyError.fail
   }
 }
+
+// https://github.com/swiftlang/swift/issues/74289
+struct LoadableGeneric<E>: Error {}
+
+func throwsLoadableGeneric<E>(_: E) throws(LoadableGeneric<E>) {
+  throw LoadableGeneric<E>()
+}

@@ -72,6 +72,11 @@ std::optional<Job::ResponseFileInfo>
 ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
                                const ToolChain::InvocationInfo &invocationInfo,
                                const ToolChain::JobContext &context) const {
+  // Never use a response file if this is a dummy driver for SourceKit, we
+  // just want the frontend arguments.
+  if (getDriver().isDummyDriverForFrontendInvocation())
+    return std::nullopt;
+
   const bool forceResponseFiles =
       C.getArgs().hasArg(options::OPT_driver_force_response_files);
   assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&

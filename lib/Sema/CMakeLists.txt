@@ -1,7 +1,7 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
-  AsyncCallerExecutionMigration.cpp
+  NonisolatedNonsendingByDefaultMigration.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
@@ -38,6 +38,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformance/DerivedConformanceRawRepresentable.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
+  LegalConstExprVerifier.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   OpenedExistentials.cpp

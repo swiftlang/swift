@@ -20,7 +20,7 @@ For an introduction and motivation into Embedded Swift, please see "[A Vision fo
 | Metatypes                                             | No, currently only allowed as unused arguments (type hints)                        |
 | Untyped throwing                                      | No, intentionally unsupported long-term (typed throwing should be used instead)    |
 | Weak references, unowned references                   | No                                                                                 |
-| Non-final generic class methods                       | No, intentionally unsupported long-term                                            |
+| Non-final generic class methods                       | No, intentionally unsupported long-term, see <[Embedded Swift -- Non-final generic methods](NonFinalGenericMethods.md)>|
 | Parameter packs (variadic generics)                   | No, not yet supported                                                              |
 
 ## Embedded Standard Library Breakdown
@@ -44,14 +44,14 @@ This status table describes which of the following standard library features can
 | Hashable, Equatable, Comparable protocols                  | Yes    |
 | InputStream, OutputStream                                  | No     |
 | Integer conversion to string                               | Yes    |
-| Integer parsing                                            | No     |
+| Integer parsing                                            | Yes    |
 | KeyPaths                                                   | Partial (only compile-time constant key paths to stored properties supported, only usable in MemoryLayout and UnsafePointer APIs)     |
-| Lazy collections                                           | No     |
+| Lazy collections                                           | Yes    |
 | ManagedBuffer                                              | Yes    |
 | Mirror (runtime reflection)                                | No, intentionally unsupported long-term |
 | Objective-C bridging                                       | No, intentionally unsupported long-term |
 | Optional                                                   | Yes    |
-| print / debugPrint                                         | Partial (only String, string interpolation, StaticStrings, integers, pointers and booleans) |
+| print / debugPrint                                         | Partial (only String, string interpolation, StaticStrings, integers, pointers and booleans, and custom types that are CustomStringConvertible) |
 | Range, ClosedRange, Stride                                 | Yes    |
 | Result                                                     | Yes    |
 | Set (dynamic heap-allocated container)                     | Yes    |                                      

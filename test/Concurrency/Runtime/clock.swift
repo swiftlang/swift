@@ -158,6 +158,13 @@ import StdlibUnittest
       }
     }
 
+    tests.test("Ensure abi layout size of Instant") {
+      // If this test fails it means the ABI of ContinuousClock.Instant has been broken!
+      // it MUST be the same laoyut of that of Duration
+      expectEqual(MemoryLayout<ContinuousClock.Instant>.size, MemoryLayout<Duration>.size)
+      expectEqual(MemoryLayout<SuspendingClock.Instant>.size, MemoryLayout<Duration>.size)
+    }
+
     await runAllTestsAsync()
   }
 }

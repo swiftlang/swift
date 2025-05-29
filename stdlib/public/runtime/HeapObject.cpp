@@ -547,6 +547,16 @@ HeapObject *swift::swift_unownedRetain(HeapObject *object) {
 #endif
 }
 
+// Assert that the metadata is a class or ErrorObject, for unowned operations.
+// Other types of metadata are not supposed to be used with unowned.
+static void checkMetadataForUnownedRR(HeapObject *object) {
+  assert(object->metadata->isClassObject() ||
+         object->metadata->getKind() == MetadataKind::ErrorObject);
+  if (object->metadata->isClassObject())
+    assert(
+        static_cast<const ClassMetadata *>(object->metadata)->isTypeMetadata());
+}
+
 void swift::swift_unownedRelease(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRelease(object);
@@ -555,9 +565,7 @@ void swift::swift_unownedRelease(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -582,9 +590,7 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -615,9 +621,7 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -641,9 +645,7 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -875,7 +877,7 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
 }
 
-#if !defined(__APPLE__) && defined(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
+#if !defined(__APPLE__) && SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
   char *ptr = static_cast<char *>(b);
   while (len >= 8) {
@@ -898,9 +900,9 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
   }
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
-#ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+#if SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
-                  "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
+                  "\xF0\xEF\xBE\xAD\xDE\xED\xFE\x0F", // 0x0ffeeddeadbeeff0
                   allocatedSize - sizeof(HeapObject));
 #endif
 

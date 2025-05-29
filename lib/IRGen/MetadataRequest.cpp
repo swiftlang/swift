@@ -264,41 +264,6 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
   return result;
 }
 
-static bool usesExtendedExistentialMetadata(CanType type) {
-  auto layout = type.getExistentialLayout();
-  // If there are parameterized protocol types that we want to
-  // treat as equal to unparameterized protocol types (maybe
-  // something like `P<some Any>`?), then AST type canonicalization
-  // should turn them into unparameterized protocol types.  If the
-  // structure makes it to IRGen, we have to honor that decision that
-  // they represent different types.
-  return !layout.getParameterizedProtocols().empty();
-}
-
-static std::optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
-usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
-  unsigned depth = 1;
-  auto cur = type.getInstanceType();
-  while (auto metatype = dyn_cast<ExistentialMetatypeType>(cur)) {
-    cur = metatype.getInstanceType();
-    depth++;
-  }
-
-  // The only existential types that don't currently use ExistentialType
-  // are Any and AnyObject, which don't use extended metadata.
-  if (usesExtendedExistentialMetadata(cur)) {
-    // HACK: The AST for an existential metatype of a (parameterized) protocol
-    // still directly wraps the existential type as its instance, which means
-    // we need to reconstitute the enclosing ExistentialType.
-    assert(cur->isExistentialType());
-    if (!cur->is<ExistentialType>()) {
-      cur = ExistentialType::get(cur)->getCanonicalType();
-    }
-    return std::make_pair(cast<ExistentialType>(cur), depth);
-  }
-  return std::nullopt;
-}
-
 llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     StringRef symbolName,
     unsigned alignment,
@@ -1998,7 +1963,7 @@ namespace {
 
       // Existential metatypes for extended existentials don't use
       // ExistentialMetatypeMetadata.
-      if (usesExtendedExistentialMetadata(type)) {
+      if (type->getExistentialLayout().needsExtendedShape()) {
         auto metadata = emitExtendedExistentialTypeMetadata(type);
         return setLocal(type, MetadataResponse::forComplete(metadata));
       }
@@ -3110,8 +3075,8 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
     void visitExistentialMetatypeType(CanExistentialMetatypeType meta) {
       // Extended existential metatypes just emit a different shape
       // and don't do any wrapping.
-      if (auto typeAndDepth = usesExtendedExistentialMetadata(meta)) {
-        return visit(typeAndDepth.first);
+      if (meta->getExistentialLayout().needsExtendedShape()) {
+        // return visit(unwrapExistentialMetatype(meta));
       }
 
       // The number of accesses turns out the same as the instance type,

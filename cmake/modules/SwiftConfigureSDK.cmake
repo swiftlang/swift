@@ -417,7 +417,7 @@ macro(configure_sdk_unix name architectures)
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
         endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
-        if(NOT arch MATCHES "(arm64|x86_64)")
+        if(NOT arch MATCHES "(aarch64|x86_64)")
           message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
         endif()
 
@@ -438,6 +438,8 @@ macro(configure_sdk_unix name architectures)
         message(STATUS "OpenBSD Version: ${openbsd_system_version}")
 
         set(SWIFT_SDK_OPENBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-openbsd${openbsd_system_version}")
+
+        add_link_options("LINKER:-z,origin")
 
         if(CMAKE_SYSROOT)
           set(SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH}" CACHE INTERNAL "sysroot path" FORCE)

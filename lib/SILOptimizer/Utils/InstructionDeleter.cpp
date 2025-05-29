@@ -63,6 +63,12 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     return false;
   }
 
+  // Don't delete dead drop_deinit instruction. They are a marker to eliminate
+  // user-defined deinit and we do not want to lose it.
+  if (isa<DropDeinitInst>(inst)) {
+    return false;
+  }
+
   for (auto result : inst->getResults()) {
     // If inst has any owned move-only value as a result, deleting it may
     // shorten that value's lifetime which is illegal according to language
@@ -268,9 +274,16 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       if (fixLifetimes) {
         LoadInst *li = nullptr;
         if (operand.isConsuming()) {
-          SILBuilderWithScope builder(inst);
-          auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
-          getCallbacks().createdNewInst(dvi);
+          if (isa<DropDeinitInst>(operandValue)) {
+            SILBuilderWithScope builder(inst);
+            auto *eli = builder.createEndLifetime(inst->getLoc(), operandValue);
+            getCallbacks().createdNewInst(eli);
+          } else {
+            SILBuilderWithScope builder(inst);
+            auto *dvi =
+                builder.createDestroyValue(inst->getLoc(), operandValue);
+            getCallbacks().createdNewInst(dvi);
+          }
         } else if ((li = dyn_cast<LoadInst>(inst)) &&
                    li->getOwnershipQualifier() ==
                        LoadOwnershipQualifier::Take) {

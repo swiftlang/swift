@@ -1418,7 +1418,8 @@ SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
   using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
@@ -1465,8 +1466,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
-                                   CancellationToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 

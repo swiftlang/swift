@@ -49,7 +49,7 @@ extension ConformsToMultiP: MultiP {
   // expected-note@-1{{unsafe type 'UnsafeSuper' cannot satisfy safe associated type 'Ptr'}}
   @unsafe func f() -> UnsafeSuper {
     .init() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-    // expected-note@-1{{reference to initializer 'init()' involves unsafe type 'UnsafeSuper'}}
+    // expected-note@-1{{argument 'self' in call to initializer 'init' has unsafe type 'UnsafeSuper.Type'}}
   }
 }
 
@@ -73,7 +73,7 @@ class Super {
   @unsafe func g() { }
 }
 
-class Sub: Super { // expected-note{{make class 'Sub' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
+class Sub: Super { // expected-note{{make class 'Sub' '@unsafe' to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
   @unsafe override func f() { } // expected-warning{{override of safe instance method with unsafe instance method}}{{documentation-file=strict-memory-safety}}
   @unsafe override func g() { }  
 }
@@ -104,9 +104,9 @@ class ExclusivityChecking {
 
   func next() -> Int {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{5-5=unsafe }}
-    value += 1 // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+    value += 1 // expected-note{{reference to '@exclusivity(unchecked)' property 'value' is unsafe}}
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
-    return value  // expected-note{{reference to @exclusivity(unchecked) property 'value' is unsafe}}
+    return value  // expected-note{{reference to '@exclusivity(unchecked)' property 'value' is unsafe}}
   }
 }
 
@@ -141,11 +141,13 @@ func testRHS(b: Bool, x: Int) {
 }
 
 // -----------------------------------------------------------------------
-// Declaration references
+// Calls and declaration references
 // -----------------------------------------------------------------------
 @unsafe func unsafeF() { }
 @unsafe var unsafeVar: Int = 0
 
+func acceptUnsafeArgument(_: UnsafePointer<Int>?) { }
+func acceptUnsafeNamedArgument(arg: UnsafePointer<Int>?) { }
 
 func testMe(
   _ pointer: PointerType,
@@ -156,11 +158,28 @@ func testMe(
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   _ = unsafeVar // expected-note{{reference to unsafe var 'unsafeVar'}}
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
-  unsafeSuper.f() // expected-note{{reference to instance method 'f()' involves unsafe type 'UnsafeSuper'}}
+  unsafeSuper.f() // expected-note{{argument 'self' in call to instance method 'f' has unsafe type 'UnsafeSuper'}}
   // expected-note@-1{{reference to parameter 'unsafeSuper' involves unsafe type 'UnsafeSuper'}}
 
+  _ = getPointers() // unsafe return is fine
+
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
-  _ = getPointers() // expected-note{{reference to global function 'getPointers()' involves unsafe type 'PointerType'}}
+  _ = getPointers // expected-note{{reference to global function 'getPointers()' involves unsafe type 'PointerType'}}
+
+  var i = 17
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  acceptUnsafeArgument(&i) // expected-note{{argument #0 in call to global function 'acceptUnsafeArgument' has unsafe type 'UnsafePointer<Int>?'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  acceptUnsafeNamedArgument(arg: &i) // expected-note{{argument 'arg' in call to global function 'acceptUnsafeNamedArgument' has unsafe type 'UnsafePointer<Int>?'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let fn: (UnsafePointer<Int>?) -> Void = acceptUnsafeArgument // expected-note{{reference to global function 'acceptUnsafeArgument' involves unsafe type 'UnsafePointer<Int>'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  fn(&i) // expected-note{{argument #0 in call has unsafe type 'UnsafePointer<Int>?'}}
+
+  // Nil isn't unsafe
+  acceptUnsafeArgument(nil)
+  acceptUnsafeNamedArgument(arg: nil)
+  fn(nil)
 }
 
 // -----------------------------------------------------------------------

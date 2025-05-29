@@ -764,7 +764,8 @@ static StringRef getModuleName(const ValueDecl *VD,
   // overlay's declaring module as the owning module.
   if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
     MD = Declaring;
-  return MD->getNameStr();
+
+  return MD->getPublicModuleName(/*onlyIfImported=*/false).str();
 }
 
 struct DeclInfo {
@@ -2775,7 +2776,8 @@ static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
 
 void SwiftLangSupport::semanticRefactoring(
     StringRef PrimaryFilePath, SemanticRefactoringInfo Info,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedEditsReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
@@ -2833,7 +2835,8 @@ void SwiftLangSupport::semanticRefactoring(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, std::move(Consumer), Once,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
@@ -2917,6 +2920,7 @@ void SwiftLangSupport::collectVariableTypes(
     StringRef PrimaryFilePath, StringRef InputBufferName,
     ArrayRef<const char *> Args, std::optional<unsigned> Offset,
     std::optional<unsigned> Length, bool FullyQualified,
+    bool CancelOnSubsequentRequest,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
   std::string Error;
@@ -2996,7 +3000,8 @@ void SwiftLangSupport::collectVariableTypes(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, std::move(Collector),
-                                   &OncePerASTToken, CancellationToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, std::move(Collector), Once,
+                                   CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }

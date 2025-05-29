@@ -28,14 +28,14 @@ struct X {}
 struct Y {}
 struct Z {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @concrete_type_concrete_method_witness(ptr noalias nocapture swiftself %0, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @concrete_type_concrete_method_witness(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} %0, ptr %Self, ptr %SelfWitnessTable)
 sil @concrete_type_concrete_method_witness : $@convention(witness_method: P) (@in Foo) -> @thick Foo.Type {
 entry(%x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @generic_type_concrete_method_witness(ptr noalias nocapture swiftself dereferenceable({{.*}}) %0, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @generic_type_concrete_method_witness(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{.*}}) %0, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-objc:    [[T1:%.*]] = getelementptr inbounds ptr, ptr %Self, i64 10
 // CHECK-native:  [[T1:%.*]] = getelementptr inbounds ptr, ptr %Self, i64 7
 // CHECK:         %T = load ptr, ptr [[T1]], align 8
@@ -87,14 +87,14 @@ entry(%x : $@thick Bar<T, U, V>.Type):
 
 // TODO: %Self Type arg is redundant for class method witness
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @concrete_type_generic_method_witness(ptr noalias %0, ptr %Z, ptr noalias nocapture swiftself %1, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @concrete_type_generic_method_witness(ptr noalias %0, ptr %Z, ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} %1, ptr %Self, ptr %SelfWitnessTable)
 sil @concrete_type_generic_method_witness : $@convention(witness_method: P) <Z> (@in Z, @in Foo) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @generic_type_generic_method_witness(ptr noalias %0, ptr %Z, ptr noalias nocapture swiftself dereferenceable(8) %1, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @generic_type_generic_method_witness(ptr noalias %0, ptr %Z, ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable(8) %1, ptr %Self, ptr %SelfWitnessTable)
 sil @generic_type_generic_method_witness : $@convention(witness_method: P) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $*Bar<T, U, V>):
   %t = metatype $@thick T.Type
@@ -147,7 +147,7 @@ entry:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @partial_apply_concrete_witness() {{.*}} {
 // CHECK:         [[CONTEXT:%.*]] = call noalias ptr @swift_allocObject({{.*}})
-// CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, ptr }>, ptr [[CONTEXT]], i32 0, i32 1
+// CHECK:         [[WTABLE:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr [[CONTEXT]], i32 0, i32 1
 // CHECK:         store ptr @"$s19sil_witness_methods3BarCyxq_q0_GAA1PAAWP", ptr [[WTABLE]]
 // CHECK:         [[RESULT:%.*]] = insertvalue { ptr, ptr } { ptr @"$s36generic_type_concrete_method_witnessTA", ptr undef }, ptr [[CONTEXT]], 1
 // CHECK:         ret { ptr, ptr } [[RESULT]]

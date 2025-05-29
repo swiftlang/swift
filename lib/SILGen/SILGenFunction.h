@@ -877,7 +877,7 @@ public:
   FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
 
   /// A helper method that calls getFunctionTypeInfo that also marks global
-  /// actor isolated async closures that are not sendable as sendable.
+  /// actor-isolated async closures that are not sendable as sendable.
   FunctionTypeInfo getClosureTypeInfo(AbstractClosureExpr *expr);
 
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
@@ -2624,8 +2624,7 @@ public:
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
-      ThunkGenOptions options = {});
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

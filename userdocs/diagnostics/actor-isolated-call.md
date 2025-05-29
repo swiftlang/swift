@@ -1,5 +1,7 @@
 # Calling an actor-isolated method from a synchronous nonisolated context
 
+Accessing actor-isolated state from outside the actor can cause data races in your program. Resolve this error by calling actor-isolated functions on the actor.
+
 Calls to actor-isolated methods from outside the actor must be done asynchronously. Otherwise, access to actor state can happen concurrently and lead to data races. These rules also apply to global actors like the main actor.
 
 For example:

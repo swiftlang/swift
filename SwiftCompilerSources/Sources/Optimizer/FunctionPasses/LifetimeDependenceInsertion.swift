@@ -247,16 +247,19 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
     insertMarkDependencies(value: dependentValue, initializer: nil, bases: sources.bases, builder: builder, context)
   }
   for resultOper in apply.applySite.indirectResultOperands {
-    let accessBase = resultOper.value.accessBase
-    guard case let .store(initializingStore, initialAddress) = accessBase.findSingleInitializer(context) else {
-      continue
+    guard let initialAddress = resultOper.value.accessBase.address else {
+      diagnoseUnknownDependenceSource(sourceLoc: apply.applySite.location.sourceLoc, context)
+      return
     }
-    assert(initializingStore == resultOper.instruction, "an indirect result is a store")
     Builder.insert(after: apply.applySite, context) { builder in
-      insertMarkDependencies(value: initialAddress, initializer: initializingStore, bases: sources.bases,
+      insertMarkDependencies(value: initialAddress, initializer: resultOper.instruction, bases: sources.bases,
                              builder: builder, context)
     }
   }
+}
+
+private func diagnoseUnknownDependenceSource(sourceLoc: SourceLoc?, _ context: FunctionPassContext) {
+  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, [], at: sourceLoc)
 }
 
 private func insertParameterDependencies(apply: LifetimeDependentApply, target: Operand,
@@ -300,8 +303,8 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
   }
 }
 
-/// Walk up the value dependence chain to find the best-effort variable declaration. Typically called while diagnosing
-/// an error.
+/// Walk up the value dependence chain to find the best-effort variable declaration. Used to find the source of a borrow
+/// dependence or to print the source variable in a diagnostic message.
 ///
 /// Returns an array with at least one introducer value.
 ///
@@ -421,6 +424,10 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
     visitedValues.insert(value)
   }
 
+  mutating func needWalk(for address: Value) -> Bool {
+    visitedValues.insert(address)
+  }
+
   mutating func walkUp(newLifetime: Value) -> WalkResult {
     if newLifetime.type.isAddress {
       return walkUp(address: newLifetime)
@@ -440,11 +447,12 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
 
   /// Override to check for on-stack variables before following an initializer.
   mutating func walkUp(address: Value, access: AccessBaseAndScopes) -> WalkResult {
-    // Check for stack locations that correspond to an lvalue.
-    if case let .stack(allocStack) = access.base {
-      if allocStack.varDecl != nil {
-        // Report this variable's innermmost access scope.
-        return addressIntroducer(access.enclosingAccess.address ?? address, access: access)
+    // Check for stack locations that correspond to an lvalue if there isn't any nested access scope.
+    if access.innermostAccess == nil {
+      if case let .stack(allocStack) = access.base {
+        if allocStack.varDecl != nil {
+          return addressIntroducer(allocStack, access: access)
+        }
       }
     }
     return walkUpDefault(address: address, access: access)

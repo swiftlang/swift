@@ -79,10 +79,14 @@ public extension NoReflectionChildren {
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, NoReflectionChildren {
+public struct StringRef : CustomStringConvertible, NoReflectionChildren, ExpressibleByStringLiteral {
   public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
+
+  public init(stringLiteral: StaticString) {
+    self._bridged = BridgedStringRef(data: stringLiteral.utf8Start, count: stringLiteral.utf8CodeUnitCount)
+  }
 
   public var string: String { String(_bridged)  }
   public var description: String { string }

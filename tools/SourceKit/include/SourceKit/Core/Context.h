@@ -166,7 +166,6 @@ class Context {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeLibPath;
-  std::string DiagnosticDocumentationPath;
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::shared_ptr<GlobalConfig> Config;
@@ -176,7 +175,6 @@ class Context {
 
 public:
   Context(StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
-          StringRef DiagnosticDocumentationPath,
           llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
               LangSupportFactoryFn,
           llvm::function_ref<std::shared_ptr<PluginSupport>(Context &)>
@@ -187,9 +185,6 @@ public:
   StringRef getSwiftExecutablePath() const { return SwiftExecutablePath; }
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }
-  StringRef getDiagnosticDocumentationPath() const {
-    return DiagnosticDocumentationPath;
-  }
 
   LangSupport &getSwiftLangSupport() { return *SwiftLang; }
 

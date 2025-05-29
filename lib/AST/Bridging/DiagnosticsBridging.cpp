@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 
@@ -76,6 +77,14 @@ void BridgedDiagnosticEngine_diagnose(
     auto text = unbridge(fixIt).getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
+}
+
+BridgedSourceLoc BridgedDiagnostic_getLocationFromExternalSource(
+    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path,
+    SwiftInt line, SwiftInt column) {
+  auto *d = bridgedEngine.unbridged();
+  auto loc = d->SourceMgr.getLocFromExternalSource(path.unbridged(), line, column);
+  return BridgedSourceLoc(loc.getOpaquePointerValue());
 }
 
 bool BridgedDiagnosticEngine_hadAnyError(

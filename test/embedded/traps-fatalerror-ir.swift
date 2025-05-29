@@ -6,6 +6,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: swift_feature_Embedded
 
 public func test() {

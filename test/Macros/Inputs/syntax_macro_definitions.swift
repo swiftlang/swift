@@ -1215,6 +1215,29 @@ public struct AddCompletionHandler: PeerMacro {
   }
 }
 
+public struct ExpandTypeErrorMacro: PeerMacro {
+  public static func expansion<
+    Context: MacroExpansionContext,
+    Declaration: DeclSyntaxProtocol
+  >(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: Declaration,
+    in context: Context
+  ) throws -> [DeclSyntax] {
+    guard let funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      throw CustomError.message("@ExpandTypeError only works on functions")
+    }
+    return [
+      """
+      public func \(funcDecl.name)(_ bar: Int) {
+        callToMissingFunction(foo)
+      }
+      """
+    ]
+  }
+}
+
+
 public struct InvalidMacro: PeerMacro, DeclarationMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2683,6 +2706,16 @@ public struct BodyMacroWithControlFlow: BodyMacro {
   }
 }
 
+struct ThrowCancellationMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    ["throw CancellationError()"]
+  }
+}
+
 @_spi(ExperimentalLanguageFeature)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
@@ -2867,6 +2900,58 @@ public struct HangingMacro: PeerMacro {
 
     return [
       DeclSyntax(mockProperty)
+    ]
+  }
+}
+
+public struct PWithNonisolatedFuncMacro: ExtensionMacro {
+  public static var inferNonisolatedConformances: Bool { false }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P {
+        nonisolated static func requirement() { }
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
+public struct NonisolatedPWithNonisolatedFuncMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    if (protocols.isEmpty) {
+      return []
+    }
+
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): P {
+        nonisolated static func requirement() { }
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
     ]
   }
 }

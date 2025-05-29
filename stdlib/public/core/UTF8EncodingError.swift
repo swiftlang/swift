@@ -256,6 +256,7 @@ extension UTF8 {
           errors.append(adjustedErr)
         }
       }
+      fatalError()
     }
   }
 }

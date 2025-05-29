@@ -389,7 +389,7 @@ class Product(object):
         sysroot_arch, vendor, abi = self.get_linux_target_components(arch)
         return '{}-{}-linux-{}'.format(sysroot_arch, vendor, abi)
 
-    def generate_linux_toolchain_file(self, platform, arch):
+    def generate_linux_toolchain_file(self, platform, arch, crosscompiling=True):
         """
         Generates a new CMake tolchain file that specifies Linux as a target
         platform.
@@ -402,8 +402,9 @@ class Product(object):
 
         toolchain_args = {}
 
-        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
-        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+        if crosscompiling:
+            toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+            toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
 
         # We only set the actual sysroot if we are actually cross
         # compiling. This is important since otherwise cmake seems to change the

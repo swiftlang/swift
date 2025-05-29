@@ -28,7 +28,7 @@ extension UTF8Span {
     }
 
     private var _start: UnsafeRawPointer {
-      unsafe codeUnits._start()
+      codeUnits._start()
     }
 
     /// Decode and return the scalar starting at `currentCodeUnitOffset`.
@@ -227,7 +227,7 @@ extension UTF8Span {
     }
 
     private var _start: UnsafeRawPointer {
-      unsafe codeUnits._start()
+      codeUnits._start()
     }
 
     /// Return the `Character` starting at `currentCodeUnitOffset`. After the

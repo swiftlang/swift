@@ -221,6 +221,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  public var accessorKindName: String? {
+    guard bridged.isAccessor() else {
+      return nil
+    }
+    return StringRef(bridged: bridged.getAccessorName()).string
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
@@ -576,6 +583,10 @@ extension Function {
                                                 atIndex: calleeArgIdx,
                                                 withConvention: convention)
         return effects.memory.read
+      },
+      // isDeinitBarrier
+      { (f: BridgedFunction) -> Bool in
+        return f.function.getSideEffects().isDeinitBarrier
       }
     )
   }

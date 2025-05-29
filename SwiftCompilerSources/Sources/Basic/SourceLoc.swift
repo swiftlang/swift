@@ -12,8 +12,11 @@
 
 import BasicBridging
 
+/// Represents a location in source code.
+/// It is basically a pointer into a buffer of the loaded source file (managed by `DiagnosticEngine`).
+/// In contrast to just having a filename+line+column, this allows displaying the context around
+/// the location when printing diagnostics.
 public struct SourceLoc {
-  /// Points into a source file.
   public let bridged: BridgedSourceLoc
 
   public init?(bridged: BridgedSourceLoc) {

@@ -319,7 +319,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 
 // CHECK: define{{.*}} swiftcc void @"$s1A39instantiate_conditional_conformance_2ndyyxAA3SubRz1SQzRszlF"(ptr {{.*}}, ptr [[T:%.*]], ptr [[TSUB:%.*]])
 // CHECK:  [[CONDBUFFER:%.*]] = alloca [1 x ptr]
-// CHECK:  [[T0:%.*]] = getelementptr inbounds [1 x ptr], ptr [[CONDBUFFER]], i32 0, i32 0
+// CHECK:  [[T0:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[CONDBUFFER]], i32 0, i32 0
 // CHECK:  [[T1:%.*]] = getelementptr inbounds ptr, ptr [[T0]], i32 0
 // CHECK:  store ptr [[TSUB]], ptr [[T1]]
 // CHECK:  call ptr @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA3SubA2aERz1SQzRszlMc{{.*}}, ptr {{.*}}, ptr [[T0]])
@@ -331,7 +331,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 // CHECK:   [[T3:%.*]] = getelementptr inbounds ptr, ptr [[C1]], i32 0
 // CHECK:   [[T4:%.*]] = load ptr, ptr [[T3]]
 // CHECK:   [[TBASE:%.*]] = call ptr @__swift_relative_protocol_witness_table_parent_1(ptr [[T4]])
-// CHECK:   [[T24:%.*]] = getelementptr inbounds [1 x ptr], ptr [[C2]], i32 0, i32 0
+// CHECK:   [[T24:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[C2]], i32 0, i32 0
 // CHECK:   [[T25:%.*]] = getelementptr inbounds ptr, ptr [[T24]], i32 0
 // CHECK:   store ptr [[TBASE]], ptr [[T25]]
 // CHECK:   [[T26:%.*]] = call ptr @swift_getWitnessTableRelative({{.*}}@"$s1A1XVyxGAA4BaseA2aERzlMc{{.*}}, ptr {{.*}}, ptr [[T24]])

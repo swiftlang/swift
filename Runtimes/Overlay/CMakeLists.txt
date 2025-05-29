@@ -7,6 +7,10 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
+if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
+  cmake_policy(SET CMP0157 OLD)
+endif()
+
 # NOTE: always use the 3-component style as the expansion as
 # `${PROJECT_VERSION}` will not extend this to the complete form and this can
 # change the behaviour for comparison with non-SemVer compliant parsing. If
@@ -36,6 +40,7 @@ include(gyb)
 include(AvailabilityMacros)
 include(DefaultSettings)
 include(EmitSwiftInterface)
+include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
 

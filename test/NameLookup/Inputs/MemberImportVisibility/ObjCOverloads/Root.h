@@ -6,4 +6,5 @@
 
 @interface RootObject (Root)
 - (void)overridden3 __attribute__((deprecated("Root.h")));
+- (void)overridden4 __attribute__((deprecated("Root.h")));
 @end

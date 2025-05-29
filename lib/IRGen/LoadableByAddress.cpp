@@ -375,12 +375,14 @@ static bool modResultType(SILFunction *F, irgen::IRGenModule &Mod,
 static bool shouldTransformYields(GenericEnvironment *genEnv,
                                   CanSILFunctionType loweredTy,
                                   irgen::IRGenModule &Mod,
-                                  LargeSILTypeMapper &Mapper) {
+                                  LargeSILTypeMapper &Mapper,
+                                  TypeExpansionContext expansion) {
   if (!modifiableFunction(loweredTy)) {
     return false;
   }
   for (auto &yield : loweredTy->getYields()) {
-    auto yieldStorageType = yield.getSILStorageInterfaceType();
+    auto yieldStorageType = yield.getSILStorageType(Mod.getSILModule(),
+                                                    loweredTy, expansion);
     auto newYieldStorageType =
         Mapper.getNewSILType(genEnv, yieldStorageType, Mod);
     if (yieldStorageType != newYieldStorageType)
@@ -394,7 +396,8 @@ static bool modYieldType(SILFunction *F, irgen::IRGenModule &Mod,
   GenericEnvironment *genEnv = getSubstGenericEnvironment(F);
   auto loweredTy = F->getLoweredFunctionType();
 
-  return shouldTransformYields(genEnv, loweredTy, Mod, Mapper);
+  return shouldTransformYields(genEnv, loweredTy, Mod, Mapper,
+                               F->getTypeExpansionContext());
 }
 
 SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,

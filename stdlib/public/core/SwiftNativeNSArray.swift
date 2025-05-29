@@ -84,13 +84,13 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   @objc(objectAtIndexedSubscript:)
   @_effects(readonly)
   dynamic internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
-    return unsafe _objectAt(index)
+    return _objectAt(index)
   }
   
   @objc(objectAtIndex:)
   @_effects(readonly)
   dynamic internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
-    return unsafe _objectAt(index)
+    return _objectAt(index)
   }
 
   @objc internal func getObjects(

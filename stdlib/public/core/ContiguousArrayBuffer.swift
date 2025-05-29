@@ -190,13 +190,13 @@ internal final class _ContiguousArrayStorage<
   @objc(objectAtIndexedSubscript:)
   @_effects(readonly)
   final override internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
-    return unsafe _objectAt(index)
+    return _objectAt(index)
   }
   
   @objc(objectAtIndex:)
   @_effects(readonly)
   final override internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
-    return unsafe _objectAt(index)
+    return _objectAt(index)
   }
   
   @objc internal override final var count: Int {
@@ -817,6 +817,16 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
     return false;
   }
+
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+ @_alwaysEmitIntoClient
+  internal mutating func beginCOWMutationUnchecked() -> Bool {
+    if Bool(Builtin.beginCOWMutation(&_storage)) {
+      return true
+    }
+    return false;
+  }
+#endif
 
   /// Puts the buffer in an immutable state.
   ///

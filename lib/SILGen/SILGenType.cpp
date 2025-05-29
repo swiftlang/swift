@@ -903,6 +903,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
+
+  if (auto isolation = getSILFunctionTypeActorIsolation(
+          reqtSubstTy, requirement, witnessRef)) {
+    f->setActorIsolation(*isolation);
+  }
+
   return f;
 }
 

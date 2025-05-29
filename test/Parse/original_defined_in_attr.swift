@@ -4,7 +4,7 @@
 @_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{'@_originallyDefinedIn' requires that 'foo()' have explicit availability for macOS}}
 public func foo() {}
 
-@_originallyDefinedIn(modulename: "foo", OSX 13.13) // expected-error {{expected 'module: "original"' in the first argument to @_originallyDefinedIn}}
+@_originallyDefinedIn(modulename: "foo", OSX 13.13) // expected-error {{expected 'module: "original"' in the first argument to '@_originallyDefinedIn'}}
 public func foo1() {}
 
 @_originallyDefinedIn(module: "foo", OSX 13.13.3) // expected-warning {{'@_originallyDefinedIn' only uses major and minor version number}}
@@ -14,7 +14,7 @@ public class ToplevelClass {}
 @_originallyDefinedIn(module: "foo") // expected-error {{expected at least one platform version in '@_originallyDefinedIn' attribute}}
 public class ToplevelClass1 {}
 
-@_originallyDefinedIn(OSX 13.13.3) // expected-error {{expected 'module: "original"' in the first argument to @_originallyDefinedIn}}
+@_originallyDefinedIn(OSX 13.13.3) // expected-error {{expected 'module: "original"' in the first argument to '@_originallyDefinedIn'}}
 public class ToplevelClass2 {}
 
 @_originallyDefinedIn(module: "foo",

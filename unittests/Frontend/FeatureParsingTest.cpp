@@ -51,8 +51,8 @@ void swift::PrintTo(const LangOptions::FeatureState::Kind &value,
   case LangOptions::FeatureState::Kind::Off:
     *os << "Off";
     break;
-  case LangOptions::FeatureState::Kind::EnabledForAdoption:
-    *os << "EnabledForAdoption";
+  case LangOptions::FeatureState::Kind::EnabledForMigration:
+    *os << "EnabledForMigration";
     break;
   case LangOptions::FeatureState::Kind::Enabled:
     *os << "Enabled";

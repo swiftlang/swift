@@ -37,7 +37,7 @@ public class FixedLayoutObjCSubclass : NSObject {
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], ptr @"$s21class_resilience_objc23FixedLayoutObjCSubclassC5fields5Int32VvpWvd"
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[OFFSET]]
 // CHECK:      call void @swift_beginAccess
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, ptr [[PAYLOAD_ADDR]]
 
 func testConstantDirectFieldAccess(_ o: FixedLayoutObjCSubclass) {
@@ -54,7 +54,7 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], ptr @"$s21class_resilience_objc26NonFixedLayoutObjCSubclassC5fields5Int32VvpWvd"
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[OFFSET]]
 // CHECK:      call void @swift_beginAccess
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, ptr [[PAYLOAD_ADDR]]
 
 func testNonConstantDirectFieldAccess(_ o: NonFixedLayoutObjCSubclass) {
@@ -91,7 +91,7 @@ public class GenericObjCSubclass<T> : NSCoder {
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], ptr [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, ptr %0, [[INT]] [[FIELD_OFFSET]]
 // CHECK:      call void @swift_beginAccess
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, ptr [[PAYLOAD_ADDR]]
 
 func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {

@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt %s -early-inline -mem2reg | %FileCheck %s
+
+import Swift
+import Builtin
+
+struct FileDescriptor : ~Copyable {
+  @_hasStorage private var fd: Int { get set }
+  init(_ fd: Int)
+  deinit
+}
+
+sil hidden [ossa] @fd_close : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  debug_value %0, let, name "fd", argno 1
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil hidden [ossa] @fd_deinit1 :
+// CHECK: drop_deinit
+// CHECK-LABEL: } // end sil function 'fd_deinit1'
+sil hidden [ossa] @fd_deinit1 : $@convention(method) (@owned FileDescriptor) -> () {
+bb0(%0 : @owned $FileDescriptor):
+  %1 = alloc_stack $FileDescriptor, let, name "self", argno 1
+  store %0 to [init] %1
+  %3 = drop_deinit %1
+  %6 = struct_element_addr %3, #FileDescriptor.fd
+  %7 = load [trivial] %6
+  %9 = function_ref @fd_close : $@convention(thin) (Int) -> ()
+  %10 = apply %9(%7) : $@convention(thin) (Int) -> ()
+  dealloc_stack %1
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil hidden [ossa] @fd_deinit2 :
+// CHECK: end_lifetime
+// CHECK-LABEL: } // end sil function 'fd_deinit2'
+sil hidden [ossa] @fd_deinit2 : $@convention(method) (@owned FileDescriptor) -> () {
+bb0(%0 : @owned $FileDescriptor):
+  %3 = drop_deinit %0
+  %6 = destructure_struct %3
+  %9 = function_ref @fd_close : $@convention(thin) (Int) -> ()
+  %10 = apply %9(%6) : $@convention(thin) (Int) -> ()
+  %12 = tuple ()
+  return %12
+}

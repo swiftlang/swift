@@ -32,7 +32,7 @@ sil hidden_external @use_all : $@convention(thin) <T, U where T : P, U : P> () -
 // CHECK: [[METADATA:%.*]] = load ptr, ptr %0, align 8
 // CHECK-objc-NEXT: [[T1:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], i64 10
 // CHECK-native-NEXT: [[T1:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], i64 7
-// CHECK-NEXT:  %T = load ptr, ptr [[T1]], align 8
+// CHECK-NEXT:  %T1 = load ptr, ptr [[T1]], align 8
 // CHECK: store
 // CHECK-objc-NEXT: [[T1:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], i64 11
 // CHECK-native-NEXT: [[T1:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], i64 8

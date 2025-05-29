@@ -7,7 +7,7 @@
 // MARK: Declarations //
 ////////////////////////
 
-/// Classes are always non-sendable, so this is non-sendable
+/// Classes are always non-Sendable, so this is non-Sendable
 class NonSendableKlass {
   // expected-note @-1 {{}}
   var field: NonSendableKlass? = nil

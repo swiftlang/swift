@@ -10,7 +10,7 @@ import Foundation
 
 public class C1<T> {}
 extension C1: P {}
-// expected-error@-1 {{conformance of generic class 'C1<T>' to @objc protocol 'P' cannot be in an extension}}
+// expected-error@-1 {{conformance of generic class 'C1<T>' to '@objc' protocol 'P' cannot be in an extension}}
 
 public class C2<T> {}
 public class C3 : C2<Int> {}
@@ -22,7 +22,7 @@ class Outer<T> {
 }
 
 extension Outer.Inner: P {}
-// expected-error@-1 {{conformance of class from generic context 'Outer<T>.Inner' to @objc protocol 'P' cannot be in an extension}}
+// expected-error@-1 {{conformance of class from generic context 'Outer<T>.Inner' to '@objc' protocol 'P' cannot be in an extension}}
 
 class SubInner: Outer<Int>.Inner2 {}
 

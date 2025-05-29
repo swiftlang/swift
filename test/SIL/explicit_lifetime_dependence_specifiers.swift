@@ -8,30 +8,6 @@
 
 import Builtin
 
-@_unsafeNonescapableResult
-@lifetime(borrow source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, borrowing source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
-@_unsafeNonescapableResult
-@lifetime(copy source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, copying source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSWcfC : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @lifetime(borrow 0)  @owned BufferView {
@@ -105,7 +81,8 @@ func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferVie
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(independent: this.ptr)
   }
-  return BufferView(independent: that.ptr)
+  let newThat = BufferView(independent: that.ptr)
+  return _overrideLifetime(newThat, copying: that)
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVAD_ADntF : $@convention(thin) (@guaranteed BufferView, @owned BufferView) -> @lifetime(copy 1, borrow 0)  @owned BufferView {

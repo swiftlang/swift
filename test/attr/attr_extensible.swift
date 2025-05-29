@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ExtensibleAttribute
+
+// REQUIRES: swift_feature_ExtensibleAttribute
 
 @extensible
 public enum E1 { // Ok
@@ -35,4 +37,13 @@ struct Test {
     get { false }
     set { }
   }
+}
+
+@preEnumExtensibility
+@extensible
+public enum PE {
+}
+
+@preEnumExtensibility // expected-error {{@preEnumExtensibility can only be used together with '@extensible' attribute}}
+public enum WrongPreE {
 }

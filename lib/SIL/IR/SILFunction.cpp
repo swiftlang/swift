@@ -214,6 +214,7 @@ static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
+static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
@@ -618,7 +619,8 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)
-    return ClangNodeOwner->getClangDecl()->isWeakImported();
+    return ClangNodeOwner->getClangDecl()->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   // For native functions check a flag on the SILFunction
   // itself.
@@ -1175,7 +1177,8 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
             CopyEffectsFn copyEffectsFn,
             GetEffectInfoFn effectInfoFn,
             GetMemBehaviorFn memBehaviorFn,
-            ArgumentMayReadFn argumentMayReadFn) {
+            ArgumentMayReadFn argumentMayReadFn,
+            IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1185,6 +1188,7 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
   argumentMayReadFunction = argumentMayReadFn;
+  isDeinitBarrierFunction = isDeinitBarrierFn;
 }
 
 std::pair<const char *, int>  SILFunction::
@@ -1284,6 +1288,13 @@ bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
     return true;
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
+}
+
+bool SILFunction::isDeinitBarrier() {
+  if (!isDeinitBarrierFunction)
+    return true;
+
+  return isDeinitBarrierFunction({this});
 }
 
 SourceFile *SILFunction::getSourceFile() const {

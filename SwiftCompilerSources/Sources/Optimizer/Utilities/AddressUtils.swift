@@ -131,7 +131,7 @@ extension AddressUseVisitor {
          is DestroyAddrInst, is DeallocStackInst, 
          is DeinitExistentialAddrInst,
          is IsUniqueInst, is MarkFunctionEscapeInst,
-         is PackElementSetInst:
+         is PackElementSetInst, is EndCOWMutationAddrInst:
       return leafAddressUse(of: operand)
 
     case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
@@ -159,7 +159,7 @@ extension AddressUseVisitor {
            .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
-           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer,
+           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer, .PrepareInitialization,
            .GetEnumTag, .InjectEnumTag:
         return leafAddressUse(of: operand)
       default:

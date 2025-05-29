@@ -16,6 +16,7 @@ import re
 import sys
 import traceback
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
+from typing import Optional
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -74,7 +75,7 @@ def check_parallel_results(results, op):
     return fail_count
 
 
-def confirm_tag_in_repo(tag, repo_name):
+def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
     # type: (str, str) -> str | None
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
@@ -99,8 +100,15 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    refspec_exists = True
+    try:
+        shell.run(["git", "rev-parse", "--verify", refspec])
+    except Exception:
+        refspec_exists = False
     args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp, refspec]
+            '--before=' + timestamp]
+    if refspec_exists:
+        args.append(refspec)
     rev = shell.capture(args).strip()
     if rev:
         return rev

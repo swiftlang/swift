@@ -227,9 +227,14 @@ swift_executor_invokeSwiftCheckIsolated(SwiftExecutorRef executor) {
 }
 
 /// Check if the current context is isolated by the specified executor.
-static inline bool
+///
+/// The numeric values correspond to `swift::IsIsolatingCurrentContextDecision`.
+///
+/// Specifically ONLY `1` means "isolated", while smaller values mean not isolated or unknown.
+/// See ``IsIsolatingCurrentContextDecision`` for details.
+static inline int8_t
 swift_executor_invokeSwiftIsIsolatingCurrentContext(SwiftExecutorRef executor) {
-  extern bool _swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor);
+  extern int8_t _swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor);
 
   return _swift_task_invokeSwiftIsIsolatingCurrentContext_c(executor);
 }
@@ -292,7 +297,8 @@ SWIFT_CC(swift) void swift_task_enqueueMainExecutorImpl(SwiftJob * _Nonnull job)
 SWIFT_CC(swift) void swift_task_checkIsolatedImpl(SwiftExecutorRef executor);
 
 /// Check if the specified executor isolates the current context.
-SWIFT_CC(swift) bool swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor);
+SWIFT_CC(swift) int8_t
+  swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor);
 
 /// Get a reference to the main executor.
 SWIFT_CC(swift) SwiftExecutorRef swift_task_getMainExecutorImpl(void);

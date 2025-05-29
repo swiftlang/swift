@@ -67,7 +67,19 @@ static void withStatusRecordLock(
   // see that the is-locked bit is now set, and then wait for the lock.
   task->_private().statusLock.lock();
 
-  bool alreadyLocked = status.isStatusRecordLocked();
+  bool alreadyLocked = false;
+
+  // `status` was loaded before we acquired the lock. If its is-locked bit is
+  // not set, then we know that this thread doesn't already hold the lock.
+  // However, if the is-locked bit is set, then we don't know if this thread
+  // held the lock or another thread did. In that case, we reload the status
+  // after acquiring the lock. If the reloaded status still has the is-locked
+  // bit set, then we know it's this thread. If it doesn't, then we know it was
+  // a different thread.
+  if (status.isStatusRecordLocked()) {
+    status = task->_private()._status().load(std::memory_order_relaxed);
+    alreadyLocked = status.isStatusRecordLocked();
+  }
 
   // If it's already locked then this thread is the thread that locked it, and
   // we can leave that bit alone here.
@@ -642,8 +654,13 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
   auto taskNameLen = strlen(_taskName);
   char* taskNameCopy = reinterpret_cast<char*>(
       _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
+#if defined(_WIN32)
+  static_cast<void>(strncpy_s(taskNameCopy, taskNameLen + 1,
+                              _taskName, _TRUNCATE));
+#else
   (void) strncpy(/*dst=*/taskNameCopy, /*src=*/_taskName, taskNameLen);
   taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
+#endif
 
   auto record =
       ::new (allocation) TaskNameStatusRecord(taskNameCopy);

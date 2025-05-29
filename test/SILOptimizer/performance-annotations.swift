@@ -485,7 +485,7 @@ func dynamicCastNoExistential(_ a: AnyObject) -> Cl? {
 
 @_noExistentials
 func useOfExistential() -> P {
-  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in @_noExistential function}}
+  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in '@_noExistential' function}}
 }
 
 @_noExistentials

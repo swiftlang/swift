@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 class InitClassImpl : cake1.InitProto {
 
     required init(x x: Int)
@@ -80,610 +78,600 @@ extension Dictionary.Keys where Key : cake1.P1 {
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 0,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 26,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 32,
+    key.offset: 6,
     key.length: 13
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 48,
+    key.offset: 22,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "InitProto",
     key.usr: "s:5cake19InitProtoP",
-    key.offset: 54,
+    key.offset: 28,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 71,
+    key.offset: 45,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 80,
+    key.offset: 54,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 85,
+    key.offset: 59,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 87,
+    key.offset: 61,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 90,
+    key.offset: 64,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 100,
+    key.offset: 74,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 112,
+    key.offset: 86,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 122,
+    key.offset: 96,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 131,
+    key.offset: 105,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 148,
+    key.offset: 122,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 153,
+    key.offset: 127,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 155,
+    key.offset: 129,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 158,
+    key.offset: 132,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 166,
+    key.offset: 140,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "InitProto",
     key.usr: "s:5cake19InitProtoP",
-    key.offset: 176,
+    key.offset: 150,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 193,
+    key.offset: 167,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 203,
+    key.offset: 177,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 210,
+    key.offset: 184,
     key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 227,
+    key.offset: 201,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "InitProto",
     key.usr: "s:5cake19InitProtoP",
-    key.offset: 233,
+    key.offset: 207,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 250,
+    key.offset: 224,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 255,
+    key.offset: 229,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 257,
+    key.offset: 231,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 260,
+    key.offset: 234,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 270,
+    key.offset: 244,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 280,
+    key.offset: 254,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 289,
+    key.offset: 263,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 299,
+    key.offset: 273,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 304,
+    key.offset: 278,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 316,
+    key.offset: 290,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 320,
+    key.offset: 294,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
+    key.offset: 299,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 305,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 309,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 320,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 325,
-    key.length: 3
+    key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 331,
-    key.length: 3
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 330,
+    key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 332,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
     key.offset: 335,
     key.length: 3
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 346,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 351,
-    key.length: 4
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 356,
+    key.offset: 340,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 358,
+    key.offset: 342,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 361,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 366,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 368,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 371,
+    key.offset: 345,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 381,
+    key.offset: 355,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 391,
+    key.offset: 365,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 393,
+    key.offset: 367,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 396,
+    key.offset: 370,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 404,
+    key.offset: 378,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 410,
+    key.offset: 384,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 414,
+    key.offset: 388,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 425,
+    key.offset: 399,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 430,
+    key.offset: 404,
     key.length: 13
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 449,
+    key.offset: 423,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 458,
+    key.offset: 432,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 463,
+    key.offset: 437,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P1",
     key.usr: "s:5cake12P1P",
-    key.offset: 469,
+    key.offset: 443,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 479,
+    key.offset: 453,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 484,
+    key.offset: 458,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 496,
+    key.offset: 470,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 501,
+    key.offset: 475,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 511,
+    key.offset: 485,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P2",
     key.usr: "s:5cake12P2P",
-    key.offset: 521,
+    key.offset: 495,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 505,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 510,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 522,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 526,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
     key.offset: 531,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 536,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 548,
     key.length: 3
   },
   {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 540,
+    key.length: 4
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 545,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 550,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
     key.offset: 552,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
-    key.offset: 557,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 566,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 571,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 576,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 578,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 581,
+    key.offset: 555,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 586,
+    key.offset: 560,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 588,
+    key.offset: 562,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 591,
+    key.offset: 565,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 601,
+    key.offset: 575,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 611,
+    key.offset: 585,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 613,
+    key.offset: 587,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 616,
+    key.offset: 590,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 624,
+    key.offset: 598,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 631,
+    key.offset: 605,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P2",
     key.usr: "s:5cake12P2P",
-    key.offset: 641,
+    key.offset: 615,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 644,
+    key.offset: 618,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
     key.usr: "s:5cake12P2P4Selfxmfp",
-    key.offset: 650,
+    key.offset: 624,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 657,
+    key.offset: 631,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P3",
     key.usr: "s:5cake12P3P",
-    key.offset: 663,
+    key.offset: 637,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 673,
+    key.offset: 647,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 678,
+    key.offset: 652,
     key.length: 13
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 697,
+    key.offset: 671,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 706,
+    key.offset: 680,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 716,
+    key.offset: 690,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 695,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 711,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Dictionary",
+    key.usr: "s:SD",
     key.offset: 721,
     key.length: 10
   },
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 737,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Dictionary",
-    key.usr: "s:SD",
-    key.offset: 747,
-    key.length: 10
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Keys",
     key.usr: "s:SD4KeysV",
-    key.offset: 758,
+    key.offset: 732,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 770,
+    key.offset: 744,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 775,
+    key.offset: 749,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 784,
+    key.offset: 758,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Dictionary",
     key.usr: "s:SD",
-    key.offset: 794,
+    key.offset: 768,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Keys",
     key.usr: "s:SD4KeysV",
-    key.offset: 805,
+    key.offset: 779,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 810,
+    key.offset: 784,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Key",
     key.usr: "s:SD3Keyxmfp",
-    key.offset: 816,
+    key.offset: 790,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 822,
+    key.offset: 796,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P1",
     key.usr: "s:5cake12P1P",
-    key.offset: 828,
+    key.offset: 802,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 838,
+    key.offset: 812,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 843,
+    key.offset: 817,
     key.length: 3
   }
 ]
@@ -692,7 +680,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.kind: source.lang.swift.decl.class,
     key.name: "InitClassImpl",
     key.usr: "s:5cake113InitClassImplC",
-    key.offset: 26,
+    key.offset: 0,
     key.length: 94,
     key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>InitClassImpl</decl.name> : <ref.protocol usr=\"s:5cake19InitProtoP\">InitProto</ref.protocol></decl.class>",
     key.conforms: [
@@ -707,7 +695,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:)",
         key.usr: "s:5cake113InitClassImplC1xACSi_tcfc",
-        key.offset: 71,
+        key.offset: 45,
         key.length: 23,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>required</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
@@ -722,7 +710,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "x",
             key.name: "x",
-            key.offset: 90,
+            key.offset: 64,
             key.length: 3
           }
         ]
@@ -732,7 +720,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "init()",
         key.usr: "s:5cake19InitProtoPAAExycfc::SYNTHESIZED::s:5cake113InitClassImplC",
         key.original_usr: "s:5cake19InitProtoPAAExycfc",
-        key.offset: 100,
+        key.offset: 74,
         key.length: 18,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
       }
@@ -742,7 +730,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "InitProto",
     key.usr: "s:5cake19InitProtoP",
-    key.offset: 122,
+    key.offset: 96,
     key.length: 42,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>InitProto</decl.name></decl.protocol>",
     key.entities: [
@@ -750,7 +738,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:)",
         key.usr: "s:5cake19InitProtoP1xxSi_tcfc",
-        key.offset: 148,
+        key.offset: 122,
         key.length: 14,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -758,7 +746,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "x",
             key.name: "x",
-            key.offset: 158,
+            key.offset: 132,
             key.length: 3
           }
         ]
@@ -767,7 +755,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
   },
   {
     key.kind: source.lang.swift.decl.extension.protocol,
-    key.offset: 166,
+    key.offset: 140,
     key.length: 35,
     key.fully_annotated_decl: "<decl.extension.protocol><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.protocol usr=\"s:5cake19InitProtoP\">InitProto</ref.protocol></decl.name></decl.extension.protocol>",
     key.extends: {
@@ -780,7 +768,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
         key.usr: "s:5cake19InitProtoPAAExycfc",
-        key.offset: 193,
+        key.offset: 167,
         key.length: 6,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
       }
@@ -790,7 +778,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.kind: source.lang.swift.decl.struct,
     key.name: "InitStructImpl",
     key.usr: "s:5cake114InitStructImplV",
-    key.offset: 203,
+    key.offset: 177,
     key.length: 75,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>InitStructImpl</decl.name> : <ref.protocol usr=\"s:5cake19InitProtoP\">InitProto</ref.protocol></decl.struct>",
     key.conforms: [
@@ -805,7 +793,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:)",
         key.usr: "s:5cake114InitStructImplV1xACSi_tcfc",
-        key.offset: 250,
+        key.offset: 224,
         key.length: 14,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
@@ -820,7 +808,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "x",
             key.name: "x",
-            key.offset: 260,
+            key.offset: 234,
             key.length: 3
           }
         ]
@@ -830,7 +818,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "init()",
         key.usr: "s:5cake19InitProtoPAAExycfc::SYNTHESIZED::s:5cake114InitStructImplV",
         key.original_usr: "s:5cake19InitProtoPAAExycfc",
-        key.offset: 270,
+        key.offset: 244,
         key.length: 6,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
       }
@@ -840,7 +828,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P1",
     key.usr: "s:5cake12P1P",
-    key.offset: 280,
+    key.offset: 254,
     key.length: 167,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P1</decl.name></decl.protocol>",
     key.entities: [
@@ -848,7 +836,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo1()",
         key.usr: "s:5cake12P1P4foo1yyF",
-        key.offset: 299,
+        key.offset: 273,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
       },
@@ -856,7 +844,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "Ins",
         key.usr: "s:5cake12P1P3InsSivp",
-        key.offset: 316,
+        key.offset: 290,
         key.length: 24,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>Ins</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
@@ -864,7 +852,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo2(a:b:)",
         key.usr: "s:5cake12P1P4foo21a1bySi_SitF",
-        key.offset: 346,
+        key.offset: 320,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
@@ -872,14 +860,14 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "a",
             key.name: "a",
-            key.offset: 361,
+            key.offset: 335,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "b",
             key.name: "b",
-            key.offset: 371,
+            key.offset: 345,
             key.length: 3
           }
         ]
@@ -888,7 +876,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
         key.usr: "s:5cake12P1PyS2icip",
-        key.offset: 381,
+        key.offset: 355,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
         key.entities: [
@@ -896,7 +884,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "a",
-            key.offset: 396,
+            key.offset: 370,
             key.length: 3
           }
         ]
@@ -905,7 +893,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "fooConstraint()",
         key.usr: "s:5cake12P1P13fooConstraintyyF",
-        key.offset: 425,
+        key.offset: 399,
         key.length: 20,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooConstraint</decl.name>()</decl.function.method.instance>"
       }
@@ -915,7 +903,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P2",
     key.usr: "s:5cake12P2P",
-    key.offset: 449,
+    key.offset: 423,
     key.length: 60,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> : <ref.protocol usr=\"s:5cake12P1P\">P1</ref.protocol></decl.protocol>",
     key.conforms: [
@@ -930,7 +918,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "bar1()",
         key.usr: "s:5cake12P2P4bar1yyF",
-        key.offset: 479,
+        key.offset: 453,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar1</decl.name>()</decl.function.method.instance>"
       },
@@ -938,7 +926,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "bar2()",
         key.usr: "s:5cake12P2P4bar2yyF",
-        key.offset: 496,
+        key.offset: 470,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar2</decl.name>()</decl.function.method.instance>"
       }
@@ -946,7 +934,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
   },
   {
     key.kind: source.lang.swift.decl.extension.protocol,
-    key.offset: 511,
+    key.offset: 485,
     key.length: 118,
     key.fully_annotated_decl: "<decl.extension.protocol><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.protocol usr=\"s:5cake12P2P\">P2</ref.protocol></decl.name></decl.extension.protocol>",
     key.extends: {
@@ -960,7 +948,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "foo1()",
         key.usr: "s:5cake12P2PAAE4foo1yyF",
         key.default_implementation_of: "s:5cake12P1P4foo1yyF",
-        key.offset: 531,
+        key.offset: 505,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
       },
@@ -969,7 +957,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "Ins",
         key.usr: "s:5cake12P2PAAE3InsSivp",
         key.default_implementation_of: "s:5cake12P1P3InsSivp",
-        key.offset: 548,
+        key.offset: 522,
         key.length: 12,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>Ins</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
@@ -978,7 +966,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "foo2(a:b:)",
         key.usr: "s:5cake12P2PAAE4foo21a1bySi_SitF",
         key.default_implementation_of: "s:5cake12P1P4foo21a1bySi_SitF",
-        key.offset: 566,
+        key.offset: 540,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
@@ -986,14 +974,14 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "a",
             key.name: "a",
-            key.offset: 581,
+            key.offset: 555,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "b",
             key.name: "b",
-            key.offset: 591,
+            key.offset: 565,
             key.length: 3
           }
         ]
@@ -1003,7 +991,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "subscript(_:)",
         key.usr: "s:5cake12P2PAAEyS2icip",
         key.default_implementation_of: "s:5cake12P1PyS2icip",
-        key.offset: 601,
+        key.offset: 575,
         key.length: 26,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
         key.entities: [
@@ -1011,7 +999,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "a",
-            key.offset: 616,
+            key.offset: 590,
             key.length: 3
           }
         ]
@@ -1025,7 +1013,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.description: "Self : P3"
       }
     ],
-    key.offset: 631,
+    key.offset: 605,
     key.length: 64,
     key.fully_annotated_decl: "<decl.extension.protocol><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.protocol usr=\"s:5cake12P2P\">P2</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:5cake12P2P4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:5cake12P3P\">P3</ref.protocol></decl.generic_type_requirement></decl.extension.protocol>",
     key.extends: {
@@ -1039,7 +1027,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.name: "fooConstraint()",
         key.usr: "s:5cake12P2PA2A2P3RzrlE13fooConstraintyyF",
         key.default_implementation_of: "s:5cake12P1P13fooConstraintyyF",
-        key.offset: 673,
+        key.offset: 647,
         key.length: 20,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooConstraint</decl.name>()</decl.function.method.instance>"
       }
@@ -1049,7 +1037,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P3",
     key.usr: "s:5cake12P3P",
-    key.offset: 697,
+    key.offset: 671,
     key.length: 38,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P3</decl.name></decl.protocol>",
     key.entities: [
@@ -1057,7 +1045,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "p3Required()",
         key.usr: "s:5cake12P3P10p3RequiredyyF",
-        key.offset: 716,
+        key.offset: 690,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>p3Required</decl.name>()</decl.function.method.instance>"
       }
@@ -1078,7 +1066,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.description: "Key : Hashable"
       }
     ],
-    key.offset: 737,
+    key.offset: 711,
     key.length: 45,
     key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:SD\">Dictionary</ref.struct>.<ref.struct usr=\"s:SD4KeysV\">Keys</ref.struct></decl.name></decl.extension.struct>",
     key.extends: {
@@ -1091,7 +1079,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
         key.usr: "s:SD4KeysV5cake1E3fooyyF",
-        key.offset: 770,
+        key.offset: 744,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"
       }
@@ -1115,7 +1103,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.description: "Key : P1"
       }
     ],
-    key.offset: 784,
+    key.offset: 758,
     key.length: 66,
     key.fully_annotated_decl: "<decl.extension.struct><syntaxtype.keyword>extension</syntaxtype.keyword> <decl.name><ref.struct usr=\"s:SD\">Dictionary</ref.struct>.<ref.struct usr=\"s:SD4KeysV\">Keys</ref.struct></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:SD3Keyxmfp\">Key</ref.generic_type_param> : <ref.protocol usr=\"s:5cake12P1P\">P1</ref.protocol></decl.generic_type_requirement></decl.extension.struct>",
     key.extends: {
@@ -1128,7 +1116,7 @@ extension Dictionary.Keys where Key : cake1.P1 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "bar()",
         key.usr: "s:SD4KeysV5cake1AC2P1RzrlE3baryyF",
-        key.offset: 838,
+        key.offset: 812,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>()</decl.function.method.instance>"
       }

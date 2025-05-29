@@ -835,9 +835,7 @@ bool DCE::removeDead() {
     }
   }
 
-  OSSALifetimeCompletion completion(
-      F, DT, *deadEndBlocks, OSSALifetimeCompletion::IgnoreTrivialVariable,
-      /*forceLivenessVerification=*/true);
+  OSSALifetimeCompletion completion(F, DT, *deadEndBlocks);
   for (auto value : valuesToComplete) {
     if (!value.has_value())
       continue;

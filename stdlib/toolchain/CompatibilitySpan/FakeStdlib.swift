@@ -74,10 +74,11 @@ internal func _overrideLifetime<
 }
 
 extension Range {
-    @_alwaysEmitIntoClient
-	internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-	    self.init(uncheckedBounds: bounds)
-	}
+  @unsafe
+  @_alwaysEmitIntoClient
+  internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.init(uncheckedBounds: bounds)
+  }
 }
 
 extension Optional {

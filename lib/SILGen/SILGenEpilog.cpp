@@ -83,10 +83,12 @@ void SILGenFunction::prepareEpilog(
 void SILGenFunction::prepareRethrowEpilog(
     DeclContext *dc, AbstractionPattern origErrorType, Type errorType,
     CleanupLocation cleanupLoc) {
+  ASSERT(!errorType->hasPrimaryArchetype());
 
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
   if (!IndirectErrorResult) {
-    SILType loweredErrorType = getLoweredType(origErrorType, errorType);
+    auto errorTypeInContext = dc->mapTypeIntoContext(errorType);
+    SILType loweredErrorType = getLoweredType(origErrorType, errorTypeInContext);
     rethrowBB->createPhiArgument(loweredErrorType, OwnershipKind::Owned);
   }
 

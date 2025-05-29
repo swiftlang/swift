@@ -424,12 +424,17 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   // temporaries do not have access scopes, so we need to walk down any projection that may be used to initialize the
   // temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
-    // Intercept mark_dependence destination to record an access point which can be used like a store when finding all
-    // uses that affect the base after the point that the dependence was marked.
     if let md = value as? MarkDependenceInst {
-      assert(operand == md.valueOperand)
-      visit(LocalVariableAccess(.dependenceDest, operand))
-      // walk down the forwarded address as usual...
+      if operand == md.valueOperand {
+        // Intercept mark_dependence destination to record an access point which can be used like a store when finding
+        // all uses that affect the base after the point that the dependence was marked.
+        visit(LocalVariableAccess(.dependenceDest, operand))
+        // walk down the forwarded address as usual...
+      } else {
+        // A dependence is similar to loading from its source. Downstream uses are not accesses of the original local.
+        visit(LocalVariableAccess(.dependenceSource, operand))
+        return .continueWalk
+      }
     }
     return walkDownAddressUses(address: value)
   }

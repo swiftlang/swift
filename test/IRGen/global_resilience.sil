@@ -94,7 +94,7 @@ bb0:
 
   %addr = global_addr @fixedGlobal : $*LargeResilientStruct
 
-  // CHECK: [[VALUE:%.*]] = load i64, ptr getelementptr inbounds (%T17global_resilience20LargeResilientStructV, ptr @fixedGlobal, i32 0, i32 1)
+  // CHECK: [[VALUE:%.*]] = load i64, ptr getelementptr inbounds{{.*}} (%T17global_resilience20LargeResilientStructV, ptr @fixedGlobal, i32 0, i32 1)
   %x_addr = struct_element_addr %addr : $*LargeResilientStruct, #LargeResilientStruct.x
   %x = load %x_addr : $*Int64
 
@@ -126,7 +126,7 @@ bb0:
 // CHECK-arm64e-NEXT: ptrtoint ptr [[VWT_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 10
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 10
 // CHECK:   [[FLAGS:%.*]] = load i32, ptr [[FLAGS_ADDR]]
 // CHECK:   [[ISNOTINLINE:%.*]] = and i32 [[FLAGS]], 131072
 // CHECK:   [[ISINLINE:%.*]] = icmp eq i32 [[ISNOTINLINE]], 0
@@ -138,7 +138,7 @@ bb0:
 // CHECK-arm64e-NEXT: ptrtoint ptr [[VWT_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK:   [[SIZE:%.*]] = load [[INT]], ptr [[SIZE_ADDR]]
 // CHECK:   [[ALIGN:%.*]] = and {{.*}}, 255
 // CHECK:   [[PTR:%.*]] = call noalias ptr @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
@@ -156,7 +156,7 @@ bb0:
 // CHECK-arm64e-NEXT: ptrtoint ptr [[VWT_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 10
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 10
 // CHECK:   [[FLAGS:%.*]] = load i32, ptr [[FLAGS_ADDR]]
 // CHECK:   [[ISNOTINLINE:%.*]] = and i32 [[FLAGS]], 131072
 // CHECK:   [[ISINLINE:%.*]] = icmp eq i32 [[ISNOTINLINE]], 0

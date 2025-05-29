@@ -519,15 +519,16 @@ static void verificationError(
     ASTContext &ctx, llvm::StringRef msg,
     std::initializer_list<std::pair<const char *, const AvailabilityScope *>>
         labelsAndNodes) {
-  llvm::errs() << msg << "\n";
-  for (auto pair : labelsAndNodes) {
-    auto label = std::get<0>(pair);
-    auto scope = std::get<1>(pair);
-    llvm::errs() << label << ":\n";
-    scope->print(llvm::errs(), ctx.SourceMgr);
-    llvm::errs() << "\n";
-  }
-  abort();
+  ABORT([&](auto &out) {
+    out << msg << "\n";
+    for (auto pair : labelsAndNodes) {
+      auto label = std::get<0>(pair);
+      auto scope = std::get<1>(pair);
+      out << label << ":\n";
+      scope->print(out, ctx.SourceMgr);
+      out << "\n";
+    }
+  });
 }
 
 void AvailabilityScope::verify(const AvailabilityScope *parent,

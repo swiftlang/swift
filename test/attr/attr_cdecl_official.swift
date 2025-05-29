@@ -20,7 +20,7 @@ var computed: Int {
 }
 
 @cdecl("inout")
-func noBody(x: inout Int) { } // expected-error{{global function cannot be marked @cdecl because inout parameters cannot be represented in C}}
+func noBody(x: inout Int) { } // expected-error{{global function cannot be marked '@cdecl' because inout parameters cannot be represented in C}}
 
 struct SwiftStruct { var x, y: Int }
 enum SwiftEnum { case A, B }
@@ -55,3 +55,19 @@ class Foo {
 
 @cdecl("throwing") // expected-error{{raising errors from @cdecl functions is not supported}}
 func throwing() throws { }
+
+@cdecl("acceptedPointers")
+func acceptedPointers(_ x: UnsafeMutablePointer<Int>,
+                        y: UnsafePointer<Int>,
+                        z: UnsafeMutableRawPointer,
+                        w: UnsafeRawPointer,
+                        u: OpaquePointer) {}
+
+@cdecl("rejectedPointers")
+func rejectedPointers( // expected-error 6 {{global function cannot be marked '@cdecl' because the type of the parameter}}
+    x: UnsafePointer<String>, // expected-note {{Swift structs cannot be represented in Objective-C}} // FIXME: Should reference C.
+    y: CVaListPointer, // expected-note {{Swift structs cannot be represented in Objective-C}}
+    z: UnsafeBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in Objective-C}}
+    u: UnsafeMutableBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in Objective-C}}
+    v: UnsafeRawBufferPointer, // expected-note {{Swift structs cannot be represented in Objective-C}}
+    t: UnsafeMutableRawBufferPointer) {} // expected-note {{Swift structs cannot be represented in Objective-C}}

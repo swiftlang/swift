@@ -18,7 +18,7 @@ struct Loadable {
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}_in_place_loadable
 func emplace_in_place_loadable() -> Loadable {
     // CHECK: [[TMP:%.*]] = alloc_stack $Loadable
-    // CHECK-NEXT: builtin "zeroInitializer"([[TMP]])
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
     // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
     // CHECK-NEXT: apply {{.*}}([[PTR]])
     // CHECK-NEXT: load [take] [[TMP]]
@@ -29,7 +29,7 @@ func emplace_in_place_loadable() -> Loadable {
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}_in_place_ao
 // CHECK: bb0([[OUT:%.*]] : $*AO):
 func emplace_in_place_ao() -> AO {
-    // CHECK: builtin "zeroInitializer"([[OUT]])
+    // CHECK: builtin "prepareInitialization"([[OUT]])
     // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[OUT]]
     // CHECK-NEXT: apply [[FN:%.*]]([[PTR]])
     // CHECK-NEXT: destroy_value [[FN]]
@@ -42,7 +42,7 @@ func emplace_in_place_ao() -> AO {
 // CHECK: bb0([[INOUT:%.*]] : $*Loadable):
 func emplace_assign_loadable(_ x: inout Loadable) {
     // CHECK: [[TMP:%.*]] = alloc_stack $Loadable
-    // CHECK-NEXT: builtin "zeroInitializer"([[TMP]])
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
     // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
     // CHECK-NEXT: apply {{.*}}([[PTR]])
     // CHECK-NEXT: [[RESULT:%.*]] = load [take] [[TMP]]
@@ -57,7 +57,7 @@ func emplace_assign_loadable(_ x: inout Loadable) {
 // CHECK: bb0([[INOUT:%.*]] : $*AO):
 func emplace_assign_ao(_ x: inout AO) {
     // CHECK: [[TMP:%.*]] = alloc_stack $AO
-    // CHECK-NEXT: builtin "zeroInitializer"([[TMP]])
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
     // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
     // CHECK-NEXT: apply {{.*}}([[PTR]])
     // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[INOUT]]
@@ -70,7 +70,7 @@ func emplace_assign_ao(_ x: inout AO) {
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}_ignore_loadable
 func emplace_ignore_loadable() {
     // CHECK: [[TMP:%.*]] = alloc_stack $Loadable
-    // CHECK-NEXT: builtin "zeroInitializer"([[TMP]])
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
     // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
     // CHECK-NEXT: apply {{.*}}([[PTR]])
     // CHECK-NEXT: [[RESULT:%.*]] = load [take] [[TMP]]
@@ -83,7 +83,7 @@ func emplace_ignore_loadable() {
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}_ignore_ao
 func emplace_ignore_ao() {
     // CHECK: [[TMP:%.*]] = alloc_stack $AO
-    // CHECK-NEXT: builtin "zeroInitializer"([[TMP]])
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
     // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
     // CHECK-NEXT: apply {{.*}}([[PTR]])
     // CHECK-NEXT: ignored_use [[TMP]]

@@ -486,7 +486,7 @@ public:
   /// for the isolated values if any to not match.
   ///
   /// This is useful if one has two non-Sendable values projected from the same
-  /// actor or global actor isolated value. E.x.: two different ref_element_addr
+  /// actor or global-actor-isolated value. E.x.: two different ref_element_addr
   /// from the same actor.
   bool hasSameIsolation(const SILIsolationInfo &other) const;
 

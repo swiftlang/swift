@@ -619,6 +619,41 @@ bb3:
   return %9999 : $()
 }
 
+sil [transparent] [ossa] @deinit_barrier : $@convention(thin) (@in_guaranteed Int) -> () {
+[global: deinit_barrier]
+bb0(%0 : $*Int):
+  %1 = tuple ()
+  return %1
+}
+
+sil [transparent] [ossa] @no_deinit_barrier : $@convention(thin) (@in_guaranteed Int) -> () {
+[global: ]
+bb0(%0 : $*Int):
+  %1 = tuple ()
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @inline_deinit_barrier :
+// CHECK:         alloc_stack [lexical] $Int
+// CHECK:         alloc_stack $Int
+// CHECK:       } // end sil function 'inline_deinit_barrier'
+sil [ossa] @inline_deinit_barrier : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  %2 = function_ref @deinit_barrier : $@convention(thin) (@in_guaranteed Int) -> ()
+  apply %2(%1) : $@convention(thin) (@in_guaranteed Int) -> ()
+  dealloc_stack %1
+
+  %10 = alloc_stack $Int
+  store %0 to [trivial] %10
+  %12 = function_ref @no_deinit_barrier : $@convention(thin) (@in_guaranteed Int) -> ()
+  apply %12(%10) : $@convention(thin) (@in_guaranteed Int) -> ()
+  dealloc_stack %10
+
+  %r = tuple ()
+  return %r
+}
 
 sil_vtable C2 {
   #C2.i!modify: (C2) -> () -> () : @devirt_callee

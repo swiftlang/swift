@@ -88,25 +88,31 @@ extern "C" bool _swift_task_invokeSwiftCheckIsolated_c(SwiftExecutorRef executor
 
 
 extern "C" SWIFT_CC(swift)
-bool _task_serialExecutor_isIsolatingCurrentContext(
+int8_t _task_serialExecutor_isIsolatingCurrentContext(
     HeapObject *executor,
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
-SWIFT_CC(swift)
-bool swift::swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor)
+SWIFT_CC(swift) int8_t
+swift::swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor)
 {
-  if (!executor.hasSerialExecutorWitnessTable())
-    return false;
+  if (!executor.hasSerialExecutorWitnessTable()) {
+    return static_cast<int8_t>(IsIsolatingCurrentContextDecision::NotIsolated);
+  }
 
-  return _task_serialExecutor_isIsolatingCurrentContext(
+  auto decision = _task_serialExecutor_isIsolatingCurrentContext(
         executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
         executor.getSerialExecutorWitnessTable());
+
+  return decision;
 }
 
-extern "C" bool _swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
+extern "C" int8_t
+_swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
 {
-  return swift_task_invokeSwiftIsIsolatingCurrentContext(*reinterpret_cast<SerialExecutorRef *>(&executor));
+  return
+      static_cast<int8_t>(swift_task_invokeSwiftIsIsolatingCurrentContext(
+      *reinterpret_cast<SerialExecutorRef *>(&executor)));
 }
 
 extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
@@ -153,6 +159,27 @@ extern "C" void *swift_job_alloc(SwiftJob *job, size_t size) {
 extern "C" void swift_job_dealloc(SwiftJob *job, void *ptr) {
   auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
   return _swift_task_dealloc_specific(task, ptr);
+}
+
+IsIsolatingCurrentContextDecision
+swift::getIsIsolatingCurrentContextDecisionFromInt(int8_t value) {
+  switch (value) {
+  case -1: return IsIsolatingCurrentContextDecision::Unknown;
+  case 0: return IsIsolatingCurrentContextDecision::NotIsolated;
+  case 1: return IsIsolatingCurrentContextDecision::Isolated;
+  default:
+    swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
+  }
+}
+
+StringRef
+swift::getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision) {
+  switch (decision) {
+  case IsIsolatingCurrentContextDecision::Unknown: return "Unknown";
+  case IsIsolatingCurrentContextDecision::NotIsolated: return "NotIsolated";
+  case IsIsolatingCurrentContextDecision::Isolated: return "Isolated";
+  }
+  swift_Concurrency_fatalError(0, "Unexpected IsIsolatingCurrentContextDecision value");
 }
 
 /*****************************************************************************/

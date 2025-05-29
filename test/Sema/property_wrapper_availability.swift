@@ -49,7 +49,7 @@ struct WrappedValueAvailable51<T> {
   }
 }
 
-struct AlwaysAvailableStruct { // expected-note 3 {{add @available attribute to enclosing struct}}
+struct AlwaysAvailableStruct { // expected-note 3 {{add '@available' attribute to enclosing struct}}
   @AlwaysAvailableWrapper var alwaysAvailableExplicit: S
   @AlwaysAvailableWrapper var alwaysAvailableInferred = S()
 
@@ -120,7 +120,7 @@ struct UnavailableOnMacOSStruct {
   @WrappedValueAvailable51 var wrappedValueAavailable51: S
 }
 
-func alwaysAvailableFunc( // expected-note 4 {{add @available attribute to enclosing global function}}
+func alwaysAvailableFunc( // expected-note 4 {{add '@available' attribute to enclosing global function}}
   @AlwaysAvailableWrapper _ alwaysAvailable: S,
   @Available51Wrapper _ available51: S, // expected-error {{'Available51Wrapper' is only available in macOS 51 or newer}}
   @DeprecatedWrapper _ deprecated: S, // expected-warning {{'DeprecatedWrapper' is deprecated}}

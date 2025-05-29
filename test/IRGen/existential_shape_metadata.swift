@@ -46,7 +46,7 @@ public func testConcrete() -> Any.Type {
 // CHECK-LABEL: define{{.*}} @"$s26existential_shape_metadata13testDependent
 public func testDependent<T>(t: T.Type) -> Any.Type {
   // CHECK: [[ARGS:%.*]] = alloca [1 x ptr], align
-  // CHECK: [[T0:%.*]] = getelementptr inbounds [1 x ptr], ptr [[ARGS]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[ARGS]], i32 0, i32 0
   // CHECK: store ptr %T, ptr [[T0]], align
   // CHECK: [[METADATA:%.*]] = call ptr @swift_getExtendedExistentialTypeMetadata(ptr @"$sl26existential_shape_metadata2Q0_px1TRts_XPXGMq{{(\.ptrauth)?}}", ptr [[ARGS]])
   // CHECK: ret ptr [[METADATA]]
@@ -59,7 +59,7 @@ public func testComplexApplication<T>(t: T.Type) -> Any.Type {
   // CHECK: [[ARGS:%.*]] = alloca [1 x ptr], align
   // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s26existential_shape_metadata1BVMa"([[INT]] 255, ptr %T)
   // CHECK: [[B_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-  // CHECK: [[T0:%.*]] = getelementptr inbounds [1 x ptr], ptr [[ARGS]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[ARGS]], i32 0, i32 0
   // CHECK: store ptr [[B_T]], ptr [[T0]], align
   // CHECK: [[METADATA:%.*]] = call ptr @swift_getExtendedExistentialTypeMetadata(ptr @"$sl26existential_shape_metadata2Q0_px1TRts_XPXGMq{{(\.ptrauth)?}}", ptr [[ARGS]])
   // CHECK: ret ptr [[METADATA]]
@@ -70,7 +70,7 @@ public func testComplexApplication<T>(t: T.Type) -> Any.Type {
 // CHECK-LABEL: define{{.*}} @"$s26existential_shape_metadata12test_private
 public func test_private<T>(t: T.Type) -> Any.Type {
   // CHECK: [[ARGS:%.*]] = alloca [1 x ptr], align
-  // CHECK: [[T0:%.*]] = getelementptr inbounds [1 x ptr], ptr [[ARGS]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[ARGS]], i32 0, i32 0
   // CHECK: store ptr %T, ptr [[T0]], align
   //   FIXME: this should be unique?
   // CHECK: [[METADATA:%.*]] = call ptr @swift_getExtendedExistentialTypeMetadata_unique(ptr @"$sl26existential_shape_metadata2R033_881A0B6978EB4286E7CFF1E27030ACACLL_px1TRts_XPXG{{(\.ptrauth)?}}", ptr [[ARGS]])

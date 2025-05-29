@@ -15,12 +15,12 @@ class Foo : Proto {
 // Reject protocols with 'unavailable' requirements
 // if a protocol is not marked @objc.
 protocol NonObjCProto {
-  @available(*,unavailable) // expected-error {{protocol members can only be marked unavailable in an @objc protocol}}
+  @available(*,unavailable) // expected-error {{protocol members can only be marked unavailable in an '@objc' protocol}}
   func bad() // expected-note {{protocol requires function 'bad()'}}
 
   func good()
 
-  @_spi_available(macOS, introduced: 10.9) // expected-warning {{protocol members can only be marked unavailable in an @objc protocol}}
+  @_spi_available(macOS, introduced: 10.9) // expected-warning {{protocol members can only be marked unavailable in an '@objc' protocol}}
   func kindaBad() // expected-note {{protocol requires function 'kindaBad()'}}
 }
 

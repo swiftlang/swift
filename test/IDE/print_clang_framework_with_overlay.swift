@@ -10,7 +10,5 @@ import FooOverlay
 // CHECK: @_exported import Foo
 // CHECK: @_exported import struct Foo.FooStruct1
 // CHECK: @_exported import Foo.FooSub
-// CHECK: @_exported import func Foo.FooSub.fooSubFunc1
-// FIXME: this duplicate import is silly, but not harmful.
 // CHECK: @_exported import func Foo.fooSubFunc1
 // CHECK: func fooSubOverlayFunc1(x: Int32) -> Int32

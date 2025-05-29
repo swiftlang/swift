@@ -48,3 +48,8 @@ module InheritedLookup {
   header "inherited-lookup.h"
   requires cplusplus
 }
+
+module CircularInheritance {
+  header "circular-inheritance.h"
+  requires cplusplus
+}

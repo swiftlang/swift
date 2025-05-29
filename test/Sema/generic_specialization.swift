@@ -71,3 +71,8 @@ do {
   // expected-swift5-warning@-1 {{cannot explicitly specialize initializer 'init(_:)'}}
   // expected-swift6-error@-2 {{cannot explicitly specialize initializer 'init(_:)'}}
 }
+
+do {
+  // expected-error@+1:13 {{cannot specialize non-generic type 'module<Swift>'}}{{none}}
+  func f(_: Swift<Int>) {}
+}

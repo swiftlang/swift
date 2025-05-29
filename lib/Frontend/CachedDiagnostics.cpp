@@ -868,7 +868,7 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
 
     if (Err) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                   toString(std::move(Err)));
+                                   "storing outputs", toString(std::move(Err)));
       return true;
     }
 

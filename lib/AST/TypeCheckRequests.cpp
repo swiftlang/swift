@@ -468,7 +468,7 @@ WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
 SourceLoc WhereClauseOwner::getLoc() const {
   if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getWhereLoc();
-  } else if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (auto attr = source.dyn_cast<AbstractSpecializeAttr *>()) {
     return attr->getLocation();
   } else if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
     return attr->getLocation();
@@ -483,8 +483,11 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
   if (owner.source.is<TrailingWhereClause *>()) {
     simple_display(out, owner.dc->getAsDecl());
-  } else if (owner.source.is<SpecializeAttr *>()) {
-    out << "@_specialize";
+  } else if (auto attr = owner.source.dyn_cast<AbstractSpecializeAttr *>()) {
+    if (attr->isPublic())
+      out << "@specialized";
+    else
+      out << "@_specialize";
   } else if (owner.source.is<DifferentiableAttr *>()) {
     out << "@_differentiable";
   } else {
@@ -508,7 +511,7 @@ void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
   if (const auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
-  } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (const auto attr = source.dyn_cast<AbstractSpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
   } else if (const auto attr = source.dyn_cast<DifferentiableAttr *>()) {
@@ -1373,31 +1376,25 @@ ConformanceIsolationRequest::getCachedResult() const {
   // everything else, which is nearly every conformance, this request quickly
   // returns "nonisolated" so there is no point in caching it.
   auto conformance = std::get<0>(getStorage());
-  auto rootNormal =
-      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
-  if (!rootNormal)
-    return ActorIsolation::forNonisolated(false);
 
   // Was actor isolation non-isolated?
-  if (rootNormal->isComputedNonisolated())
+  if (conformance->isComputedNonisolated())
     return ActorIsolation::forNonisolated(false);
 
-  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
   return ctx.evaluator.getCachedNonEmptyOutput(*this);
 }
 
 void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
   auto conformance = std::get<0>(getStorage());
-  auto rootNormal =
-      cast<NormalProtocolConformance>(conformance->getRootConformance());
 
   // Common case: conformance is nonisolated.
   if (result.isNonisolated()) {
-    rootNormal->setComputedNonnisolated();
+    conformance->setComputedNonnisolated();
     return;
   }
 
-  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
   ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 

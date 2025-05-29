@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
-// REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_Extern
@@ -279,17 +278,20 @@ var async11Var: Int { get async { fatalError() } }
 // PBD shape checking
 //
 
-@abi(var x1, y1: Int) // expected-error {{cannot give pattern binding the ABI of a binding with more patterns}}
-var x1: Int = 0
+@abi(var x1, y1: Int)
+var x1: Int = 0 // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
 
 @abi(var x2: Int)
-var x2 = 0, y2: Int = 0 // expected-error {{cannot give pattern binding the ABI of a binding with fewer patterns}}
+var x2 = 0, y2: Int = 0 // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
 
-@abi(var (x3, y3): (Int, Int), (a3, b3): (Int, Int)) // expected-error {{no match for ABI var 'b3'}}
-var (x3, y3): (Int, Int) = (0, 0), a3: Int = 0
+@abi(var (x3, y3): (Int, Int), (a3, b3): (Int, Int))
+var (x3, y3): (Int, Int) = (0, 0), a3: Int = 0 // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
 
 @abi(var (x4, y4): (Int, Int), a4: Int)
-var (x4, y4): (Int, Int) = (0, 0), (a4, b4): (Int, Int) = (0, 0) // expected-error {{no match for var 'b4' in the ABI}}
+var (x4, y4): (Int, Int) = (0, 0), (a4, b4): (Int, Int) = (0, 0) // expected-error {{'abi' attribute can only be applied to a single var; declare each var separately}}
+
+@abi(var x5: Int)
+var x5: Int = 0
 
 //
 // Redeclaration diagnostics
@@ -1274,14 +1276,14 @@ nonisolated(nonsending) func isolation19() async {}
 }
 
 struct CustomAttrPropertyWrapper {
-  @abi(@PropertyWrapper var v1: Int) // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
-  @PropertyWrapper var v1: Int // expected-error {{property 'v1' with a wrapper cannot also be @abi}}
+  @abi(@PropertyWrapper var v1: Int) // expected-error {{property 'v1' with a wrapper cannot also be '@abi'}}
+  @PropertyWrapper var v1: Int // expected-error {{property 'v1' with a wrapper cannot also be '@abi'}}
 
-  @abi(@PropertyWrapper var v2: Int) // expected-error {{property 'v2' with a wrapper cannot also be @abi}}
+  @abi(@PropertyWrapper var v2: Int) // expected-error {{property 'v2' with a wrapper cannot also be '@abi'}}
   var v2: Int
 
   @abi(var v3: Int)
-  @PropertyWrapper var v3: Int // expected-error {{property 'v3' with a wrapper cannot also be @abi}}
+  @PropertyWrapper var v3: Int // expected-error {{property 'v3' with a wrapper cannot also be '@abi'}}
 }
 
 // CustomAttr for attached macro -- see Macros/macro_expand_peers.swift
@@ -1404,15 +1406,18 @@ func nonEphemeral2(_: UnsafeRawPointer) {}
 @abi(func disfavoredOverload3(_: UnsafeRawPointer))
 func nonEphemeral3(@_nonEphemeral _: UnsafeRawPointer) {}
 
-// @_inheritActorContext -- banned in @abi
-@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+// @_inheritActorContext
+@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void))
 func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
 
-@abi(func inheritActorContext2(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+@abi(func inheritActorContext2(@_inheritActorContext fn: @Sendable @escaping () async -> Void))
 func inheritActorContext2(fn: @Sendable @escaping () async -> Void) {}
 
 @abi(func inheritActorContext3(fn: @Sendable @escaping () async -> Void))
 func inheritActorContext3(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
+
+@abi(func inheritActorContext4(@_inheritActorContext(always) fn: @Sendable @escaping () async -> Void))
+func inheritActorContext4(fn: @Sendable @escaping () async -> Void) {}
 
 // @excusivity(checked/unchecked) -- banned in @abi
 class Exclusivity {

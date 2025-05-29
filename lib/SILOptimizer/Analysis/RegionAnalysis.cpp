@@ -985,13 +985,12 @@ RegionAnalysisValueMap::getUnderlyingTrackedValueHelperAddress(
     // occur in the underlying DenseMap that backs getUnderlyingTrackedValue()
     // if we insert another entry into the DenseMap.
     if (!visitor.value)
-      return UnderlyingTrackedValueInfo(
-          getUnderlyingTrackedValueHelperObject(base));
+      return UnderlyingTrackedValueInfo(getUnderlyingTrackedValueHelper(base));
 
     // TODO: Should we us the base or value from
     // getUnderlyingTrackedValueHelperObject as our base?
     return UnderlyingTrackedValueInfo(
-        visitor.value, getUnderlyingTrackedValueHelperObject(base).value);
+        visitor.value, getUnderlyingTrackedValueHelper(base).value);
   }
 
   // Otherwise, we return the actorIsolation that our visitor found.
@@ -1724,7 +1723,7 @@ struct PartitionOpBuilder {
         lookupValueID(rep), lookupValueID(srcOperand->get()), srcOperand));
   }
 
-  /// Mark \p value artifically as being part of an actor isolated region by
+  /// Mark \p value artifically as being part of an actor-isolated region by
   /// introducing a new fake actor introducing representative and merging them.
   void addActorIntroducingInst(SILValue sourceValue, Operand *sourceOperand,
                                SILIsolationInfo actorIsolation) {
@@ -1794,7 +1793,7 @@ public:
 namespace {
 
 enum class TranslationSemantics {
-  /// An instruction that does not affect region based state or if it does we
+  /// An instruction that does not affect region-based state or if it does we
   /// would like to error on some other use. An example would be something
   /// like end_borrow, inject_enum_addr, or alloc_global. We do not produce
   /// any partition op.
@@ -2474,7 +2473,7 @@ public:
   void translateSILPartialApply(PartialApplyInst *pai) {
     // First check if our partial apply is Sendable and not global actor
     // isolated. In such a case, we will have emitted an earlier warning in Sema
-    // and can return early. If we have a global actor isolated partial_apply,
+    // and can return early. If we have a global-actor-isolated partial_apply,
     // we can be looser and can use region isolation since we know that the
     // Sendable closure will be executed serially due to the closure having to
     // run on the global actor queue meaning that we do not have to worry about
@@ -2503,7 +2502,8 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
+        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
@@ -3376,6 +3376,7 @@ CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(EndCOWMutationInst, LookThrough)
+CONSTANT_TRANSLATION(EndCOWMutationAddrInst, Ignored)
 CONSTANT_TRANSLATION(ProjectBoxInst, LookThrough)
 CONSTANT_TRANSLATION(EndInitLetRefInst, LookThrough)
 CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
@@ -3410,6 +3411,7 @@ CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
 CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
 CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
+CONSTANT_TRANSLATION(VectorBaseAddrInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 
 //===---

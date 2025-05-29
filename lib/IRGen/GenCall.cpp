@@ -5023,6 +5023,8 @@ static void emitRetconCoroutineEntry(
   for (auto *arg : finalArguments) {
     arguments.push_back(arg);
   }
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, arguments);
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
@@ -5117,9 +5119,7 @@ void irgen::emitYieldOnceCoroutineEntry(
   auto *buffer = emission.getCoroutineBuffer();
   llvm::SmallVector<llvm::Value *, 2> finalArgs;
   llvm::Constant *allocFn = nullptr;
-  if (IGF.getOptions().EmitTypeMallocForCoroFrame
-      && !llvm::Triple(IGF.IGM.Triple).isOSLinux()
-      && !llvm::Triple(IGF.IGM.Triple).isOSWindows()) {
+  if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
     auto mallocTypeId = IGF.getMallocTypeId();
     finalArgs.push_back(mallocTypeId);
     // Use swift_coroFrameAllocStub to emit our allocator.
@@ -5129,7 +5129,6 @@ void irgen::emitYieldOnceCoroutineEntry(
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
   }
 
-  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(), IGF.Builder);
   emitRetconCoroutineEntry(IGF, fnType, buffer,
                            llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),

@@ -33,24 +33,25 @@ public struct PTrace: ~Copyable {
   // process by calling cont().
   // NOTE: clients must use withPTracedProcess instead of direct initialization.
   fileprivate init(_ pid: pid_t) throws {
-    guard ptrace_attach(pid) != -1 else {
-      throw PTraceError.operationFailure(PTRACE_ATTACH, pid: pid)
+    self.pid = pid
+
+    guard ptrace_attach(self.pid) != -1 else {
+      throw PTraceError.operationFailure(PTRACE_ATTACH, pid: self.pid)
     }
 
     while true {
       var status: CInt = 0
-      let result = waitpid(pid, &status, 0)
+      let result = waitpid(self.pid, &status, 0)
       if result == -1 {
         if get_errno() == EINTR { continue }
-        throw PTraceError.waitFailure(pid: pid)
+        throw PTraceError.waitFailure(pid: self.pid)
       }
 
-      precondition(pid == result, "waitpid returned unexpected value \(result)")
+      precondition(self.pid == result,
+                   "waitpid returned unexpected value \(result)")
 
       if wIfStopped(status) { break }
     }
-
-    self.pid = pid
   }
 
   deinit { _ = ptrace_detach(self.pid) }

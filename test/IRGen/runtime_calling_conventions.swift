@@ -11,7 +11,7 @@ public class C {
 // Check that runtime functions use a proper calling convention.
 // CHECK-NOT: call void {{.*}} @swift_release
 
-// OPT-CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s{{(27|28)}}runtime_calling_conventions3fooyyAA1CCF"(ptr nocapture{{.*}} %0)
+// OPT-CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @"$s{{(27|28)}}runtime_calling_conventions3fooyyAA1CCF"(ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %0)
 // Check that runtime functions use a proper calling convention.
 // OPT-CHECK-NOT: tail call void @swift_release
 

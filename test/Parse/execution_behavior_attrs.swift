@@ -17,10 +17,10 @@ func test_err1_caller(_: nonisolated(nonsending) @MainActor () async -> Void) {}
 // expected-error@-1 {{cannot use 'nonisolated(nonsending)' because function type is isolated to a global actor 'MainActor'}}
 
 func test_err2_concurrent(_: @concurrent @isolated(any) () async -> Void) {}
-// expected-error@-1 {{cannot use '@concurrent' together with @isolated(any)}}
+// expected-error@-1 {{cannot use '@concurrent' together with '@isolated(any)'}}
 
 func test_err2_caller(_: nonisolated(nonsending) @isolated(any) () async -> Void) {}
-// expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with @isolated(any)}}
+// expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with '@isolated(any)'}}
 
 func test_err3_concurrent(_: @concurrent (isolated (any Actor)?) async -> Void) {}
 // expected-error@-1 {{cannot use '@concurrent' together with an isolated parameter}}

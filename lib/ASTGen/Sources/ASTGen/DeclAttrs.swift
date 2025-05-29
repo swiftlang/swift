@@ -179,6 +179,8 @@ extension ASTGenVisitor {
         return handle(self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute)
       case .specialize:
         return handle(self.generateSpecializeAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
+      case .specialized:
+        return handle(self.generateSpecializedAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .spiAccessControl:
         return handle(self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute)
       case .storageRestrictions:
@@ -229,6 +231,7 @@ extension ASTGenVisitor {
         .eagerMove,
         .exported,
         .extensible,
+        .preEnumExtensibility,
         .discardableResult,
         .disfavoredOverload,
         .dynamicMemberLookup,
@@ -248,7 +251,6 @@ extension ASTGenVisitor {
         .ibSegueAction,
         .implementationOnly,
         .implicitSelfCapture,
-        .inheritActorContext,
         .inheritsConvenienceInitializers,
         .inlinable,
         .isolated,
@@ -311,6 +313,9 @@ extension ASTGenVisitor {
       case .referenceOwnership:
         // TODO: Diagnose.
         return handle(self.generateReferenceOwnershipAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
+      case .inheritActorContext:
+        return handle(self.generateInheritActorContextAttr(attribute: node)?.asDeclAttribute)
+
       case .async,
         .consuming,
         .borrowing,
@@ -1410,6 +1415,28 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateInheritActorContextAttr(attribute node: AttributeSyntax) -> BridgedInheritActorContextAttr? {
+    let modifier: BridgedInheritActorContextModifier? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "always": return .always
+        default: return nil
+        }
+      },
+      valueIfOmitted: BridgedInheritActorContextModifier.none
+    )
+    guard let modifier else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      modifier: modifier
+    )
+  }
+
   /// E.g.:
   ///   ```
   ///   @objc
@@ -1846,7 +1873,40 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
-  ///   @_specialize(exporeted: true, T == Int)
+  ///   @specialized(T == Int)
+  ///   ```
+  func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
+    guard
+      var arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
+    else {
+      // TODO: Diagnose
+      return nil
+    }
+    var exported: Bool?
+    var kind: BridgedSpecializationKind? = nil
+    var whereClause: BridgedTrailingWhereClause? = nil
+    var targetFunction: BridgedDeclNameRef? = nil
+    var spiGroups: [BridgedIdentifier] = []
+    var availableAttrs: [BridgedAvailableAttr] = []
+
+    whereClause =  self.generate(genericWhereClause: arg.genericWhereClause)
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      whereClause: whereClause.asNullable,
+      exported: exported ?? false,
+      kind: kind ?? .full,
+      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      spiGroups: spiGroups.lazy.bridgedArray(in: self),
+      availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_specialize(exported: true, T == Int)
   ///   ```
   func generateSpecializeAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializeAttr? {
     guard
@@ -1855,7 +1915,6 @@ extension ASTGenVisitor {
       // TODO: Diagnose
       return nil
     }
-
     var exported: Bool?
     var kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil

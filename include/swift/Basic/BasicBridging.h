@@ -50,6 +50,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/APInt.h"
 #include <string>
 #include <vector>
 #endif
@@ -272,6 +273,24 @@ BRIDGED_INLINE SwiftInt BridgedOwnedString_count(BridgedOwnedString str);
 
 SWIFT_NAME("getter:BridgedOwnedString.isEmpty(self:)")
 BRIDGED_INLINE bool BridgedOwnedString_empty(BridgedOwnedString str);
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedOptionalInt
+//===----------------------------------------------------------------------===//
+
+struct BridgedOptionalInt {
+  SwiftInt value;
+  bool hasValue;
+
+#ifdef USED_IN_CPP_SOURCE
+  static BridgedOptionalInt getFromAPInt(llvm::APInt i) {
+    if (i.getSignificantBits() <= std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
+      return {(SwiftInt)i.getSExtValue(), true};
+    }
+    return {0, false};
+  }
+#endif
+};
 
 //===----------------------------------------------------------------------===//
 // MARK: OStream

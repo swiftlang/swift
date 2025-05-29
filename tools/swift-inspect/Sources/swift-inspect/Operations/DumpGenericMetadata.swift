@@ -88,6 +88,18 @@ internal struct Output: TextOutputStream {
   }
 }
 
+internal func dumpJson(of: (any Encodable), outputFile: String?) throws {
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+  let data = try encoder.encode(of)
+  let jsonOutput = String(data: data, encoding: .utf8)!
+  if let outputFile = outputFile {
+    try jsonOutput.write(toFile: outputFile, atomically: true, encoding: .utf8)
+  } else {
+    print(jsonOutput)
+  }
+}
+
 internal struct DumpGenericMetadata: ParsableCommand {
   static let configuration = CommandConfiguration(
     abstract: "Print the target's generic metadata allocations.")
@@ -99,7 +111,10 @@ internal struct DumpGenericMetadata: ParsableCommand {
   var backtraceOptions: BacktraceOptions
 
   @OptionGroup()
-  var genericMetadataOptions: GenericMetadataOptions
+  var metadataOptions: MetadataOptions
+  
+  @Flag(help: "Show allocations in mangled form")
+  var mangled: Bool = false
 
   func run() throws {
     disableStdErrBuffer()
@@ -126,7 +141,7 @@ internal struct DumpGenericMetadata: ParsableCommand {
 
         return Metadata(ptr: pointer,
                         allocation: allocation,
-                        name: process.context.name(type: pointer, mangled: genericMetadataOptions.mangled) ?? "<unknown>",
+                        name: process.context.name(type: pointer, mangled: mangled) ?? "<unknown>",
                         isArrayOfClass: process.context.isArrayOfClass(pointer),
                         garbage: garbage,
                         backtrace: currentBacktrace)
@@ -146,30 +161,30 @@ internal struct DumpGenericMetadata: ParsableCommand {
         }
       }
 
-      if genericMetadataOptions.json {
+      if metadataOptions.json {
         let processMetadata = ProcessMetadata(name: process.processName,
                                               pid: process.processIdentifier as! ProcessIdentifier,
                                               metadata: generics)
         allProcesses.append(processMetadata)
-      } else if !genericMetadataOptions.summary {
+      } else if !metadataOptions.summary {
         try dumpText(process: process, generics: generics)
         }
     } // inspect
 
-    if genericMetadataOptions.json {
-      if genericMetadataOptions.summary {
-        try dumpJson(of: metadataSummary)
+    if metadataOptions.json {
+      if metadataOptions.summary {
+        try dumpJson(of: metadataSummary, outputFile: metadataOptions.outputFile)
       } else {
-        try dumpJson(of: allProcesses)
+        try dumpJson(of: allProcesses, outputFile: metadataOptions.outputFile)
         }
-    } else if genericMetadataOptions.summary {
+    } else if metadataOptions.summary {
       try dumpTextSummary(of: metadataSummary)
     }
   }
 
   private func dumpText(process: any RemoteProcess, generics: [Metadata]) throws {
     var erroneousMetadata: [(ptr: swift_reflection_ptr_t, name: String)] = []
-    var output = try Output(genericMetadataOptions.outputFile)
+    var output = try Output(metadataOptions.outputFile)
     print("\(process.processName)(\(process.processIdentifier)):\n", to: &output)
     print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t", to: &output)
     generics.forEach {
@@ -198,20 +213,8 @@ internal struct DumpGenericMetadata: ParsableCommand {
     print("", to: &output)
   }
 
-  private func dumpJson(of: (any Encodable)) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    let data = try encoder.encode(of)
-    let jsonOutput = String(data: data, encoding: .utf8)!
-    if let outputFile = genericMetadataOptions.outputFile {
-      try jsonOutput.write(toFile: outputFile, atomically: true, encoding: .utf8)
-    } else {
-      print(jsonOutput)
-    }
-  }
-
   private func dumpTextSummary(of: [String: MetadataSummary]) throws {
-    var output = try Output(genericMetadataOptions.outputFile)
+    var output = try Output(metadataOptions.outputFile)
     print("Size", "Owners", "Name", separator: "\t", to: &output)
     var totalSize = 0
     var unknownSize = 0

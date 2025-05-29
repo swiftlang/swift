@@ -56,6 +56,6 @@ testSdump()
 // IR-TRIVIAL: }
 
 // IR-NONTRIVIAL-LABEL: define {{.*}} swiftcc void @"$s4main9testSdumpyyF"()
-// IR-NONTRIVIAL: call {{.*}} @_ZN1SC1ERKS_
 // IR-NONTRIVIAL: call {{.*}} @_ZNK1S4dumpEv
+// IR-NONTRIVIAL: call {{.*}} @_ZN1SC1ERKS_
 // IR-NONTRIVIAL: call {{.*}} @_ZN1SD1Ev

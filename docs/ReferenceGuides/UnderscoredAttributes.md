@@ -600,6 +600,43 @@ inherit the actor context (i.e. what actor it should be run on) based on the
 declaration site of the closure rather than be non-Sendable. This does not do
 anything if the closure is synchronous.
 
+This works with global actors as expected:
+
+```swift 
+@MainActor
+func test() {
+  Task { /* main actor isolated */ }
+}
+```
+
+However, for the inference to work with instance actors (i.e. `isolated` parameters),
+the closure must capture the isolated parameter explicitly:
+
+```swift 
+func test(actor: isolated (any Actor)) {
+  Task { /* non isolated */ } // !!!
+}
+
+func test(actor: isolated (any Actor)) {
+  Task { // @_inheritActorContext
+    _ = actor // 'actor'-isolated 
+  }
+}
+```
+
+The attribute takes an optional modifier '`always`', which changes this behavior 
+and *always* captures the enclosing isolated context, rather than forcing developers
+to perform the explicit capture themselfes:
+
+```swift
+func test(actor: isolated (any Actor)) {
+  Task.immediate { // @_inheritActorContext(always)
+    // 'actor'-isolated!
+    // (without having to capture 'actor explicitly')
+  }
+}
+```
+
 DISCUSSION: The reason why this does nothing when the closure is synchronous is
 since it does not have the ability to hop to the appropriate executor before it
 is run, so we may create concurrency errors.

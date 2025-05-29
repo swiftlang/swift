@@ -291,9 +291,10 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
 
   // Everything else should be a type parameter.
   if (!type->isTypeParameter()) {
-    llvm::errs() << "Unhandled type:\n";
-    type->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Unhandled type:\n";
+      type->dump(out);
+    });
   }
 
   if (!type->getRootGenericParam()->isEqual(origParam)) {
@@ -823,10 +824,11 @@ Type swift::typeEraseOpenedExistentialReference(
 
   auto applyOuterSubstitutions = [&](Type t) -> Type {
     if (t->hasTypeParameter()) {
-      auto outerSubs = existentialSig.Generalization;
-      unsigned depth = existentialSig.OpenedSig->getMaxDepth();
-      OuterSubstitutions replacer{outerSubs, depth};
-      return t.subst(replacer, replacer);
+      if (auto outerSubs = existentialSig.Generalization) {
+        unsigned depth = existentialSig.OpenedSig->getMaxDepth();
+        OuterSubstitutions replacer{outerSubs, depth};
+        return t.subst(replacer, replacer);
+      }
     }
 
     return t;

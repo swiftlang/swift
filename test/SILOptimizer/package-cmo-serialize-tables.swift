@@ -275,7 +275,7 @@ public struct PubStruct: PubProto {
   // protocol witness for static PubProto.root.getter in conformance PubStruct
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PubProto) (@thick PubStruct.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PubStructV4roots6UInt16VvgZ : $@convention(method) (@thin PubStruct.Type) -> UInt16
-  // CHECK-DAG: sil [canonical] @$s3Lib9PubStructV4roots6UInt16VvgZ : $@convention(method) (@thin PubStruct.Type) -> UInt16
+  // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubStructV4roots6UInt16VvgZ : $@convention(method) (@thin PubStruct.Type) -> UInt16
   public static let root: UInt16 = 1 << 0
 
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubStructVAA0B5ProtoA2aDP3envs6UInt16VvgTW : $@convention(witness_method: PubProto) (@in_guaranteed PubStruct) -> UInt16 {
@@ -365,7 +365,7 @@ package class PkgKlassZ: PkgProto {
   // protocol witness for static PkgProto.root.getter in conformance PkgKlassZ
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PkgProto) (@thick PkgKlassZ.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PkgKlassZC4roots6UInt16VvgZ : $@convention(method) (@thick PkgKlassZ.Type) -> UInt16
-  // CHECK-DAG: sil package_external [canonical] @$s3Lib9PkgKlassZC4roots6UInt16VvgZ : $@convention(method) (@thick PkgKlassZ.Type) -> UInt16
+  // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgKlassZC4roots6UInt16VvgZ : $@convention(method) (@thick PkgKlassZ.Type) -> UInt16
   package static let root: UInt16 = 1 << 0
 
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgKlassZCAA0B5ProtoA2aDP3envs6UInt16VvgTW : $@convention(witness_method: PkgProto) (@in_guaranteed PkgKlassZ) -> UInt16 {
@@ -396,7 +396,7 @@ package struct PkgStruct: PkgProto { /// NOTE: witness thunks get `shared` linka
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP4roots6UInt16VvgZTW : $@convention(witness_method: PkgProto) (@thick PkgStruct.Type) -> UInt16 {
   // CHECK-DAG: function_ref @$s3Lib9PkgStructV4roots6UInt16VvgZ : $@convention(method) (@thin PkgStruct.Type)
   // static PkgStruct.root.getter
-  // CHECK-DAG: sil package_external [canonical] @$s3Lib9PkgStructV4roots6UInt16VvgZ : $@convention(method) (@thin PkgStruct.Type) -> UInt16
+  // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9PkgStructV4roots6UInt16VvgZ : $@convention(method) (@thin PkgStruct.Type) -> UInt16
   package static let root: UInt16 = 1 << 0
 
   // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PkgStructVAA0B5ProtoA2aDP3envs6UInt16VvsTW : $@convention(witness_method: PkgProto) (UInt16, @inout PkgStruct) -> () {

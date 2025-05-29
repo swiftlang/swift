@@ -426,7 +426,6 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, type, dc);
   func->setStatic(isStatic);
-  func->setAccess(getOverridableAccessLevel(dc));
   func->setIsObjC(false);
   func->setIsDynamic(false);
 
@@ -2021,11 +2020,6 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   assert(!method->isStatic() ||
          method->getNameInfo().getName().getCXXOverloadedOperator() ==
              clang::OO_Call);
-  // When emitting symbolic decls, the method might not have a concrete
-  // record type as this type.
-  if (ImporterImpl.importSymbolicCXXDecls && !method->isStatic() &&
-      !method->getThisType()->getPointeeCXXRecordDecl())
-    return nullptr;
 
   // Create a new method in the derived class that calls the base method.
   clang::DeclarationName name = method->getNameInfo().getName();

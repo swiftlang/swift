@@ -110,8 +110,6 @@ class WasmSwiftSDK(product.Product):
 
     def build(self, host_target):
         build_root = os.path.dirname(self.build_dir)
-        llvm_runtime_libs_build_path = os.path.join(
-            build_root, '%s-%s' % ('wasmllvmruntimelibs', host_target))
 
         target_packages = []
         # NOTE: We have three types of target triples:
@@ -130,6 +128,9 @@ class WasmSwiftSDK(product.Product):
                 build_root, '%s-%s' % (build_basename, host_target))
             wasi_sysroot = wasisysroot.WASILibc.sysroot_install_path(
                 build_root, clang_multiarch_triple)
+            llvm_runtime_libs_build_path = os.path.join(
+                build_root, '%s-%s' % ('wasmllvmruntimelibs', host_target),
+                clang_multiarch_triple)
             package_path = self._build_target_package(
                 swift_host_triple, short_triple, stdlib_build_path,
                 llvm_runtime_libs_build_path, wasi_sysroot)

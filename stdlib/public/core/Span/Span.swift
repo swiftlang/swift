@@ -764,7 +764,8 @@ extension Span where Element: ~Copyable {
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
-    return unsafe Self(_unchecked: _pointer, count: newCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -786,7 +787,8 @@ extension Span where Element: ~Copyable {
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
-    return unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span containing the final elements of the span,

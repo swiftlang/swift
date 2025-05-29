@@ -12,7 +12,7 @@ func longFormIntroducedIn11_0() { }
 @available(OSX, introduced: 13.0)
 func longFormIntroducedIn13_0() { }
 
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func useLongFromIntroduced() {
   longFormIntroducedIn10_16()
   // expected-error@-1{{'longFormIntroducedIn10_16()' is only available in macOS 11.0 or newer}}
@@ -43,7 +43,7 @@ func shortFormIntroducedIn11_0() { }
 @available(OSX 13.0, *)
 func shortFormIntroducedIn13_0() { }
 
-// expected-note@+1 *{{add @available attribute to enclosing global function}}
+// expected-note@+1 *{{add '@available' attribute to enclosing global function}}
 func useShortIntroduced() {
   shortFormIntroducedIn10_16()
     // expected-error@-1{{'shortFormIntroducedIn10_16()' is only available in macOS 11.0 or newer}}

@@ -75,6 +75,7 @@
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -1019,6 +1020,36 @@ bool Decl::isInMacroExpansionInContext() const {
   return file->getFulfilledMacroRole() != std::nullopt;
 }
 
+bool Decl::isInMacroExpansionFromClangHeader() const {
+  SourceLoc declLoc = getLoc();
+  if (declLoc.isInvalid())
+    return false;
+
+  auto &ctx = getASTContext();
+  auto &SourceMgr = ctx.SourceMgr;
+
+  auto declBufferID = SourceMgr.findBufferContainingLoc(declLoc);
+  auto declGeneratedSourceInfo = SourceMgr.getGeneratedSourceInfo(declBufferID);
+  if (!declGeneratedSourceInfo)
+    return false;
+  CustomAttr *attr = declGeneratedSourceInfo->attachedMacroCustomAttr;
+  if (!attr)
+    return false;
+
+  SourceLoc macroAttrLoc = attr->AtLoc;
+  if (macroAttrLoc.isInvalid())
+    return false;
+
+  auto macroAttrBufferID = SourceMgr.findBufferContainingLoc(macroAttrLoc);
+  auto macroAttrGeneratedSourceInfo =
+      SourceMgr.getGeneratedSourceInfo(macroAttrBufferID);
+  if (!macroAttrGeneratedSourceInfo)
+    return false;
+
+  return macroAttrGeneratedSourceInfo->kind ==
+         GeneratedSourceInfo::AttributeFromClang;
+}
+
 SourceLoc Decl::getLocFromSource() const {
   switch (getKind()) {
 #define DECL(ID, X) \
@@ -1468,9 +1499,9 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
 bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
-  if (auto clangDecl = getClangDecl()) {
-    return clangDecl->isWeakImported();
-  }
+  if (auto clangDecl = getClangDecl())
+    return clangDecl->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
@@ -2495,6 +2526,19 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   auto &ctx = getAnchoringVarDecl()->getASTContext();
   auto init = getOriginalInit();
   return extractInlinableText(ctx, init, scratch);
+}
+
+SourceLoc PatternBindingDecl::getStartLoc() const {
+  if (StaticLoc.isValid())
+    return StaticLoc;
+
+  if (VarLoc.isValid())
+    return VarLoc;
+
+  if (getPatternList().empty())
+    return SourceLoc();
+
+  return getPatternList().front().getStartLoc();
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -3859,6 +3903,13 @@ bool swift::conflicting(ASTContext &ctx,
   if (sig1.IsFunction != sig2.IsFunction)
     return true;
 
+  // Gracefully handle the case where value generic arguments were introduced
+  // as a conflicting value with static variables of the same name.
+  if (sig1.IsGenericArg != sig2.IsGenericArg) {
+    *wouldConflictInSwift5 = true;
+    return true;
+  }
+
   // Variables always conflict with non-variables with the same signature.
   // (e.g variables with zero argument functions, variables with type
   //  declarations)
@@ -4037,6 +4088,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.IsMacro = isa<MacroDecl>(this);
+  signature.IsGenericArg = isa<GenericTypeParamDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
@@ -8880,6 +8932,21 @@ ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::cloneAccessor(const ASTContext &Ctx,
+                                    ParamDecl const *subscriptParam,
+                                    DeclContext *Parent) {
+  auto *param = new (Ctx) ParamDecl(
+      subscriptParam->getSpecifierLoc(), subscriptParam->getArgumentNameLoc(),
+      subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
+      subscriptParam->getName(), /*declContext*/ Parent);
+  param->setOptions(subscriptParam->getOptions());
+
+  // The cloned parameter is implicit.
+  param->setImplicit();
+
+  return param;
+}
+
 ParamDecl *
 ParamDecl::createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                           SourceLoc argumentNameLoc, Identifier argumentName,
@@ -10269,30 +10336,20 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  SourceLoc endLoc;
+  SourceRange thrownTypeRange;
+  if (auto *typeRepr = getThrownTypeRepr())
+    thrownTypeRange = typeRepr->getSourceRange();
 
   // name(parameter list...) async throws(E)
-  if (auto *typeRepr = getThrownTypeRepr())
-    endLoc = typeRepr->getSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getThrowsLoc();
-  if (endLoc.isInvalid())
-    endLoc = getAsyncLoc();
-
-  if (endLoc.isInvalid())
-    return getParameterListSourceRange();
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getParameterListSourceRange(), getAsyncLoc(),
+                              getThrowsLoc(), thrownTypeRange);
 }
 
 SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto endLoc = getParameters()->getSourceRange().End;
-  if (endLoc.isInvalid())
-    return getNameLoc();
-
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getNameLoc(), getParameters()->getSourceRange());
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
@@ -11099,23 +11156,7 @@ AccessorDecl *AccessorDecl::createParsed(
       paramsEnd = indices->getEndLoc();
     }
     for (auto *subscriptParam : *indices) {
-      // Clone the parameter.
-      auto *param = new (ctx) ParamDecl(
-          subscriptParam->getSpecifierLoc(),
-          subscriptParam->getArgumentNameLoc(),
-          subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
-          subscriptParam->getName(), /*declContext*/ accessor);
-      param->setAutoClosure(subscriptParam->isAutoClosure());
-
-      // The cloned parameter is implicit.
-      param->setImplicit();
-
-      if (subscriptParam->isSending())
-        param->setSending();
-
-      if (subscriptParam->isCallerIsolated())
-        param->setCallerIsolated();
-
+      auto param = ParamDecl::cloneAccessor(ctx, subscriptParam, accessor);
       newParams.push_back(param);
     }
 
@@ -11415,33 +11456,62 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
   return nullptr;
 }
 
+SourceLoc FuncDecl::getStartLoc() const {
+  if (StaticLoc)
+    return StaticLoc;
+
+  if (FuncLoc)
+    return FuncLoc;
+
+  auto nameLoc = getNameLoc();
+  if (nameLoc)
+    return nameLoc;
+
+  auto sigStart = getSignatureSourceRange().Start;
+  if (sigStart)
+    return sigStart;
+
+  auto resultTyStart = getResultTypeSourceRange().Start;
+  if (resultTyStart)
+    return resultTyStart;
+
+  auto genericWhereStart = getGenericTrailingWhereClauseSourceRange().Start;
+  if (genericWhereStart)
+    return genericWhereStart;
+
+  auto bodyStart = getOriginalBodySourceRange().Start;
+  if (bodyStart)
+    return bodyStart;
+
+  return SourceLoc();
+}
+
+SourceLoc FuncDecl::getEndLoc() const {
+  auto bodyEnd = getOriginalBodySourceRange().End;
+  if (bodyEnd)
+    return bodyEnd;
+
+  auto genericWhereEnd = getGenericTrailingWhereClauseSourceRange().End;
+  if (genericWhereEnd)
+    return genericWhereEnd;
+
+  auto resultTyEnd = getResultTypeSourceRange().End;
+  if (resultTyEnd)
+    return resultTyEnd;
+
+  auto sigEnd = getSignatureSourceRange().End;
+  if (sigEnd)
+    return sigEnd;
+
+  return getStartLoc();
+}
+
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
-
   if (startLoc.isInvalid())
     return SourceRange();
 
-  if (getBodyKind() == BodyKind::Unparsed)
-    return { startLoc, BodyRange.End };
-
-  SourceLoc endLoc = getOriginalBodySourceRange().End;
-  if (endLoc.isInvalid()) {
-    if (isa<AccessorDecl>(this))
-      return startLoc;
-
-    if (getBodyKind() == BodyKind::Synthesize)
-      return SourceRange();
-
-    endLoc = getGenericTrailingWhereClauseSourceRange().End;
-  }
-  if (endLoc.isInvalid())
-    endLoc = getResultTypeSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getSignatureSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = startLoc;
-
-  return { startLoc, endLoc };
+  return { startLoc, getEndLoc() };
 }
 
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,

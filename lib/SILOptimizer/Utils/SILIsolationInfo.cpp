@@ -357,6 +357,69 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
   return SILIsolationInfo::get(targetOperand->getUser());
 }
 
+static SILValue lookThroughNonVarDeclOwnershipInsts(SILValue v) {
+  while (true) {
+    if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+      if (isa<CopyValueInst>(svi)) {
+        v = svi->getOperand(0);
+        continue;
+      }
+
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(v)) {
+        if (!bbi->isFromVarDecl()) {
+          v = bbi->getOperand();
+          continue;
+        }
+        return v;
+      }
+
+      if (auto *mvi = dyn_cast<MoveValueInst>(v)) {
+        if (!mvi->isFromVarDecl()) {
+          v = mvi->getOperand();
+          continue;
+        }
+
+        return v;
+      }
+    }
+
+    return v;
+  }
+}
+
+/// See if \p pai has at least one nonisolated(unsafe) capture and that all
+/// captures are either nonisolated(unsafe) or sendable.
+static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
+  bool foundOneNonIsolatedUnsafe = false;
+  for (auto &op : pai->getArgumentOperands()) {
+    if (SILIsolationInfo::isSendableType(op.get()))
+      continue;
+
+    // Normally we would not look through copy_value, begin_borrow, or
+    // move_value since this is meant to find the inherent isolation of a
+    // specific element. But since we are checking for captures rather
+    // than the actual value itself (just for unsafe nonisolated
+    // purposes), it is ok.
+    //
+    // E.x.: As an example of something we want to prevent, consider an
+    // invocation of a nonisolated function that is a parameter to an
+    // @MainActor function. That means from a region isolation
+    // perspective, the function parameter is in the MainActor region, but
+    // the actual function itself is not MainActor isolated, since the
+    // function will not hop onto the main actor.
+    //
+    // TODO: We should use some of the shared infrastructure to find the
+    // underlying value of op.get(). This is conservatively correct for
+    // now.
+    auto value = lookThroughNonVarDeclOwnershipInsts(op.get());
+    if (!SILIsolationInfo::get(value).isUnsafeNonIsolated())
+      return false;
+    foundOneNonIsolatedUnsafe = true;
+  }
+
+  return foundOneNonIsolatedUnsafe;
+}
+
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
     // Before we do anything, see if we have a sending result. In such a case,
@@ -436,12 +499,23 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
+    // Check if we have any captures and if the isolation info for all captures
+    // are nonisolated(unsafe) or Sendable. In such a case, we consider the
+    // partial_apply to be nonisolated(unsafe). We purposely do not do this if
+    // the partial_apply does not have any parameters just out of paranoia... we
+    // shouldn't have such a partial_apply emitted by SILGen (it should use a
+    // thin to thick function or something like that)... but in that case since
+    // we do not have any nonisolated(unsafe), it doesn't make sense to
+    // propagate nonisolated(unsafe).
+    bool partialApplyIsNonIsolatedUnsafe = isPartialApplyNonisolatedUnsafe(pai);
+
     if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
       auto actorIsolation = ace->getActorIsolation();
 
       if (actorIsolation.isGlobalActor()) {
         return SILIsolationInfo::getGlobalActorIsolated(
-            pai, actorIsolation.getGlobalActor());
+                   pai, actorIsolation.getGlobalActor())
+            .withUnsafeNonIsolated(partialApplyIsNonIsolatedUnsafe);
       }
 
       if (actorIsolation.isActorInstanceIsolated()) {
@@ -465,13 +539,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(
                     actualIsolatedValue.getValue())) {
               if (auto info =
-                      SILIsolationInfo::getActorInstanceIsolated(pai, fArg))
+                      SILIsolationInfo::getActorInstanceIsolated(pai, fArg)
+                          .withUnsafeNonIsolated(
+                              partialApplyIsNonIsolatedUnsafe))
                 return info;
             }
           }
 
           return SILIsolationInfo::getActorInstanceIsolated(
-              pai, actorInstance, actorIsolation.getActor());
+                     pai, actorInstance, actorIsolation.getActor())
+              .withUnsafeNonIsolated(partialApplyIsNonIsolatedUnsafe);
         }
 
         // For now, if we do not have an actor instance, just create an actor
@@ -485,12 +562,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         //
         // TODO: How do we want to resolve this.
         return SILIsolationInfo::getPartialApplyActorInstanceIsolated(
-            pai, actorIsolation.getActor());
+                   pai, actorIsolation.getActor())
+            .withUnsafeNonIsolated(partialApplyIsNonIsolatedUnsafe);
       }
 
       assert(actorIsolation.getKind() != ActorIsolation::Erased &&
              "Implement this!");
     }
+
+    if (partialApplyIsNonIsolatedUnsafe)
+      return SILIsolationInfo::getDisconnected(partialApplyIsNonIsolatedUnsafe);
   }
 
   // See if the memory base is a ref_element_addr from an address. If so, add
@@ -708,7 +789,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // See if we have a struct_extract from a global actor isolated type.
+  // See if we have a struct_extract from a global-actor-isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(sei->getField());
     if (auto isolation =
@@ -729,12 +810,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         varIsolation.isNonisolatedUnsafe());
   }
 
-  // See if we have an unchecked_enum_data from a global actor isolated type.
+  // See if we have an unchecked_enum_data from a global-actor-isolated type.
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(uedi, uedi->getEnumDecl());
   }
 
-  // See if we have an unchecked_enum_data from a global actor isolated type.
+  // See if we have an unchecked_enum_data from a global-actor-isolated type.
   if (auto *utedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(utedi,
                                                     utedi->getEnumDecl());
@@ -754,7 +835,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  // See if we have a convert function from a Sendable actor isolated function,
+  // See if we have a convert function from a Sendable actor-isolated function,
   // we want to treat the result of the convert function as being actor isolated
   // so that we cannot escape the value.
   //
@@ -865,7 +946,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (!SILIsolationInfo::isNonSendableType(arg->getType(), arg->getFunction()))
     return {};
 
-  // Handle a switch_enum from a global actor isolated type.
+  // Handle a switch_enum from a global-actor-isolated type.
   if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
     if (auto *singleTerm = phiArg->getSingleTerminator()) {
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
@@ -899,7 +980,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
           fArg->getFunction()->maybeGetIsolatedArgument())) {
     auto astType = isolatedArg->getType().getASTType();
-    if (auto *nomDecl = astType->lookThroughAllOptionalTypes()->getAnyActor()) {
+    if (astType->lookThroughAllOptionalTypes()->getAnyActor()) {
       return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);
     }
   }
@@ -913,7 +994,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     // disconnected so we can construct the actor value. Users cannot write
     // allocator functions so we just need to worry about compiler generated
     // code. In the case of a non-actor, we can only have an allocator that is
-    // global actor isolated, so we will never hit this code path.
+    // global-actor isolated, so we will never hit this code path.
     if (declRef.kind == SILDeclRef::Kind::Allocator) {
       if (auto isolation = fArg->getFunction()->getActorIsolation()) {
         if (isolation->isActorInstanceIsolated()) {
@@ -1068,7 +1149,7 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     // If either have an actor instance, and the actor instance doesn't match,
     // return false.
     //
-    // This ensures that cases like comparing two global actor isolated things
+    // This ensures that cases like comparing two global-actor-isolated things
     // do not hit this path.
     //
     // It also catches cases where we have a missing actor instance.

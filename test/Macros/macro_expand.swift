@@ -152,6 +152,18 @@ struct RedeclChecking {
 // CHECK-DIAGS: }
 // CHECK-DIAGS: END CONTENTS OF FILE
 
+@attached(body)
+public macro ThrowCancellation() = #externalMacro(module: "MacroDefinition", type: "ThrowCancellationMacro")
+
+// https://github.com/swiftlang/swift/issues/79039 - Make sure we diagnose the
+// error mismatch.
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039()' here}}
+func issue79039() throws(DecodingError)
+// CHECK-DIAGS: @__swiftmacro_9MacroUser10issue7903917ThrowCancellationfMb_.swift:2:11: error: thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'
+
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039_2()' here}}
+func issue79039_2() throws(DecodingError) {}
+// CHECK-DIAGS: @__swiftmacro_9MacroUser12issue79039_217ThrowCancellationfMb_.swift:2:11: error: thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'
 #endif
 
 @freestanding(declaration)
@@ -706,6 +718,29 @@ func testPropertyWrapperMacro() {
   #hasPropertyWrapperParam(x: 0)
   #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
 }
+
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
 
 #if TEST_DIAGNOSTICS
 @freestanding(expression)

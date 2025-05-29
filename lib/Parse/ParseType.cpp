@@ -742,6 +742,10 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
       // Parse the comma, if the list continues.
       if (!consumeIf(tok::comma))
         break;
+      
+      // If the comma was a trailing comma, finish parsing the list of types
+      if (startsWithGreater(Tok))
+        break;
     }
   }
 
@@ -1161,7 +1165,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   SmallVector<TupleTypeReprElement, 8> ElementsR;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
-                                  /*AllowSepAfterLast=*/false,
+                                  /*AllowSepAfterLast=*/true,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
@@ -1605,7 +1609,8 @@ bool Parser::canParseGenericArguments() {
     if (!canParseType())
       return false;
     // Parse the comma, if the list continues.
-  } while (consumeIf(tok::comma));
+    // This could be the trailing comma.
+  } while (consumeIf(tok::comma) && !startsWithGreater(Tok));
 
   if (!startsWithGreater(Tok)) {
     return false;

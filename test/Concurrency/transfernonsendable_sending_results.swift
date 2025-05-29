@@ -236,7 +236,7 @@ func asyncLetReabstractionThunkTest() async {
 }
 
 func asyncLetReabstractionThunkTest2() async {
-  // We emit the error here since we are returning a main actor isolated value.
+  // We emit the error here since we are returning a MainActor-isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
   // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
 
@@ -259,7 +259,7 @@ func asyncLetReabstractionThunkTest2() async {
 }
 
 @MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
-  // We emit the error here since we are returning a main actor isolated value.
+  // We emit the error here since we are returning a MainActor-isolated value.
   async let newValue: NonSendableKlass = await getMainActorValueAsync()
   // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
 

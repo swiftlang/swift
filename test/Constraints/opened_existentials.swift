@@ -565,3 +565,29 @@ do {
     types.assertTypesAreEqual()
   }
 }
+
+struct G<A>: PP3 {}
+
+protocol PP1 {
+    associatedtype A
+}
+
+extension PP1 {
+    func f(p: any PP2<G<Self.A>>) {
+        p.g(t: self)
+    }
+}
+
+protocol PP2<B> {
+    associatedtype A
+    associatedtype B: PP3 where Self.B.A == Self.A
+}
+
+extension PP2 {
+    func g<T: PP1>(t: T) where Self.B == G<T.A> {}
+}
+
+protocol PP3 {
+    associatedtype A
+}
+

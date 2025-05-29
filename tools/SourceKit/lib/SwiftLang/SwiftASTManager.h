@@ -259,8 +259,7 @@ public:
                            std::shared_ptr<RequestTracker> ReqTracker,
                            std::shared_ptr<swift::PluginRegistry> Plugins,
                            StringRef SwiftExecutablePath,
-                           StringRef RuntimeResourcePath,
-                           StringRef DiagnosticDocumentationPath);
+                           StringRef RuntimeResourcePath);
   ~SwiftASTManager();
 
   SwiftInvocationRef getTypecheckInvocation(ArrayRef<const char *> Args,

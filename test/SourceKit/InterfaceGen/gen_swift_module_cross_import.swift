@@ -9,7 +9,7 @@
 // Make sure cursor info within the generated interface of A on one of the
 // decls originally from a cross-import decls shows 'A' as the parent module.
 //
-// RUN: %sourcekitd-test -req=interface-gen-open -module A -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %S/../Inputs/CrossImport -module-cache-path %t.mod/mcp == -req=cursor -print-raw-response -pos=11:15 -- -I %S/../Inputs/CrossImport -Xfrontend -enable-cross-import-overlays > %t.response
+// RUN: %sourcekitd-test -req=interface-gen-open -module A -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %S/../Inputs/CrossImport -module-cache-path %t.mod/mcp == -req=cursor -print-raw-response -pos=9:15 -- -I %S/../Inputs/CrossImport -Xfrontend -enable-cross-import-overlays > %t.response
 // RUN: %FileCheck --input-file %t.response %s
 //
 // CHECK: key.name: "From_ABAdditionsType"

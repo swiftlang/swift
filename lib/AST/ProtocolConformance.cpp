@@ -515,6 +515,10 @@ TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
   return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
 }
 
+bool NormalProtocolConformance::hasExplicitGlobalActorIsolation() const {
+  return Bits.NormalProtocolConformance.HasExplicitGlobalActor;
+}
+
 void
 NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
   if (!typeExpr) {
@@ -733,6 +737,13 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
     return Witness();
   }
   return entry->second;
+}
+
+ProtocolConformanceRef
+SelfProtocolConformance::getAssociatedConformance(Type assocType,
+                                                  ProtocolDecl *protocol) const {
+  ASSERT(assocType->isEqual(protocol->getSelfInterfaceType()));
+  return lookupConformance(getType(), protocol);
 }
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {

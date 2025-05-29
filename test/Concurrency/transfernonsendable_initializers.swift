@@ -110,7 +110,7 @@ func initActorWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
 }
 
 ////////////////////////////////
-// MARK: Actor Isolated Class //
+// MARK: Actor-Isolated Class //
 ////////////////////////////////
 
 @CustomActor

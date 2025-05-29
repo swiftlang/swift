@@ -77,12 +77,10 @@ func getTagsFromSwiftRepo(branch: Branch, dryRun: Bool = false) async throws -> 
   let allTags = try! decoder.decode([Tag].self, from: await data)
   log("[INFO] Finished downloading snapshot information from github.")
 
-  let snapshotTagPrefix = "swift-\(branch.rawValue.uppercased())"
-
   // Then filter the tags to just include the specific snapshot branch
   // prefix. Add the branch to an aggregate BranchTag.
   var filteredTags: [BranchTag] = allTags.filter {
-    $0.name.starts(with: snapshotTagPrefix)
+    $0.name.starts(with: branch.tagPrefix)
   }.map {
     BranchTag(tag: $0, branch: branch)
   }

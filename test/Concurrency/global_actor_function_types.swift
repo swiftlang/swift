@@ -7,7 +7,7 @@
 // Emit SIL with targeted concurrency.
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
 
-// Emit SIL with strict concurrency + region based isolation + transferring
+// Emit SIL with strict concurrency + region-based isolation + transferring
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
@@ -328,7 +328,7 @@ func stripActor(_ expr: @Sendable @autoclosure () -> (() -> ())) async {
 }
 
 // We used to not emit an error here with strict-concurrency enabled since we
-// were inferring the async let to main actor isolated (which was incorrect). We
+// were inferring the async let to MainActor isolated (which was incorrect). We
 // now always treat async let as non-isolated, so we get the same error in all
 // contexts.
 @MainActor func exampleWhereConstraintSolverHasWrongDeclContext_v2() async -> Int {

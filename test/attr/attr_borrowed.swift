@@ -11,7 +11,7 @@ func foo() -> String {}
 var string = ""
 
 @objc protocol P {
-  @_borrowed // expected-error {{property cannot be '@_borrowed' if it is an @objc protocol requirement}}
+  @_borrowed // expected-error {{property cannot be '@_borrowed' if it is an '@objc' protocol requirement}}
   var title: String { get }
 }
 

@@ -35,10 +35,10 @@ func doSomething() {}
 // SIL:   [[BOX:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // SIL:   [[INOUT_BOX:%.*]] = alloc_stack [var_decl] $Int, var, name "x2"
 // SIL:   [[ACCESS:%.*]] = begin_access [modify] [static] [[BOX]]
-// SIL:   copy_addr [take] [[ACCESS]] to [init] [[INOUT_BOX]]
+// SIL:   store {{%.*}} to [[INOUT_BOX]]
 // SIL:   [[FUNC:%.*]] = function_ref @$s18reference_bindings11doSomethingyyF : $@convention(thin) () -> ()
 // SIL:   apply [[FUNC]]()
-// SIL:   copy_addr [take] [[INOUT_BOX]] to [init] [[ACCESS]]
+// SIL:   store {{%.*}} to [[ACCESS]]
 // SIL:   end_access [[ACCESS]]
 // SIL: } // end sil function '$s18reference_bindings13testBindToVaryyF'
 func testBindToVar() {

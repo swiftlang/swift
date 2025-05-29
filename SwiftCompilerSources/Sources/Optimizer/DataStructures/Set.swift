@@ -177,7 +177,44 @@ struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
   }
 }
 
+/// An `InstructionSet` which also provides a `count` property.
+struct SpecificInstructionSetWithCount<InstType: Instruction> : IntrusiveSet {
+  private(set) var count = 0
+  private var underlyingSet: SpecificInstructionSet<InstType>
+
+  init(_ context: some Context) {
+    self.underlyingSet = SpecificInstructionSet(context)
+  }
+
+  func contains(_ inst: InstType) -> Bool { underlyingSet.contains(inst) }
+
+  var isEmpty: Bool { count == 0 }
+
+  /// Returns true if `inst` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ inst: InstType) -> Bool {
+    if underlyingSet.insert(inst) {
+      count += 1
+      return true
+    }
+    return false
+  }
+
+  mutating func erase(_ inst: InstType) {
+    if underlyingSet.contains(inst) {
+      count -= 1
+      assert(count >= 0)
+    }
+    underlyingSet.erase(inst)
+  }
+
+  var description: String { underlyingSet.description }
+
+  mutating func deinitialize() { underlyingSet.deinitialize() }
+}
+
 typealias InstructionSet = SpecificInstructionSet<Instruction>
+typealias InstructionSetWithCount = SpecificInstructionSetWithCount<Instruction>
 
 /// A set of operands.
 ///

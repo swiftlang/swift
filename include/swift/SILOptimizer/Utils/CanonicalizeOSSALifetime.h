@@ -261,7 +261,7 @@ private:
   SILValue currentDef;
 
   /// Instructions beyond which liveness is not extended by destroy uses.
-  ArrayRef<SILInstruction *> currentLexicalLifetimeEnds;
+  ArrayRef<SILInstruction *> explicitLifetimeEnds;
 
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed.  Each block either contains a consuming instruction (e.g.
@@ -368,7 +368,7 @@ public:
     clear();
 
     currentDef = def;
-    currentLexicalLifetimeEnds = lexicalLifetimeEnds;
+    explicitLifetimeEnds = lexicalLifetimeEnds;
 
     liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     liveness->initializeDef(getCurrentDef());
@@ -465,6 +465,16 @@ public:
   UserRange getUsers() const { return liveness->getAllUsers(); }
 
 private:
+  bool endingLifetimeAtExplicitEnds() const {
+    return explicitLifetimeEnds.size() > 0;
+  }
+
+  bool respectsDeadEnds() const {
+    // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+    //                               this method.
+    return !endingLifetimeAtExplicitEnds();
+  }
+
   bool respectsDeinitBarriers() const {
     if (!currentDef->isLexical())
       return false;

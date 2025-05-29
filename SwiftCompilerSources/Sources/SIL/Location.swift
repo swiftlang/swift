@@ -13,7 +13,19 @@
 import SILBridging
 import AST
 
-public struct Location: Equatable, CustomStringConvertible {
+/// Represents a location in source code.
+/// `Location` is used in SIL and by the Optimizer.
+///
+/// When compiling a Swift file, `Location` is basically a `SourceLoc` + information about the
+/// containing debug scope. In this case the `SourceLoc` is directly retrieved from the AST nodes.
+///
+/// However, for debug info which is de-serialized from a swiftmodule file, the location consists of
+/// a filename + line and column indices. From such a location, a `SourceLoc` can only be created by
+/// loading the file with `DiagnosticEngine.getLocationFromExternalSource`.
+///
+/// In case of parsing textual SIL (e.g. with `sil-opt`), which does _not_ contain debug line
+/// information, the location is also a `SourceLoc` which points to the textual SIL.
+public struct Location: ProvidingSourceLocation, Equatable, CustomStringConvertible {
   let bridged: BridgedLocation
 
   public var description: String {
@@ -23,6 +35,24 @@ public struct Location: Equatable, CustomStringConvertible {
   public var sourceLoc: SourceLoc? {
     if hasValidLineNumber {
       return SourceLoc(bridged: bridged.getSourceLocation())
+    }
+    return nil
+  }
+
+  public var fileNameAndPosition: (path: StringRef, line: Int, column: Int)? {
+    if bridged.isFilenameAndLocation() {
+      let loc = bridged.getFilenameAndLocation()
+      return (StringRef(bridged: loc.path), loc.line, loc.column)
+    }
+    return nil
+  }
+
+  public func getSourceLocation(diagnosticEngine: DiagnosticEngine) -> SourceLoc? {
+    if let sourceLoc = sourceLoc {
+      return sourceLoc
+    }
+    if let (path, line, column) = fileNameAndPosition {
+      return diagnosticEngine.getLocationFromExternalSource(path: path, line: line, column: column)
     }
     return nil
   }

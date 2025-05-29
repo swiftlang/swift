@@ -34,7 +34,7 @@ public func testActor(_ a: A) {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1AC11asyncMethodyyYaFTwS"()
   if #_hasSymbol(a.asyncMethod) {}
 
-  // FIXME: Add support for actor isolated methods
+  // FIXME: Add support for actor-isolated methods
 }
 
 // --- A.init() ---

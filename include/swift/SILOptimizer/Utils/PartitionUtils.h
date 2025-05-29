@@ -93,7 +93,7 @@ class RegionAnalysisValueMap;
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
 ///
-/// We use a wrapper struct here so that we can inject "fake" actor isolated
+/// We use a wrapper struct here so that we can inject "fake" actor-isolated
 /// values into the regions of values that become merged into an actor by
 /// calling a function without a non-sendable result.
 class RepresentativeValue {
@@ -103,8 +103,8 @@ class RepresentativeValue {
 
   /// If this is set to a SILValue then it is the actual represented value. If
   /// it is set to a SILInstruction, then this is a "fake" representative value
-  /// used to inject actor isolatedness. The instruction stored is the
-  /// instruction that introduced the actor isolated-ness.
+  /// used to inject actor isolation. The instruction stored is the
+  /// instruction that introduced the actor isolation.
   InnerType value;
 
 public:
@@ -1438,15 +1438,18 @@ public:
       }
       std::tie(sentRegionIsolation, regionHasClosureCapturedElt) = *pairOpt;
 
-      // If we merged anything, we need to handle an attempt to send a
-      // never-sent value unless our value has the same isolation info as our
-      // callee.
       auto calleeIsolationInfo = getIsolationInfo(op);
-      if (!(calleeIsolationInfo &&
-            sentRegionIsolation.hasSameIsolation(calleeIsolationInfo)) &&
-          !sentRegionIsolation.isDisconnected()) {
-        return handleSendNeverSentHelper(op, op.getOpArg1(),
-                                         sentRegionIsolation);
+
+      // If our callee and region are both actor isolated and part of the same
+      // isolation domain, do not treat this as a send.
+      if (calleeIsolationInfo.isActorIsolated() &&
+          sentRegionIsolation.hasSameIsolation(calleeIsolationInfo))
+        return;
+
+      // At this point, check if our sent value is not disconnected. If so, emit
+      // a sent never sendable helper.
+      if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
+        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a

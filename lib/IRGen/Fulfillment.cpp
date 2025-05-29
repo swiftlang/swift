@@ -178,35 +178,44 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                      source, std::move(path), keys);
   }
 
-  if (auto tupleType = dyn_cast<TupleType>(type)) {
-    if (tupleType->getNumElements() == 1 &&
-        isa<PackExpansionType>(tupleType.getElementType(0))) {
-
-      bool hadFulfillment = false;
-      auto packType = tupleType.getInducedPackType();
-
-      {
-        auto argPath = path;
-        argPath.addTuplePackComponent();
-        hadFulfillment |= searchTypeMetadataPack(IGM, packType,
-                                                 isExact, metadataState, source,
-                                                 std::move(argPath), keys);
-      }
-
-      {
-        auto argPath = path;
-        argPath.addTupleShapeComponent();
-        hadFulfillment |= searchShapeRequirement(IGM, packType, source,
-                                                 std::move(argPath));
-
-      }
-
-      return hadFulfillment;
-    }
-  }
-
   // TODO: functions
   // TODO: metatypes
+
+  return false;
+}
+
+/// Metadata fulfillment in a tuple conformance witness thunks.
+///
+/// \return true if any fulfillments were added by this search.
+bool FulfillmentMap::searchTupleTypeMetadata(IRGenModule &IGM, CanTupleType tupleType,
+                                             IsExact_t isExact,
+                                             MetadataState metadataState,
+                                             unsigned source, MetadataPath &&path,
+                                             const InterestingKeysCallback &keys) {
+  if (tupleType->getNumElements() == 1 &&
+      isa<PackExpansionType>(tupleType.getElementType(0))) {
+
+    bool hadFulfillment = false;
+    auto packType = tupleType.getInducedPackType();
+
+    {
+      auto argPath = path;
+      argPath.addTuplePackComponent();
+      hadFulfillment |= searchTypeMetadataPack(IGM, packType,
+                                               isExact, metadataState, source,
+                                               std::move(argPath), keys);
+    }
+
+    {
+      auto argPath = path;
+      argPath.addTupleShapeComponent();
+      hadFulfillment |= searchShapeRequirement(IGM, packType, source,
+                                               std::move(argPath));
+
+    }
+
+    return hadFulfillment;
+  }
 
   return false;
 }
