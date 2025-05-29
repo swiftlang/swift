@@ -3657,7 +3657,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
                                                       AccessLevel requiredAccess,
                                                       NormalProtocolConformance *conformance) {
   DeclContext *DC = decl->getDeclContext();
-  NominalTypeDecl *typeDecl = dyn_cast<NominalTypeDecl>(DC->getAsDecl());
+  auto *typeDecl = dyn_cast<NominalTypeDecl>(DC);
   SourceRange typeBraces = typeDecl->getBraces();
 
   ASTContext &Ctx = decl->getASTContext();
