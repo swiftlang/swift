@@ -413,6 +413,11 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
   }
  
   mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
+    if let addrToPtr = value as? AddressToPointerInst {
+      // AddressToPointer introduces the value dependence. To handle Builtin.addressOfBorrow, follow the address that
+      // the pointer is derived from.
+      return walkUp(address: addrToPtr.address)
+    }
     return visitorClosure(value)
   }
 
