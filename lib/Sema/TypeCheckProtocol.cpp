@@ -3703,7 +3703,6 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
                                   requiredAccess);
 
   fixItDiag.fixItInsertAfter(typeBraces.Start, FixitString);
-  fixItDiag.flush();
 }
 
 /// Helper function for diagnostics when a witness needs to be seated at a
