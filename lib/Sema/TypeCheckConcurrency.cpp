@@ -6456,6 +6456,43 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
   return requiredIsolation;
 }
 
+std::optional<DefaultIsolation>
+DefaultIsolationInSourceFileRequest::evaluate(Evaluator &evaluator,
+                                              const SourceFile *file) const {
+  llvm::SmallVector<Decl *> usingDecls;
+  llvm::copy_if(file->getTopLevelDecls(), std::back_inserter(usingDecls),
+                [](Decl *D) { return isa<UsingDecl>(D); });
+
+  if (usingDecls.empty())
+    return std::nullopt;
+
+  std::optional<std::pair<Decl *, DefaultIsolation>> isolation;
+
+  auto setIsolation = [&isolation](Decl *D, DefaultIsolation newIsolation) {
+    if (isolation) {
+      D->diagnose(diag::invalid_redecl_of_file_isolation);
+      isolation->first->diagnose(diag::invalid_redecl_of_file_isolation_prev);
+      return;
+    }
+
+    isolation = std::make_pair(D, newIsolation);
+  };
+
+  for (auto *D : usingDecls) {
+    switch (cast<UsingDecl>(D)->getSpecifier()) {
+    case UsingSpecifier::MainActor:
+      setIsolation(D, DefaultIsolation::MainActor);
+      break;
+    case UsingSpecifier::nonisolated:
+      setIsolation(D, DefaultIsolation::Nonisolated);
+      break;
+    }
+  }
+
+  return isolation.has_value() ? std::optional(isolation->second)
+                               : std::nullopt;
+}
+
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isa<TypeDecl>(value))
     return;
