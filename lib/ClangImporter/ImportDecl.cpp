@@ -9055,12 +9055,26 @@ public:
   }
 
   void printAvailability() {
+    if (!hasMacroParameter("spanAvailability"))
+      return;
     printSeparator();
     out << "spanAvailability: ";
     printAvailabilityOfType("Span");
   }
 
 private:
+  bool hasMacroParameter(StringRef ParamName) {
+    ValueDecl *D = getDecl("_SwiftifyImport");
+    auto *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(D);
+    assert(SwiftifyImportDecl);
+    if (!SwiftifyImportDecl)
+      return false;
+    for (auto *Param : *SwiftifyImportDecl->parameterList)
+      if (Param->getArgumentName().str() == ParamName)
+        return true;
+    return false;
+  }
+
   ValueDecl *getDecl(StringRef DeclName) {
     SmallVector<ValueDecl *, 1> decls;
     SwiftContext.lookupInSwiftModule(DeclName, decls);
