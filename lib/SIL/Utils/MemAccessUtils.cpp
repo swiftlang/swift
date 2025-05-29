@@ -1437,7 +1437,7 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
 }
 
 bool swift::visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    SILValue address, TypeExpansionContext tec, SILFunction &function,
     std::function<void(AccessPath::PathNode, SILType)> visitor) {
   auto rootPath = AccessPath::compute(address);
   if (!rootPath.isValid()) {
@@ -1469,7 +1469,8 @@ bool swift::visitProductLeafAccessPathNodes(
       for (auto *field : decl->getStoredProperties()) {
         auto *fieldNode = node->getChild(index);
         worklist.push_back(
-            {silType.getFieldType(field, module, tec), fieldNode});
+            {silType.getFieldType(field, function.getModule(), tec),
+             fieldNode});
         ++index;
       }
     } else {
