@@ -1,5 +1,5 @@
 // {"signature":"swift::ProtocolConformanceRef::getProtocol() const"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
    func a<each b {
                    enum c {
                     case struct  var d: e      struct e {

@@ -1684,6 +1684,8 @@ public:
     const bool hasAnyConformances =
         llvm::any_of(substitutions.getConformances(),
                      [](const ProtocolConformanceRef conformance) {
+                       if (conformance.isInvalid())
+                         return false;
                        auto *requirement = conformance.getProtocol();
                        return !requirement->getInvertibleProtocolKind();
                      });
