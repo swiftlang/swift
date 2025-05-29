@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedGlobal -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,C-ONLY
-// RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedGlobal -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default -Xcc -std=c++20 | %FileCheck %s
+// RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedGlobal -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 -Xcc -std=c++20 | %FileCheck %s
 // RUN: %target-swift-ide-test -Xcc -fbounds-safety -disable-objc-interop -print-module -module-to-print=BoundsAttributedGlobal -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,BOUNDS-SAFETY,C-ONLY
 
 // This test case checks that ClangImporter can import declarations using various bounds attributes,
@@ -13,11 +13,11 @@
 
 
 // RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s
-// RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -cxx-interoperability-mode=swift-6
 // RUN: %target-swift-frontend -Xcc -fbounds-safety -disable-objc-interop -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -D BOUNDS_SAFETY
 
 // RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -verify -verify-additional-file %S/Inputs/bounds-attributed-global.h -D VERIFY
-// RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -cxx-interoperability-mode=default -verify -verify-additional-file %S/Inputs/bounds-attributed-global.h -D VERIFY
+// RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -cxx-interoperability-mode=swift-6 -verify -verify-additional-file %S/Inputs/bounds-attributed-global.h -D VERIFY
 // RUN: %target-swift-frontend -Xcc -fbounds-safety -disable-objc-interop -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -verify -verify-additional-file %S/Inputs/bounds-attributed-global.h -D BOUNDS_SAFETY -D VERIFY
 
 import BoundsAttributedGlobal
