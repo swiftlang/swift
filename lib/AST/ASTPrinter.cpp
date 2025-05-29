@@ -383,6 +383,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      // The `using` declarations are private to the file at the moment
+      // and shouldn't appear in swift interfaces.
+      if (isa<UsingDecl>(D))
+        return false;
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
