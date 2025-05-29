@@ -5023,8 +5023,11 @@ static void emitRetconCoroutineEntry(
   for (auto *arg : finalArguments) {
     arguments.push_back(arg);
   }
-  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
-                         IGF.Builder);
+  std::optional<ArtificialLocation> Loc;
+  if (IGF.getDebugScope()) {
+    Loc.emplace(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                           IGF.Builder);
+  }
   llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, arguments);
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
