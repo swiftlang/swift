@@ -3671,7 +3671,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
 
   ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
   Printer.printNewline();
-  PrintOptions Options = PrintOptions::printForDiagnostics(AccessLevel::Public,
+  PrintOptions Options = PrintOptions::printForDiagnostics(requiredAccess,
                                                            Ctx.TypeCheckerOpts.PrintFullConvention);
   Options.PrintDocumentationComments = false;
   Options.PrintAccess = true;
@@ -3693,7 +3693,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
 
   Options.CurrentModule = typeDecl->getParentModule();
 
-  decl->overwriteAccess(AccessLevel::Public);
+  decl->overwriteAccess(requiredAccess);
 
   decl->print(Printer, Options);
 
