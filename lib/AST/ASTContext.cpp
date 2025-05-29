@@ -520,7 +520,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
   /// Macro discriminators per context.
-  llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
+  llvm::DenseMap<std::pair<const void *, DeclBaseName>, unsigned>
       NextMacroDiscriminator;
 
   /// Local and closure discriminators per context.
@@ -2286,8 +2286,8 @@ unsigned ASTContext::getNextMacroDiscriminator(
     MacroDiscriminatorContext context,
     DeclBaseName baseName
 ) {
-  std::pair<const void *, Identifier> key(
-      context.getOpaqueValue(), baseName.getIdentifier());
+  std::pair<const void *, DeclBaseName> key(
+      context.getOpaqueValue(), baseName);
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
