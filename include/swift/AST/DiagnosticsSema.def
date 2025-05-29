@@ -2334,6 +2334,7 @@ NOTE(dependency_as_imported_by_main_module,none,
 NOTE(dependency_as_imported_by, none,
      "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
 ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
+ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
 
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
