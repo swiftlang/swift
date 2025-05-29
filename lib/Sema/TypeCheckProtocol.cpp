@@ -3673,11 +3673,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
   Printer.printNewline();
   PrintOptions Options = PrintOptions::printForDiagnostics(requiredAccess,
                                                            Ctx.TypeCheckerOpts.PrintFullConvention);
-  Options.PrintDocumentationComments = false;
-  Options.PrintAccess = true;
-  Options.SkipAttributes = true;
   Options.FunctionDefinitions = true;
-  Options.FullyQualifiedTypesIfAmbiguous = true;
 
   Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
     Printer << " {";
