@@ -847,31 +847,6 @@ static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
 using MirroredMethodEntry =
   std::tuple<const clang::ObjCMethodDecl*, ProtocolDecl*, bool /*isAsync*/>;
 
-ImportedType findOptionSetType(clang::QualType type,
-                               ClangImporter::Implementation &Impl) {
-  ImportedType importedType;
-  auto fieldType = type;
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(fieldType))
-    fieldType = elaborated->desugar();
-  if (auto typedefType = dyn_cast<clang::TypedefType>(fieldType)) {
-    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum =
-              findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(
-            clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-            typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
-  return importedType;
-}
-
 static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   for (const auto *f : decl->fields()) {
     auto *fieldRecord = f->getType()->getAsCXXRecordDecl();
@@ -4511,8 +4486,8 @@ namespace {
           return nullptr;
       }
 
-      auto fieldType = decl->getType();
-      ImportedType importedType = findOptionSetType(fieldType, Impl);
+      auto fieldType = desugarIfElaborated(decl->getType());
+      ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
         importedType =
@@ -6155,8 +6130,8 @@ namespace {
         }
       }
 
-      auto fieldType = decl->getType();
-      ImportedType importedType = findOptionSetType(fieldType, Impl);
+      auto fieldType = desugarIfElaborated(decl->getType());
+      ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
 
       if (!importedType)
         importedType = Impl.importPropertyType(decl, isInSystemModule(dc));
@@ -7120,8 +7095,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       getAccessorPropertyType(getter, false, getterName.getSelfIndex());
   if (propertyType.isNull())
     return nullptr;
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(propertyType))
-    propertyType = elaborated->desugar();
+  propertyType = desugarIfElaborated(propertyType);
 
   // If there is a setter, check that the property it implies
   // matches that of the getter.
@@ -7147,24 +7121,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (dc->isTypeContext() && !getterName.getSelfIndex())
     isStatic = true;
 
-  ImportedType importedType;
-
-  // Sometimes we import unavailable typedefs as enums. If that's the case,
-  // use the enum, not the typedef here.
-  if (auto typedefType = dyn_cast<clang::TypedefType>(propertyType.getTypePtr())) {
-    if (Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
+  ImportedType importedType = importer::findOptionSetEnum(propertyType, Impl);
 
   if (!importedType) {
     // Compute the property type.
@@ -9268,9 +9225,10 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
         paramHasLifetimeInfo = true;
       }
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
-        printer.printLifetimeboundReturn(
-            index, !paramHasBoundsInfo &&
-                       swiftParamTy->isEscapable());
+        // If this parameter has bounds info we will tranform it into a Span,
+        // so then it will no longer be Escapable.
+        bool willBeEscapable = swiftParamTy->isEscapable() && !paramHasBoundsInfo;
+        printer.printLifetimeboundReturn(index, willBeEscapable);
         paramHasLifetimeInfo = true;
         returnHasLifetimeInfo = true;
       }

@@ -339,7 +339,16 @@ public:
     // closures.
     if (ExprDepth == 0) {
       auto isExprStmt = (E == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
-      performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt);
+
+      bool isConstInitExpr = false;
+      if (Target.isForInitialization()) {
+        if (auto initPattern = Target.getInitializationPattern())
+          if (auto namedPatternVarDecl = initPattern->getSingleVar())
+            isConstInitExpr = namedPatternVarDecl->isConstValue();
+      }
+
+      performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt,
+                                      isConstInitExpr);
     }
     ExprDepth += 1;
     return Action::Continue(E);

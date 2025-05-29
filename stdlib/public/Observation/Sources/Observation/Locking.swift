@@ -34,7 +34,15 @@ internal struct Lock {
   #if canImport(Darwin)
   typealias Primitive = os_unfair_lock
   #elseif canImport(Glibc) || canImport(Musl) || canImport(Bionic)
+  #if os(FreeBSD) || os(OpenBSD)
+  // BSD libc does not annotate the nullability of pthread APIs.
+  // We should replace this with the appropriate API note in the platform
+  // overlay.
+  // https://github.com/swiftlang/swift/issues/81407
+  typealias Primitive = pthread_mutex_t?
+  #else
   typealias Primitive = pthread_mutex_t
+  #endif
   #elseif canImport(WinSDK)
   typealias Primitive = SRWLOCK
   #elseif arch(wasm32)

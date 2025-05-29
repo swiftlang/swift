@@ -73,6 +73,8 @@ SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER,
           "optimize.sil.specialize.generic.partial.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_INLINE_CONSTANT_ARGUMENTS,
           "optimize.sil.inline.constant.arguments")
+SEMANTICS_ATTR(DERIVED_ENUM_EQUALS,
+          "derived_enum_equals")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
           "optimize.sil.specialize.generic.size.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,

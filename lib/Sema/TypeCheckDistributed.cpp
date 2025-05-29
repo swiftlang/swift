@@ -709,6 +709,18 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   if (!swift::ensureDistributedModuleLoaded(nominal))
     return;
 
+  auto &C = nominal->getASTContext();
+  auto loc = nominal->getLoc();
+  recordRequiredImportAccessLevelForDecl(
+    C.getDistributedActorDecl(), nominal, nominal->getEffectiveAccess(),
+    [&](AttributedImport<ImportedModule> attributedImport) {
+  ModuleDecl *importedVia = attributedImport.module.importedModule,
+             *sourceModule = nominal->getModuleContext();
+  C.Diags.diagnose(loc, diag::module_api_import, nominal, importedVia,
+                         sourceModule, importedVia == sourceModule,
+                         /*isImplicit*/ false);
+});
+
   // ==== Constructors
   // --- Get the default initializer
   // If applicable, this will create the default 'init(transport:)' initializer

@@ -1851,6 +1851,13 @@ SILValue SILGenFunction::emitZipperedOSVersionRangeCheck(
     return B.createIntegerLiteral(loc, i1, true);
   }
 
+  // If either version is "never" then the check is trivially false because it
+  // can never succeed.
+  if (OSVersion.isEmpty() || VariantOSVersion.isEmpty()) {
+    SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
+    return B.createIntegerLiteral(loc, i1, false);
+  }
+
   // The variant-only availability-checking entrypoint is not part
   // of the Swift 5.0 ABI. It is only available in macOS 10.15 and above.
   bool isVariantEntrypointAvailable = !TargetTriple.isMacOSXVersionLT(10, 15);

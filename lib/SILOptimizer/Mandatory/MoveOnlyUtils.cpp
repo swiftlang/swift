@@ -218,7 +218,8 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   }
   case SILInstructionKind::BuiltinInst: {
     auto bi = cast<BuiltinInst>(memInst);
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       // `zeroInitializer` with an address operand zeroes out the address operand
       return true;
     }
@@ -251,6 +252,9 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
   case SILInstructionKind::ExplicitCopyAddrInst: {
     auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && !CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::MarkDependenceAddrInst: {
+    return true;
   }
   case SILInstructionKind::YieldInst: {
     auto *yield = cast<YieldInst>(memInst);

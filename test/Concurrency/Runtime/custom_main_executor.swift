@@ -13,10 +13,10 @@
 import StdlibUnittest
 import Synchronization
 
-typealias _DefaultExecutorFactory = SimpleExecutorFactory
+typealias DefaultExecutorFactory = SimpleExecutorFactory
 
-struct SimpleExecutorFactory: _ExecutorFactory {
-  public static var mainExecutor: any _MainExecutor {
+struct SimpleExecutorFactory: ExecutorFactory {
+  public static var mainExecutor: any MainExecutor {
     print("Creating main executor")
     return SimpleMainExecutor()
   }
@@ -27,7 +27,7 @@ struct SimpleExecutorFactory: _ExecutorFactory {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class SimpleMainExecutor: _MainExecutor, @unchecked Sendable {
+final class SimpleMainExecutor: MainExecutor, @unchecked Sendable {
   public var isRunning: Bool = false
 
   var shouldStop: Bool = false
@@ -41,7 +41,7 @@ final class SimpleMainExecutor: _MainExecutor, @unchecked Sendable {
     }
   }
 
-  func _run() throws {
+  func run() throws {
     print("Running")
     isRunning = true
     while !shouldStop {
@@ -58,7 +58,7 @@ final class SimpleMainExecutor: _MainExecutor, @unchecked Sendable {
     isRunning = false
   }
 
-  func _stop() {
+  func stop() {
     shouldStop = true
   }
 }
@@ -66,7 +66,7 @@ final class SimpleMainExecutor: _MainExecutor, @unchecked Sendable {
 @available(SwiftStdlib 6.2, *)
 final class SimpleTaskExecutor: TaskExecutor, @unchecked Sendable {
   func enqueue(_ job: consuming ExecutorJob) {
-    MainActor._executor.enqueue(job)
+    MainActor.executor.enqueue(job)
   }
 }
 

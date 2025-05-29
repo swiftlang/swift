@@ -872,7 +872,9 @@ namespace swift {
     FeatureState getFeatureState(Feature feature) const;
 
     /// Returns whether the given feature is enabled.
-    bool hasFeature(Feature feature) const;
+    ///
+    /// If allowMigration is set, also returns true when the feature has been enabled for migration.
+    bool hasFeature(Feature feature, bool allowMigration = false) const;
 
     /// Returns whether a feature with the given name is enabled. Returns
     /// `false` if a feature by this name is not known.

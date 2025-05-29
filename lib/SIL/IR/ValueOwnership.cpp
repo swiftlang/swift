@@ -694,6 +694,7 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
 // fields. The initialized value is immediately consumed by an assignment, so it
 // must be owned.
 OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
+OWNED_OR_NONE_DEPENDING_ON_RESULT(PrepareInitialization)
 #undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)

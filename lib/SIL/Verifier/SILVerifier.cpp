@@ -1059,7 +1059,13 @@ public:
     
     auto objectTy = value->getType().unwrapOptionalType();
     
-    require(objectTy.isReferenceCounted(F.getModule()),
+    // Immortal C++ foreign reference types are represented as trivially lowered
+    // types since they do not require retain/release calls.
+    bool isImmortalFRT = objectTy.isForeignReferenceType() &&
+                         objectTy.getASTType()->getReferenceCounting() ==
+                             ReferenceCounting::None;
+
+    require(objectTy.isReferenceCounted(F.getModule()) || isImmortalFRT,
             valueDescription + " must have reference semantics");
   }
   
@@ -2387,7 +2393,8 @@ public:
     auto builtinKind = BI->getBuiltinKind();
     auto arguments = BI->getArguments();
 
-    if (builtinKind == BuiltinValueKind::ZeroInitializer) {
+    if (builtinKind == BuiltinValueKind::ZeroInitializer ||
+        builtinKind == BuiltinValueKind::PrepareInitialization) {
       require(!BI->getSubstitutions(),
               "zeroInitializer has no generic arguments as a SIL builtin");
       if (arguments.size() == 0) {
