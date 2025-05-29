@@ -990,7 +990,7 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc);
 
   auto &ctx = sf->getASTContext();
-  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(decl, sf);
+  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(sf);
   if (!bestLoc.isValid())
     return;
 
