@@ -1255,3 +1255,28 @@ bb0(%aggregate : $*NEAggregate):
   %retval = tuple ()
   return %retval
 }
+
+struct NCGutless: ~Copyable {
+  let ptr: UnsafeRawPointer?
+}
+struct NCAggregate: ~Copyable {
+  var ne: NCGutless
+  let regular: Regular
+  deinit {}
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_noncopyable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_noncopyable'
+sil [ossa] @no_destructure_noncopyable : $@convention(method) (@in NCAggregate) -> () {
+bb0(%aggregate : $*NCAggregate):
+  %regular = struct_element_addr %aggregate, #NCAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
