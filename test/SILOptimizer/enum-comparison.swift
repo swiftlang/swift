@@ -80,6 +80,28 @@ func compare4(_ x: LargeEnum) -> Bool {
   return x == .e3(28)
 }
 
+enum CustomRawValue: RawRepresentable {
+  case a, b, c
+
+  init(rawValue: Int) {
+    self = .a
+  }
+
+  @inline(never)
+  var rawValue: Int {
+    print(0)
+    return 0
+  }
+}
+
+// CHECK-LABEL: define {{.*}} i1 @"$s4test8compare5ySbAA14CustomRawValueOF"(i8 %0)
+// CHECK:       entry:
+// CHECK-NEXT:    call
+@inline(never)
+func compare5(_ x: CustomRawValue) -> Bool {
+  return x == .b
+}
+
 // OUT: 1: false
 print("1: \(compareeq(.c, .long_case_name_for_testing))")
 
@@ -115,4 +137,7 @@ print("11: \(compare4(.e3(28)))")
 
 // OUT: 12: false
 print("12: \(compare4(.e3(27)))")
+
+// OUT: 13: true
+print("13: \(compare5(.a))")
 
