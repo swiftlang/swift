@@ -1,3 +1,3 @@
 // {"signature":"swift::ParamSpecifierRequest::evaluate(swift::Evaluator&, swift::ParamDecl*) const"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 func a([0])
