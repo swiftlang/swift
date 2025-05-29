@@ -3655,7 +3655,8 @@ public:
 static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
                                                       ConstructorDecl *decl,
                                                       AccessLevel requiredAccess,
-                                                      NormalProtocolConformance *conformance) {
+                                                      NormalProtocolConformance *conformance,
+                                                      SourceLoc diagLoc) {
   DeclContext *DC = decl->getDeclContext();
   auto *typeDecl = dyn_cast<NominalTypeDecl>(DC);
   SourceRange typeBraces = typeDecl->getBraces();
@@ -3693,7 +3694,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
 
   decl->print(Printer, Options);
 
-  auto fixItDiag = diags.diagnose(conformance->getLoc(),
+  auto fixItDiag = diags.diagnose(diagLoc,
                                   diag::implicit_init_witness_fix_access,
                                   decl->getDescriptiveKind(),
                                   requiredAccess);
@@ -4498,14 +4499,15 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             ? (ctor && ctor->isSynthesized()) ? diag::implicit_init_witness_not_accessible_proto : diag::witness_not_accessible_proto
             : diag::witness_not_accessible_type;
 
-        diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
+        SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
+        diags.diagnose(diagLoc,
                        diagKind, getProtocolRequirementKind(requirement),
                        witness, isSetter, requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto);
 
         if (ctor && ctor->isSynthesized()) {
-          diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, conformance);
+          diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, conformance, diagLoc);
         } else if (decl && decl->isSynthesized()) {
           return;
         } else {
