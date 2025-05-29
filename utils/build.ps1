@@ -1498,6 +1498,8 @@ function Build-CMakeProject {
     if ($CacheScript) {
       $cmakeGenerateArgs += @("-C", $CacheScript)
     }
+
+    $ParsedDefines = @{}
     foreach ($Define in ($Defines.GetEnumerator() | Sort-Object Name)) {
       # The quoting gets tricky to support defines containing compiler flags args,
       # some of which can contain spaces, for example `-D` `Flags=-flag "C:/Program Files"`
@@ -1524,7 +1526,41 @@ function Build-CMakeProject {
         }
       }
 
+      # Remove the backslashes from the value, as they are not in CMakeCache.txt
+      $ParsedDefines["$($Define.Key)"] = $Value.Replace("\", "")
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
+    }
+
+    # Read CMakeCache.txt to see if we need to re-run configure.
+    $CMakeCacheFile = [IO.Path]::Combine($Bin, "CMakeCache.txt")
+    $NeedsConfigure = $false
+    if (Test-Path $CMakeCacheFile) {
+      $CMakeCacheRaw = Get-Content $CMakeCacheFile -Raw
+      $CMakeCache = @{}
+      foreach ($Entry in $CMakeCacheRaw -split "`r?`n") {
+        if ($Entry -match "^(?<Key>[^:]+):(?<Type>[^=]+)=(?<Value>.*)$") {
+          $CMakeCache[$matches["Key"]] = $matches["Value"]
+        }
+      }
+
+      foreach ($Define in $ParsedDefines.GetEnumerator()) {
+        if ($CMakeCache[$Define.Key] -ne $Define.Value) {
+          Write-Host "CMake define '$($Define.Key)' changed from '$($CMakeCache[$Define.Key])' to '$($Define.Value)'. Reconfiguring project."
+          $NeedsConfigure = $true
+          break
+        }
+      }
+
+      if (-not $NeedsConfigure) {
+        # Check if the CMake generator has changed
+        if ($CMakeCache["CMAKE_GENERATOR"] -ne $Generator) {
+          Write-Host "CMake generator changed from '$($CMakeCache["CMAKE_GENERATOR"])' to '$Generator'. Reconfiguring project."
+          $NeedsConfigure = $true
+        }
+      }
+    } else {
+      Write-Host "CMake cache file '$CMakeCacheFile' does not exist. Reconfiguring project."
+      $NeedsConfigure = $true
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
@@ -1532,13 +1568,23 @@ function Build-CMakeProject {
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
-    if ($ToBatch) {
-      Write-Output ""
-      Write-Output "echo $cmake $cmakeGenerateArgs"
+
+    if ($NeedsConfigure) {
+      if ($ToBatch) {
+        Write-Output ""
+        Write-Output "echo $cmake $cmakeGenerateArgs"
+      } else {
+        Write-Host "$cmake $cmakeGenerateArgs"
+      }
+      Invoke-Program $cmake @cmakeGenerateArgs
     } else {
-      Write-Host "$cmake $cmakeGenerateArgs"
+      if ($ToBatch) {
+        Write-Output ""
+        Write-Output "echo Skipping reconfiguration of '$Src' to '$Bin' as no input changed."
+      } else {
+        Write-Host -ForegroundColor Yellow "Skipping reconfiguration of '$Src' to '$Bin' as no input changed."
+      }
     }
-    Invoke-Program $cmake @cmakeGenerateArgs
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
