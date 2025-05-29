@@ -3157,7 +3157,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
   }
 
   // Collect the stored properties of the type.
-  unsigned numFields = getNumFields(target);
+  unsigned numFields = countExportableFields(IGM, target);
 
   // Fill out an array with the field type metadata records.
   Address fields = createAlloca(
@@ -3170,6 +3170,9 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
   forEachField(IGM, target, [&](Field field) {
     assert(field.isConcrete() &&
            "initializing offset vector for type with missing member?");
+    if (!isExportableField(field))
+      return;
+
     SILType propTy = field.getType(IGM, T);
     llvm::Value *fieldLayout = emitTypeLayoutRef(*this, propTy, collector);
     Address fieldLayoutAddr =
