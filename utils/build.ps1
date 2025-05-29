@@ -646,30 +646,26 @@ function Invoke-BuildStep {
 
   $SplatArgs = @{}
   if ($RemainingArgs) {
-    $i = 0
-    while ($i -lt $RemainingArgs.Count) {
-      $Arg = $RemainingArgs[$i]
+    $Enumerator = $RemainingArgs.GetEnumerator()
+    while ($Enumerator.MoveNext()) {
+      $Arg = $Enumerator.Current
       if ($Arg -is [Hashtable]) {
         $SplatArgs += $Arg
-        $i++
       } elseif ($Arg -is [string] -and $Arg.StartsWith('-')) {
         $ParamName = $Arg.TrimStart('-')
-        
-        # Check if the next argument is a value for this parameter
-        $HasNextArg = ($i -lt $RemainingArgs.Count - 1)
-        if ($HasNextArg -and $RemainingArgs[$i + 1] -is [string] -and !$RemainingArgs[$i + 1].StartsWith('-')) {
-          # This is a named parameter with a value
-          $SplatArgs[$ParamName] = $RemainingArgs[$i + 1]
-          $i += 2
-        } else {
-          # This is a switch parameter (flag)
-          $SplatArgs[$ParamName] = $true
-          $i++
+        $HasNextArg = $RemainingArgs.IndexOf($Arg) -lt ($RemainingArgs.Count - 1)
+        if ($HasNextArg) {
+          $NextArg = $RemainingArgs[$RemainingArgs.IndexOf($Arg) + 1]
+          if ($NextArg -is [string] -and !$NextArg.StartsWith('-')) {
+            $SplatArgs[$ParamName] = $NextArg
+            $Enumerator.MoveNext() # Skip NextArg
+            continue
+          }
         }
+        # Must be a flag.
+        $SplatArgs[$ParamName] = $true
       } else {
-        # Handle positional parameter
         throw "Positional parameter '$Arg' found. The Invoke-BuildStep function only supports named parameters after the required Name and Platform parameters."
-        $i++
       }
     }
   }
@@ -680,7 +676,6 @@ function Invoke-BuildStep {
     Add-TimingData $Platform $Name $Stopwatch.Elapsed
   }
 }
-
 
 enum Project {
   BuildTools
