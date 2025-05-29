@@ -63,6 +63,8 @@ endif()
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
   "-enable-experimental-feature"
   "IsolatedAny"
+  "-enable-experimental-feature"
+  "ExecutionAttribute"
   )
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-strict-memory-safety")
