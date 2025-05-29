@@ -22,15 +22,16 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ContextualTypeInfo.h"
 
 namespace swift {
 
 namespace constraints {
-/// Describes information about a for-each loop that needs to be tracked
-/// within the constraint system.
-struct ForEachStmtInfo {
+/// Describes information about a for-in loop over a sequence that needs to be
+/// tracked in the constraint system.
+struct SequenceIterationInfo {
   /// The type of the sequence.
   Type sequenceType;
 
@@ -47,6 +48,17 @@ struct ForEachStmtInfo {
   Expr *nextCall;
 };
 
+/// Describes information about a for-in loop over a pack that needs to be
+/// tracked in the constraint system.
+struct PackIterationInfo {
+  /// The type of the pattern that matches the elements.
+  Type patternType;
+};
+
+/// Describes information about a for-in loop that needs to be tracked
+/// within the constraint system.
+using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
+
 /// Describes the target to which a constraint system's solution can be
 /// applied.
 class SyntacticElementTarget {
@@ -59,7 +71,10 @@ public:
     caseLabelItem,
     patternBinding,
     uninitializedVar,
-    forEachStmt,
+
+    /// The preamble of a for-in statement, including everything except the
+    /// body.
+    forEachPreamble,
   } kind;
 
 private:
@@ -78,6 +93,9 @@ private:
       /// When initializing a pattern from the expression, this is the
       /// pattern.
       Pattern *pattern;
+
+      /// The parent return statement if any.
+      ReturnStmt *parentReturnStmt;
 
       struct {
         /// The variable to which property wrappers have been applied, if
@@ -147,9 +165,8 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      bool ignoreWhereClause;
       ForEachStmtInfo info;
-    } forEachStmt;
+    } forEachPreamble;
 
     PatternBindingDecl *patternBinding;
   };
@@ -226,12 +243,10 @@ public:
     uninitializedVar.type = patternTy;
   }
 
-  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         bool ignoreWhereClause)
-      : kind(Kind::forEachStmt) {
-    forEachStmt.stmt = stmt;
-    forEachStmt.dc = dc;
-    forEachStmt.ignoreWhereClause = ignoreWhereClause;
+  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc)
+      : kind(Kind::forEachPreamble) {
+    forEachPreamble.stmt = stmt;
+    forEachPreamble.dc = dc;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -242,14 +257,20 @@ public:
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
   static SyntacticElementTarget
-  forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
+  forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
-  /// Form a target for a for-in loop.
-  static SyntacticElementTarget forForEachStmt(ForEachStmt *stmt,
-                                               DeclContext *dc,
-                                               bool ignoreWhereClause = false);
+  /// Form an expression target for a ReturnStmt.
+  static SyntacticElementTarget
+  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
+
+  /// Form a target for the preamble of a for-in loop, excluding its where
+  /// clause and body.
+  static SyntacticElementTarget
+  forForEachPreamble(ForEachStmt *stmt, DeclContext *dc) {
+    return {stmt, dc};
+  }
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -288,7 +309,7 @@ public:
       return ref.getAbstractClosureExpr();
     }
 
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return getAsForEachStmt();
 
     case Kind::stmtCondition:
@@ -316,7 +337,7 @@ public:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return nullptr;
     }
     llvm_unreachable("invalid expression type");
@@ -349,8 +370,8 @@ public:
       return uninitializedVar.binding->getInitContext(uninitializedVar.index);
     }
 
-    case Kind::forEachStmt:
-      return forEachStmt.dc;
+    case Kind::forEachPreamble:
+      return forEachPreamble.dc;
     }
     llvm_unreachable("invalid decl context type");
   }
@@ -415,6 +436,11 @@ public:
     expression.contextualInfo.typeLoc = type;
   }
 
+  void setExprContextualTypePurpose(ContextualTypePurpose ctp) {
+    assert(kind == Kind::expression);
+    expression.contextualInfo.purpose = ctp;
+  }
+
   /// Whether this target is for an initialization expression and pattern.
   bool isForInitialization() const {
     return kind == Kind::expression &&
@@ -436,6 +462,11 @@ public:
     return cast<ExprPattern>(expression.pattern);
   }
 
+  ReturnStmt *getParentReturnStmt() const {
+    assert(kind == Kind::expression);
+    return expression.parentReturnStmt;
+  }
+
   Type getClosureContextualType() const {
     assert(kind == Kind::closure);
     return closure.convertType;
@@ -444,8 +475,8 @@ public:
   /// For a pattern initialization target, retrieve the contextual pattern.
   ContextualPattern getContextualPattern() const;
 
-  /// Whether this target is for a for-in statement.
-  bool isForEachStmt() const { return kind == Kind::forEachStmt; }
+  /// Whether this target is for a for-in preamble, excluding the body.
+  bool isForEachPreamble() const { return kind == Kind::forEachPreamble; }
 
   /// Whether this is an initialization for an Optional.Some pattern.
   bool isOptionalSomePatternInit() const {
@@ -517,19 +548,14 @@ public:
     return expression.initialization.patternBindingIndex;
   }
 
-  bool ignoreForEachWhereClause() const {
-    assert(isForEachStmt());
-    return forEachStmt.ignoreWhereClause;
-  }
-
   const ForEachStmtInfo &getForEachStmtInfo() const {
-    assert(isForEachStmt());
-    return forEachStmt.info;
+    assert(isForEachPreamble());
+    return forEachPreamble.info;
   }
 
   ForEachStmtInfo &getForEachStmtInfo() {
-    assert(isForEachStmt());
-    return forEachStmt.info;
+    assert(isForEachPreamble());
+    return forEachPreamble.info;
   }
 
   /// Whether this context infers an opaque return type.
@@ -548,6 +574,19 @@ public:
     expression.expression = expr;
   }
 
+  Pattern *getPattern() const {
+    if (auto *pattern = getAsUninitializedVar())
+      return pattern;
+
+    if (isForInitialization())
+      return getInitializationPattern();
+
+    if (kind == Kind::forEachPreamble)
+      return forEachPreamble.pattern;
+
+    return nullptr;
+  }
+
   void setPattern(Pattern *pattern) {
     if (kind == Kind::uninitializedVar) {
       assert(uninitializedVar.declaration.is<Pattern *>());
@@ -555,8 +594,8 @@ public:
       return;
     }
 
-    if (kind == Kind::forEachStmt) {
-      forEachStmt.pattern = pattern;
+    if (kind == Kind::forEachPreamble) {
+      forEachPreamble.pattern = pattern;
       return;
     }
 
@@ -573,7 +612,7 @@ public:
     expression.pattern = pattern;
   }
 
-  llvm::Optional<AnyFunctionRef> getAsFunction() const {
+  std::optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -581,8 +620,8 @@ public:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
-    case Kind::forEachStmt:
-      return llvm::None;
+    case Kind::forEachPreamble:
+      return std::nullopt;
 
     case Kind::function:
       return function.function;
@@ -590,7 +629,7 @@ public:
     llvm_unreachable("invalid function kind");
   }
 
-  llvm::Optional<StmtCondition> getAsStmtCondition() const {
+  std::optional<StmtCondition> getAsStmtCondition() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -598,8 +637,8 @@ public:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
-    case Kind::forEachStmt:
-      return llvm::None;
+    case Kind::forEachPreamble:
+      return std::nullopt;
 
     case Kind::stmtCondition:
       return stmtCondition.stmtCondition;
@@ -607,7 +646,7 @@ public:
     llvm_unreachable("invalid statement kind");
   }
 
-  llvm::Optional<CaseLabelItem *> getAsCaseLabelItem() const {
+  std::optional<CaseLabelItem *> getAsCaseLabelItem() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -615,8 +654,8 @@ public:
     case Kind::stmtCondition:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
-    case Kind::forEachStmt:
-      return llvm::None;
+    case Kind::forEachPreamble:
+      return std::nullopt;
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
@@ -632,7 +671,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::uninitializedVar:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return nullptr;
 
     case Kind::patternBinding:
@@ -649,7 +688,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -666,7 +705,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -686,8 +725,8 @@ public:
     case Kind::uninitializedVar:
       return nullptr;
 
-    case Kind::forEachStmt:
-      return forEachStmt.stmt;
+    case Kind::forEachPreamble:
+      return forEachPreamble.stmt;
     }
     llvm_unreachable("invalid case label type");
   }
@@ -700,7 +739,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -717,7 +756,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return nullptr;
 
     case Kind::uninitializedVar:
@@ -734,7 +773,7 @@ public:
     case Kind::stmtCondition:
     case Kind::caseLabelItem:
     case Kind::patternBinding:
-    case Kind::forEachStmt:
+    case Kind::forEachPreamble:
       return 0;
 
     case Kind::uninitializedVar:
@@ -797,9 +836,9 @@ public:
       return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
     }
 
-    // For-in statement target doesn't cover the body.
-    case Kind::forEachStmt:
-      auto *stmt = forEachStmt.stmt;
+    // For-in preamble target doesn't cover the body.
+    case Kind::forEachPreamble:
+      auto *stmt = forEachPreamble.stmt;
       SourceLoc startLoc = stmt->getForLoc();
       SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
 
@@ -841,14 +880,18 @@ public:
       return uninitializedVar.declaration.get<Pattern *>()->getLoc();
     }
 
-    case Kind::forEachStmt:
-      return forEachStmt.stmt->getStartLoc();
+    case Kind::forEachPreamble:
+      return forEachPreamble.stmt->getStartLoc();
     }
     llvm_unreachable("invalid target type");
   }
 
+  /// Marks the target as invalid, filling in ErrorTypes for the AST it
+  /// represents.
+  void markInvalid() const;
+
   /// Walk the contents of the application target.
-  llvm::Optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
+  std::optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
 };
 
 } // namespace constraints

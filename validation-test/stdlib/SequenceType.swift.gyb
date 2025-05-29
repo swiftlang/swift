@@ -1,7 +1,8 @@
 // -*- swift -*-
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
-
+// rdar://125917150
+// UNSUPPORTED: freestanding
 % import os.path
 % import gyb
 
@@ -249,7 +250,7 @@ extension EnumeratedSequence where Base : TestProtocol1 {
   }
 }
 
-SequenceTypeTests.test("enumerated()") {
+SequenceTypeTests.test("enumerated()/Sequence") {
   typealias Element = (offset: Int, element: OpaqueValue<Int>)
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
     return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
@@ -270,6 +271,81 @@ SequenceTypeTests.test("enumerated()") {
       result,
       resiliencyChecks: .none, sameValue: compareElements)
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
+  }
+}
+
+SequenceTypeTests.test("enumerated()/Collection") {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  typealias Element = (offset: Int, element: OpaqueValue<Int>)
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
+    return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
+  }
+
+  for test in enumerateTests {
+    let s = MinimalCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    var result = s.enumerated()
+    expectType(
+      EnumeratedSequence<MinimalCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    checkCollection(
+      test.expected.map {
+        (offset: $0.0, element: OpaqueValue($0.1))
+      } as [Element],
+      result,
+      resiliencyChecks: .none, sameValue: compareElements)
+  }
+}
+
+SequenceTypeTests.test("enumerated()/BidirectionalCollection") {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  typealias Element = (offset: Int, element: OpaqueValue<Int>)
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
+    return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
+  }
+
+  for test in enumerateTests {
+    let s = MinimalBidirectionalRandomAccessCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    var result = s.enumerated()
+    expectType(
+      EnumeratedSequence<MinimalBidirectionalRandomAccessCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    checkBidirectionalCollection(
+      test.expected.map {
+        (offset: $0.0, element: OpaqueValue($0.1))
+      } as [Element],
+      result,
+      resiliencyChecks: .none, sameValue: compareElements)
+  }
+}
+
+SequenceTypeTests.test("enumerated()/RandomAccessCollection") {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  typealias Element = (offset: Int, element: OpaqueValue<Int>)
+  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
+    return lhs.0 == rhs.0 && lhs.1.value == rhs.1.value
+  }
+
+  for test in enumerateTests {
+    let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    var result = s.enumerated()
+    expectType(
+      EnumeratedSequence<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    checkRandomAccessCollection(
+      test.expected.map {
+        (offset: $0.0, element: OpaqueValue($0.1))
+      } as [Element],
+      result,
+      resiliencyChecks: .none, sameValue: compareElements)
   }
 }
 
@@ -625,6 +701,40 @@ SequenceTypeTests.test("allSatisfy/Predicate") {
     expectEqual(
       test.expectedLeftoverSequence.map { $0.value }, s.map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// count(where:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("count/Predicate") {
+  for test in predicateCountTests {
+    let s = MinimalSequence<OpaqueValue<Int>>(
+      elements: test.sequence.map { OpaqueValue($0) })
+    expectEqual(
+      test.expected,
+      s.count(where: { test.includeElement($0.value) }),
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+SequenceTypeTests.test("count/Predicate/throws") {
+  struct E: Error, Equatable {}
+  
+  // FIXME: remove `throws(E)` annotations once error type is inferred
+  do throws(E) {
+    let c = try ([] as [Int]).count(where: { (_) throws(E) in throw E() })
+    expectEqual(c, 0)
+  } catch {
+    expectUnreachable()
+  }
+  
+  do throws(E) {
+    let c = try [1, 2, 3].count(where: { (_) throws(E) in throw E() })
+    expectUnreachable()
+  } catch {
+    expectEqual(error, E())
   }
 }
 

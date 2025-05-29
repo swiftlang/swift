@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name initializers -swift-version 5  -disable-availability-checking | %FileCheck %s --enable-var-scope --implicit-check-not=hop_to_executor
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name initializers -swift-version 5  -target %target-swift-5.1-abi-triple | %FileCheck %s --enable-var-scope --implicit-check-not=hop_to_executor
 // REQUIRES: concurrency
 
 // CHECK:       protocol Person {
@@ -56,8 +56,21 @@ enum MyEnum {
 }
 
 actor MyActor {
-  // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@owned MyActor) -> @owned MyActor
-  init() async {}
+  // CHECK-DAG:   sil hidden [ossa] @$s12initializers7MyActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned MyActor) -> @owned MyActor
+  // CHECK:       bb0(%0 : @owned $MyActor):
+  //   In the prologue, hop to the generic executor.
+  // CHECK-NEXT:    [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]] :
+  //   Later, when we return from an async call, hop to the
+  //   correct flow-sensitive value.
+  // CHECK:         [[FN:%.*]] = function_ref @$s12initializers8MyStructVACyYacfC :
+  // CHECK-NEXT:    apply [[FN]]
+  // CHECK-NEXT:    [[ISOLATION:%.*]] = builtin "flowSensitiveSelfIsolation"<MyActor>({{%.*}})
+  // CHECK-NEXT:    hop_to_executor [[ISOLATION]]
+  // CHECK-NEXT:    destroy_value [[ISOLATION]]
+  init() async {
+    _ = await MyStruct()
+  }
 }
 
 class EarthPerson : Person {
@@ -129,9 +142,10 @@ enum Birb {
 // CHECK-LABEL:  sil hidden [ossa] @$s12initializers7makeCatyyYaF : $@convention(thin) @async () -> () {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-// CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:          hop_to_executor [[BORROWED_EXECUTOR:%[0-9]+]]
+// CHECK:          end_borrow [[BORROWED_EXECUTOR]]
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat
-// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// CHECK:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers7makeCatyyYaF'
 func makeCat() async {
   _ = await Cat(name: "Socks")
@@ -140,9 +154,10 @@ func makeCat() async {
 // CHECK-LABEL:  sil hidden [ossa] @$s12initializers7makeDogyyYaF : $@convention(thin) @async () -> () {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-// CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:          hop_to_executor [[BORROWED_EXEC:%.*]] :
+// CHECK-NEXT:     end_borrow [[BORROWED_EXEC]]
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Dog.Type) -> Dog
-// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// CHECK:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers7makeDogyyYaF'
 func makeDog() async {
   _ = await Dog(name: "Lassie")
@@ -151,9 +166,10 @@ func makeDog() async {
 // CHECK-LABEL:  sil hidden [ossa] @$s12initializers8makeBirbyyYaF : $@convention(thin) @async () -> () {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-// CHECK:          hop_to_executor {{%[0-9]+}} : $MainActor
+// CHECK:          hop_to_executor [[BORROWED_EXEC:%.*]] : $MainActor
+// CHECK-NEXT:     end_borrow [[BORROWED_EXEC]]
 // CHECK-NEXT:     {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thin Birb.Type) -> Birb
-// CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
+// CHECK:          hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:        } // end sil function '$s12initializers8makeBirbyyYaF'
 func makeBirb() async {
   _ = await Birb(name: "Chirpy")
@@ -162,11 +178,13 @@ func makeBirb() async {
 actor SomeActor {
   var x: Int = 0
 
-  // NOTE: during SILGen, we don't expect any hop_to_executors in here.
-  // The implicit check-not covers that for us. The hops are inserted later.
+  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned SomeActor) -> @owned SomeActor {
+  // CHECK:       bb0(%0 :
+  // CHECK-NEXT:    [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
   init() async {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@guaranteed SomeActor) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s12initializers9SomeActorC10someMethodyyYaF : $@convention(method) @async (@sil_isolated @guaranteed SomeActor) -> () {
   // CHECK:           hop_to_executor {{%[0-9]+}} : $SomeActor
   // CHECK: } // end sil function '$s12initializers9SomeActorC10someMethodyyYaF'
   func someMethod() async {}
@@ -205,7 +223,7 @@ func callActorMethodFromGeneric(a: SomeActor) async {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply
-// CHECK-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> () -> @out τ_0_0 for <SomeActor> {
+// CHECK-LABEL: sil private [ossa] @$s12initializers15makeActorInTaskyyYaFAA04SomeC0CyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @out τ_0_0 for <SomeActor> {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply
@@ -219,7 +237,7 @@ func makeActorInTask() async {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply
-// CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYaYbcfU_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (@guaranteed SomeActor) -> @out τ_0_0 for <()> {
+// CHECK-LABEL: sil private [ossa] @$s12initializers21callActorMethodInTask1ayAA04SomeC0C_tYaFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>, @guaranteed SomeActor) -> @out τ_0_0 for <()> {
 // CHECK:          [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
 // CHECK-NEXT:     hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
 // CHECK:          apply

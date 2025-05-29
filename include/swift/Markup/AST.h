@@ -14,10 +14,10 @@
 #define SWIFT_MARKUP_AST_H
 
 #include "swift/Markup/LineList.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 namespace markup {
@@ -34,13 +34,13 @@ class LocalizationKeyField;
 /// The basic structure of a doc comment attached to a Swift
 /// declaration.
 struct CommentParts {
-  llvm::Optional<const Paragraph *> Brief;
+  std::optional<const Paragraph *> Brief;
   ArrayRef<const MarkupASTNode *> BodyNodes;
   ArrayRef<ParamField *> ParamFields;
-  llvm::Optional<const swift::markup::ReturnsField *> ReturnsField;
-  llvm::Optional<const swift::markup::ThrowsField *> ThrowsField;
+  std::optional<const swift::markup::ReturnsField *> ReturnsField;
+  std::optional<const swift::markup::ThrowsField *> ThrowsField;
   llvm::SmallSetVector<StringRef, 8> Tags;
-  llvm::Optional<const swift::markup::LocalizationKeyField *>
+  std::optional<const swift::markup::LocalizationKeyField *>
       LocalizationKeyField;
 
   bool isEmpty() const {
@@ -556,14 +556,14 @@ class Image final : public InlineContent,
 
   // FIXME: Hyperlink destinations can't be wrapped - use a Line
   StringRef Destination;
-  llvm::Optional<StringRef> Title;
+  std::optional<StringRef> Title;
 
-  Image(StringRef Destination, llvm::Optional<StringRef> Title,
+  Image(StringRef Destination, std::optional<StringRef> Title,
         ArrayRef<MarkupASTNode *> Children);
 
 public:
   static Image *create(MarkupContext &MC, StringRef Destination,
-                       llvm::Optional<StringRef> Title,
+                       std::optional<StringRef> Title,
                        ArrayRef<MarkupASTNode *> Children);
 
   StringRef getDestination() const { return Destination; }
@@ -651,7 +651,7 @@ class ParamField final : public PrivateExtension,
 
   // Parameter fields can contain a substructure describing a
   // function or closure parameter.
-  llvm::Optional<CommentParts> Parts;
+  std::optional<CommentParts> Parts;
 
   ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children);
 
@@ -664,9 +664,7 @@ public:
     return Name;
   }
 
-  llvm::Optional<CommentParts> getParts() const {
-    return Parts;
-  }
+  std::optional<CommentParts> getParts() const { return Parts; }
 
   void setParts(CommentParts P) {
     Parts = P;

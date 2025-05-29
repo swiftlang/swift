@@ -138,11 +138,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "NameLookup.h"
@@ -200,8 +202,7 @@ class ConcreteContraction {
     Other
   };
 
-  llvm::Optional<Type> substTypeParameterRec(Type type,
-                                             Position position) const;
+  std::optional<Type> substTypeParameterRec(Type type, Position position) const;
   Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;
@@ -234,7 +235,7 @@ public:
 /// to be some subclass of SomeClass which does conform to Sequence;
 /// this is perfectly valid, and we cannot substitute the 'T.Element'
 /// requirement. In this case, this method returns None.
-llvm::Optional<Type>
+std::optional<Type>
 ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
   // If we have a superclass (T : C) or same-type requirement (T == C),
@@ -272,7 +273,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
     auto baseType = memberType->getBase();
     auto substBaseType = substTypeParameterRec(baseType, Position::BaseType);
     if (!substBaseType)
-      return llvm::None;
+      return std::nullopt;
 
     // A resolved DependentMemberType stores an associated type declaration.
     //
@@ -280,15 +281,11 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
     // type's conformance to the associated type's protocol.
     if (auto *assocType = memberType->getAssocType()) {
       auto *proto = assocType->getProtocol();
-      auto *module = proto->getParentModule();
 
       // The 'Sendable' protocol does not declare any associated types, so the
       // 'allowMissing' value here is actually irrelevant.
-      auto conformance = ((*substBaseType)->isTypeParameter()
-                          ? ProtocolConformanceRef(proto)
-                          : module->lookupConformance(
-                              *substBaseType, proto,
-                              /*allowMissing=*/false));
+      auto conformance = lookupConformance(*substBaseType, proto,
+                                           /*allowMissing=*/false);
 
       if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
           conformance.hasUnavailableConformance()) {
@@ -302,12 +299,10 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
           llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
                        << proto->getName() << "\n";
         }
-        return llvm::None;
+        return std::nullopt;
       }
 
-      return assocType->getDeclaredInterfaceType()
-                      ->castTo<DependentMemberType>()
-                      ->substBaseType(module, *substBaseType);
+      return conformance.getTypeWitness(assocType);
     }
 
     // An unresolved DependentMemberType stores an identifier. Handle this
@@ -323,17 +318,16 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
         llvm::dbgs() << "@@@ Lookup of " << memberType->getName() << " failed on "
                      << *substBaseType << "\n";
       }
-      return llvm::None;
+      return std::nullopt;
     }
 
     // Substitute the base type into the member type.
     auto *dc = typeDecl->getDeclContext();
-    auto subMap = (*substBaseType)->getContextSubstitutionMap(
-        dc->getParentModule(), dc);
+    auto subMap = (*substBaseType)->getContextSubstitutionMap(dc);
     return typeDecl->getDeclaredInterfaceType().subst(subMap);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Replace the generic parameter at the root of \p type, which must be a
@@ -346,7 +340,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 /// it is the subject of a conformance requirement.
 Type ConcreteContraction::substTypeParameter(
     Type type, Position position) const {
-  assert(type->isTypeParameter());
+  ASSERT(type->isTypeParameter());
 
   auto result = substTypeParameterRec(type, position);
   if (!result)
@@ -357,9 +351,9 @@ Type ConcreteContraction::substTypeParameter(
 
 /// Substitute all type parameters occurring in structural positions of \p type.
 Type ConcreteContraction::substType(Type type) const {
-  return type.transformRec([&](Type type) -> llvm::Optional<Type> {
+  return type.transformRec([&](Type type) -> std::optional<Type> {
     if (!type->isTypeParameter())
-      return llvm::None;
+      return std::nullopt;
 
     return substTypeParameter(type, Position::Other);
   });
@@ -398,7 +392,6 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
         firstType, Position::ConformanceRequirement);
 
     auto *proto = req.getProtocolDecl();
-    auto *module = proto->getParentModule();
 
     // For conformance to 'Sendable', allow synthesis of a missing conformance
     // if the generic parameter is concrete, that is, if we're looking at a
@@ -414,8 +407,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
       allowMissing = true;
 
     if (!substFirstType->isTypeParameter()) {
-      auto conformance = module->lookupConformance(substFirstType, proto,
-                                                   allowMissing);
+      auto conformance = lookupConformance(substFirstType, proto,
+                                           allowMissing);
 
       if (!allowMissing &&
           proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
@@ -552,13 +545,13 @@ bool ConcreteContraction::performConcreteContraction(
   // subject type is a generic parameter.
   for (auto req : requirements) {
     auto subjectType = req.req.getFirstType();
-    assert(subjectType->isTypeParameter() &&
-           "You forgot to call desugarRequirement()");
+    ASSERT(subjectType->isTypeParameter() &&
+           "Forgot to call desugarRequirement()");
 
     auto kind = req.req.getKind();
     switch (kind) {
     case RequirementKind::SameShape:
-      assert(req.req.getSecondType()->isTypeParameter());
+      ASSERT(req.req.getSecondType()->isTypeParameter());
       continue;
 
     case RequirementKind::SameType: {
@@ -584,8 +577,8 @@ bool ConcreteContraction::performConcreteContraction(
     }
     case RequirementKind::Superclass: {
       auto constraintType = req.req.getSecondType();
-      assert(!constraintType->isTypeParameter() &&
-             "You forgot to call desugarRequirement()");
+      ASSERT(!constraintType->isTypeParameter() &&
+             "Forgot to call desugarRequirement()");
 
       subjectType = stripBoundDependentMemberTypes(subjectType);
       if (typeOccursIn(subjectType,
@@ -625,19 +618,25 @@ bool ConcreteContraction::performConcreteContraction(
 
     auto superclassTy = *found->second.begin();
 
-    for (const auto *proto : pair.second) {
-      if (auto otherSuperclassTy = proto->getSuperclass()) {
-        if (Debug) {
-          llvm::dbgs() << "@ Subject type of superclass requirement "
-                       << subjectType << " : " << superclassTy
-                       << " conforms to "<< proto->getName()
-                       << " which has a superclass bound "
-                       << otherSuperclassTy << "\n";
-        }
+    for (auto *proto : pair.second) {
+      if (lookupConformance(superclassTy, proto)) {
+        auto genericSig = proto->getGenericSignature();
+        // FIXME: If we end up here while building the requirement
+        // signature of `proto`, we will hit a request cycle.
+        if (auto otherSuperclassTy = genericSig->getSuperclassBound(
+                proto->getSelfInterfaceType())) {
+          if (Debug) {
+            llvm::dbgs() << "@ Subject type of superclass requirement "
+                         << subjectType << " : " << superclassTy
+                         << " conforms to "<< proto->getName()
+                         << " which has a superclass bound "
+                         << otherSuperclassTy << "\n";
+          }
 
-        if (superclassTy->isEqual(otherSuperclassTy)) {
-          Superclasses.erase(subjectType);
-          break;
+          if (superclassTy->isEqual(otherSuperclassTy)) {
+            Superclasses.erase(subjectType);
+            break;
+          }
         }
       }
     }
@@ -690,23 +689,8 @@ bool ConcreteContraction::performConcreteContraction(
     // Otherwise, desugar the requirement again, since we might now have a
     // requirement where the left hand side is not a type parameter.
     SmallVector<Requirement, 4> reqs;
-    if (req.inferred) {
-      // Discard errors from desugaring a substituted requirement that
-      // was inferred. For example, if we have something like
-      //
-      //   <T, U where T == Int, U == Set<T>>
-      //
-      // The inferred requirement 'T : Hashable' from 'Set<>' will
-      // be substituted with 'T == Int' to get 'Int : Hashable'.
-      //
-      // Desugaring will diagnose a redundant conformance requirement,
-      // but we want to ignore that, since the user did not explicitly
-      // write 'Int : Hashable' (or 'T : Hashable') anywhere.
-      SmallVector<RequirementError, 4> discardErrors;
-      desugarRequirement(substReq, SourceLoc(), reqs, discardErrors);
-    } else {
-      desugarRequirement(substReq, req.loc, reqs, errors);
-    }
+    SmallVector<InverseRequirement, 4> ignoreInverses;
+    desugarRequirement(substReq, req.loc, reqs, ignoreInverses, errors);
 
     for (auto desugaredReq : reqs) {
       if (Debug) {
@@ -714,7 +698,7 @@ bool ConcreteContraction::performConcreteContraction(
         desugaredReq.dump(llvm::dbgs());
         llvm::dbgs() << "\n";
       }
-      result.push_back({desugaredReq, req.loc, req.inferred});
+      result.push_back({desugaredReq, req.loc});
     }
 
     if (preserveSameTypeRequirement(req.req) &&
@@ -728,7 +712,7 @@ bool ConcreteContraction::performConcreteContraction(
 
       // Make the duplicated requirement 'inferred' so that we don't diagnose
       // it as redundant.
-      result.push_back({req.req, SourceLoc(), /*inferred=*/true});
+      result.push_back({req.req, SourceLoc()});
     }
   }
 

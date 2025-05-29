@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -Xllvm -sil-print-types -emit-sil -O -g %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -38,7 +38,7 @@ public func pullback<T>(
 
 // CHECK-LABEL: sil private @$s4main19testUpdateByCallingyyKF8fOfArrayL_5arraySdSaySdG_tFySdzcfU_TJpSUpSr :
 // CHECK: alloc_stack $Double, var, name "derivative of 'element' in scope at {{.*}} (scope #3)"
-// CHECK: debug_value %{{.*}} : $Builtin.FPIEEE64, var, (name "derivative of 'element' in scope at {{.*}} (scope #1)"
+// CHECK: debug_value %{{.*}} : $Builtin.FPIEEE64, var, (name "derivative of 'element' in scope at {{.*}} (scope #{{.*}})"
 
 public extension Array where Element: Differentiable {
     @inlinable

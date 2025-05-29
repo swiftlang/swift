@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import sys
 
 from . import product
 from .. import shell
@@ -42,16 +41,11 @@ class EarlySwiftDriver(product.Product):
         return True
 
     def should_build(self, host_target):
-        # Temporarily disable for non-darwin since this build never works
-        # outside of that case currently.
-        if sys.platform != 'darwin':
-            return False
-
         if self.is_cross_compile_target(host_target):
             return False
 
         if self.args.build_early_swift_driver:
-            if toolchain.host_toolchain().find_tool("swift") is None:
+            if toolchain.host_toolchain().find_tool("swiftc") is None:
                 warn_msg = 'Host toolchain could not locate a '\
                            'compiler to build swift-driver. '\
                            '(Try `--skip-early-swift-driver`)'
@@ -113,14 +107,6 @@ def run_build_script_helper(action, host_target, product, args):
     swiftc_path = os.path.abspath(product.toolchain.swiftc)
     toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
 
-    # Pass Dispatch directory down if we built it
-    dispatch_build_dir = os.path.join(
-        build_root, '%s-%s' % ('libdispatch', host_target))
-
-    # Pass Foundation directory down if we built it
-    foundation_build_dir = os.path.join(
-        build_root, '%s-%s' % ('foundation', host_target))
-
     # Pass the swift lit tests if we're testing and the Swift tests were built
     swift_build_dir = os.path.join(
         build_root, 'swift-{}'.format(host_target))
@@ -141,14 +127,6 @@ def run_build_script_helper(action, host_target, product, args):
         '--local_compiler_build'
     ]
 
-    if os.path.exists(dispatch_build_dir):
-        helper_cmd += [
-            '--dispatch-build-dir', dispatch_build_dir
-        ]
-    if os.path.exists(foundation_build_dir):
-        helper_cmd += [
-            '--foundation-build-dir', foundation_build_dir
-        ]
     if os.path.exists(lit_test_dir) and action == 'test':
         helper_cmd += [
             '--lit-test-dir', lit_test_dir

@@ -6,7 +6,16 @@
 // REQUIRES: OS=linux-gnu
 // REQUIRES: backtracing
 
-@_spi(DwarfTest) import _Backtracing
+@_spi(DwarfTest) import Runtime
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(SwiftWASILibc)
+import SwiftWASILibc
+#elseif canImport(ucrt)
+import ucrt
+#elseif canImport(SwiftGlibc)
+import SwiftGlibc
+#endif
 
 @main
 struct DwarfReader {

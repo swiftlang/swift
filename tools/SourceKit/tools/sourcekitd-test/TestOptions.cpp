@@ -20,6 +20,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+using namespace llvm::opt;
 using namespace sourcekitd_test;
 using llvm::StringRef;
 
@@ -28,9 +29,7 @@ namespace {
 // Create enum with OPT_xxx values for each option in Options.td.
 enum Opt {
   OPT_INVALID = 0,
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELP, META, VALUES)                                             \
-  OPT_##ID,
+#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
 #include "Options.inc"
   LastOption
 #undef OPTION
@@ -46,12 +45,7 @@ enum Opt {
 
 // Create table mapping all options defined in Options.td.
 static const llvm::opt::OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  {PREFIX,      NAME,      HELPTEXT,                                           \
-   METAVAR,     OPT_##ID,  llvm::opt::Option::KIND##Class,                     \
-   PARAM,       FLAGS,     OPT_##GROUP,                                        \
-   OPT_##ALIAS, ALIASARGS, VALUES},
+#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
 #include "Options.inc"
 #undef OPTION
 };
@@ -143,7 +137,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
-        .Case("syntactic-rename", SourceKitRequest::SyntacticRename)
         .Case("find-rename-ranges", SourceKitRequest::FindRenameRanges)
         .Case("find-local-rename-ranges", SourceKitRequest::FindLocalRenameRanges)
         .Case("translate", SourceKitRequest::NameTranslation)
@@ -200,7 +193,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- extract-comment\n"
                      << "- module-groups\n"
                      << "- range\n"
-                     << "- syntactic-rename\n"
                      << "- find-rename-ranges\n"
                      << "- find-local-rename-ranges\n"
                      << "- translate\n"
@@ -344,7 +336,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
-      SourceText = llvm::None;
+      SourceText = std::nullopt;
       Inputs.push_back(InputArg->getValue());
       break;
 
@@ -472,10 +464,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       DisableImplicitStringProcessingModuleImport = true;
       break;
 
-    case OPT_disable_implicit_backtracing_module_import:
-      DisableImplicitBacktracingModuleImport = true;
-      break;
-
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
@@ -496,7 +484,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 void TestOptions::printHelp(bool ShowHidden) const {
 
   // Based off of swift/lib/Driver/Driver.cpp, at Driver::printHelp
-  //FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
+  // FIXME: should we use IncludedFlagsBitmask and ExcludedFlagsBitmask?
   // Maybe not for modes such as Interactive, Batch, AutolinkExtract, etc,
   // as in Driver.cpp. But could be useful for extra info, like HelpHidden.
 

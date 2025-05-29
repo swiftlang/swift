@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=alloc_ref_dynamic | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+class BaseClass {
+  init()
+}
+
+class SubClass: BaseClass {
+  override init()
+}
+
+// CHECK-LABEL: sil [ossa] @test_alloc_ref_dynamic_with_upcast
+// CHECK:       bb0(%0 : $Builtin.Word):
+// CHECK:         [[AL:%.*]] = alloc_ref [tail_elems $Int * {{.*}} : $Builtin.Word] $SubClass
+// CHECK:         [[UP:%.*]] = upcast [[AL]] : $SubClass to $BaseClass
+// CHECK:         [[MO:%.*]] = move_value [lexical] [var_decl] [[UP]] : $BaseClass
+// CHECK:         return [[MO]] : $BaseClass
+// CHECK:       } // end sil function 'test_alloc_ref_dynamic_with_upcast'
+sil [ossa] @test_alloc_ref_dynamic_with_upcast : $@convention(thin) (Builtin.Word) -> @owned BaseClass {
+bb0(%0 : $Builtin.Word):
+  %4 = metatype $@thick SubClass.Type
+  %5 = upcast %4 : $@thick SubClass.Type to $@thick BaseClass.Type
+  %12 = alloc_ref_dynamic [tail_elems $Int * %0 : $Builtin.Word] %5 : $@thick BaseClass.Type, $BaseClass
+  %13 = move_value [lexical] [var_decl] %12 : $BaseClass
+  return %13 : $BaseClass
+}
+
+// CHECK-LABEL: sil [ossa] @test_alloc_ref_dynamic_without_upcast
+// CHECK:       bb0(%0 : $Builtin.Word):
+// CHECK:         [[AL:%.*]] = alloc_ref [tail_elems $Int * {{.*}} : $Builtin.Word] $BaseClass
+// CHECK:         [[MO:%.*]] = move_value [lexical] [var_decl] [[AL]] : $BaseClass
+// CHECK:         return [[MO]] : $BaseClass
+// CHECK:       } // end sil function 'test_alloc_ref_dynamic_without_upcast'
+sil [ossa] @test_alloc_ref_dynamic_without_upcast : $@convention(thin) (Builtin.Word) -> @owned BaseClass {
+bb0(%0 : $Builtin.Word):
+  %4 = metatype $@thick BaseClass.Type
+  %12 = alloc_ref_dynamic [tail_elems $Int * %0 : $Builtin.Word] %4 : $@thick BaseClass.Type, $BaseClass
+  %13 = move_value [lexical] [var_decl] %12 : $BaseClass
+  return %13 : $BaseClass
+}

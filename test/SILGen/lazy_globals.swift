@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library %s | %FileCheck %s
 
 // CHECK: sil private [global_init_once_fn] [ossa] @[[T:.*]]WZ : $@convention(c) (Builtin.RawPointer) -> () {
 // CHECK:   alloc_global @$s12lazy_globals1xSiv
@@ -9,8 +9,8 @@
 // CHECK:   [[TOKEN_ADDR:%.*]] = global_addr @[[T]]Wz : $*Builtin.Word
 // CHECK:   [[TOKEN_PTR:%.*]] = address_to_pointer [[TOKEN_ADDR]] : $*Builtin.Word to $Builtin.RawPointer
 // CHECK:   [[INIT_FUNC:%.*]] = function_ref @[[T]]WZ : $@convention(c) (Builtin.RawPointer) -> ()
-// CHECK:   builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(c) (Builtin.RawPointer) -> ()) : $()
-// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @$s12lazy_globals1xSivp : $*Int
+// CHECK:   [[ONCE:%.*]] = builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(c) (Builtin.RawPointer) -> ()) : $Builtin.SILToken
+// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @$s12lazy_globals1xSivp : $*Int depends_on [[ONCE]]
 // CHECK:   [[GLOBAL_PTR:%.*]] = address_to_pointer [[GLOBAL_ADDR]] : $*Int to $Builtin.RawPointer
 // CHECK:   return [[GLOBAL_PTR]] : $Builtin.RawPointer
 // CHECK: }
@@ -27,8 +27,8 @@ struct Foo {
 // CHECK:   [[TOKEN_ADDR:%.*]] = global_addr @[[T]]Wz : $*Builtin.Word
 // CHECK:   [[TOKEN_PTR:%.*]] = address_to_pointer [[TOKEN_ADDR]] : $*Builtin.Word to $Builtin.RawPointer
 // CHECK:   [[INIT_FUNC:%.*]] = function_ref @[[T]]WZ : $@convention(c) (Builtin.RawPointer) -> ()
-// CHECK:   builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(c) (Builtin.RawPointer) -> ()) : $()
-// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @$s12lazy_globals3FooV3fooSivpZ : $*Int
+// CHECK:   [[ONCE:%.*]] = builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(c) (Builtin.RawPointer) -> ()) : $Builtin.SILToken
+// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @$s12lazy_globals3FooV3fooSivpZ : $*Int depends_on [[ONCE]]
 // CHECK:   [[GLOBAL_PTR:%.*]] = address_to_pointer [[GLOBAL_ADDR]] : $*Int to $Builtin.RawPointer
 // CHECK:   return [[GLOBAL_PTR]] : $Builtin.RawPointer
   static var foo: Int = 22
@@ -51,8 +51,8 @@ enum Bar {
 // CHECK:   [[TOKEN_ADDR:%.*]] = global_addr @[[T]]Wz : $*Builtin.Word
 // CHECK:   [[TOKEN_PTR:%.*]] = address_to_pointer [[TOKEN_ADDR]] : $*Builtin.Word to $Builtin.RawPointer
 // CHECK:   [[INIT_FUNC:%.*]] = function_ref @[[T]]WZ : $@convention(c) (Builtin.RawPointer) -> ()
-// CHECK:   builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(c) (Builtin.RawPointer) -> ()) : $()
-// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @$s12lazy_globals3BarO3barSivpZ : $*Int
+// CHECK:   [[ONCE:%.*]] = builtin "once"([[TOKEN_PTR]] : $Builtin.RawPointer, [[INIT_FUNC]] : $@convention(c) (Builtin.RawPointer) -> ()) : $Builtin.SILToken
+// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @$s12lazy_globals3BarO3barSivpZ : $*Int depends_on [[ONCE]]
 // CHECK:   [[GLOBAL_PTR:%.*]] = address_to_pointer [[GLOBAL_ADDR]] : $*Int to $Builtin.RawPointer
 // CHECK:   return [[GLOBAL_PTR]] : $Builtin.RawPointer
   static var bar: Int = 33

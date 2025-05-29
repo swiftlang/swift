@@ -34,6 +34,8 @@ class ArgumentList;
 /// declaration/expression nodes.
 struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
   SourceLoc SigilLoc;
+  DeclNameRef ModuleName;
+  DeclNameLoc ModuleNameLoc;
   DeclNameRef MacroName;
   DeclNameLoc MacroNameLoc;
   SourceLoc LeftAngleLoc, RightAngleLoc;
@@ -43,13 +45,20 @@ struct MacroExpansionInfo : ASTAllocated<MacroExpansionInfo> {
   /// The referenced macro.
   ConcreteDeclRef macroRef;
 
-  MacroExpansionInfo(SourceLoc sigilLoc, DeclNameRef macroName,
+  enum : unsigned { InvalidDiscriminator = 0xFFFF };
+
+  unsigned Discriminator = InvalidDiscriminator;
+
+  MacroExpansionInfo(SourceLoc sigilLoc, DeclNameRef moduleName,
+                     DeclNameLoc moduleNameLoc, DeclNameRef macroName,
                      DeclNameLoc macroNameLoc, SourceLoc leftAngleLoc,
                      SourceLoc rightAngleLoc, ArrayRef<TypeRepr *> genericArgs,
                      ArgumentList *argList)
-      : SigilLoc(sigilLoc), MacroName(macroName), MacroNameLoc(macroNameLoc),
-        LeftAngleLoc(leftAngleLoc), RightAngleLoc(rightAngleLoc),
-        GenericArgs(genericArgs), ArgList(argList) {}
+      : SigilLoc(sigilLoc), ModuleName(moduleName),
+        ModuleNameLoc(moduleNameLoc), MacroName(macroName),
+        MacroNameLoc(macroNameLoc), LeftAngleLoc(leftAngleLoc),
+        RightAngleLoc(rightAngleLoc), GenericArgs(genericArgs),
+        ArgList(argList) {}
 
   SourceLoc getLoc() const { return SigilLoc; }
   SourceRange getGenericArgsRange() const {
@@ -66,12 +75,12 @@ enum class FreestandingMacroKind {
 /// A base class of either 'MacroExpansionExpr' or 'MacroExpansionDecl'.
 class FreestandingMacroExpansion {
   llvm::PointerIntPair<MacroExpansionInfo *, 1, FreestandingMacroKind>
-      infoAndKind;
+    infoAndKind;
 
 protected:
   FreestandingMacroExpansion(FreestandingMacroKind kind,
                              MacroExpansionInfo *info)
-      : infoAndKind(info, kind) {}
+  : infoAndKind(info, kind) {}
 
 public:
   MacroExpansionInfo *getExpansionInfo() const {
@@ -85,6 +94,10 @@ public:
 
   SourceLoc getPoundLoc() const { return getExpansionInfo()->SigilLoc; }
 
+  DeclNameLoc getModuleNameLoc() const {
+    return getExpansionInfo()->ModuleNameLoc;
+  }
+  DeclNameRef getModuleName() const { return getExpansionInfo()->ModuleName; }
   DeclNameLoc getMacroNameLoc() const {
     return getExpansionInfo()->MacroNameLoc;
   }
@@ -105,7 +118,13 @@ public:
 
   DeclContext *getDeclContext() const;
   SourceRange getSourceRange() const;
+
+  /// Returns a discriminator which determines this macro expansion's index
+  /// in the sequence of macro expansions within the current context.
   unsigned getDiscriminator() const;
+
+  /// Returns the raw discriminator, for debugging purposes only.
+  unsigned getRawDiscriminator() const;
 };
 
 } // namespace swift

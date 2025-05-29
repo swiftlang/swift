@@ -5,7 +5,7 @@ import Swift
 
 // CHECK-LABEL: sil [noinline] @$s14jumpthreadtest3fooys6UInt64Vs5UInt8VF :
 // CHECK: bb0
-// CHECK:  [[FUNC:%.*]] = function_ref @$ss17FixedWidthIntegerPsE15_truncatingInityxqd__SzRd__lFZs6UInt64V_s5UInt8VTgmq5 :
+// CHECK:  [[FUNC:%.*]] = function_ref @$ss17FixedWidthIntegerPsE15_truncatingInityxqd__SzRd__lFZs6UInt64V_s5UInt8VTt1gq5 :
 // CHECK: apply [[FUNC]]
 // CHECK-NOT: bb1
 // CHECK-LABEL: } // end sil function '$s14jumpthreadtest3fooys6UInt64Vs5UInt8VF'

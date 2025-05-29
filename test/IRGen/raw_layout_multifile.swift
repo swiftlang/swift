@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/raw_layout_multifile.swift
-// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-ir -O -disable-availability-checking %s %S/Inputs/raw_layout_multifile_b.swift | %FileCheck %t/raw_layout_multifile.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-ir -O -Xllvm -sil-disable-pass=deinit-devirtualizer -disable-availability-checking %s %S/Inputs/raw_layout_multifile_b.swift | %FileCheck %t/raw_layout_multifile.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_RawLayout
 
 @_rawLayout(like: Int32)
 public struct Foo<T>: ~Copyable {}
@@ -10,8 +13,8 @@ public struct Foo<T>: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 4
 // stride
 // CHECK-SAME:  , {{i64|i32}} 4
-// flags: alignment 3, noncopyable
-// CHECK-SAME:  , <i32 0x800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable
+// CHECK-SAME:  , <i32 0x1800003>
 struct MyInt: ~Copyable {
   let x: Int32Fake
 }
@@ -21,8 +24,8 @@ struct MyInt: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 48
 // stride
 // CHECK-SAME:  , {{i64|i32}} 48
-// flags: alignment 7, noncopyable, is not inline
-// CHECK-SAME:  , <i32 0x820007>
+// flags: alignment 7, noncopyable, non-bitwise-borrowable, is not inline
+// CHECK-SAME:  , <i32 0x1820007>
 struct BadBuffer: ~Copyable {
   let buf = SmallVectorOf3<Int64?>()
 }
@@ -32,10 +35,10 @@ struct BadBuffer: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 8
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags-32: alignment 7, noncopyable, is not inline
-// CHECK-SAME-32:  , <i32 0x820007>
-// flags-64: alignment 7, noncopyable
-// CHECK-SAME-64:  , <i32 0x800007>
+// flags-32: alignment 7, noncopyable, non-bitwise-borrowable, is not inline
+// CHECK-SAME-32:  , <i32 0x1820007>
+// flags-64: alignment 7, noncopyable, non-bitwise-borrowable
+// CHECK-SAME-64:  , <i32 0x1800007>
 struct Weird: ~Copyable {
   let value = UnsafeCell<Int64>()
 }

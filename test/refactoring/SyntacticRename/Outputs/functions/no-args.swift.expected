@@ -1,6 +1,6 @@
 import func SomeModule . /*import*/someFunc
 
-func /*no-args:def*/anotherFunc() -> Int {
+func /*no-args:def*/<base>aFunc</base>() -> Int {
     return 1
 }
 
@@ -9,7 +9,7 @@ func /*param-label:def*/aFunc(a: Int) {}
 func /*arg-label:def*/aFunc(b a:Int) {}
 
 func /*no-label:def*/aFunc(_ b:Int) -> Int {
-    return /*no-args:call*/anotherFunc()
+    return /*no-args:call*/<base>aFunc</base>()
 }
 
 func /*whitespace-labels:def*/aFunc(     a  b: Int ,_   a: Int, c c   : Int) {}
@@ -38,15 +38,15 @@ class AStruct {
 }
 
 let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/+ AStruct()
-/*no-args:call*/anotherFunc()
+/*no-args:call*/<base>aFunc</base>()
 /*param-label:call*/aFunc(a: 2)
-/*arg-label:call*/aFunc(b: /*no-args:call*/anotherFunc() * /*no-args:call*/anotherFunc())
+/*arg-label:call*/aFunc(b: /*no-args:call*/<base>aFunc</base>() * /*no-args:call*/<base>aFunc</base>())
 let _ = /*no-label:call*/aFunc(3)
 /*whitespace-labels:call*/aFunc( a  :  2 ,2,  c:  4 )
 
 let _ = aStruct . /*method:call*/foo(a: 2, b: 3, 1)
 let _ = AStruct . /*method*/foo(aStruct)(a: 1, b: 8, 10)
-let _ = aStruct . /*bar:call*/bar(/*no-args:call*/anotherFunc())(/*no-label:call*/aFunc(2))
+let _ = aStruct . /*bar:call*/bar(/*no-args:call*/<base>aFunc</base>())(/*no-label:call*/aFunc(2))
 
 var a = /*referenced*/bar
 var b = /*referenced*/bar(a:)

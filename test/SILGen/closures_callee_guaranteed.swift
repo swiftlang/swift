@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library  %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -parse-as-library  %s | %FileCheck %s
 import Swift
 
 // CHECK-LABEL: sil [ossa] @{{.*}}apply{{.*}} : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int)

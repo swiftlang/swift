@@ -23,7 +23,7 @@
 
 #include <atomic>
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 namespace threading_impl {
@@ -35,7 +35,7 @@ using thread_id = ::DWORD;
 inline thread_id thread_get_current() { return ::GetCurrentThreadId(); }
 bool thread_is_main();
 inline bool threads_same(thread_id a, thread_id b) { return a == b; }
-llvm::Optional<stack_bounds> thread_get_current_stack_bounds();
+std::optional<stack_bounds> thread_get_current_stack_bounds();
 
 // .. Mutex support ..........................................................
 
@@ -66,9 +66,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 using lazy_mutex_handle = SWIFT_SRWLOCK;
 
 // We don't need to be lazy here because Win32 has SRWLOCK_INIT.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return SRWLOCK_INIT;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER SRWLOCK_INIT
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
@@ -86,6 +85,26 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 }
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ReleaseSRWLockExclusive(&handle);
+}
+
+// .. Recursive mutex support ................................................
+
+using recursive_mutex_handle = SWIFT_CRITICAL_SECTION;
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {
+  InitializeCriticalSection(&handle);
+}
+
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {
+  DeleteCriticalSection(&handle);
+}
+
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
+  EnterCriticalSection(&handle);
+}
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
+  LeaveCriticalSection(&handle);
 }
 
 // .. ConditionVariable support ..............................................

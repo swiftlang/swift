@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}

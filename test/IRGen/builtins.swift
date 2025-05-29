@@ -1,9 +1,8 @@
-
-// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -enable-builtin-module -module-name builtins -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
-import Swift
+import Builtin
 
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
@@ -174,6 +173,37 @@ func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
   )
 }
 
+func scalar_select_test(
+  _ predicate: Builtin.Int1,
+  _ trueValue: Builtin.Int32,
+  _ falseValue: Builtin.Int32
+) -> Builtin.Int32 {
+  // CHECK: scalar_select_test
+  // CHECK: select i1 %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 %{{[0-9]+}}
+  Builtin.select_Int1_Int32(predicate, trueValue, falseValue)
+}
+
+func scalar_select_test_ii(
+  _ predicate: Builtin.Int1,
+  _ trueValue: Builtin.Vec4xInt32,
+  _ falseValue: Builtin.Vec4xInt32
+) -> Builtin.Vec4xInt32 {
+  // CHECK: scalar_select_test_ii
+  // CHECK: select i1 %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}
+  Builtin.select_Int1_Vec4xInt32(predicate, trueValue, falseValue)
+}
+
+func vector_select_test(
+  _ predicate: Builtin.Vec8xInt32,
+  _ trueValue: Builtin.Vec8xInt32,
+  _ falseValue: Builtin.Vec8xInt32
+) -> Builtin.Vec8xInt32 {
+  // CHECK: vector_select_test
+  // CHECK: select <8 x i1> %{{[0-9]+}}, <8 x i32> %{{[0-9]+}}, <8 x i32> %{{[0-9]+}}
+  let p = Builtin.trunc_Vec8xInt32_Vec8xInt1(predicate)
+  return Builtin.select_Vec8xInt1_Vec8xInt32(p, trueValue, falseValue)
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
@@ -213,11 +243,11 @@ func sizeof_alignof_metatype_test() {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 0, i32 8
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 0, i32 8
   // CHECK-NEXT: [[SIZE:%.*]] = load i64, ptr [[T0]]
   // CHECK-NEXT: store i64 [[SIZE]], ptr [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 0, i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 0, i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = zext i32 [[FLAGS]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 255
@@ -228,7 +258,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 9
   // CHECK-NEXT: [[STRIDE:%.*]] = load i64, ptr [[T0]]
   // CHECK-NEXT: store i64 [[STRIDE]], ptr [[S:%.*]]
   var s = Builtin.strideof(T.self)
@@ -330,9 +360,9 @@ func fneg_test(_ half: Builtin.FPIEEE16,
                double: Builtin.FPIEEE64)
   -> (Builtin.FPIEEE16, Builtin.FPIEEE32, Builtin.FPIEEE64)
 {
-  // CHECK: fsub half 0xH8000, {{%.*}}
-  // CHECK: fsub float -0.000000e+00, {{%.*}}
-  // CHECK: fsub double -0.000000e+00, {{%.*}}
+  // CHECK: fneg half
+  // CHECK: fneg float
+  // CHECK: fneg double
   return (Builtin.fneg_FPIEEE16(half),
           Builtin.fneg_FPIEEE32(single),
           Builtin.fneg_FPIEEE64(double))
@@ -456,6 +486,26 @@ func destroyGenArray<T>(_ array: Builtin.RawPointer, count: Builtin.Word, _: T) 
   Builtin.destroyArray(T.self, array, count)
 }
 
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins21destroyArraySinglePODyyBpF"(ptr %0)
+// CHECK-NOT:     call void @swift_arrayDestroy
+func destroyArraySinglePOD(_ array: Builtin.RawPointer) {
+  Builtin.destroyArray(Int.self, array, 1._builtinWordValue)
+}
+
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins24destroyArraySingleNonPODyyBpF"(ptr %0)
+// CHECK-NOT:     call void @swift_arrayDestroy
+// CHECK:         [[TO_DESTROY:%.*]] = load ptr, ptr {{%.*}}
+// CHECK:         call void @swift_release(ptr [[TO_DESTROY]])
+func destroyArraySingleNonPOD(_ array: Builtin.RawPointer) {
+  Builtin.destroyArray(C.self, array, 1._builtinWordValue)
+}
+
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins21destroyArraySingleGenyyBp_xmtlF"(ptr %0, ptr %1, ptr %T)
+// CHECK-NOT:     call void @swift_arrayDestroy
+// CHECK:         call void {{%.*}}(ptr {{.*}} {{%.*}}, ptr %T)
+func destroyArraySingleGen<T>(_ array: Builtin.RawPointer, _: T.Type) {
+  Builtin.destroyArray(T.self, array, 1._builtinWordValue)
+}
 
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12copyPODArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2)
 // check:         mul nuw i64 4, %2
@@ -619,11 +669,11 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
-// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsBuiltinNativeObject(_ ref: inout Builtin.NativeObject?) {}
 
 // native
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr %[[LD_RC]])
@@ -633,7 +683,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // native nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD_RC]])
@@ -642,13 +692,13 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK:      [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
+// CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load ptr, ptr [[ADDR]]
 // CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}(ptr [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr [[REF]])
@@ -659,9 +709,9 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 
 // ObjC nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
-// CHECK-SAME:    (ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-SAME:    (ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK:      [[ADDR:%.+]] = getelementptr inbounds %AnyObject, ptr %0, i32 0, i32 0
+// CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} %AnyObject, ptr %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load ptr, ptr [[ADDR]]
 // CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull(ptr [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr [[REF]])
@@ -671,7 +721,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(ptr %[[LD]])
@@ -687,7 +737,7 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD]])
@@ -697,7 +747,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: call zeroext i1 @swift_isUniquelyReferenced_native(ptr
 // CHECK: ret i1
@@ -714,7 +764,7 @@ func COWBufferForReading(_ ref: __owned C) -> C {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i32 [[FLAGS]], 65536
   // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i32 [[ISNOTPOD]], 0
@@ -733,7 +783,7 @@ func ispod_test() {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_isbitwisetakable_test
 func generic_isbitwisetakable_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i32 [[FLAGS]], 1048576
   // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i32 [[ISNOTBITWISETAKABLE]], 0
@@ -827,5 +877,28 @@ func convertTaskToJob(_ task: Builtin.NativeObject) -> Builtin.Job {
   return Builtin.convertTaskToJob(task)
 }
 
+// CHECK-LABEL: define {{.*}} swiftcc i32 @"$s8builtins10getEnumTagys6UInt32VxlF"(ptr {{.*}} %0, ptr %T)
+// CHECK: %GetEnumTag = load ptr, ptr {{%.*}}
+// CHECK: [[TAG:%.*]] = call i32 %GetEnumTag(ptr {{.*}} %0, ptr %T)
+// CHECK: ret i32 [[TAG]]
+func getEnumTag<T>(_ x: T) -> UInt32 {
+  UInt32(Builtin.getEnumTag(x))
+}
+
+// CHECK-LABEL: define {{.*}} swiftcc void @"$s8builtins13injectEnumTag_3tagyxz_s6UInt32VtlF"(ptr %0, i32 %1, ptr %T)
+// CHECK: %DestructiveInjectEnumTag = load ptr, ptr {{%.*}}
+// CHECK: call void %DestructiveInjectEnumTag(ptr {{.*}} %0, i32 %1, ptr %T)
+func injectEnumTag<T>(_ x: inout T, tag: UInt32) {
+  Builtin.injectEnumTag(&x, tag._value)
+}
+
+// Check that we still support the obsolete allocVector builtin in old Swift.interface files.
+
+// CHECK-LABEL: define {{.*}} swiftcc ptr @"$s8builtins14allocateVector11elementType8capacityBpxm_BwtlF"
+// CHECK:       trap()
+// CHECK:       unreachable
+func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) -> Builtin.RawPointer {
+  return Builtin.allocVector(elementType, capacity)
+}
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

@@ -42,22 +42,24 @@ generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
 generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 
 add_swift_host_library(swiftBasic STATIC
+  Assertions.cpp
   BasicBridging.cpp
   BasicSourceInfo.cpp
   Cache.cpp
-  CBasicBridging.cpp
+  CASOptions.cpp
   ClusteredBitVector.cpp
-  CBasicBridging.cpp
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
   ExponentialGrowthAppendingBinaryByteStream.cpp
+  Feature.cpp
   FileSystem.cpp
   FileTypes.cpp
   Fingerprint.cpp
   ParseableOutput.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LoadDynamicLibrary.cpp
   Located.cpp
   Mangler.cpp
   OutputFileMap.cpp
@@ -68,10 +70,12 @@ add_swift_host_library(swiftBasic STATIC
   Program.cpp
   QuotedString.cpp
   Sandbox.cpp
+  SmallBitVector.cpp
   SourceLoc.cpp
   StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
+  SupportedFeatures.cpp
   TargetInfo.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
@@ -95,6 +99,7 @@ _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 
 target_include_directories(swiftBasic PRIVATE
+  clangBasic
   ${UUID_INCLUDE})
 
 target_link_libraries(swiftBasic PUBLIC

@@ -32,6 +32,8 @@ class SourceLocation;
 
 namespace swift {
 
+class ClangInheritanceInfo;
+class ClangNode;
 class ConcreteDeclRef;
 class Decl;
 class FuncDecl;
@@ -144,9 +146,10 @@ public:
   virtual clang::Sema &getClangSema() const = 0;
   virtual const clang::CompilerInstance &getClangInstance() const = 0;
   virtual void printStatistics() const = 0;
+  virtual void dumpSwiftLookupTables() const = 0;
 
   /// Returns the module that contains imports and declarations from all loaded
-  /// Objective-C header files.
+  /// header files.
   virtual ModuleDecl *getImportedHeaderModule() const = 0;
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
@@ -201,10 +204,17 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
-  /// Imports a clang decl from a base class, cloning it for \param newContext
-  /// if it wasn't cloned for this specific context before.
+  /// Clones an imported \param decl from its base class to its derived class
+  /// \param newContext where it is inherited. Its access level is determined
+  /// with respect to \param inheritance, which signifies whether \param decl
+  /// was inherited via C++ public/protected/private inheritance.
+  ///
+  /// This function uses a cache so that it is idempotent; successive
+  /// invocations will only generate one cloned ValueDecl (and all return
+  /// a pointer to it). Returns a NULL pointer upon failure.
   virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                          DeclContext *newContext) = 0;
+                                          DeclContext *newContext,
+                                          ClangInheritanceInfo inheritance) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -283,7 +293,9 @@ public:
 
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
-  virtual llvm::Optional<Type>
+  virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
+  virtual std::optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;
 
@@ -310,6 +322,10 @@ public:
   getTypeDefForCXXCFOptionsDefinition(const clang::Decl *candidateDecl) = 0;
 
   virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
+
+  /// Just like Decl::getClangNode() except we look through to the 'Code'
+  /// enum of an error wrapper struct.
+  virtual ClangNode getEffectiveClangNode(const Decl *decl) const = 0;
 };
 
 /// Describes a C++ template instantiation error.

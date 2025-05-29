@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -os-log-optimization -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -os-log-optimization -enable-sil-verify-all %s 2>&1 | %FileCheck %s
 
 // SIL tests for the OSLogOptimization pass which performs compile-time analysis
 // and optimization of os log APIs. This test checks specific aspects of the
@@ -38,7 +38,7 @@ sil @useFormatString: $@convention(thin) (@guaranteed String) -> ()
 // CHECK-DAG: [[BORROW]] = begin_borrow [[STRINGCONST:%[0-9]+]]
 // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
 // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-// CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+// CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
 // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 sil [ossa] @testConstantFoldingOfStructExtract : $@convention(thin) () -> () {
 bb0:
@@ -64,6 +64,34 @@ bb0:
   destroy_value %7 : $OSLogMessageStub
   %13 = tuple ()
   return %13 : $()
+}
+
+// CHECK-LABEL: @testConstantFoldingOfStructExtractMetatypeArg :
+// CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+// CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[BORROW:%[0-9]+]])
+// CHECK-DAG: [[BORROW]] = begin_borrow [[STRINGCONST:%[0-9]+]]
+// CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+// CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+// CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
+// CHECK-DAG: destroy_value [[STRINGCONST]] : $String
+sil [ossa] @testConstantFoldingOfStructExtractMetatypeArg : $@convention(thin) (@thin String.Type) -> () {
+bb0(%0 : $@thin String.Type):
+  %1 = string_literal utf8 "test message: %lld"
+  %2 = integer_literal $Builtin.Word, 18
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%1, %2, %3, %0) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %8 = begin_borrow %7
+  %9 = struct_extract %8, #OSLogMessageStub.interpolation
+  %10 = struct_extract %9, #OSLogInterpolationStub.formatString
+  %11 = function_ref @useFormatString : $@convention(thin) (@guaranteed String) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed String) -> ()
+  end_borrow %8
+  destroy_value %7
+  %15 = tuple ()
+  return %15
 }
 
 /// A function that models the use of a string in some arbitrary way.
@@ -98,7 +126,7 @@ bb0:
   dealloc_stack %11 : $*String
   %15 = tuple ()
   return %15 : $()
-    // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "some long message: %llx"
+    // CHECK: [[LIT:%[0-9]+]] = string_literal oslog "some long message: %llx"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST:%[0-9]+]] = apply [[STRINGINIT]]([[LIT]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[STRINGCONST]]
@@ -136,7 +164,7 @@ bb0:
     // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
     // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
     // FIXME: function_ref @extractFormatStringAsOwned will not be removed as of
     // now by OSLogOptimization pass even though it is folded as function calls
     // are not dead-code eliminated.
@@ -173,12 +201,12 @@ bb0:
   destroy_value %9 : $String
   %12 = tuple ()
   return %12 : $()
-    // CHECK-DAG [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
-    // CHECK-DAG {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
-    // CHECK-DAG [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
-    // CHECK-DAG [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG [[LIT]] = string_literal utf8 "test message: %lld"
-    // CHECK-DAG destroy_value [[STRINGCONST]] : $String
+    // CHECK-DAG: [[STRINGUSE:%[0-9]+]] = function_ref @useFormatString
+    // CHECK-DAG: {{%.*}} = apply [[STRINGUSE]]([[STRINGCONST:%[0-9]+]])
+    // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
+    // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
 // Test that the OSLogOptimization pass does not fold instructions that define
@@ -219,7 +247,7 @@ bb0:
     // CHECK-DAG: [[BORROW2]] = begin_borrow [[STRINGCONST:%[0-9]+]]
     // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
     // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
@@ -271,12 +299,12 @@ bb5:
     // We must have all string literals at the beginning of the borrowed scope,
     // and destroys of the literals at the end of the borrow scope.
 
-    // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "test message: %lld"
+    // CHECK: [[LIT:%[0-9]+]] = string_literal oslog "test message: %lld"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST:%[0-9]+]] = apply [[STRINGINIT]]([[LIT]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[STRINGCONST]]
 
-    // CHECK: [[LIT2:%[0-9]+]] = string_literal utf8 "test message: %lld"
+    // CHECK: [[LIT2:%[0-9]+]] = string_literal oslog "test message: %lld"
     // CHECK: [[STRINGINIT2:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST2:%[0-9]+]] = apply [[STRINGINIT2]]([[LIT2]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[BORROW2:%[0-9]+]] = begin_borrow [[STRINGCONST2]]
@@ -324,7 +352,7 @@ bb0:
     // CHECK-DAG: [[BORROW]] = begin_borrow [[STRINGCONST:%[0-9]+]]
     // CHECK-DAG: [[STRINGCONST]] = apply [[STRINGINIT:%[0-9]+]]([[LIT:%[0-9]+]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK-DAG: [[STRINGINIT]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
-    // CHECK-DAG: [[LIT]] = string_literal utf8 "test message: %lld"
+    // CHECK-DAG: [[LIT]] = string_literal oslog "test message: %lld"
     // CHECK-DAG: destroy_value [[STRINGCONST]] : $String
 }
 
@@ -407,7 +435,8 @@ bb0:
     // CHECK: [[ALLOCATORREF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK: [[TUPLE:%[0-9]+]] = apply [[ALLOCATORREF]]<Int64>([[NUMELEMS]])
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
-    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]] : $Builtin.RawPointer to [strict] $*Int64
+    // CHECK: [[MDI:%.*]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAY]] : $Array<Int64>
+    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Int64
     // CHECK: store [[ELEM1INT]] to [trivial] [[STORAGEADDR]] : $*Int64
     // CHECK: [[INDEX1:%[0-9]+]] = integer_literal $Builtin.Word, 1
     // CHECK: [[INDEXADDR1:%[0-9]+]] = index_addr [[STORAGEADDR]] : $*Int64, [[INDEX1]] : $Builtin.Word
@@ -532,14 +561,15 @@ bb0:
   %8 = tuple ()
   return %8 : $()
     // The first instance of "ab" will be dead code eliminated.
-    // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "ab"
+    // CHECK: [[LIT:%[0-9]+]] = string_literal oslog "ab"
     // CHECK: [[STRINGINIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
     // CHECK: [[STRINGCONST:%[0-9]+]] = apply [[STRINGINIT]]([[LIT]], {{%.*}}, {{%.*}}, {{%.*}})
     // CHECK: [[NUMELEMS:%[0-9]+]] = integer_literal $Builtin.Word, 1
     // CHECK: [[ALLOCATORREF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK: [[TUPLE:%[0-9]+]] = apply [[ALLOCATORREF]]<String>([[NUMELEMS]])
     // CHECK: ([[ARRAY:%[0-9]+]], [[STORAGEPTR:%[0-9]+]]) = destructure_tuple [[TUPLE]]
-    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]] : $Builtin.RawPointer to [strict] $*String
+    // CHECK: [[MDI:%.*]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAY]] : $Array<String>
+    // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*String
     // CHECK: store [[STRINGCONST]] to [init] [[STORAGEADDR]] : $*String
     // CHECK: [[FINALIZEREF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
     // CHECK: [[FINALIZED:%[0-9]+]] = apply [[FINALIZEREF]]<String>([[ARRAY]])

@@ -18,19 +18,27 @@ import _Concurrency
 internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   static let _shared: DistributedRemoteActorReferenceExecutor = DistributedRemoteActorReferenceExecutor()
   static var sharedUnownedExecutor: UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: _shared)
+    unsafe UnownedSerialExecutor(ordinary: _shared)
   }
 
   internal init() {}
 
+  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @inlinable
+  func enqueue(_ job: UnownedJob) {
+    let jobDescription = job.description
+    fatalError("Attempted to enqueue ExecutorJob (\(jobDescription)) on executor of remote distributed actor reference!")
+  }
+  #else
   @inlinable
   public func enqueue(_ job: consuming ExecutorJob) {
     let jobDescription = job.description
     fatalError("Attempted to enqueue ExecutorJob (\(jobDescription)) on executor of remote distributed actor reference!")
   }
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: self)
+    unsafe UnownedSerialExecutor(ordinary: self)
   }
 }
 
@@ -49,5 +57,5 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
 public func buildDefaultDistributedRemoteActorExecutor<Act>(
     _ actor: Act
 ) -> UnownedSerialExecutor where Act: DistributedActor {
-  return DistributedRemoteActorReferenceExecutor.sharedUnownedExecutor
+  return unsafe DistributedRemoteActorReferenceExecutor.sharedUnownedExecutor
 }

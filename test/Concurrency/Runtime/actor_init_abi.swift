@@ -8,20 +8,20 @@
 /// -----------------------------------------------------------------------
 
 // ------> first library DOES delegate
-// RUN: %target-build-swift-dylib(%t/%target-library-name(MysteryInit)) -D DELEGATES -Xfrontend -disable-availability-checking -enable-library-evolution %S/Inputs/MysteryInit.swift -emit-module -emit-module-path %t/MysteryInit.swiftmodule -module-name MysteryInit
+// RUN: %target-build-swift-dylib(%t/%target-library-name(MysteryInit)) -D DELEGATES -target %target-swift-5.1-abi-triple -enable-library-evolution %S/Inputs/MysteryInit.swift -emit-module -emit-module-path %t/MysteryInit.swiftmodule -module-name MysteryInit
 // RUN: %target-codesign %t/%target-library-name(MysteryInit)
 
 
 // ------> make sure that works
-// RUN: %target-build-swift -parse-as-library  -Xfrontend -disable-availability-checking %s -lMysteryInit -I %t -L %t -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift -parse-as-library  -target %target-swift-5.1-abi-triple %s -lMysteryInit -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(MysteryInit) | %FileCheck --check-prefix=CHECK-DELEGATES %s
 
-// ------> do a little internal sanity check on this test itself
+// ------> do a little internal soundness check on this test itself
 // RUN: %target-run %t/main %t/%target-library-name(MysteryInit) | not %FileCheck --check-prefix=CHECK-NO-DELEGATES %s
 
 // ------> now recompile that library's init so it DOES NOT delegate, without recompiling executable
-// RUN: %target-build-swift-dylib(%t/%target-library-name(MysteryInit)) -Xfrontend -disable-availability-checking -enable-library-evolution %S/Inputs/MysteryInit.swift -emit-module -emit-module-path %t/MysteryInit.swiftmodule -module-name MysteryInit
+// RUN: %target-build-swift-dylib(%t/%target-library-name(MysteryInit)) -target %target-swift-5.1-abi-triple -enable-library-evolution %S/Inputs/MysteryInit.swift -emit-module -emit-module-path %t/MysteryInit.swiftmodule -module-name MysteryInit
 // RUN: %target-codesign %t/%target-library-name(MysteryInit)
 
 // ------> re-run executable
@@ -33,12 +33,12 @@
 /// -----------------------------------------------------------------------
 
 // ------> library currently DOES NOT delegate. recompile executable to match.
-// RUN: %target-build-swift -parse-as-library  -Xfrontend -disable-availability-checking %s -lMysteryInit -I %t -L %t -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift -parse-as-library  -target %target-swift-5.1-abi-triple %s -lMysteryInit -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(MysteryInit) | %FileCheck --check-prefix=CHECK-NO-DELEGATES %s
 
 // ------> now recompile that library's init so it DOES delegate, without recompiling executable
-// RUN: %target-build-swift-dylib(%t/%target-library-name(MysteryInit)) -D DELEGATES -Xfrontend -disable-availability-checking -enable-library-evolution %S/Inputs/MysteryInit.swift -emit-module -emit-module-path %t/MysteryInit.swiftmodule -module-name MysteryInit
+// RUN: %target-build-swift-dylib(%t/%target-library-name(MysteryInit)) -D DELEGATES -target %target-swift-5.1-abi-triple -enable-library-evolution %S/Inputs/MysteryInit.swift -emit-module -emit-module-path %t/MysteryInit.swiftmodule -module-name MysteryInit
 // RUN: %target-codesign %t/%target-library-name(MysteryInit)
 
 // ------> re-run executable

@@ -48,6 +48,7 @@ private:
   llvm::Triple TargetTriple;
   std::vector<std::string> InputFilenames;
   bool UseSharedResourceFolder = true;
+  bool EnableObjCInterop = true;
 
 public:
   bool hasSingleInput() const { return InputFilenames.size() == 1; }
@@ -65,6 +66,7 @@ public:
   llvm::Triple &getTargetTriple() { return TargetTriple; }
 
   bool useSharedResourceFolder() { return UseSharedResourceFolder; }
+  bool enableObjCInterop() { return EnableObjCInterop; }
 
   int parseArgs(llvm::ArrayRef<const char *> Args, DiagnosticEngine &Diags) {
     using namespace options;
@@ -124,6 +126,9 @@ public:
       UseSharedResourceFolder = false;
     }
 
+    EnableObjCInterop = ParsedArgs.hasFlag(OPT_enable_objc_interop,
+        OPT_disable_objc_interop, TargetTriple.isOSDarwin());
+
     return 0;
   }
 };
@@ -182,16 +187,23 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   LangOptions LangOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   LangOpts.Target = Invocation.getTargetTriple();
+  LangOpts.EnableObjCInterop = Invocation.enableObjCInterop();
   ASTContext &ASTCtx = *ASTContext::get(
       LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
-      SymbolGraphOpts, SrcMgr, Instance.getDiags(),
+      SymbolGraphOpts, CASOpts, SerializationOpts, SrcMgr, Instance.getDiags(),
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
-  
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ""), true);
-  ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
+
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, "",
+                                               nullptr, nullptr,
+                                               true),
+                         true);
+  ModuleDecl *M =
+      ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(
       new Lowering::TypeConverter(*M, ASTCtx.SILOpts.EnableSILOpaqueValues));
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, *TC, SILOpts);

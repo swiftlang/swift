@@ -43,7 +43,8 @@ AddressOnlyTangentVectorTests.test("LoadableClassAddressOnlyTangentVector") {
   @differentiable(reverse)
   func conditional<T: Differentiable>(_ s: LoadableClass<T>) -> T {
     var tuple = (s, (s, s))
-    if false {}
+    // TODO: cannot use literal `false` because it crashes
+    if 1 == 0 {}
     return tuple.1.0.stored
   }
   expectEqual(.init(stored: 1), gradient(at: LoadableClass<Float>(10), of: conditional))

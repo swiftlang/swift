@@ -63,6 +63,12 @@ public struct CollectionDifference<ChangeElement> {
         }
       }
     }
+    internal var _isRemoval: Bool {
+      switch self {
+      case .insert: false
+      case .remove: true
+      }
+    }
   }
 
   /// The insertions contained by this difference, from lowest offset to 
@@ -380,6 +386,7 @@ extension CollectionDifference where ChangeElement: Hashable {
   }
 }
 
+#if !$Embedded
 @available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   private enum _CodingKeys: String, CodingKey {
@@ -404,13 +411,7 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: _CodingKeys.self)
-    switch self {
-    case .remove(_, _, _):
-      try container.encode(true, forKey: .isRemove)
-    case .insert(_, _, _):
-      try container.encode(false, forKey: .isRemove)
-    }
-    
+    try container.encode(_isRemoval, forKey: .isRemove)
     try container.encode(_offset, forKey: .offset)
     try container.encode(_element, forKey: .element)
     try container.encode(_associatedOffset, forKey: .associatedOffset)
@@ -418,7 +419,38 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension CollectionDifference: Codable where ChangeElement: Codable {}
+extension CollectionDifference: Codable where ChangeElement: Codable {
+  private enum _CodingKeys: String, CodingKey {
+    case insertions
+    case removals
+  }
+  
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: _CodingKeys.self)
+    var changes = try container.decode([Change].self, forKey: .removals)
+    let removalCount = changes.count
+    try changes.append(contentsOf: container.decode([Change].self, forKey: .insertions))
+
+    guard changes[..<removalCount].allSatisfy({ $0._isRemoval }),
+          changes[removalCount...].allSatisfy({ !$0._isRemoval }),
+          Self._validateChanges(changes)
+    else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot decode an invalid collection difference"))
+    }
+
+    self.init(_validatedChanges: changes)
+  }
+  
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: _CodingKeys.self)
+    try container.encode(insertions, forKey: .insertions)
+    try container.encode(removals, forKey: .removals)
+  }
+}
+#endif
 
 @available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Sendable where ChangeElement: Sendable { }

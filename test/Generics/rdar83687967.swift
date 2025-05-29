@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
@@ -28,7 +28,6 @@ public func caller11<Child: P3>(_: Child)
 // CHECK: Generic signature: <Child where Child : P3, Child.[P3]B == G<Child.[P3]A>>
 public func caller12<Child: P3>(_: Child)
     where Child.B == G<Child.A>, Child.A : P1 {
-    // expected-warning@-1 {{redundant conformance constraint 'Child.A' : 'P1'}}
 
   // Make sure IRGen can evaluate the conformance access path
   // (Child : P3)(Self.B : P2)(Self.A : P1).
@@ -48,7 +47,6 @@ public protocol X1 {
 public protocol X2 {
   associatedtype Child: P3
     where Child.B == G<Child.A>, Child.A : P1
-    // expected-warning@-1 {{redundant conformance constraint 'Self.Child.A' : 'P1'}}
 }
 
 public func caller21<T : X1>(_: T) {

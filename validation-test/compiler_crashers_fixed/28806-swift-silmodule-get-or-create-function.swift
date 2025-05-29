@@ -5,7 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
 // RUN: %target-swift-frontend %s -emit-ir -o /dev/null -verify
 
 @_cdecl("main")func x(){} // expected-error {{multiple definitions of symbol 'main'}}

@@ -25,6 +25,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "clang/CAS/CASOptions.h"
+#include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/ObjectStore.h"
@@ -45,21 +46,20 @@ enum class SwiftCacheToolAction {
   PrintBaseKey,
   PrintOutputKeys,
   ValidateOutputs,
-  RenderDiags
+  RenderDiags,
+  PrintIncludeTreeList,
+  PrintCompileCacheKey,
 };
 
 struct OutputEntry {
   std::string InputPath;
-  std::string OutputPath;
-  std::string OutputKind;
   std::string CacheKey;
+  std::vector<std::pair<std::string, std::string>> Outputs;
 };
 
 enum ID {
   OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  OPT_##ID,
+#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
 #include "SwiftCacheToolOptions.inc"
   LastOption
 #undef OPTION
@@ -73,10 +73,7 @@ enum ID {
 #undef PREFIX
 
 static const OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  {PREFIX, NAME,  HELPTEXT,    METAVAR,     OPT_##ID,  Option::KIND##Class,    \
-   PARAM,  FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS, VALUES},
+#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
 #include "SwiftCacheToolOptions.inc"
 #undef OPTION
 };
@@ -148,12 +145,17 @@ public:
               .Case("print-output-keys", SwiftCacheToolAction::PrintOutputKeys)
               .Case("validate-outputs", SwiftCacheToolAction::ValidateOutputs)
               .Case("render-diags", SwiftCacheToolAction::RenderDiags)
+              .Case("print-include-tree-list",
+                    SwiftCacheToolAction::PrintIncludeTreeList)
+              .Case("print-compile-cache-key",
+                    SwiftCacheToolAction::PrintCompileCacheKey)
               .Default(SwiftCacheToolAction::Invalid);
 
     if (ActionKind == SwiftCacheToolAction::Invalid) {
       llvm::errs()
           << "Invalid option specified for -cache-tool-action: "
-          << "print-base-key|print-output-keys|validate-outputs|render-diags\n";
+          << "print-base-key|print-output-keys|validate-outputs|render-diags|"
+          << "print-include-tree-list|print-compile-cache-key\n";
       return 1;
     }
 
@@ -170,6 +172,10 @@ public:
       return validateOutputs();
     case SwiftCacheToolAction::RenderDiags:
       return renderDiags();
+    case SwiftCacheToolAction::PrintIncludeTreeList:
+      return printIncludeTreeList();
+    case SwiftCacheToolAction::PrintCompileCacheKey:
+      return printCompileCacheKey();
     case SwiftCacheToolAction::Invalid:
       return 0; // No action. Probably just print help. Return.
     }
@@ -188,9 +194,9 @@ private:
     }
     // drop swift-frontend executable path and leading `-frontend` from
     // command-line.
-    if (StringRef(FrontendArgs[0]).endswith("swift-frontend"))
+    if (StringRef(FrontendArgs[0]).ends_with("swift-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());
-    if (StringRef(FrontendArgs[0]).equals("-frontend"))
+    if (StringRef(FrontendArgs[0]) == "-frontend")
       FrontendArgs.erase(FrontendArgs.begin());
 
     SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4>
@@ -221,7 +227,7 @@ private:
                              MainExecutablePath))
       return true;
 
-    if (!Invocation.getFrontendOptions().EnableCaching) {
+    if (!Invocation.getCASOptions().EnableCaching) {
       llvm::errs() << "Requested command-line arguments do not enable CAS\n";
       return true;
     }
@@ -241,12 +247,13 @@ private:
     return false;
   }
 
-  llvm::Optional<ObjectRef> getBaseKey() {
+  std::optional<ObjectRef> getBaseKey() {
     auto BaseKey = Instance.getCompilerBaseKey();
     if (!BaseKey) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                   "Base Key doesn't exist");
-      return llvm::None;
+                                   "query base cache key",
+                                   "base cache key doesn't exist");
+      return std::nullopt;
     }
 
     return *BaseKey;
@@ -270,6 +277,8 @@ private:
   int printOutputKeys();
   int validateOutputs();
   int renderDiags();
+  int printIncludeTreeList();
+  int printCompileCacheKey();
 };
 
 } // end anonymous namespace
@@ -285,44 +294,42 @@ int SwiftCacheToolInvocation::printOutputKeys() {
 
   std::vector<OutputEntry> OutputKeys;
   bool hasError = false;
-  auto addOutputKey = [&](StringRef InputPath, file_types::ID OutputKind,
-                          StringRef OutputPath) {
+  auto addFromInputFile = [&](const InputFile &Input, unsigned InputIndex) {
+    auto InputPath = Input.getFileName();
     auto OutputKey =
-        createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath);
+        createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputIndex);
     if (!OutputKey) {
-      llvm::errs() << "cannot create cache key for " << OutputPath << ": "
+      llvm::errs() << "cannot create cache key for " << InputPath << ": "
                    << toString(OutputKey.takeError()) << "\n";
       hasError = true;
     }
     OutputKeys.emplace_back(
-        OutputEntry{InputPath.str(), OutputPath.str(),
-                    file_types::getTypeName(OutputKind).str(),
-                    CAS.getID(*OutputKey).toString()});
-  };
-  auto addFromInputFile = [&](const InputFile &Input) {
-    auto InputPath = Input.getFileName();
+        OutputEntry{InputPath, CAS.getID(*OutputKey).toString(), {}});
+    auto &Outputs = OutputKeys.back().Outputs;
     if (!Input.outputFilename().empty())
-      addOutputKey(InputPath,
-                   Invocation.getFrontendOptions()
-                       .InputsAndOutputs.getPrincipalOutputType(),
-                   Input.outputFilename());
+      Outputs.emplace_back(file_types::getTypeName(
+                               Invocation.getFrontendOptions()
+                                   .InputsAndOutputs.getPrincipalOutputType()),
+                           Input.outputFilename());
     Input.getPrimarySpecificPaths()
         .SupplementaryOutputs.forEachSetOutputAndType(
             [&](const std::string &File, file_types::ID ID) {
               // Dont print serialized diagnostics.
               if (file_types::isProducedFromDiagnostics(ID))
                 return;
-
-              addOutputKey(InputPath, ID, File);
+              Outputs.emplace_back(file_types::getTypeName(ID), File);
             });
   };
-  llvm::for_each(
-      Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs(),
-      addFromInputFile);
+  auto AllInputs =
+      Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  for (unsigned Index = 0; Index < AllInputs.size(); ++Index)
+    addFromInputFile(AllInputs[Index], Index);
 
   // Add diagnostics file.
-  addOutputKey("<cached-diagnostics>", file_types::ID::TY_CachedDiagnostics,
-               "<cached-diagnostics>");
+  if (!OutputKeys.empty())
+    OutputKeys.front().Outputs.emplace_back(
+        file_types::getTypeName(file_types::ID::TY_CachedDiagnostics),
+        "<cached-diagnostics>");
 
   if (hasError)
     return 1;
@@ -331,10 +338,16 @@ int SwiftCacheToolInvocation::printOutputKeys() {
   Out.array([&] {
     for (const auto &E : OutputKeys) {
       Out.object([&] {
-        Out.attribute("OutputPath", E.OutputPath);
-        Out.attribute("OutputKind", E.OutputKind);
         Out.attribute("Input", E.InputPath);
         Out.attribute("CacheKey", E.CacheKey);
+        Out.attributeArray("Outputs", [&] {
+          for (const auto &OutEntry : E.Outputs) {
+            Out.object([&] {
+              Out.attribute("Kind", OutEntry.first);
+              Out.attribute("Path", OutEntry.second);
+            });
+          }
+        });
       });
     }
   });
@@ -367,9 +380,20 @@ int SwiftCacheToolInvocation::validateOutputs() {
     report_fatal_error(DB.takeError());
 
   auto &CAS = *DB->first;
+  auto &Cache = *DB->second;
 
   PrintingDiagnosticConsumer PDC;
   Instance.getDiags().addConsumer(PDC);
+
+  auto lookupFailed = [&](StringRef Key) {
+    llvm::errs() << "failed to find output for cache key " << Key << "\n";
+    return true;
+  };
+  auto lookupError = [&](llvm::Error Err, StringRef Key) {
+    llvm::errs() << "failed to find output for cache key " << Key << ": "
+                 << toString(std::move(Err)) << "\n";
+    return true;
+  };
 
   auto validateCacheKeysFromFile = [&](const std::string &Path) {
     auto Keys = readOutputEntriesFromFile(Path);
@@ -389,28 +413,30 @@ int SwiftCacheToolInvocation::validateOutputs() {
             return true;
           }
           auto Ref = CAS.getReference(*ID);
-          if (!Ref) {
-            llvm::errs() << "failed to find output for cache key " << Key
-                         << "\n";
-            return true;
-          }
-          cas::CachedResultLoader Loader(*DB->first, *DB->second, *Ref);
-          auto Result = Loader.replay(
+          if (!Ref)
+            return lookupFailed(*Key);
+          auto KeyID = CAS.getID(*Ref);
+          auto Lookup = Cache.get(KeyID);
+          if (!Lookup)
+            return lookupError(Lookup.takeError(), *Key);
+
+          if (!*Lookup)
+            return lookupFailed(*Key);
+
+          auto OutputRef = CAS.getReference(**Lookup);
+          if (!OutputRef)
+            return lookupFailed(*Key);
+
+          cas::CachedResultLoader Loader(CAS, *OutputRef);
+          if (auto Err = Loader.replay(
                   [&](file_types::ID Kind, ObjectRef Ref) -> llvm::Error {
                     auto Proxy = CAS.getProxy(Ref);
                     if (!Proxy)
                       return Proxy.takeError();
                     return llvm::Error::success();
-                  });
-
-          if (!Result) {
+                  })) {
             llvm::errs() << "failed to find output for cache key " << *Key
-                         << ": " << toString(Result.takeError()) << "\n";
-            return true;
-          }
-          if (!*Result) {
-            llvm::errs() << "failed to load output for cache key " << *Key
-                         << "\n";
+                         << ": " << toString(std::move(Err)) << "\n";
             return true;
           }
           continue;
@@ -470,6 +496,70 @@ int SwiftCacheToolInvocation::renderDiags() {
   };
 
   return llvm::any_of(Inputs, renderDiagsFromFile);
+}
+
+int SwiftCacheToolInvocation::printIncludeTreeList() {
+  auto error = [](llvm::Error err) {
+    llvm::errs() << llvm::toString(std::move(err)) << "\n";
+    return 1;
+  };
+  auto DB = CASOpts.getOrCreateDatabases();
+  if (!DB) {
+    return error(DB.takeError());
+  }
+  auto CAS = DB->first;
+  for (auto &input: Inputs) {
+    auto ID = CAS->parseID(input);
+    if (!ID)
+      return error(ID.takeError());
+
+    auto Ref = CAS->getReference(*ID);
+    if (!Ref) {
+      llvm::errs() << "CAS object not found: " << input << "\n";
+      return 1;
+    }
+
+    auto fileList = clang::cas::IncludeTree::FileList::get(*CAS, *Ref);
+    if (!fileList)
+      return error(fileList.takeError());
+
+    if (auto err = fileList->print(llvm::outs()))
+      return error(std::move(err));
+  }
+
+  return 0;
+}
+
+int SwiftCacheToolInvocation::printCompileCacheKey() {
+  auto error = [](llvm::Error err) {
+    llvm::errs() << "cannot print cache key: " << llvm::toString(std::move(err))
+                 << "\n";
+    return 1;
+  };
+  if (Inputs.size() != 1) {
+    llvm::errs() << "expect 1 CASID as input\n";
+    return 1;
+  }
+  auto DB = CASOpts.getOrCreateDatabases();
+  if (!DB) {
+    return error(DB.takeError());
+  }
+  auto CAS = DB->first;
+  auto &input = Inputs.front();
+  auto ID = CAS->parseID(input);
+  if (!ID)
+    return error(ID.takeError());
+
+  auto Ref = CAS->getReference(*ID);
+  if (!Ref) {
+    llvm::errs() << "CAS object not found: " << input << "\n";
+    return 1;
+  }
+
+  if (auto err = swift::printCompileJobCacheKey(*CAS, *Ref, llvm::outs()))
+    return error(std::move(err));
+
+  return 0;
 }
 
 int swift_cache_tool_main(ArrayRef<const char *> Args, const char *Argv0,

@@ -12,6 +12,7 @@ Mangling
   mangled-name ::= '@__swiftmacro_' global // Swift mangling for filenames
   mangled-name ::= '_T0' global // Swift 4.0
   mangled-name ::= '$S' global  // Swift 4.2
+  mangled-name ::= '$e' global  // Embedded Swift (unstable)
 
 All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
 compiler has used variations of the mangling described in this document, though
@@ -237,6 +238,8 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function
+  global ::= global 'Twc'                // coro function pointer of a function
+  global ::= global 'Twd'                // default override of a function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
@@ -257,6 +260,8 @@ types where the metadata itself has unknown layout.)
   global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
+  global ::= entity generic-signature? type type* 'Tkmu' // key path unapplied method
+  global ::= entity generic-signature? type type* 'TkMA' // key path applied method
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
   global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function
@@ -328,9 +333,16 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOs' // Outlined release
   global ::= generic-signature? type 'WOb' // Outlined initializeWithTake
   global ::= generic-signature? type 'WOc' // Outlined initializeWithCopy
+  global ::= generic-signature? type 'WOC' // Outlined initializeWithCopy, not using value witness
   global ::= generic-signature? type 'WOd' // Outlined assignWithTake
+  global ::= generic-signature? type 'WOD' // Outlined assignWithTake, not using value witness
   global ::= generic-signature? type 'WOf' // Outlined assignWithCopy
+  global ::= generic-signature? type 'WOF' // Outlined assignWithCopy, not using value witness
   global ::= generic-signature? type 'WOh' // Outlined destroy
+  global ::= generic-signature? type 'WOH' // Outlined destroy, not using value witness
+  global ::= generic-signature? type 'WOi` // Outlined store enum tag
+  global ::= generic-signature? type 'WOj` // Outlined enum destructive project
+  global ::= generic-signature? type 'WOg` // Outlined enum get tag
 
 Entities
 ~~~~~~~~
@@ -358,6 +370,7 @@ Entities
   entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fW'                       // property wrapper init from projected value
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
+  entity-spec ::= 'fZ'                       // isolated deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped
   entity-spec ::= 'fe'                       // ivar initializer; untyped
@@ -380,11 +393,13 @@ Entities
   ACCESSOR ::= 'G'                           // global getter
   ACCESSOR ::= 'w'                           // willSet
   ACCESSOR ::= 'W'                           // didSet
-  ACCESSOR ::= 'r'                           // read
-  ACCESSOR ::= 'M'                           // modify (temporary)
+  ACCESSOR ::= 'r'                           // _read
+  ACCESSOR ::= 'M'                           // _modify (temporary)
   ACCESSOR ::= 'a' ADDRESSOR-KIND            // mutable addressor
   ACCESSOR ::= 'l' ADDRESSOR-KIND            // non-mutable addressor
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
+  ACCESSOR ::= 'x'                           // modify
+  ACCESSOR ::= 'y'                           // read
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore
@@ -407,6 +422,9 @@ Entities
   macro-expansion-operator ::= decl-name identifier 'fMm' // attached member macro
   macro-expansion-operator ::= decl-name identifier 'fMp' // attached peer macro
   macro-expansion-operator ::= decl-name identifier 'fMc' // attached conformance macro
+  macro-expansion-operator ::= decl-name identifier 'fMe' // attached extension macro
+  macro-expansion-operator ::= decl-name identifier 'fMq' // attached preamble macro
+  macro-expansion-operator ::= decl-name identifier 'fMb' // attached body macro
   macro-expansion-operator ::= decl-name identifier 'fMu' // uniquely-named entity
 
   file-discriminator ::= identifier 'Ll'     // anonymous file-discriminated declaration
@@ -457,8 +475,92 @@ An ``extension`` mangling is used whenever an entity's declaration context is
 an extension *and* the entity being extended is in a different module. In this
 case the extension's module is mangled first, followed by the entity being
 extended. If the extension and the extended entity are in the same module, the
-plain ``entity`` mangling is preferred. If the extension is constrained, the
-constraints on the extension are mangled in its generic signature.
+plain ``entity`` mangling is preferred, but not always used. An extension is
+considered "constrained" if it:
+
+  - Has any requirements not already satisfied by the extended nominal,
+    excluding conformance requirements for invertible protocols.
+  - Has any generic parameters with an inverse requirement.
+
+Those requirements included in any of the above are included in the extension's
+generic signature. The reason for this additional complexity is that we do not
+mangle conformance req's for invertible protocols, only their absence.
+
+::
+
+  struct S<A: ~Copyable, B: ~Copyable> {}
+
+  // An unconstrained extension.
+  extension S {}
+
+  // Also an unconstrained extension, because there are no inverses to mangle.
+  // This extension is exactly the same as the previous.
+  extension S where A: Copyable, B: Copyable {}
+
+  // A constrained extension, because of the added requirement `B: P` that is
+  // not already present in S.
+  extension S where B: P {}
+
+  // A constrained extension, because of the absence of `A: Copyable`.
+  // Despite also being absent in `S`, absences of invertible protocols
+  // are always mangled.
+  extension S where A: ~Copyable {}
+
+Some entities, like computed properties, rely on the generic signature in their
+`context`, so in order to disambiguate between those properties and
+those in a context where a generic type requires Copyable, which is not mangled,
+we have the following rule:
+
+If the innermost type declaration for an entity has any inverses in its generic
+signature, then extension mangling is used. This strategy is used to ensure
+that moving a declaration between a nominal type and one of its extensions does
+not cause an ABI break if the generic signature of the entity is equivalent in
+both circumstances. For example:
+
+::
+
+  struct R<A: ~Copyable> {
+    func f1() {} // uses extension mangling, just like `f3`
+
+    func f2() where A: Copyable {}
+  }
+
+  extension R where A: ~Copyable {
+    func f3() {}
+
+    func f4() where A: Copyable {} // uses entity mangling, just like `f2`
+  }
+
+  extension R where A: Copyable {
+    // 'f5' is mangled equivalent to 'f2' and 'f4' modulo its identifier.
+    func f5() {}
+  }
+
+For intermediate nested types, i.e., those between the top level and the entity,
+any inverses that remain in at the signature of the entity are mangled into
+that entity's generic signature:
+
+::
+
+  struct X<A: ~Copyable> {
+    struct Y<B: ~Copyable> {
+      // 'g1' uses 'entity' context mangling with and has no mangled signatures.
+      func g1() where A: Copyable, B: Copyable {}
+
+      // 'g2' uses 'entity' context mangling. The requirement `B: ~Copyable` is
+      //mangled into the generic signature for 'g2'.
+      func g2() where A: Copyable {}
+
+      // 'g3' uses extension mangling with generic signature 'A: ~Copyable'.
+      // The mangled generic signature of 'g3' is empty.
+      func g3() where B: Copyable {}
+
+      // 'g4' uses extension mangling with generic signature 'A: ~Copyable'.
+      // The mangled generic signature of 'g4' contains 'B: ~Copyable'.
+      func g4() {}
+    }
+  }
+
 
 When mangling the context of a local entity within a constructor or
 destructor, the non-allocating or non-deallocating variant is used.
@@ -596,6 +698,7 @@ Types
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bt'                              // Builtin.SILToken
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
+  type ::= type type 'BV'                    // Builtin.FixedArray<N, T>
   type ::= 'Bw'                              // Builtin.Word
   type ::= function-signature 'c'            // function type (escaping)
   type ::= function-signature 'X' FUNCTION-KIND // special function type
@@ -616,6 +719,10 @@ Types
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
 
+#if SWIFT_RUNTIME_VERSION >= 6.TBD
+  type ::= '$' 'n'? INDEX                    // integer type
+#endif
+
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
@@ -630,10 +737,12 @@ Types
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
-  C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
-  Non-ASCII identifiers are preserved as-is; we do not use Punycode.
+  C-TYPE ::= NATURAL CHAR*                   // raw Itanium mangling
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
+  function-signature ::= result-type params-type async? sendable? throws? differentiable? function-isolation? sending-result? // results and parameters
+
+  result-type ::= type
+  result-type ::= empty-list                 // shortcut for ()
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -643,30 +752,45 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     async ::= 'Ya'                             // 'async' annotation on function types
     sendable ::= 'Yb'                          // @Sendable on function types
-    global-actor :: = type 'Yc'                // Global actor on function type
+    function-isolation ::= type 'Yc'          // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
+  #if SWIFT_RUNTIME_VERSION >= 6.0
+    throws ::= type 'YK'                     // 'throws(type)' annotation on function types
+    function-isolation ::= type 'YA'         // @isolated(any) on function type
+    sending-result ::= 'YT'                  // -> sending T
+  #endif
+  #if SWIFT_RUNTIME_VERSION >= 6.2
+    function-isolation :== 'YC'              // nonisolated(nonsending) on function type
+  #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
   differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
-
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
   list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'? 'Yt'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', variadic specifier, and compile-time constant
 
+In the mangling of C function types,``C-TYPE`` is mangled according to the Itanium ABI, prefixed with its length. This resembles the mangling of ``identifier``, but it does not honor substitutions or Punycode.
+
+The 6.0 Swift runtime supports demangling ``sending-result``, but has a bug when it's combined with ``function-isolation``.
+
+::
+
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
   METATYPE-REPR ::= 'o'                      // ObjC metatype representation
 
+  existential-layout ::= protocol-list 'p'                 // existential layout
+  existential-layout ::= protocol-list superclass 'Xc'     // existential layout with superclass
+  existential-layout ::= protocol-list 'Xl'                // existential layout with AnyObject
+
   type ::= associated-type
   type ::= any-generic-type
-  type ::= protocol-list 'p'                 // existential type
-  type ::= protocol-list superclass 'Xc'     // existential type with superclass
-  type ::= protocol-list 'Xl'                // existential type with AnyObject
-  type ::= protocol-list requirement* '_' 'XP'   // constrained existential type
+  type ::= existential-layout                         // existential type
+  type ::= existential-layout requirement '_' requirement* 'XP'   // constrained existential type
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0
@@ -720,13 +844,15 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
+
+  ISOLATION ::= 'A'                          // @isolated(any)
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
   DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)
@@ -748,11 +874,16 @@ mangled in to disambiguate.
   FUNC-REPRESENTATION ::= 'W'                // protocol witness
 
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
+  COROUTINE-KIND ::= 'I'                     // yield-once-2 coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
   #if SWIFT_RUNTIME_VERSION >= 5.5
-    SENDABLE ::= 'h'                           // @Sendable
-    ASYNC ::= 'H'                              // @async
+    SENDABLE ::= 'h'                         // @Sendable
+    ASYNC ::= 'H'                            // @async
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 6.0
+    SENDING-RESULT ::= 'T'                   // sending result
   #endif
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
@@ -760,6 +891,7 @@ mangled in to disambiguate.
   PARAM-CONVENTION ::= 'l'                   // indirect inout
   PARAM-CONVENTION ::= 'b'                   // indirect inout aliasable
   PARAM-CONVENTION ::= 'n'                   // indirect in guaranteed
+  PARAM-CONVENTION ::= 'X'                   // indirect in C++
   PARAM-CONVENTION ::= 'x'                   // direct owned
   PARAM-CONVENTION ::= 'y'                   // direct unowned
   PARAM-CONVENTION ::= 'g'                   // direct guaranteed
@@ -823,7 +955,7 @@ productions:
   type ::= base-type "XSq"                       // sugared Optional type
   type ::= base-type "XSa"                       // sugared Array type
   type ::= key-type value-type "XSD"             // sugared Dictionary type
-  type ::= base-type "XSp"                       // sugared Paren type
+  type ::= count-type element-type "XSA"         // sugared InlineArray type
 
 Generics
 ~~~~~~~~
@@ -859,6 +991,7 @@ Property behaviors are implemented using private protocol conformances.
 
   any-protocol-conformance ::= concrete-protocol-conformance
   any-protocol-conformance ::= dependent-protocol-conformance
+  any-protocol-conformance ::= pack-protocol-conformance
 
   any-protocol-conformance-list ::= any-protocol-conformance '_' any-protocol-conformance-list
   any-protocol-conformance-list ::= empty-list
@@ -872,6 +1005,8 @@ Property behaviors are implemented using private protocol conformances.
 
   dependent-associated-conformance ::= type protocol
   dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
+
+  pack-protocol-conformance ::= any-protocol-conformance-list 'HX'
 
 A compact representation used to represent mangled protocol conformance witness
 arguments at runtime. The ``module`` is only specified for conformances that
@@ -899,10 +1034,17 @@ now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 
-  generic-signature ::= requirement* generic-param-pack-marker* 'l'     // one generic parameter
-  generic-signature ::= requirement* generic-param-pack-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+  generic-signature ::= requirement* generic-param-marker 'l'     // one generic parameter
+  generic-signature ::= requirement* generic-param-marker* 'r' GENERIC-PARAM-COUNT* 'l'
+
+  generic-param-marker ::= generic-param-pack-marker
+  generic-param-marker ::= generic-param-value-marker
 
   generic-param-pack-marker ::= 'Rv' GENERIC_PARAM-INDEX   // generic parameter pack marker
+
+#if SWIFT_RUNTIME_VERSION >= 6.TBD
+  generic-param-value-marker ::= type 'RV' GENERIC-PARAM-INDEX // generic parameter value marker
+#endif
 
   GENERIC-PARAM-COUNT ::= 'z'                // zero parameters
   GENERIC-PARAM-COUNT ::= INDEX              // N+1 parameters
@@ -911,6 +1053,12 @@ now codified into the ABI; the index 0 is therefore reserved.
   requirement ::= protocol assoc-type-name 'Rp' GENERIC-PARAM-INDEX // protocol requirement on associated type
   requirement ::= protocol assoc-type-list 'RP' GENERIC-PARAM-INDEX // protocol requirement on associated type at depth
   requirement ::= protocol substitution 'RQ'                        // protocol requirement with substitution
+#if SWIFT_RUNTIME_VERSION >= 6.0
+  requirement ::= 'Ri' INDEX GENERIC-PARAM-INDEX                    // inverse requirement on generic parameter where INDEX is the bit number
+  requirement ::= substitution 'RI' INDEX                           // inverse requirement with substitution
+  requirement ::= assoc-type-name 'Rj' INDEX GENERIC-PARAM-INDEX    // inverse requirement on associated type
+  requirement ::= assoc-type-list 'RJ' INDEX GENERIC-PARAM-INDEX    // inverse requirement on associated type at depth
+#endif
   requirement ::= type 'Rb' GENERIC-PARAM-INDEX                     // base class requirement
   requirement ::= type assoc-type-name 'Rc' GENERIC-PARAM-INDEX     // base class requirement on associated type
   requirement ::= type assoc-type-list 'RC' GENERIC-PARAM-INDEX     // base class requirement on associated type at depth
@@ -941,6 +1089,8 @@ now codified into the ABI; the index 0 is therefore reserved.
   LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
+  LAYOUT-CONSTRAINT ::= 'B' // BridgeObject
+  LAYOUT-CONSTRAINT ::= 'S' // TrivialStride
 
   LAYOUT-SIZE ::= INDEX // Size only
   LAYOUT-SIZE-AND-ALIGNMENT ::= INDEX INDEX // Size followed by alignment
@@ -1148,13 +1298,16 @@ Function Specializations
 
 ::
 
-  specialization ::= type '_' type* 'Tg' SPEC-INFO     // Generic re-abstracted specialization
-  specialization ::= type '_' type* 'TB' SPEC-INFO     // Alternative mangling for generic re-abstracted specializations,
-                                                       // used for functions with re-abstracted resilient parameter types.
+  specialization ::= type '_' type* 'T' dropped-arg* 'g' SPEC-INFO  // Generic re-abstracted specialization
+  specialization ::= type '_' type* 'T' dropped-arg* 'B' SPEC-INFO  // Alternative mangling for generic re-abstracted specializations,
+                                                                    // used for functions with re-abstracted resilient parameter types.
+  specialization ::= type '_' type* 'T' dropped-arg* 'G' SPEC-INFO  // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ts' SPEC-INFO     // Generic re-abstracted prespecialization
-  specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
   specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.
   specialization ::= type '_' type* 'Ta' SPEC-INFO     // Non-async specialization
+
+  dropped-arg ::= 't'                                  // The first argument is dropped
+  dropped-arg ::= 't' NATURAL                          // The `N+1`th argument is dropped
 
 The types are the replacement types of the substitution list.
 
@@ -1177,7 +1330,7 @@ Some kinds need arguments, which precede ``Tf``.
   spec-arg ::= identifier
   spec-arg ::= type
 
-  SPEC-INFO ::= MT-REMOVED? FRAGILE? ASYNC-REMOVED? PASSID
+  SPEC-INFO ::= FRAGILE? ASYNC-REMOVED? PASSID
 
   PASSID ::= '0'                             // AllocBoxToStack,
   PASSID ::= '1'                             // ClosureSpecializer,
@@ -1187,8 +1340,6 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '5'                             // GenericSpecializer,
   PASSID ::= '6'                             // MoveDiagnosticInOutToOut,
   PASSID ::= '7'                             // AsyncDemotion,
-
-  MT-REMOVED ::= 'm'                         // non-generic metatype arguments are removed in the specialized function
 
   FRAGILE ::= 'q'
 

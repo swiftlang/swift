@@ -14,6 +14,7 @@
 
 #include "swift/ABI/System.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -115,11 +116,13 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   SmallString<128> SharedResourceDirPath;
   getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/false);
 
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  if (!context.Args.hasArg(options::OPT_nostartfiles)) {
+    SmallString<128> swiftrtPath = SharedResourceDirPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
@@ -211,7 +214,7 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
 void validateLinkerArguments(DiagnosticEngine &diags,
                              ArgStringList linkerArgs) {
   for (auto arg : linkerArgs) {
-    if (StringRef(arg).startswith("--global-base=")) {
+    if (StringRef(arg).starts_with("--global-base=")) {
       diags.diagnose(SourceLoc(), diag::error_wasm_doesnt_support_global_base);
     }
   }

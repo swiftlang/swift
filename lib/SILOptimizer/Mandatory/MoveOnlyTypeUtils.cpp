@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MoveOnlyTypeUtils.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -22,10 +23,10 @@ static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
   return structDecl;
 }
 
-llvm::Optional<std::pair<TypeOffsetSizePair, SILType>>
+std::optional<std::pair<TypeOffsetSizePair, SILType>>
 TypeOffsetSizePair::walkOneLevelTowardsChild(
     TypeOffsetSizePair ancestorOffsetSize, SILType ancestorType,
-    SILFunction *fn) const {
+    SILType childType, SILFunction *fn) const {
   assert(ancestorOffsetSize.size >= size &&
          "Too large to be a child of ancestorType");
   assert((ancestorOffsetSize.startOffset <= startOffset &&
@@ -101,7 +102,39 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
   }
 
   if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
-    llvm_unreachable("Cannot find child type of enum!\n");
+    if (enumDecl == fn->getASTContext().getOptionalDecl()) {
+      // The only possible child of Optional is the wrapped type.
+      return {{ancestorOffsetSize, ancestorType.getOptionalObjectType()}};
+    }
+    unsigned elementOffset = ancestorOffsetSize.startOffset;
+    for (auto *element : enumDecl->getAllElements()) {
+      if (!element->hasAssociatedValues()) {
+        continue;
+      }
+      SILType elementTy = ancestorType.getEnumElementType(element, fn);
+      unsigned elementSize = TypeSubElementCount(elementTy, fn);
+      // iterOffset + size(tupleChild) is the offset of the next tuple
+      // element. If our target offset is less than that, then we know that
+      // the target type must be a child of this tuple element type.
+      if (elementOffset + elementSize > startOffset) {
+        return {{{elementOffset, elementSize}, elementTy}};
+      }
+
+      // Otherwise, add the new size of this field to iterOffset so we visit
+      // our sibling type next.
+      elementOffset += elementSize;
+    }
+    llvm_unreachable("Not a child of this enum?!");
+  }
+
+  if (ancestorType.isExistentialType()) {
+    assert(childType);
+    auto childArchetypeType =
+        childType.getASTType()->getAs<ExistentialArchetypeType>();
+    assert(childArchetypeType);
+    assert(childArchetypeType->getExistentialType()->getCanonicalType() ==
+           ancestorType.getASTType());
+    return {{ancestorOffsetSize, childType}};
   }
 
   llvm_unreachable("Hit a leaf type?! Should have handled it earlier");
@@ -110,7 +143,7 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
 /// Given an ancestor offset \p ancestorOffset and a type called \p
 /// ancestorType, walk one level towards this current type inserting on value,
 /// the relevant projection.
-llvm::Optional<std::pair<TypeOffsetSizePair, SILValue>>
+std::optional<std::pair<TypeOffsetSizePair, SILValue>>
 TypeOffsetSizePair::walkOneLevelTowardsChild(
     SILBuilderWithScope &builder, SILLocation loc,
     TypeOffsetSizePair ancestorOffsetSize, SILValue ancestorValue) const {
@@ -196,6 +229,14 @@ TypeOffsetSizePair::walkOneLevelTowardsChild(
   }
 
   if (auto *enumDecl = ancestorType.getEnumOrBoundGenericEnum()) {
+    if (enumDecl == fn->getASTContext().getOptionalDecl()) {
+      // The only possible child of Optional is the wrapped type.
+      auto newValue
+        = builder.createUncheckedEnumData(loc, ancestorValue,
+                                    fn->getASTContext().getOptionalSomeDecl());
+      return {{ancestorOffsetSize, newValue}};
+    }
+
     llvm_unreachable("Cannot find child type of enum!\n");
   }
 
@@ -305,7 +346,35 @@ void TypeOffsetSizePair::constructPathString(
     }
 
     if (auto *enumDecl = iterType.getEnumOrBoundGenericEnum()) {
-      llvm_unreachable("Cannot find child type of enum!\n");
+      unsigned childOffset = iterPair.startOffset;
+      bool foundValue = false;
+      if (enumDecl == fn->getASTContext().getOptionalDecl()) {
+        os << '!';
+        continue;
+      }
+      for (auto *element : enumDecl->getAllElements()) {
+        if (!element->hasAssociatedValues()) {
+          continue;
+        }
+        SILType elementTy = ancestorType.getEnumElementType(element, fn);
+        unsigned elementSize = TypeSubElementCount(elementTy, fn);
+
+        if (childOffset + elementSize > startOffset) {
+          os << '.';
+          os << element->getBaseName().userFacingName();
+          iterPair = {childOffset, elementSize};
+          iterType = elementTy;
+          foundValue = true;
+          break;
+        }
+
+        childOffset += elementSize;
+      }
+
+      if (foundValue)
+        continue;
+
+      llvm_unreachable("Not a child of this type?!");
     }
 
     llvm_unreachable("Hit a leaf type?! Should have handled it earlier");

@@ -56,6 +56,8 @@ public:
     const Decl *Dcl = nullptr;
     /// The range in the interface source.
     TextRange Range;
+    /// The USR, if the declaration has one
+    StringRef USR;
 
     TextDecl(const Decl *D, TextRange Range)
       : Dcl(D), Range(Range) {}
@@ -66,6 +68,8 @@ public:
     std::string Text;
     std::vector<TextReference> References;
     std::vector<TextDecl> Decls;
+    /// Do not clear the map or erase elements,
+    /// without keeping the Decls vector in sync
     llvm::StringMap<TextDecl> USRMap;
   };
 
@@ -115,9 +119,10 @@ public:
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
   }
 
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     // When we start print a synthesized extension, record the target's USR.
     llvm::SmallString<64> Buf;
     llvm::raw_svector_ostream OS(Buf);
@@ -129,7 +134,7 @@ public:
 
   void printSynthesizedExtensionPost(
       const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      llvm::Optional<BracketOptions> Bracket) override {
+      std::optional<BracketOptions> Bracket) override {
     // When we leave a synthesized extension, clear target's USR.
     TargetUSR = "";
   }
@@ -154,8 +159,17 @@ public:
           OS << TargetUSR;
         }
         StringRef USR = OS.str();
-        Info.USRMap[USR] = Entry;
         DeclUSRs.emplace_back(VD, USR);
+        auto iterator = Info.USRMap.insert_or_assign(USR, Entry).first;
+        // Set the USR in the declarations to the key in the USRMap, because the
+        // lifetime of that matches/exceeds the lifetime of Decls. String keys
+        // in the StringMap are heap allocated and only get destroyed on
+        // explicit erase() or clear() calls, or on destructor calls (the
+        // Programmer's Manual description itself also states that StringMap
+        // "only ever copies a string if a value is inserted").
+        // Thus this never results in a dangling reference, as the USRMap is
+        // never cleared and no elements are erased in its lifetime.
+        Info.Decls.back().USR = iterator->getKey();
       }
     }
   }
@@ -233,7 +247,7 @@ static void reportSyntacticAnnotations(CompilerInstance &CI,
                                        EditorConsumer &Consumer) {
   auto SF = dyn_cast<SourceFile>(CI.getMainModule()->getFiles()[0]);
   SyntaxModelContext SyntaxContext(*SF);
-  DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), *SF->getBufferID(),
+  DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), SF->getBufferID(),
                                Consumer);
   SyntaxContext.walk(SyntaxWalker);
 }
@@ -261,6 +275,21 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
     unsigned Offset = Ref.Range.Offset;
     unsigned Length = Ref.Range.Length;
     Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
+  }
+}
+
+/// Create the declarations array (sourcekitd::DeclarationsArrayBuilder) from
+/// the SourceTextInfo about declarations
+static void reportDeclarations(const SourceTextInfo &IFaceInfo,
+                               EditorConsumer &Consumer) {
+  for (auto &Dcl : IFaceInfo.Decls) {
+    if (!Dcl.Dcl)
+      continue;
+    UIdent Kind = SwiftLangSupport::getUIDForDecl(Dcl.Dcl);
+    if (Kind.isInvalid())
+      continue;
+    Consumer.handleDeclaration(Dcl.Range.Offset, Dcl.Range.Length, Kind,
+                               Dcl.USR);
   }
 }
 
@@ -305,9 +334,9 @@ public:
 } // end anonymous namespace
 
 static bool getModuleInterfaceInfo(
-    ASTContext &Ctx, StringRef ModuleName, llvm::Optional<StringRef> Group,
+    ASTContext &Ctx, StringRef ModuleName, std::optional<StringRef> Group,
     SwiftInterfaceGenContext::Implementation &Impl, std::string &ErrMsg,
-    bool SynthesizedExtensions, llvm::Optional<StringRef> InterestedUSR) {
+    bool SynthesizedExtensions, std::optional<StringRef> InterestedUSR) {
   ModuleDecl *&Mod = Impl.Mod;
   SourceTextInfo &Info = Impl.Info;
 
@@ -358,17 +387,20 @@ static bool getModuleInterfaceInfo(
       Options.SkipInlineCXXNamespace = true;
     }
   }
+  // Skip submodules but include any exported modules that have the same public
+  // module name as this module.
   ModuleTraversalOptions TraversalOptions =
-      llvm::None; // Don't print submodules.
+      ModuleTraversal::VisitMatchingExported;
+
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
   if (!Group && InterestedUSR) {
     Group = findGroupNameForUSR(Mod, InterestedUSR.value());
   }
-  printModuleInterface(Mod, Group.has_value()
-                         ? llvm::makeArrayRef(Group.value())
-                         : ArrayRef<StringRef>(),
+  printModuleInterface(Mod,
+                       Group.has_value() ? llvm::ArrayRef(Group.value())
+                                         : ArrayRef<StringRef>(),
                        TraversalOptions, Printer, Options,
                        Group.has_value() && SynthesizedExtensions);
 
@@ -426,9 +458,9 @@ SwiftInterfaceGenContext::createForSwiftSource(StringRef DocumentName,
 
 SwiftInterfaceGenContextRef SwiftInterfaceGenContext::create(
     StringRef DocumentName, bool IsModule, StringRef ModuleOrHeaderName,
-    llvm::Optional<StringRef> Group, CompilerInvocation Invocation,
+    std::optional<StringRef> Group, CompilerInvocation Invocation,
     std::string &ErrMsg, bool SynthesizedExtensions,
-    llvm::Optional<StringRef> InterestedUSR) {
+    std::optional<StringRef> InterestedUSR) {
   SwiftInterfaceGenContextRef IFaceGenCtx{ new SwiftInterfaceGenContext() };
   IFaceGenCtx->Impl.DocumentName = DocumentName.str();
   IFaceGenCtx->Impl.IsModule = IsModule;
@@ -592,6 +624,8 @@ void SwiftInterfaceGenContext::reportEditorInfo(EditorConsumer &Consumer) const 
   reportSyntacticAnnotations(Impl.TextCI, Consumer);
   reportDocumentStructure(Impl.TextCI, Consumer);
   reportSemanticAnnotations(Impl.Info, Consumer);
+
+  reportDeclarations(Impl.Info, Consumer);
   Consumer.finished();
 }
 
@@ -623,7 +657,7 @@ SwiftInterfaceGenContext::resolveEntityForOffset(unsigned Offset) const {
 
   SourceManager &SM = Impl.TextCI.getSourceMgr();
   auto SF = dyn_cast<SourceFile>(Impl.TextCI.getMainModule()->getFiles()[0]);
-  unsigned BufferID = *SF->getBufferID();
+  unsigned BufferID = SF->getBufferID();
   SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufferID, Offset);
   Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
 
@@ -642,11 +676,11 @@ SwiftInterfaceGenContext::resolveEntityForOffset(unsigned Offset) const {
   return ResolvedEntity();
 }
 
-llvm::Optional<std::pair<unsigned, unsigned>>
+std::optional<std::pair<unsigned, unsigned>>
 SwiftInterfaceGenContext::findUSRRange(StringRef USR) const {
   auto Pos = Impl.Info.USRMap.find(USR);
   if (Pos == Impl.Info.USRMap.end())
-    return llvm::None;
+    return std::nullopt;
 
   return std::make_pair(Pos->getValue().Range.Offset,
                         Pos->getValue().Range.Length);
@@ -728,8 +762,8 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 //===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorOpenInterface(
     EditorConsumer &Consumer, StringRef Name, StringRef ModuleName,
-    llvm::Optional<StringRef> Group, ArrayRef<const char *> Args,
-    bool SynthesizedExtensions, llvm::Optional<StringRef> InterestedUSR) {
+    std::optional<StringRef> Group, ArrayRef<const char *> Args,
+    bool SynthesizedExtensions, std::optional<StringRef> InterestedUSR) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -760,8 +794,8 @@ void SwiftLangSupport::editorOpenInterface(
       // if the first attempt failed.
       bool retryWithCxxEnabled = true;
       for (const auto &arg: Args) {
-          if (StringRef(arg).startswith("-cxx-interoperability-mode=") ||
-              StringRef(arg).startswith("-enable-experimental-cxx-interop")) {
+          if (StringRef(arg).starts_with("-cxx-interoperability-mode=") ||
+              StringRef(arg).starts_with("-enable-experimental-cxx-interop")) {
               retryWithCxxEnabled = false;
               break;
           }
@@ -819,6 +853,7 @@ public:
 
 void SwiftLangSupport::editorOpenSwiftSourceInterface(
     StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    bool CancelOnSubsequentRequest,
     SourceKitCancellationToken CancellationToken,
     std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
@@ -830,7 +865,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invocation, AstConsumer, Once,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
@@ -850,7 +886,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   CompilerInvocation Invocation;
   std::string Error;
 
-  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
+  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : std::nullopt;
   if (getASTManager()->initCompilerInvocationNoInputs(
           Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
           CI.getDiags(), Error)) {
@@ -873,8 +909,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(
       Name,
-      /*IsModule=*/false, HeaderName, llvm::None, Invocation, Error,
-      SynthesizedExtensions, llvm::None);
+      /*IsModule=*/false, HeaderName, std::nullopt, Invocation, Error,
+      SynthesizedExtensions, std::nullopt);
   if (!IFaceGenRef) {
     Consumer.handleRequestError(Error.c_str());
     return;
@@ -940,8 +976,12 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
     else
       addArgPair("-F", FramePath.Path);
   }
-  for (const auto &Path : SPOpts.getImportSearchPaths())
-    addArgPair("-I", Path);
+  for (const auto &Path : SPOpts.getImportSearchPaths()) {
+    if (Path.IsSystem)
+      addArgPair("-Isystem", Path.Path);
+    else
+      addArgPair("-I", Path.Path);
+  }
 
   const auto &ClangOpts = Invocation.getClangImporterOptions();
   addArgPair("-module-cache-path", ClangOpts.ModuleCachePath);

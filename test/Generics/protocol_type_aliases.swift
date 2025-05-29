@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures > %t.dump 2>&1
 
 
@@ -59,10 +59,8 @@ protocol Q4: P {
     typealias A = Int // expected-warning{{typealias overriding associated type 'A' from protocol 'P'}}
 }
 
-// FIXME(rqm-diagnostics): Bogus warning
-
 protocol Q5: P {
-    typealias X = Int // expected-warning{{redundant same-type constraint 'Self.X' == 'Int'}}
+    typealias X = Int
 }
 
 // fully generic functions that manipulate the archetypes in a P

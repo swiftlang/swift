@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir  -disable-availability-checking -g | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir  -target %target-swift-5.1-abi-triple -g | %FileCheck %s
 // REQUIRES: concurrency
 
 // Don't assert on dynamically sized variables.

@@ -19,11 +19,11 @@
 #include "swift/IRGen/GenericRequirement.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 
 namespace swift {
@@ -96,13 +96,16 @@ public:
 
     inline const ParamDecl &getParamDecl() const { return paramDecl; }
 
+    inline ParameterConvention getConvention() const { return convention; }
+
   private:
     DirectParameter(IRABIDetailsProviderImpl &owner,
                     const irgen::TypeInfo &typeDetails,
-                    const ParamDecl &paramDecl);
+                    const ParamDecl &paramDecl, ParameterConvention convention);
     IRABIDetailsProviderImpl &owner;
     const irgen::TypeInfo &typeDetails;
     const ParamDecl &paramDecl;
+    ParameterConvention convention;
     friend class LoweredFunctionSignature;
   };
 
@@ -111,9 +114,13 @@ public:
   public:
     inline const ParamDecl &getParamDecl() const { return paramDecl; }
 
+    inline ParameterConvention getConvention() const { return convention; }
+
   private:
-    IndirectParameter(const ParamDecl &paramDecl);
+    IndirectParameter(const ParamDecl &paramDecl,
+                      ParameterConvention convention);
     const ParamDecl &paramDecl;
+    ParameterConvention convention;
     friend class LoweredFunctionSignature;
   };
 
@@ -149,7 +156,7 @@ public:
 
   /// Returns lowered direct result details, or \c None if direct result is
   /// void.
-  llvm::Optional<DirectResultType> getDirectResultType() const;
+  std::optional<DirectResultType> getDirectResultType() const;
 
   /// Returns the number of indirect result values in this function signature.
   size_t getNumIndirectResultValues() const;
@@ -199,12 +206,12 @@ public:
 
   /// Returns the function signature lowered to its C / LLVM - like
   /// representation, or \c None if such representation could not be computed.
-  llvm::Optional<LoweredFunctionSignature>
+  std::optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd);
 
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.
-  llvm::Optional<SizeAndAlignment>
+  std::optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
 
   /// An representation of a single type, or a C struct with multiple members
@@ -228,7 +235,7 @@ public:
     SmallVector<TypeRecordABIRepresentation, 4> parameterTypes;
   };
 
-  /// Returns the function signature that is used for the the type metadata
+  /// Returns the function signature that is used for the type metadata
   /// access function.
   FunctionABISignature getTypeMetadataAccessFunctionSignature();
 
@@ -271,14 +278,14 @@ public:
     }
 
     static MethodDispatchInfo indirectVTableStaticOffset(
-        size_t offset, llvm::Optional<PointerAuthDiscriminator> discriminator) {
+        size_t offset, std::optional<PointerAuthDiscriminator> discriminator) {
       return MethodDispatchInfo(Kind::IndirectVTableStaticOffset, offset, "",
                                 discriminator);
     }
 
     static MethodDispatchInfo indirectVTableRelativeOffset(
         size_t offset, std::string symbolName,
-        llvm::Optional<PointerAuthDiscriminator> discriminator) {
+        std::optional<PointerAuthDiscriminator> discriminator) {
       return MethodDispatchInfo(Kind::IndirectVTableRelativeOffset, offset,
                                 symbolName, discriminator);
     }
@@ -295,7 +302,7 @@ public:
       assert(kind == Kind::IndirectVTableStaticOffset);
       return offset;
     }
-    llvm::Optional<PointerAuthDiscriminator>
+    std::optional<PointerAuthDiscriminator>
     getPointerAuthDiscriminator() const {
       assert(kind == Kind::IndirectVTableStaticOffset ||
              kind == Kind::IndirectVTableRelativeOffset);
@@ -323,17 +330,17 @@ public:
   private:
     MethodDispatchInfo(
         Kind kind, size_t offset, std::string symbolName = "",
-        llvm::Optional<PointerAuthDiscriminator> discriminator = llvm::None)
+        std::optional<PointerAuthDiscriminator> discriminator = std::nullopt)
         : kind(kind), offset(offset), symbolName(symbolName),
           discriminator(discriminator) {}
 
     Kind kind;
     size_t offset;
     std::string symbolName;
-    llvm::Optional<PointerAuthDiscriminator> discriminator;
+    std::optional<PointerAuthDiscriminator> discriminator;
   };
 
-  llvm::Optional<MethodDispatchInfo>
+  std::optional<MethodDispatchInfo>
   getMethodDispatchInfo(const AbstractFunctionDecl *funcDecl);
 
   /// Returns the type of the base offset value located at the specific class

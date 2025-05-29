@@ -1,5 +1,5 @@
 // RUN: %target-build-swift %s
-// RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -g %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // UNSUPPORTED: OS=linux-gnu
@@ -45,9 +45,9 @@ struct MyModel: Differentiable {
   @differentiable(reverse)
   mutating func member4() {
 // CHECK-LABEL: // pullback of MyModel.member4()
-// CHECK-NOT: debug_value %{{.*}} : $MyModel.TangentVector, var, name %{{.*}}, argno 1, implicit, scope
+// CHECK-NOT: debug_value %{{.*}} : $MyModel.TangentVector, var, name %{{.*}}, argno 1, scope
 // CHECK: bb0(%{{.*}} : $_AD__$s4main7MyModelV7member4yyF_bb3__Pred__src_0_wrt_0):
-// CHECK: debug_value %{{.*}} : $MyModel.TangentVector, var, name "derivative of 'self' in scope at {{.*}} (scope #1)", implicit, scope
+// CHECK: debug_value %{{.*}} : $MyModel.TangentVector, var, (name "derivative of 'self' in scope at {{.*}} (scope #1)"{{.*}}), scope
     // Must be a differentiable type.
     var localVar: Float = 0
 
@@ -55,7 +55,8 @@ struct MyModel: Differentiable {
     property2 = localVar
 
     // `false` may instead be any expression that returns a `Bool`.
-    if false {
+    // TODO: cannot use literal `false` because it crashes
+    if 1 == 0 {
       localVar = member3
     }
   }

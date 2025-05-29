@@ -14,9 +14,10 @@
 #define SWIFT_SILGEN_FORMALEVALUATION_H
 
 #include "Cleanup.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILValue.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 namespace Lowering {
@@ -195,7 +196,7 @@ public:
 /// access cleanup when the "top level" scope is not a formal evaluation scope.
 class FormalEvaluationScope {
   SILGenFunction &SGF;
-  llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
+  std::optional<FormalEvaluationContext::stable_iterator> savedDepth;
 
   /// The immediate outer evaluation scope.  This scope is only inserted
   /// into the chain if it wasn't in an inout conversion scope on creation.

@@ -36,15 +36,52 @@ extension CxxRandomAccessCollection {
     return Int(__endUnsafe() - __beginUnsafe())
   }
 
+  @inlinable
+  @inline(__always)
+  internal func _getRawIterator(at index: Int) -> RawIterator {
+    var rawIterator = self.__beginUnsafe()
+    rawIterator += RawIterator.Distance(index)
+    precondition(self.__endUnsafe() - rawIterator > 0,
+        "C++ iterator access out of bounds")
+    return rawIterator
+  }
+
   /// A C++ implementation of the subscript might be more performant. This 
   /// overload should only be used if the C++ type does not define `operator[]`.
   @inlinable
   public subscript(_ index: Int) -> Element {
     _read {
-      // Not using CxxIterator here to avoid making a copy of the collection.
-      var rawIterator = __beginUnsafe()
-      rawIterator += RawIterator.Distance(index)
-      yield rawIterator.pointee
+      yield self._getRawIterator(at: index).pointee
+    }
+  }
+}
+
+public protocol CxxMutableRandomAccessCollection<Element>:
+    CxxRandomAccessCollection, MutableCollection {
+  associatedtype RawMutableIterator: UnsafeCxxMutableRandomAccessIterator
+      where RawMutableIterator.Pointee == Element
+
+  /// Do not implement this function manually in Swift.
+  mutating func __beginMutatingUnsafe() -> RawMutableIterator
+
+  /// Do not implement this function manually in Swift.
+  mutating func __endMutatingUnsafe() -> RawMutableIterator
+}
+
+extension CxxMutableRandomAccessCollection {
+  /// A C++ implementation of the subscript might be more performant. This 
+  /// overload should only be used if the C++ type does not define `operator[]`.
+  @inlinable
+  public subscript(_ index: Int) -> Element {
+    _read {
+      yield self._getRawIterator(at: index).pointee
+    }
+    _modify {
+      var rawIterator = self.__beginMutatingUnsafe()
+      rawIterator += RawMutableIterator.Distance(index)
+      precondition(self.__endMutatingUnsafe() - rawIterator > 0,
+          "C++ iterator access out of bounds")
+      yield &rawIterator.pointee
     }
   }
 }

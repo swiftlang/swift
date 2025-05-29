@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil %s -target %target-cpu-apple-macosx10.50 -verify
-// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s -target %target-cpu-apple-macosx10.50 -verify
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
@@ -70,6 +70,16 @@ if #available(macOS 10.52, *) {
 }
 
 // CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
+// CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 53
+// CHECK: [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[QUERY_FUNC:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-NOT: {{.*}}integer_literal $Builtin.Int1, -1
+// CHECK-NOT: builtin "xor_Int1"{{.*}}
+if #available(*, macOS 10.53) {
+}
+
+// CHECK: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK: [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
 // CHECK: [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK: [[QUERY_FUNC:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -121,7 +131,7 @@ func testUnreachableVersionAvailable(condition: Bool) {
   if true {
     doThing() // no-warning
   }
-  if false { // expected-note {{condition always evaluates to false}}
+  if 1 == 0 { // expected-note {{condition always evaluates to false}}
     doThing() // expected-warning {{will never be executed}}
   }
 }
@@ -144,8 +154,8 @@ func testUnreachablePlatformAvailable(condition: Bool) {
   if true {
     doThing() // no-warning
   }
-  if false { // expected-note {{condition always evaluates to false}}
-    doThing() // expected-warning {{will never be executed}}
+  if false {
+    doThing()
   }
 }
 

@@ -300,13 +300,13 @@ func testOptionalSelf(_ y : Y) {
     clone.operationThatOnlyExistsOnY()
   }
 
-  // Sanity-checking to make sure that the above succeeding
+  // Soundness-checking to make sure that the above succeeding
   // isn't coincidental.
   if let clone = y.cloneOrFail() { // expected-error {{initializer for conditional binding must have Optional type, not 'Y'}}
     clone.operationThatOnlyExistsOnY()
   }
 
-  // Sanity-checking to make sure that the above succeeding
+  // Soundness-checking to make sure that the above succeeding
   // isn't coincidental.
   if let clone = y.cloneAsObjectSlice() {
     clone.operationThatOnlyExistsOnY() // expected-error {{value of type 'X' has no member 'operationThatOnlyExistsOnY'}}
@@ -441,6 +441,10 @@ class Iterable : Sequence {
 // Default arguments of methods cannot capture 'Self' or 'self'
 class MathClass {
   func invalidDefaultArg(s: Int = Self.intMethod()) {}
+  // expected-error@-1 {{covariant 'Self' type cannot be referenced from a default argument expression}}
+
+  // Make sure we check subscripts too.
+  subscript(_: Int = Self.intMethod()) -> Int { return 0 }
   // expected-error@-1 {{covariant 'Self' type cannot be referenced from a default argument expression}}
 
   static func intMethod() -> Int { return 0 }

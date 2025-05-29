@@ -78,6 +78,8 @@ class SILModuleConventions {
 public:
   static bool isPassedIndirectlyInSIL(SILType type, SILModule &M);
 
+  static bool isThrownIndirectlyInSIL(SILType type, SILModule &M);
+
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
   static SILModuleConventions getLoweredAddressConventions(SILModule &M) {
@@ -214,10 +216,7 @@ public:
     return getSILType(funcTy->getErrorResult(), context);
   }
 
-  bool isTypedError() const {
-    return !funcTy->getErrorResult()
-        .getInterfaceType()->isExistentialWithError();
-  }
+  bool isTypedError() const;
 
   /// Returns an array of result info.
   /// Provides convenient access to the underlying SILFunctionType.
@@ -241,6 +240,38 @@ public:
     }
 
     return 0;
+  }
+
+  std::optional<SILResultInfo> getIndirectErrorResult() const {
+    if (!silConv.loweredAddresses)
+      return std::nullopt;
+    auto info = funcTy->getOptionalErrorResult();
+    if (!info)
+      return std::nullopt;
+    if (info->getConvention() != ResultConvention::Indirect)
+      return std::nullopt;
+    return info;
+  }
+
+  SILType getIndirectErrorResultType(TypeExpansionContext context) const {
+    auto result = getIndirectErrorResult();
+    if (!result)
+      return SILType();
+    return getSILType(*result, context);
+  }
+
+  bool isArgumentIndexOfIndirectErrorResult(unsigned idx) {
+    unsigned indirectResults = getNumIndirectSILResults();
+    return idx >= indirectResults &&
+           idx < indirectResults + getNumIndirectSILErrorResults();
+  }
+
+  unsigned getNumAutoDiffSemanticResults() const {
+    return funcTy->getNumAutoDiffSemanticResults();
+  }
+
+  unsigned getNumAutoDiffSemanticResultParameters() const {
+    return funcTy->getNumAutoDiffSemanticResultsParameters();
   }
 
   /// Are any SIL results passed as address-typed arguments?
@@ -579,6 +610,7 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
 
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_CXX:
     return isTypeIndirectForIndirectParamConvention(param.getInterfaceType(),
                                                     loweredAddresses);
   case ParameterConvention::Indirect_Inout:

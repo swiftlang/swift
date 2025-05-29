@@ -13,8 +13,12 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -83,9 +87,13 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::StringLiteral:
     return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
-    return Ctx.getArrayDecl()->getDeclaredType();
+    if (!Ctx.getArrayDecl())
+      return Type();
+    return Ctx.getArrayDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
-    return Ctx.getDictionaryDecl()->getDeclaredType();
+    if (!Ctx.getDictionaryDecl())
+      return Type();
+    return Ctx.getDictionaryDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
   case CodeCompletionLiteralKind::ImageLiteral:
@@ -96,12 +104,18 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
 }
 
-/// Whether funcType has a single argument (not including defaulted arguments)
-/// that is of type () -> ().
-static bool hasTrivialTrailingClosure(const FuncDecl *FD,
-                                      AnyFunctionType *funcType) {
-  ParameterListInfo paramInfo(funcType->getParams(), FD,
-                              /*skipCurriedSelf*/ FD->hasCurriedSelf());
+/// Whether the provided type has a single argument (not including defaulted
+/// arguments) that is of type () -> ().
+static bool hasTrivialTrailingClosure(const ValueDecl *VD, Type type) {
+  if (!VD->hasParameterList())
+    return false;
+
+  auto *funcType = type->getAs<AnyFunctionType>();
+  if (!funcType)
+    return false;
+
+  ParameterListInfo paramInfo(funcType->getParams(), VD,
+                              /*skipCurriedSelf*/ VD->hasCurriedSelf());
 
   if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
@@ -196,14 +210,14 @@ bool swift::ide::canDeclContextHandleAsync(const DeclContext *DC) {
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         if (E == Target)
-          return Action::SkipChildren(E);
+          return Action::SkipNode(E);
 
         if (auto conversionExpr = dyn_cast<FunctionConversionExpr>(E)) {
           if (conversionExpr->getSubExpr() == Target) {
             if (conversionExpr->getType()->is<AnyFunctionType>() &&
                 conversionExpr->getType()->castTo<AnyFunctionType>()->isAsync())
               Result = true;
-            return Action::SkipChildren(E);
+            return Action::SkipNode(E);
           }
         }
         return Action::Continue(E);
@@ -251,19 +265,13 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  auto T = TAD->getDeclaredInterfaceType();
-  auto subMap = selfTy->getMemberSubstitutionMap(TAD->getParentModule(), TAD);
-  T = T.subst(subMap)->getCanonicalType();
-
-  ArchetypeType *archeTy = T->getAs<ArchetypeType>();
-  if (!archeTy)
+  if (TAD->isGeneric())
     return false;
-  archeTy = archeTy->getRoot();
 
-  // For protocol, the 'archeTy' should match with the 'baseTy' which is the
-  // dynamic 'Self' type of the protocol. For nominal decls, 'archTy' should
-  // be one of the generic params in 'selfTy'. Search 'archeTy' in 'baseTy'.
-  return selfTy.findIf([&](Type T) { return archeTy->isEqual(T); });
+  auto T = TAD->getDeclaredInterfaceType();
+  auto subMap = selfTy->getContextSubstitutionMap(TAD->getDeclContext());
+
+  return T.subst(subMap)->is<ArchetypeType>();
 }
 
 CompletionLookup::CompletionLookup(CodeCompletionResultSink &Sink,
@@ -290,8 +298,7 @@ void CompletionLookup::addSubModuleNames(
   for (auto &Pair : SubModuleNameVisibilityPairs) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Declaration, SemanticContextKind::None);
-    auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(Ctx.getIdentifier(Pair.first), Ctx);
     Builder.setAssociatedDecl(MD);
     Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
@@ -325,7 +332,7 @@ void CompletionLookup::collectImportedModules(
 }
 
 void CompletionLookup::addModuleName(
-    ModuleDecl *MD, llvm::Optional<ContextualNotRecommendedReason> R) {
+    ModuleDecl *MD, std::optional<ContextualNotRecommendedReason> R) {
 
   // Don't add underscored cross-import overlay modules.
   if (MD->getDeclaringModuleIfCrossImportOverlay())
@@ -365,10 +372,9 @@ void CompletionLookup::addImportModuleNames() {
     if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
       continue;
 
-    auto MD = ModuleDecl::create(ModuleName, Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(ModuleName, Ctx);
 
-    llvm::Optional<ContextualNotRecommendedReason> Reason = llvm::None;
+    std::optional<ContextualNotRecommendedReason> Reason = std::nullopt;
 
     // Imported modules are not recommended.
     if (directImportedModules.contains(MD->getNameStr())) {
@@ -388,7 +394,7 @@ CompletionLookup::getSemanticContext(const Decl *D, DeclVisibilityKind Reason,
     return *ForcedSemanticContext;
 
   switch (Reason) {
-  case DeclVisibilityKind::LocalVariable:
+  case DeclVisibilityKind::LocalDecl:
   case DeclVisibilityKind::FunctionParameter:
   case DeclVisibilityKind::GenericParameter:
     return SemanticContextKind::Local;
@@ -475,6 +481,14 @@ CompletionLookup::makeResultBuilder(CodeCompletionResultKind kind,
 void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
                                         DeclBaseName Name) {
   auto NameStr = Name.userFacingName();
+  if (Name.mustAlwaysBeEscaped()) {
+    // Names that are raw identifiers must always be escaped regardless of
+    // their position.
+    SmallString<16> buffer;
+    Builder.addBaseName(Builder.escapeWithBackticks(NameStr, buffer));
+    return;
+  }
+
   bool shouldEscapeKeywords;
   if (Name.isSpecial()) {
     // Special names (i.e. 'init') are always displayed as its user facing
@@ -495,6 +509,16 @@ void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
   } else {
     SmallString<16> buffer;
     Builder.addBaseName(Builder.escapeKeyword(NameStr, true, buffer));
+  }
+}
+
+void CompletionLookup::addIdentifier(CodeCompletionResultBuilder &Builder,
+                                     Identifier Name) {
+  if (Name.mustAlwaysBeEscaped()) {
+    SmallString<16> buffer;
+    Builder.addBaseName(Builder.escapeWithBackticks(Name.str(), buffer));
+  } else {
+    Builder.addBaseName(Name.str());
   }
 }
 
@@ -551,15 +575,10 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
   if (!genericSig)
     return type;
 
-  auto buildProtocolComposition = [&](ArrayRef<ProtocolDecl *> protos) -> Type {
-    SmallVector<Type, 2> types;
-    for (auto proto : protos)
-      types.push_back(proto->getDeclaredInterfaceType());
-    return ProtocolCompositionType::get(Ctx, types,
-                                        /*HasExplicitAnyObject=*/false);
-  };
-
   if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
+    assert(genericFuncType->getGenericSignature()->isEqual(genericSig) &&
+           "if not, just use the GFT's signature instead below");
+
     SmallVector<AnyFunctionType::Param, 8> erasedParams;
     for (const auto &param : genericFuncType->getParams()) {
       auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
@@ -571,27 +590,36 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         genericFuncType->getExtInfo());
   }
 
-  return type.transform([&](Type t) -> Type {
+  return type.transformRec([&](Type t) -> std::optional<Type> {
     // FIXME: Code completion should only deal with one or the other,
     // and not both.
     if (auto *archetypeType = t->getAs<ArchetypeType>()) {
       // Don't erase opaque archetype.
       if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
           archetypeType->isRoot())
-        return t;
+        return std::nullopt;
 
-      auto protos = archetypeType->getConformsTo();
-      if (!protos.empty())
-        return buildProtocolComposition(protos);
+      auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
+      auto upperBound = genericSig->getUpperBound(
+          archetypeType->getInterfaceType(),
+          /*forExistentialSelf=*/false,
+          /*withParameterizedProtocols=*/false);
+
+      if (!upperBound->isAny())
+        return upperBound;
     }
 
     if (t->isTypeParameter()) {
-      const auto protos = genericSig->getRequiredProtocols(t);
-      if (!protos.empty())
-        return buildProtocolComposition(protos);
+      auto upperBound = genericSig->getUpperBound(
+          t,
+          /*forExistentialSelf=*/false,
+          /*withParameterizedProtocols=*/false);
+
+      if (!upperBound->isAny())
+        return upperBound;
     }
 
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -599,7 +627,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
                                        DynamicLookupInfo dynamicLookupInfo) {
   switch (dynamicLookupInfo.getKind()) {
   case DynamicLookupInfo::None:
-    return getTypeOfMember(VD, this->ExprType);
+    return getTypeOfMember(VD, getMemberBaseType());
   case DynamicLookupInfo::AnyObject:
     return getTypeOfMember(VD, Type());
   case DynamicLookupInfo::KeyPathDynamicMember: {
@@ -633,14 +661,15 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
     //     τ_1_0(U) => U }
     auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
 
+    // FIXME: The below should use substitution map substitution.
+
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
-    auto keyPathResultTy =
-        getResultTypeOfKeypathDynamicMember(SD)->mapTypeOutOfContext();
+    auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD);
     if (keyPathResultTy->hasTypeParameter()) {
       auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).subst(
           QueryTypeSubstitutionMap{subs},
-          LookUpConformanceInModule(CurrModule));
+          LookUpConformanceInModule());
 
       // The result type of the VD.
       // i.e. 'Circle.center' => 'Point'.
@@ -664,14 +693,21 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
     // Substitute the element type of the subscript using modified map.
     // i.e. 'Wrapped<U>' => 'Wrapped<Point>'.
     return elementTy.subst(QueryTypeSubstitutionMap{subs},
-                           LookUpConformanceInModule(CurrModule));
+                           LookUpConformanceInModule());
   }
   }
   llvm_unreachable("Unhandled DynamicLookupInfo Kind in switch");
 }
 
 Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-  Type T = VD->getInterfaceType();
+  Type T;
+  if (auto *TD = dyn_cast<TypeDecl>(VD)) {
+    // For a type decl we're interested in the declared interface type, i.e
+    // we don't want a metatype.
+    T = TD->getDeclaredInterfaceType();
+  } else {
+    T = VD->getInterfaceType();
+  }
   assert(!T.isNull());
 
   if (ExprType) {
@@ -707,8 +743,39 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       if (MaybeNominalType->hasUnboundGenericType())
         return T;
 
+      // If we are doing implicit member lookup on a protocol and we have found
+      // a declaration in a constrained extension, use the extension's `Self`
+      // type for the generic substitution.
+      // Eg in the following, the `Self` type returned by `qux` is
+      // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
+      // ```
+      // protocol MyProto {}
+      // struct MyGeneric<T>: MyProto {}
+      // extension MyProto where Self == MyGeneric<Int> {
+      //   static func qux() -> Self { .init() }
+      // }
+      // func takeMyProto(_: any MyProto)  {}
+      // func test() {
+      //   takeMyProto(.#^COMPLETE^#)
+      // }
+      // ```
+      if (MaybeNominalType->isExistentialType()) {
+        Type SelfType;
+        if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
+            auto Sig = ED->getGenericSignature();
+            SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
+          }
+        }
+        if (SelfType) {
+          MaybeNominalType = SelfType;
+        } else {
+          return T;
+        }
+      }
+
       // For everything else, substitute in the base type.
-      auto Subs = MaybeNominalType->getMemberSubstitutionMap(CurrModule, VD);
+      auto Subs = MaybeNominalType->getMemberSubstitutionMap(VD);
 
       // For a GenericFunctionType, we only want to substitute the
       // param/result types, as otherwise we might end up with a bad generic
@@ -727,17 +794,14 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
 }
 
 Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
-  Type BaseTy = BaseType;
-  if (!BaseTy)
-    BaseTy = ExprType;
+  Type BaseTy = getMemberBaseType();
   if (!BaseTy && CurrDeclContext)
     BaseTy =
         CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
-    if (auto NTD = BaseTy->getAnyNominal()) {
-      auto *Module = NTD->getParentModule();
-      auto Conformance = Module->lookupConformance(BaseTy, ATD->getProtocol());
+    if (BaseTy->getAnyNominal()) {
+      auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
             const_cast<AssociatedTypeDecl *>(ATD));
@@ -749,7 +813,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
 
 void CompletionLookup::analyzeActorIsolation(
     const ValueDecl *VD, Type T, bool &implicitlyAsync,
-    llvm::Optional<ContextualNotRecommendedReason> &NotRecommended) {
+    std::optional<ContextualNotRecommendedReason> &NotRecommended) {
   auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
 
   switch (isolation.getKind()) {
@@ -761,15 +825,15 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
-  case ActorIsolation::GlobalActorUnsafe:
-    // For "unsafe" global actor isolation, automatic 'async' only happens
+  case ActorIsolation::GlobalActor: {
+    // For "preconcurrency" global actor isolation, automatic 'async' only happens
     // if the context has adopted concurrency.
-    if (!CanCurrDeclContextHandleAsync &&
+    if (isolation.preconcurrency() &&
+        !CanCurrDeclContextHandleAsync &&
         !completionContextUsesConcurrencyFeatures(CurrDeclContext)) {
       return;
     }
-    LLVM_FALLTHROUGH;
-  case ActorIsolation::GlobalActor: {
+
     auto getClosureActorIsolation = [this](AbstractClosureExpr *CE) {
       // Prefer solution-specific actor-isolations and fall back to the one
       // recorded in the AST.
@@ -787,36 +851,14 @@ void CompletionLookup::analyzeActorIsolation(
     }
     break;
   }
+  case ActorIsolation::Erased:
+    implicitlyAsync = true;
+    break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedUnsafe:
     return;
-  }
-
-  // If the reference is 'async', all types must be 'Sendable'.
-  if (Ctx.LangOpts.StrictConcurrencyLevel >= StrictConcurrency::Complete &&
-      implicitlyAsync && T) {
-    auto *M = CurrDeclContext->getParentModule();
-    if (isa<VarDecl>(VD)) {
-      if (!isSendableType(M, T)) {
-        NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
-      }
-    } else {
-      assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
-      // Check if the result and the param types are all 'Sendable'.
-      auto *AFT = T->castTo<AnyFunctionType>();
-      if (!isSendableType(M, AFT->getResult())) {
-        NotRecommended = ContextualNotRecommendedReason::CrossActorReference;
-      } else {
-        for (auto &param : AFT->getParams()) {
-          Type paramType = param.getPlainType();
-          if (!isSendableType(M, paramType)) {
-            NotRecommended =
-                ContextualNotRecommendedReason::CrossActorReference;
-            break;
-          }
-        }
-      }
-    }
   }
 }
 
@@ -838,7 +880,7 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
     VarType = getTypeOfMember(VD, dynamicLookupInfo);
   }
 
-  llvm::Optional<ContextualNotRecommendedReason> NotRecommended;
+  std::optional<ContextualNotRecommendedReason> NotRecommended;
   // "not recommended" in its own getter.
   if (Kind == LookupKind::ValueInDeclContext) {
     if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
@@ -849,14 +891,9 @@ void CompletionLookup::addVarDeclRef(const VarDecl *VD,
   }
   bool implicitlyAsync = false;
   analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
-  bool explicitlyAsync = false;
-  if (auto accessor = VD->getEffectfulGetAccessor()) {
-    explicitlyAsync = accessor->hasAsync();
-  }
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(VD, Reason, dynamicLookupInfo));
-  Builder.setIsAsync(explicitlyAsync || implicitlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(VD);
   addLeadingDot(Builder);
@@ -964,10 +1001,10 @@ bool isNonDesirableImportedDefaultArg(const ParamDecl *param) {
   auto baseName = func->getBaseName().getIdentifier().str();
   switch (kind) {
   case DefaultArgumentKind::EmptyArray:
-    return (baseName.endswith("Options"));
+    return (baseName.ends_with("Options"));
   case DefaultArgumentKind::EmptyDictionary:
-    return (baseName.endswith("Options") || baseName.endswith("Attributes") ||
-            baseName.endswith("UserInfo"));
+    return (baseName.ends_with("Options") || baseName.ends_with("Attributes") ||
+            baseName.ends_with("UserInfo"));
   default:
     llvm_unreachable("unhandled DefaultArgumentKind");
   }
@@ -991,9 +1028,10 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
     return true;
 
   case DefaultArgumentKind::None:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::ExpressionMacro:
     return false;
   }
 }
@@ -1057,8 +1095,8 @@ bool CompletionLookup::addCallArgumentPatterns(
     Builder.addCallArgument(argName, bodyName,
                             eraseArchetypes(paramTy, genericSig), contextTy,
                             isVariadic, isInOut, isIUO, isAutoclosure,
-                            /*UseUnderscoreLabel=*/false,
-                            /*IsLabeledTrailingClosure=*/false, hasDefault);
+                            /*IsLabeledTrailingClosure=*/false,
+                            /*IsForOperator=*/false, hasDefault);
 
     modifiedBuilder = true;
     needComma = true;
@@ -1095,7 +1133,7 @@ void CompletionLookup::addEffectsSpecifiers(
     Builder.addAnnotatedThrows();
 }
 
-void CompletionLookup::addPoundAvailable(llvm::Optional<StmtKind> ParentKind) {
+void CompletionLookup::addPoundAvailable(std::optional<StmtKind> ParentKind) {
   if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
     return;
   CodeCompletionResultBuilder Builder = makeResultBuilder(
@@ -1177,7 +1215,7 @@ CompletionLookup::getSemanticContextKind(const ValueDecl *VD) {
 
 void CompletionLookup::addSubscriptCallPattern(
     const AnyFunctionType *AFT, const SubscriptDecl *SD,
-    const llvm::Optional<SemanticContextKind> SemanticContext) {
+    const std::optional<SemanticContextKind> SemanticContext) {
   foundFunction(AFT);
   GenericSignature genericSig;
   if (SD)
@@ -1214,7 +1252,7 @@ void CompletionLookup::addSubscriptCallPattern(
 
 void CompletionLookup::addFunctionCallPattern(
     const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD,
-    const llvm::Optional<SemanticContextKind> SemanticContext) {
+    const std::optional<SemanticContextKind> SemanticContext) {
   GenericSignature genericSig;
   if (AFD)
     genericSig = AFD->getGenericSignatureOfContext();
@@ -1227,6 +1265,10 @@ void CompletionLookup::addFunctionCallPattern(
             : CodeCompletionResultKind::Pattern,
         SemanticContext ? *SemanticContext : getSemanticContextKind(AFD));
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
+    if (DotLoc) {
+      Builder.setNumBytesToErase(Ctx.SourceMgr.getByteDistance(
+          DotLoc, Ctx.SourceMgr.getIDEInspectionTargetLoc()));
+    }
     if (AFD)
       Builder.setAssociatedDecl(AFD);
 
@@ -1252,7 +1294,6 @@ void CompletionLookup::addFunctionCallPattern(
     else
       addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-    Builder.setIsAsync(AFT->hasExtInfo() && AFT->isAsync());
     Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
@@ -1364,7 +1405,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
   if (AFT && !IsImplicitlyCurriedInstanceMethod)
     trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
-  llvm::Optional<ContextualNotRecommendedReason> NotRecommended;
+  std::optional<ContextualNotRecommendedReason> NotRecommended;
   bool implictlyAsync = false;
   analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
@@ -1374,7 +1415,6 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     CodeCompletionResultBuilder Builder =
         makeResultBuilder(CodeCompletionResultKind::Declaration,
                           getSemanticContext(FD, Reason, dynamicLookupInfo));
-    Builder.setIsAsync(implictlyAsync || (AFT->hasExtInfo() && AFT->isAsync()));
     Builder.setHasAsyncAlternative(
         FD->getAsyncAlternative() &&
         !FD->getAsyncAlternative()->shouldHideFromEditor());
@@ -1497,8 +1537,8 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
 void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
                                           DeclVisibilityKind Reason,
                                           DynamicLookupInfo dynamicLookupInfo,
-                                          llvm::Optional<Type> BaseType,
-                                          llvm::Optional<Type> Result,
+                                          std::optional<Type> BaseType,
+                                          std::optional<Type> Result,
                                           bool IsOnType, Identifier addName) {
   foundFunction(CD);
   Type MemberType = getTypeOfMember(CD, BaseType.value_or(ExprType));
@@ -1534,7 +1574,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
       addLeadingDot(Builder);
       Builder.addBaseName("init");
     } else if (!addName.empty()) {
-      Builder.addBaseName(addName.str());
+      addIdentifier(Builder, addName);
     } else {
       Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
     }
@@ -1571,8 +1611,6 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
       addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
     }
 
-    Builder.setIsAsync(ConstructorType->hasExtInfo() &&
-                       ConstructorType->isAsync());
     Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   };
 
@@ -1606,7 +1644,7 @@ void CompletionLookup::addConstructorCallsForType(
     if (init->shouldHideFromEditor())
       continue;
     addConstructorCall(cast<ConstructorDecl>(init), Reason, dynamicLookupInfo,
-                       type, llvm::None,
+                       type, std::nullopt,
                        /*IsOnType=*/true, name);
   }
 }
@@ -1628,14 +1666,13 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   if (!subscriptType)
     return;
 
-  llvm::Optional<ContextualNotRecommendedReason> NotRecommended;
+  std::optional<ContextualNotRecommendedReason> NotRecommended;
   bool implictlyAsync = false;
   analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
   CodeCompletionResultBuilder Builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration,
                         getSemanticContext(SD, Reason, dynamicLookupInfo));
-  Builder.setIsAsync(implictlyAsync);
   Builder.setCanCurrDeclContextHandleAsync(CanCurrDeclContextHandleAsync);
   Builder.setAssociatedDecl(SD);
 
@@ -1660,7 +1697,7 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   Type resultTy = subscriptType->getResult();
   if (IsDynamicLookup) {
     // Values of properties that were found on a AnyObject have
-    // llvm::Optional<T> type.
+    // std::optional<T> type.
     resultTy = OptionalType::get(resultTy);
   }
 
@@ -1699,7 +1736,10 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
                         getSemanticContext(NTD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(NTD);
   addLeadingDot(Builder);
-  Builder.addBaseName(NTD->getName().str());
+  addValueBaseName(Builder, NTD->getBaseName());
+
+  // Substitute the base type for a nested type if needed.
+  auto nominalTy = getTypeOfMember(NTD, dynamicLookupInfo);
 
   // "Fake" annotation for custom attribute types.
   SmallVector<char, 0> stash;
@@ -1707,7 +1747,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   if (!customAttributeAnnotation.empty()) {
     Builder.addTypeAnnotation(customAttributeAnnotation);
   } else {
-    addTypeAnnotation(Builder, NTD->getDeclaredType());
+    addTypeAnnotation(Builder, nominalTy);
   }
 
   // Override the type relation for NominalTypes. Use the better relation
@@ -1717,9 +1757,47 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   //   func receiveMetatype(_: Int.Type) {}
   //
   // We want to suggest 'Int' as 'Identical' for both arguments.
-  Builder.setResultTypes(
-      {NTD->getInterfaceType(), NTD->getDeclaredInterfaceType()});
+  Builder.setResultTypes({MetatypeType::get(nominalTy), nominalTy});
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
+}
+
+Type CompletionLookup::getTypeAliasType(const TypeAliasDecl *TAD,
+                                        DynamicLookupInfo dynamicLookupInfo) {
+  // Substitute the base type for a nested typealias if needed.
+  auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
+  auto *typeAliasTy = dyn_cast<TypeAliasType>(ty.getPointer());
+  if (!typeAliasTy)
+    return ty;
+
+  // If the underlying type has an error, prefer to print the full typealias,
+  // otherwise get the underlying type. We only want the direct underlying type,
+  // not the full desugared type, since that more faithfully reflects what's
+  // written in source.
+  Type underlyingTy = typeAliasTy->getSinglyDesugaredType();
+  if (underlyingTy->hasError())
+    return ty;
+
+  // The underlying type might be unbound for e.g:
+  //
+  // struct S<T> {}
+  // typealias X = S
+  //
+  // Introduce type parameters such that we print the underlying type as
+  // 'S<T>'. We only expect unbound generics at the top-level of a type-alias,
+  // they are rejected by type resolution in any other position.
+  //
+  // FIXME: This is a hack – using the declared interface type isn't correct
+  // since the generic parameters ought to be introduced at a higher depth,
+  // i.e we should be treating it as `typealias X<T> = S<T>`. Ideally this would
+  // be fixed by desugaring the unbound typealias during type resolution. For
+  // now this is fine though since we only use the resulting type for printing
+  // the type annotation; the type relation logic currently skips type
+  // parameters.
+  if (auto *UGT = underlyingTy->getAs<UnboundGenericType>())
+    underlyingTy = UGT->getDecl()->getDeclaredInterfaceType();
+
+  ASSERT(!underlyingTy->hasUnboundGenericType());
+  return underlyingTy;
 }
 
 void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
@@ -1730,18 +1808,8 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                         getSemanticContext(TAD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
-  Builder.addBaseName(TAD->getName().str());
-  if (auto underlyingType = TAD->getUnderlyingType()) {
-    if (underlyingType->hasError()) {
-      addTypeAnnotation(Builder,
-                        TAD->isGeneric()
-                        ? TAD->getUnboundGenericType()
-                        : TAD->getDeclaredInterfaceType());
-
-    } else {
-      addTypeAnnotation(Builder, underlyingType);
-    }
-  }
+  addValueBaseName(Builder, TAD->getBaseName());
+  addTypeAnnotation(Builder, getTypeAliasType(TAD, dynamicLookupInfo));
 }
 
 void CompletionLookup::addGenericTypeParamRef(
@@ -1753,7 +1821,7 @@ void CompletionLookup::addGenericTypeParamRef(
                         getSemanticContext(GP, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(GP);
   addLeadingDot(Builder);
-  Builder.addBaseName(GP->getName().str());
+  addValueBaseName(Builder, GP->getBaseName());
   addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
 }
 
@@ -1765,7 +1833,7 @@ void CompletionLookup::addAssociatedTypeRef(
                         getSemanticContext(AT, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AT);
   addLeadingDot(Builder);
-  Builder.addBaseName(AT->getName().str());
+  addValueBaseName(Builder, AT->getBaseName());
   if (Type T = getAssociatedTypeType(AT))
     addTypeAnnotation(Builder, T);
 }
@@ -1776,8 +1844,17 @@ void CompletionLookup::addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
   CodeCompletionResultBuilder builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration, semanticContext);
 
-  builder.addBaseName(PGD->getName().str());
+  addIdentifier(builder, PGD->getName());
   builder.setAssociatedDecl(PGD);
+}
+
+void CompletionLookup::addBuiltinMemberRef(StringRef Name,
+                                           Type TypeAnnotation) {
+  CodeCompletionResultBuilder Builder = makeResultBuilder(
+      CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
+  addLeadingDot(Builder);
+  Builder.addBaseName(Name);
+  addTypeAnnotation(Builder, TypeAnnotation);
 }
 
 void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
@@ -1855,6 +1932,12 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
     case MacroRole::Peer:
       roleStrs.push_back("Peer Macro");
       break;
+    case MacroRole::Preamble:
+      roleStrs.push_back("Preamble Macro");
+      break;
+    case MacroRole::Body:
+      roleStrs.push_back("Body Macro");
+      break;
     }
   }
 
@@ -1867,6 +1950,36 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
   llvm::raw_svector_ostream OS(stash);
   llvm::interleave(roleStrs, OS, ", ");
   return {stash.data(), stash.size()};
+}
+
+void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
+                                             DeclVisibilityKind Reason,
+                                             bool forTrivialTrailingClosure) {
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(MD, Reason, DynamicLookupInfo()));
+  Builder.setAssociatedDecl(MD);
+
+  addValueBaseName(Builder, MD->getBaseIdentifier());
+
+  if (forTrivialTrailingClosure) {
+    Builder.addBraceStmtWithCursor(" { code }");
+  } else if (MD->parameterList && MD->parameterList->size() > 0) {
+    auto *macroTy = MD->getInterfaceType()->castTo<AnyFunctionType>();
+    Builder.addLeftParen();
+    addCallArgumentPatterns(Builder, macroTy, MD->parameterList,
+                            MD->getGenericSignature());
+    Builder.addRightParen();
+  }
+
+  auto roles = MD->getMacroRoles();
+  if (roles.containsOnly(MacroRole::Expression)) {
+    addTypeAnnotation(Builder, MD->getResultInterfaceType(),
+                      MD->getGenericSignature());
+  } else {
+    llvm::SmallVector<char, 0> stash;
+    Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
+  }
 }
 
 void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
@@ -1885,30 +1998,10 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
       return;
   }
 
-  CodeCompletionResultBuilder Builder =
-      makeResultBuilder(CodeCompletionResultKind::Declaration,
-                        getSemanticContext(MD, Reason, DynamicLookupInfo()));
-  Builder.setAssociatedDecl(MD);
+  if (hasTrivialTrailingClosure(MD, MD->getInterfaceType()))
+    addMacroCallArguments(MD, Reason, /*forTrivialTrailingClosure*/ true);
 
-  addValueBaseName(Builder, MD->getBaseIdentifier());
-
-  Type macroType = MD->getInterfaceType();
-  if (MD->parameterList && MD->parameterList->size() > 0) {
-    Builder.addLeftParen();
-    addCallArgumentPatterns(Builder, macroType->castTo<AnyFunctionType>(),
-                            MD->parameterList,
-                            MD->getGenericSignature());
-    Builder.addRightParen();
-  }
-
-  auto roles = MD->getMacroRoles();
-  if (roles.containsOnly(MacroRole::Expression)) {
-    addTypeAnnotation(Builder, MD->getResultInterfaceType(),
-                      MD->getGenericSignature());
-  } else {
-    llvm::SmallVector<char, 0> stash;
-    Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
-  }
+  addMacroCallArguments(MD, Reason);
 }
 
 void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
@@ -1971,10 +2064,11 @@ bool CompletionLookup::addCompoundFunctionNameIfDesiable(
   if (!useFunctionReference && funcTy) {
     // We know that the CodeCompletionResultType is AST-based so we can pass
     // nullptr for USRTypeContext.
-    auto maxRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
+    auto maxFuncTyRel = CodeCompletionResultType(funcTy).calculateTypeRelation(
         &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
-    useFunctionReference =
-        maxRel >= CodeCompletionResultTypeRelation::Convertible;
+    auto maxResultTyRel = CodeCompletionResultType(funcTy->getResult()).calculateTypeRelation(
+        &expectedTypeContext, CurrDeclContext, /*USRTypeContext=*/nullptr);
+    useFunctionReference = maxFuncTyRel > maxResultTyRel;
   }
   if (!useFunctionReference)
     return false;
@@ -2032,15 +2126,15 @@ void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
 }
 
 Type CompletionLookup::normalizeTypeForDuplicationCheck(Type Ty) {
-  return Ty.transform([](Type T) {
+  return Ty.transformRec([](Type T) -> std::optional<Type> {
     if (auto opaque = T->getAs<OpaqueTypeArchetypeType>()) {
       /// Opaque type has a _invisible_ substitution map. Since IDE can't
       /// differentiate them, replace it with empty substitution map.
-      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
-                                          opaque->getInterfaceType(),
-                                          /*Substitutions=*/{});
+      return Type(OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                               opaque->getInterfaceType(),
+                                               /*Substitutions=*/{}));
     }
-    return T;
+    return std::nullopt;
   });
 }
 
@@ -2079,7 +2173,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
 
         // If instance type is type alias, show users that the constructed
         // type is the typealias instead of the underlying type of the alias.
-        llvm::Optional<Type> Result = llvm::None;
+        std::optional<Type> Result = std::nullopt;
         if (!CD->getInterfaceType()->is<ErrorType>() &&
             isa<TypeAliasType>(Ty.getPointer()) &&
             Ty->getDesugaredType() ==
@@ -2092,12 +2186,14 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
         // and either the initializer is required, the base type's instance type
         // is not a class, or this is a 'self' or 'super' reference.
         if (IsStaticMetatype || IsUnresolvedMember || Ty->is<ArchetypeType>())
-          addConstructorCall(CD, Reason, dynamicLookupInfo, llvm::None, Result,
+          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt,
+                             Result,
                              /*isOnType*/ true);
         else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
                   CD->isRequired()) &&
                  !HaveLParen)
-          addConstructorCall(CD, Reason, dynamicLookupInfo, llvm::None, Result,
+          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt,
+                             Result,
                              /*isOnType*/ false);
         return;
       }
@@ -2115,8 +2211,8 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
             return;
         }
         if (IsSelfRefExpr || IsSuperRefExpr)
-          addConstructorCall(CD, Reason, dynamicLookupInfo, llvm::None,
-                             llvm::None,
+          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt,
+                             std::nullopt,
                              /*IsOnType=*/false);
       }
       return;
@@ -2283,28 +2379,37 @@ bool CompletionLookup::tryTupleExprCompletions(Type ExprType) {
 
   unsigned Index = 0;
   for (auto TupleElt : TT->getElements()) {
-    CodeCompletionResultBuilder Builder = makeResultBuilder(
-        CodeCompletionResultKind::Pattern, SemanticContextKind::CurrentNominal);
-    addLeadingDot(Builder);
+    auto Ty = TupleElt.getType();
     if (TupleElt.hasName()) {
-      Builder.addBaseName(TupleElt.getName().str());
+      addBuiltinMemberRef(TupleElt.getName().str(), Ty);
     } else {
       llvm::SmallString<4> IndexStr;
       {
         llvm::raw_svector_ostream OS(IndexStr);
         OS << Index;
       }
-      Builder.addBaseName(IndexStr.str());
+      addBuiltinMemberRef(IndexStr, Ty);
     }
-    addTypeAnnotation(Builder, TupleElt.getType());
     ++Index;
   }
   return true;
 }
 
+void CompletionLookup::tryFunctionIsolationCompletion(Type ExprType) {
+  auto *FT = ExprType->getAs<FunctionType>();
+  if (!FT || !FT->getIsolation().isErased())
+    return;
+
+  // The type of `.isolation` is `(any Actor)?`
+  auto *actorProto = Ctx.getProtocol(KnownProtocolKind::Actor);
+  auto memberTy = OptionalType::get(actorProto->getDeclaredExistentialType());
+
+  addBuiltinMemberRef(Ctx.Id_isolation.str(), memberTy);
+}
+
 bool CompletionLookup::tryFunctionCallCompletions(
     Type ExprType, const ValueDecl *VD,
-    llvm::Optional<SemanticContextKind> SemanticContext) {
+    std::optional<SemanticContextKind> SemanticContext) {
   ExprType = ExprType->getRValueType();
   if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
     if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(VD)) {
@@ -2379,6 +2484,9 @@ bool CompletionLookup::tryUnwrappedCompletions(Type ExprType, bool isIUO) {
     }
     if (NumBytesToEraseForOptionalUnwrap <=
         CodeCompletionResult::MaxNumBytesToErase) {
+      // Add '.isolation' to @isolated(any) functions.
+      tryFunctionIsolationCompletion(Unwrapped);
+
       if (!tryTupleExprCompletions(Unwrapped)) {
         lookupVisibleMemberDecls(*this, Unwrapped, DotLoc,
                                  CurrDeclContext,
@@ -2441,8 +2549,7 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
 
   if (!ExprType->getMetatypeInstanceType()->isAnyObject()) {
     if (ExprType->isAnyExistentialType()) {
-      ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType(),
-                                             CurrDeclContext->getGenericSignatureOfContext());
+      ExprType = ExistentialArchetypeType::getAny(ExprType->getCanonicalType());
     }
   }
   if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
@@ -2454,6 +2561,10 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
     ExprType = OptionalType::get(ExprType);
 
   // Handle special cases
+
+  // Add '.isolation' to @isolated(any) functions.
+  tryFunctionIsolationCompletion(ExprType);
+
   bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
   if (tryFunctionCallCompletions(ExprType, IsDeclUnapplied ? VD : nullptr))
     return;
@@ -2531,7 +2642,8 @@ void CompletionLookup::addAssignmentOperator(Type RHSType) {
   Type contextTy;
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     contextTy = typeContext->getDeclaredTypeInContext();
-  builder.addCallArgument(Identifier(), RHSType, contextTy);
+  builder.addCallArgument(Identifier(), RHSType, contextTy,
+                          /*IsForOperator=*/true);
 }
 
 void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
@@ -2555,7 +2667,8 @@ void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
     Type contextTy;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       contextTy = typeContext->getDeclaredTypeInContext();
-    builder.addCallArgument(Identifier(), RHSType, contextTy);
+    builder.addCallArgument(Identifier(), RHSType, contextTy,
+                            /*IsForOperator=*/true);
   }
   if (resultType)
     addTypeAnnotation(builder, resultType);
@@ -2582,7 +2695,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
     // Check for conformance to the literal protocol.
     if (T->getAnyNominal()) {
-      if (CurrModule->lookupConformance(T, PD)) {
+      if (lookupConformance(T, PD)) {
         literalType = T;
         break;
       }
@@ -2751,8 +2864,8 @@ void CompletionLookup::getValueCompletionsInDeclContext(SourceLoc Loc,
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
   FilteredDeclConsumer FilteringConsumer(AccessFilteringConsumer, Filter);
 
-  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 
   CodeCompletionFilter filter{CodeCompletionFilterFlag::Expr,
                               CodeCompletionFilterFlag::Type};
@@ -2884,8 +2997,9 @@ void CompletionLookup::addCallArgumentCompletionResults(
     Builder.addCallArgument(Arg->getLabel(), Identifier(), Arg->getPlainType(),
                             ContextType, Arg->isVariadic(), Arg->isInOut(),
                             /*IsIUO=*/false, Arg->isAutoClosure(),
-                            /*UseUnderscoreLabel=*/true,
-                            isLabeledTrailingClosure, /*HasDefault=*/false);
+                            isLabeledTrailingClosure,
+                            /*IsForOperator=*/false,
+                            /*HasDefault=*/false);
     Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
     auto Ty = Arg->getPlainType();
     if (Arg->isInOut()) {
@@ -2921,6 +3035,22 @@ void CompletionLookup::getTypeCompletions(Type BaseType) {
   }
 }
 
+void CompletionLookup::getInvertedTypeCompletions() {
+  Kind = LookupKind::Type;
+
+  auto addCompletion = [&](InvertibleProtocolKind invertableKind) {
+    auto *P = Ctx.getProtocol(getKnownProtocolKind(invertableKind));
+    if (!P)
+      return;
+
+    addNominalTypeRef(P, DeclVisibilityKind::VisibleAtTopLevel,
+                      DynamicLookupInfo());
+  };
+#define INVERTIBLE_PROTOCOL(Name, Bit)         \
+  addCompletion(InvertibleProtocolKind::Name);
+#include "swift/ABI/InvertibleProtocols.def"
+}
+
 void CompletionLookup::getGenericRequirementCompletions(
     DeclContext *DC, SourceLoc CodeCompletionLoc) {
   auto genericSig = DC->getGenericSignatureOfContext();
@@ -2950,11 +3080,14 @@ void CompletionLookup::getGenericRequirementCompletions(
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
   // We not only allow referencing nested types/typealiases directly, but also
-  // qualified by the current type. Thus also suggest current self type so the
+  // qualified by the current type, as long as it's a top-level type (nested
+  // types need to be qualified). Thus also suggest current self type so the
   // user can do a memberwise lookup on it.
-  if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
-    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalVariable,
-                      DynamicLookupInfo());
+  if (auto *NTD = typeContext->getSelfNominalTypeDecl()) {
+    if (!NTD->getDeclContext()->isTypeContext()) {
+      addNominalTypeRef(NTD, DeclVisibilityKind::LocalDecl,
+                        DynamicLookupInfo());
+    }
   }
 
   // Self is also valid in all cases in which it can be used in function
@@ -2964,8 +3097,8 @@ void CompletionLookup::getGenericRequirementCompletions(
 }
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                             bool IsConcurrencyEnabled,
-                                             llvm::Optional<DeclKind> DK,
+                                             const LangOptions &langOpts,
+                                             std::optional<DeclKind> DK,
                                              StringRef Name) {
   if (DeclAttribute::isUserInaccessible(DAK))
     return false;
@@ -2975,8 +3108,12 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!IsInSil && DeclAttribute::isSilOnly(DAK))
     return false;
-  if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
+  if (!langOpts.EnableExperimentalConcurrency
+        && DeclAttribute::isConcurrencyOnly(DAK))
     return false;
+  if (auto feature = DeclAttribute::getRequiredFeature(DAK))
+    if (!langOpts.hasFeature(*feature))
+      return false;
   if (!DK.has_value())
     return true;
   // Hide underscored attributes even if they are not marked as user
@@ -2987,8 +3124,8 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
-void CompletionLookup::getAttributeDeclCompletions(
-    bool IsInSil, llvm::Optional<DeclKind> DK) {
+void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
+                                                   std::optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
   if (DK.has_value()) {
@@ -3000,20 +3137,33 @@ void CompletionLookup::getAttributeDeclCompletions(
 #include "swift/AST/DeclNodes.def"
     }
   }
-  bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK,     \
-                            #KEYWORD))                                         \
+  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, Ctx.LangOpts,         \
+                            DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
-#include "swift/AST/Attr.def"
+#include "swift/AST/DeclAttr.def"
 }
 
 void CompletionLookup::getAttributeDeclParamCompletions(
-    CustomSyntaxAttributeKind AttrKind, int ParamIndex, bool HasLabel) {
+    ParameterizedDeclAttributeKind AttrKind, int ParamIndex, bool HasLabel) {
   switch (AttrKind) {
-  case CustomSyntaxAttributeKind::Available:
+  case ParameterizedDeclAttributeKind::Unowned:
+    addDeclAttrParamKeyword("safe", /*Parameters=*/{}, "", false);
+    addDeclAttrParamKeyword("unsafe", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::Nonisolated:
+    addDeclAttrParamKeyword("unsafe", /*Parameters=*/{}, "", false);
+    addDeclAttrParamKeyword("nonsending", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::InheritActorContext:
+    addDeclAttrParamKeyword("always", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::AccessControl:
+    addDeclAttrParamKeyword("set", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::Available:
     if (ParamIndex == 0) {
       addDeclAttrParamKeyword("*", /*Parameters=*/{}, "Platform", false);
 
@@ -3034,15 +3184,15 @@ void CompletionLookup::getAttributeDeclParamCompletions(
                               "Specify version number", true);
     }
     break;
-  case CustomSyntaxAttributeKind::FreestandingMacro:
-  case CustomSyntaxAttributeKind::AttachedMacro:
+  case ParameterizedDeclAttributeKind::FreestandingMacro:
+  case ParameterizedDeclAttributeKind::AttachedMacro:
     switch (ParamIndex) {
     case 0:
       for (auto role : getAllMacroRoles()) {
         bool isRoleSupported = isMacroSupported(role, Ctx);
-        if (AttrKind == CustomSyntaxAttributeKind::FreestandingMacro) {
+        if (AttrKind == ParameterizedDeclAttributeKind::FreestandingMacro) {
           isRoleSupported &= isFreestandingMacro(role);
-        } else if (AttrKind == CustomSyntaxAttributeKind::AttachedMacro) {
+        } else if (AttrKind == ParameterizedDeclAttributeKind::AttachedMacro) {
           isRoleSupported &= isAttachedMacro(role);
         }
         if (isRoleSupported) {
@@ -3070,7 +3220,7 @@ void CompletionLookup::getAttributeDeclParamCompletions(
       break;
     }
     break;
-  case CustomSyntaxAttributeKind::StorageRestrictions: {
+  case ParameterizedDeclAttributeKind::StorageRestrictions: {
     bool suggestInitializesLabel = false;
     bool suggestAccessesLabel = false;
     bool suggestArgument = false;
@@ -3110,18 +3260,41 @@ void CompletionLookup::getAttributeDeclParamCompletions(
   }
 }
 
-void CompletionLookup::getTypeAttributeKeywordCompletions() {
-  auto addTypeAttr = [&](StringRef Name) {
+void CompletionLookup::getTypeAttributeKeywordCompletions(
+    CompletionKind completionKind) {
+  auto addTypeAttr = [&](TypeAttrKind Kind, StringRef Name) {
+    if (completionKind != CompletionKind::TypeAttrInheritanceBeginning) {
+      switch (Kind) {
+      case TypeAttrKind::Retroactive:
+      case TypeAttrKind::Preconcurrency:
+      case TypeAttrKind::Nonisolated:
+      case TypeAttrKind::Unchecked:
+      case TypeAttrKind::Unsafe:
+        // These attributes are only available in inheritance clasuses.
+        return;
+      default:
+        break;
+      }
+    }
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Keyword, SemanticContextKind::None);
     Builder.addAttributeKeyword(Name, "Type Attribute");
   };
-  addTypeAttr("autoclosure");
-  addTypeAttr("convention(swift)");
-  addTypeAttr("convention(block)");
-  addTypeAttr("convention(c)");
-  addTypeAttr("convention(thin)");
-  addTypeAttr("escaping");
+
+  // Add simple user-accessible attributes.
+#define SIL_TYPE_ATTR(SPELLING, C)
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, C)
+#define SIMPLE_TYPE_ATTR(SPELLING, C)                                          \
+  if (!TypeAttribute::isUserInaccessible(TypeAttrKind::C))                     \
+    addTypeAttr(TypeAttrKind::C, #SPELLING);
+#include "swift/AST/TypeAttr.def"
+
+  // Add non-simple cases.
+  addTypeAttr(TypeAttrKind::Convention, "convention(swift)");
+  addTypeAttr(TypeAttrKind::Convention, "convention(block)");
+  addTypeAttr(TypeAttrKind::Convention, "convention(c)");
+  addTypeAttr(TypeAttrKind::Convention, "convention(thin)");
+  addTypeAttr(TypeAttrKind::Isolated, "isolated(any)");
 }
 
 void CompletionLookup::collectPrecedenceGroups() {
@@ -3181,7 +3354,7 @@ void CompletionLookup::getPrecedenceGroupCompletions(
 void CompletionLookup::getPoundAvailablePlatformCompletions() {
 
   // The platform names should be identical to those in @available.
-  getAttributeDeclParamCompletions(CustomSyntaxAttributeKind::Available, 0,
+  getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind::Available, 0,
                                    /*HasLabel=*/false);
 }
 
@@ -3235,8 +3408,8 @@ void CompletionLookup::getTypeCompletionsInDeclContext(SourceLoc Loc,
   Kind = LookupKind::TypeInDeclContext;
 
   AccessFilteringDeclConsumer AccessFilteringConsumer(CurrDeclContext, *this);
-  lookupVisibleDecls(AccessFilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
+  lookupVisibleDecls(AccessFilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 
   CodeCompletionFilter filter{CodeCompletionFilterFlag::Type};
   if (ModuleQualifier) {
@@ -3347,54 +3520,23 @@ void CompletionLookup::lookupExternalModuleDecls(
 }
 
 void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
-  class LabelFinder : public ASTWalker {
-    SourceManager &SM;
-    SourceLoc TargetLoc;
-    bool IsContinue;
+  auto *SF = CurrDeclContext->getParentSourceFile();
+  llvm::SmallPtrSet<Identifier, 4> labels;
+  for (auto *LS : ASTScope::lookupLabeledStmts(SF, Loc)) {
+    if (isContinue && !LS->isPossibleContinueTarget())
+      continue;
 
-  public:
-    SmallVector<Identifier, 2> Result;
+    auto labelInfo = LS->getLabelInfo();
+    if (!labelInfo)
+      continue;
 
-    /// Walk only the arguments of a macro.
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
+    auto label = labelInfo.Name;
+    if (!labels.insert(label).second)
+      continue;
 
-    LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
-        : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return Action::SkipChildren(S);
-
-      if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
-        if (LS->getLabelInfo()) {
-          if (!IsContinue || LS->isPossibleContinueTarget()) {
-            auto label = LS->getLabelInfo().Name;
-            if (!llvm::is_contained(Result, label))
-              Result.push_back(label);
-          }
-        }
-      }
-
-      return Action::Continue(S);
-    }
-
-    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
-      return Action::Stop();
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return Action::SkipChildren(E);
-      return Action::Continue(E);
-    }
-  } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
-  const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);
-  for (auto name : Finder.Result) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Pattern, SemanticContextKind::Local);
-    Builder.addTextChunk(name.str());
+    Builder.addTextChunk(label.str());
   }
 }
 
@@ -3423,12 +3565,6 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
   // modules. For suggesting top level results, we need a way to filter cached
   // results.
 
-  lookupVisibleDecls(FilteringConsumer, CurrDeclContext,
-                     /*IncludeTopLevel=*/false, Loc);
-}
-
-void CompletionLookup::getWithoutConstraintTypes() {
-  // FIXME: Once we have a typealias declaration for copyable, we should be
-  // returning that instead of a keyword (rdar://109107817).
-  addKeyword("Copyable");
+  lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
+                     /*IncludeTopLevel=*/false);
 }

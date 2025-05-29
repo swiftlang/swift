@@ -16,12 +16,12 @@
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/Concurrency.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Mutex.h"
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -31,29 +31,30 @@ namespace llvm {
 namespace SourceKit {
   class LangSupport;
   class NotificationCenter;
+  class PluginSupport;
 
-class GlobalConfig {
-public:
-  struct Settings {
-    struct IDEInspectionOptions {
+  class GlobalConfig {
+  public:
+    struct Settings {
+      struct IDEInspectionOptions {
 
-      /// Max count of reusing ASTContext for cached IDE inspection.
-      unsigned MaxASTContextReuseCount = 100;
+        /// Max count of reusing ASTContext for cached IDE inspection.
+        unsigned MaxASTContextReuseCount = 100;
 
-      /// Interval second for checking dependencies in cached IDE inspection.
-      unsigned CheckDependencyInterval = 5;
-    } IDEInspectionOpts;
-  };
+        /// Interval second for checking dependencies in cached IDE inspection.
+        unsigned CheckDependencyInterval = 5;
+      } IDEInspectionOpts;
+    };
 
-private:
-  Settings State;
-  mutable llvm::sys::Mutex Mtx;
+  private:
+    Settings State;
+    mutable llvm::sys::Mutex Mtx;
 
-public:
-  Settings
-  update(llvm::Optional<unsigned> IDEInspectionMaxASTContextReuseCount,
-         llvm::Optional<unsigned> IDEInspectionCheckDependencyInterval);
-  Settings::IDEInspectionOptions getIDEInspectionOpts() const;
+  public:
+    Settings
+    update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+           std::optional<unsigned> IDEInspectionCheckDependencyInterval);
+    Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 
 /// Keeps track of all requests that are currently in progress and coordinates
@@ -165,33 +166,33 @@ class Context {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeLibPath;
-  std::string DiagnosticDocumentationPath;
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<RequestTracker> ReqTracker;
+  std::shared_ptr<PluginSupport> Plugins;
   std::shared_ptr<SlowRequestSimulator> SlowRequestSim;
 
 public:
   Context(StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
-          StringRef DiagnosticDocumentationPath,
           llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
               LangSupportFactoryFn,
+          llvm::function_ref<std::shared_ptr<PluginSupport>(Context &)>
+              PluginSupportFactoryFn,
           bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
   StringRef getSwiftExecutablePath() const { return SwiftExecutablePath; }
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }
-  StringRef getDiagnosticDocumentationPath() const {
-    return DiagnosticDocumentationPath;
-  }
 
   LangSupport &getSwiftLangSupport() { return *SwiftLang; }
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
 
   std::shared_ptr<GlobalConfig> getGlobalConfiguration() { return Config; }
+
+  std::shared_ptr<PluginSupport> getPlugins() { return Plugins; }
 
   std::shared_ptr<SlowRequestSimulator> getSlowRequestSimulator() {
     return SlowRequestSim;

@@ -16,6 +16,7 @@
 #include "Utils.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift::refactoring;
 
@@ -186,7 +187,8 @@ swift::refactoring::checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
   case swift::DeclContextKind::TopLevelCodeDecl:
     break;
 
-  case swift::DeclContextKind::SerializedLocal:
+  case swift::DeclContextKind::SerializedAbstractClosure:
+  case swift::DeclContextKind::SerializedTopLevelCodeDecl:
   case swift::DeclContextKind::Package:
   case swift::DeclContextKind::Module:
   case swift::DeclContextKind::FileUnit:
@@ -294,7 +296,7 @@ bool RefactoringActionExtractExprBase::performChange() {
                             /*StartColumn=*/StartOffset + 1,
                             /*EndLine=*/1,
                             /*EndColumn=*/EndOffset + 1,
-                            /*ArgIndex*/ llvm::None};
+                            /*ArgIndex*/ std::nullopt};
 
   // Perform code change.
   EditConsumer.accept(SM, InsertLoc, DeclBuffer.str(), {DeclNameRegion});
@@ -307,7 +309,7 @@ bool RefactoringActionExtractExprBase::performChange() {
         {{RefactoringRangeKind::BaseName,
           /*StartLine=*/1, /*StartColumn-*/ 1, /*EndLine=*/1,
           /*EndColumn=*/static_cast<unsigned int>(PreferredName.size() + 1),
-          /*ArgIndex*/ llvm::None}});
+          /*ArgIndex*/ std::nullopt}});
   }
   return false;
 }

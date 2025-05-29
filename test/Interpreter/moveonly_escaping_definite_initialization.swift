@@ -3,8 +3,7 @@
 
 // REQUIRES: executable_test
 
-@_moveOnly
-struct MO {
+struct MO: ~Copyable {
     var value: Int
 
     func use() {}
@@ -70,4 +69,3 @@ closure = {}
 
 // CHECK-NEXT: done
 print("done")
-

@@ -266,3 +266,6 @@ do {
   // expected-warning@-1 {{dictionary literal of type '[String : Int]' has duplicate entries for string literal key 'a'}}
   // expected-note@-2 2 {{duplicate key declared here}}
 }
+
+func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x }()) {}
+// expected-error@-1 {{cannot convert value of type 'String' to type 'Int' in coercion}}

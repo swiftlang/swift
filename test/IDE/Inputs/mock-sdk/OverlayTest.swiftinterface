@@ -3,8 +3,8 @@
 
 @_exported import OverlayTest
 
-public extension Overlayed {
+public extension Overlaid {
     public func inOverlayFunc() {}
 }
 
-public func createOverlayedInOverlay() -> Overlayed
+public func createOverlaidInOverlay() -> Overlaid

@@ -29,14 +29,18 @@ enum class ObjCSelectorContext {
   SetterSelector
 };
 
-/// Attributes that have syntax which can't be modelled using a function call.
-/// This can't be \c DeclAttrKind because '@freestandig' and '@attached' have
+/// Parameterized attributes that have code completion.
+/// This can't be \c DeclAttrKind because '@freestanding' and '@attached' have
 /// the same attribute kind but take different macro roles as arguemnts.
-enum class CustomSyntaxAttributeKind {
+enum class ParameterizedDeclAttributeKind {
+  AccessControl,
+  Nonisolated,
+  Unowned,
   Available,
   FreestandingMacro,
   AttachedMacro,
-  StorageRestrictions
+  StorageRestrictions,
+  InheritActorContext
 };
 
 /// A bit of a hack. When completing inside the '@storageRestrictions'
@@ -142,7 +146,7 @@ public:
   };
 
   /// Set target decl for attribute if the CC token is in attribute of the decl.
-  virtual void setAttrTargetDeclKind(llvm::Optional<DeclKind> DK) {}
+  virtual void setAttrTargetDeclKind(std::optional<DeclKind> DK) {}
 
   /// Set that the code completion token occurred in a custom attribute. This
   /// allows us to type check the custom attribute even if it is not attached to
@@ -170,10 +174,6 @@ public:
   /// is completing after set as its base.
   virtual void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace){};
 
-  /// Complete a given expr-postfix, given that there is a following
-  /// left parenthesis.
-  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
-
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
   ///
@@ -182,8 +182,21 @@ public:
   /// #keyPath argument have been parsed yet.
   virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) {};
 
+  /// Complete the beginning of the type for a parameter of a
+  /// func/subscript/closure, or the type for a parameter in a function type.
+  /// For the latter, we cannot know for sure whether the user is trying to
+  /// write a function type, so will complete for e.g `let x: (#^COMPLETE^#`.
+  virtual void completeTypePossibleFunctionParamBeginning() {}
+
   /// Complete the beginning of the type of result of func/var/let/subscript.
   virtual void completeTypeDeclResultBeginning() {};
+
+  /// Same as `completeTypeSimpleOrComposition` but also allows `repeat`.
+  virtual void completeTypeBeginning(){};
+
+  /// Same as `completeTypeSimpleBeginning` but also allows `any`, `some` and
+  /// `each`.
+  virtual void completeTypeSimpleOrComposition(){};
 
   /// Complete the beginning of type-simple -- no tokens provided
   /// by user.
@@ -194,6 +207,9 @@ public:
 
   /// Complete a given \c type-simple when there is no trailing dot.
   virtual void completeTypeSimpleWithoutDot(TypeRepr *TR){};
+
+  /// Complete a given \c type-simple following a \c ~ prefix.
+  virtual void completeTypeSimpleInverted() {};
 
   /// Complete the beginning of a case statement at the top of switch stmt.
   virtual void completeCaseStmtKeyword() {};
@@ -216,7 +232,7 @@ public:
   /// @available.
   /// If `HasLabel` is `true`, then the argument already has a label specified,
   /// e.g. we're completing after `names: ` in a macro declaration.
-  virtual void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index,
+  virtual void completeDeclAttrParam(ParameterizedDeclAttributeKind DK, int Index,
                                      bool HasLabel){};
 
   /// Complete 'async' and 'throws' at effects specifier position.
@@ -243,7 +259,7 @@ public:
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
                                         SourceLoc DotLoc) {};
 
-  virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
+  virtual void completeCallArg(CodeCompletionExpr *E) {};
 
   virtual bool canPerformCompleteLabeledTrailingClosure() const {
     return false;
@@ -259,10 +275,10 @@ public:
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,
-                                 llvm::Optional<unsigned> yieldIndex){};
+                                 std::optional<unsigned> yieldIndex){};
 
   virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
-                                      llvm::Optional<StmtKind> ParentKind){};
+                                      std::optional<StmtKind> ParentKind){};
 
   virtual void completeAfterPoundDirective() {};
 
@@ -275,13 +291,14 @@ public:
   virtual void completeStmtLabel(StmtKind ParentKind) {};
 
   virtual
-  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
+  void completeForEachPatternBeginning(
+      bool hasTry, bool hasAwait, bool hasUnsafe) {};
 
   virtual void completeTypeAttrBeginning() {};
 
-  virtual void completeOptionalBinding(){};
+  virtual void completeTypeAttrInheritanceBeginning() {};
 
-  virtual void completeWithoutConstraintType(){};
+  virtual void completeOptionalBinding(){};
 };
 
 class DoneParsingCallback {

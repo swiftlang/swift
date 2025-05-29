@@ -157,24 +157,19 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
       continue;
 
-    // TODO: it's not yet clear how to deal with error existentials.
-    // Ignore them for now. If we have typed throws we could ban error existentials
-    // because typed throws would provide and alternative.
-    if (isa<ThrowInst>(block.getTerminator()))
-      continue;
-
-    if (!neBlocks.isNonErrorHandling(&block))
-      continue;
-
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, perfConstr, parentLoc)) {
+        if (inst.getLoc().getSourceLoc().isInvalid()) {
+          auto demangledName = Demangle::demangleSymbolAsString(
+              inst.getFunction()->getName(),
+              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+          llvm::errs() << "in function " << demangledName << "\n";
+        }
         LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
         return true;
       }
@@ -354,24 +349,17 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
           break;
       }
     }
+    if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
+      if (auto *callee = apply->getReferencedFunctionOrNull()) {
+        // Exclude `Swift._diagnoseUnexpectedEnumCaseValue<A, B>(type: A.Type, rawValue: B) -> Swift.Never`
+        // It's a fatal error function, used for imported C enums.
+        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF") {
+          continue;
+        }
+      }
+    }
     return false;
   }
-  return true;
-}
-
-static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
-  // Only diagnose metatype and value_metatype instructions, for now.
-  if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
-    auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
-    if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
-      Type instTy = metaTy->getInstanceType();
-      if (auto selfType = instTy->getAs<DynamicSelfType>())
-        instTy = selfType->getSelfType();
-      // Class metadata are supported in embedded Swift
-      return instTy->getClassOrBoundGenericClass() ? true : false;
-    }
-  }
-
   return true;
 }
 
@@ -382,31 +370,32 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
-  if (module.getOptions().EmbeddedSwift) {
-    if (impact & RuntimeEffect::Existential) {
-      PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
-      if (impactType) {
-        diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
-      } else {
-        diagnose(loc, diag::embedded_swift_existential);
-      }
-      return true;
+  if (perfConstr == PerformanceConstraints::NoExistentials &&
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+    if (impactType) {
+      diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
+    } else {
+      diagnose(loc, diag::perf_diag_existential);
     }
-
-    if (impact & RuntimeEffect::MetaData) {
-      if (!allowedMetadataUseInEmbeddedSwift(inst)) {
-        PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
-        if (impactType) {
-          diagnose(loc, diag::embedded_swift_metatype_type, impactType.getASTType());
-        } else {
-          diagnose(loc, diag::embedded_swift_metatype);
-        }
-        return true;
-      }
-    }
+    return true;
   }
 
-  if (perfConstr == PerformanceConstraints::None)
+  if ((perfConstr == PerformanceConstraints::NoObjCBridging ||
+       perfConstr == PerformanceConstraints::NoAllocation ||
+       perfConstr == PerformanceConstraints::NoLocks) &&
+      (impact & RuntimeEffect::ObjectiveC)) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found objc effect", inst);
+
+    diagnose(loc, diag::performance_objectivec);
+    return true;
+  }
+
+  if (perfConstr == PerformanceConstraints::None ||
+      perfConstr == PerformanceConstraints::NoExistentials ||
+      perfConstr == PerformanceConstraints::NoObjCBridging)
     return false;
 
   if (impact & RuntimeEffect::Casting) {
@@ -471,6 +460,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
     return true;
   }
+  
+  if (perfConstr == PerformanceConstraints::NoRuntime)
+    return false;
+  
   if (impact & RuntimeEffect::Allocating) {
     PrettyStackTracePerformanceDiagnostics stackTrace(
         "found allocation effect", inst);
@@ -517,13 +510,6 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     diagnose(loc, diag::performance_deallocating, "this code pattern");
     return true;
   }
-  if (impact & RuntimeEffect::ObjectiveC) {
-    PrettyStackTracePerformanceDiagnostics stackTrace(
-        "found objc effect", inst);
-
-    diagnose(loc, diag::performance_objectivec);
-    return true;
-  }
 
   if (perfConstr == PerformanceConstraints::NoAllocation)
     return false;
@@ -552,13 +538,6 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
-      if (function->getModule().getOptions().EmbeddedSwift) {
-        auto loc = LocWithParent(inst.getLoc().getSourceLoc(), nullptr);
-        if (visitInst(&inst, PerformanceConstraints::None, &loc)) {
-          LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
-        }
-      }
-
       auto as = FullApplySite::isa(&inst);
       if (!as)
         continue;
@@ -615,6 +594,11 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @_section, @_silgen_name is only on constant globals
@@ -654,18 +638,12 @@ private:
       }
     }
 
-    if (!annotatedFunctionsFound && !getModule()->getOptions().EmbeddedSwift)
+    if (!annotatedFunctionsFound)
       return;
 
     for (SILFunction &function : *module) {
       // Don't rerun diagnostics on deserialized functions.
       if (function.wasDeserializedCanonical())
-        continue;
-
-      // Don't check generic functions in embedded Swift, they're about to be
-      // removed anyway.
-      if (getModule()->getOptions().EmbeddedSwift &&
-          function.getLoweredFunctionType()->getSubstGenericSignature())
         continue;
 
       if (function.getPerfConstraints() == PerformanceConstraints::None) {

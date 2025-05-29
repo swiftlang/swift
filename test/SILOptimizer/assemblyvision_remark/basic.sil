@@ -68,7 +68,7 @@ bb0(%0 : $StructWithOwner):
 }
 
 // This case should never actually happen like this, but we should handle it in
-// a sane way by printing both notes for y and x and also make sure that we do
+// a sound way by printing both notes for y and x and also make sure that we do
 // not infer .owner on y since y is on owner itself.
 sil @extract_out_singleobj_struct_subfield_multiple_debugvalue : $@convention(thin) (@guaranteed StructWithOwner) -> Klass {
 bb0(%0 : $StructWithOwner):

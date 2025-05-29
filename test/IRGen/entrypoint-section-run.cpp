@@ -23,6 +23,13 @@ using mach_header_platform = mach_header_64;
 using mach_header_platform = mach_header;
 #endif
 
+#if __has_feature(ptrauth_function_pointer_type_discrimination)
+#define my_ptrauth_function_pointer_type_discriminator(__type) \
+  __builtin_ptrauth_type_discriminator(__type)
+#else
+#define my_ptrauth_function_pointer_type_discriminator(__type) ((ptrauth_extra_data_t)0)
+#endif
+
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     printf("no argument!\n");
@@ -66,7 +73,7 @@ int main(int argc, char *argv[]) {
               reinterpret_cast<long>(data) + offset
           ),
           ptrauth_key_function_pointer,
-          ptrauth_function_pointer_type_discriminator(MainFunction)
+          my_ptrauth_function_pointer_type_discriminator(MainFunction)
       )
     );
 

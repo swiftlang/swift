@@ -1,0 +1,8 @@
+// RUN: not %target-sil-opt %s -enable-upcoming-feature RegionBasedIsolation -swift-version 6 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_RegionBasedIsolation
+
+// READ THIS: This test makes sure that we error if an upcoming feature is
+// enabled in a language mode where it is enabled by default.
+
+// CHECK: error: upcoming feature "RegionBasedIsolation" is already enabled as of Swift version 6

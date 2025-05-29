@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-silgen %s -target x86_64-apple-ios50.0-macabi -target-variant x86_64-apple-macosx10.52 | %FileCheck %s
 
 
-// REQUIRES: maccatalyst_support
+// REQUIRES: OS=macosx || OS=maccatalyst
 
 // CHECK-LABEL: sil{{.+}}@main{{.*}} {
 

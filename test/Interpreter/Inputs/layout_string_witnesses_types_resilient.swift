@@ -19,6 +19,18 @@ public struct GenericResilient<C, T> {
     }
 }
 
+public struct GenericResilientWithUnmanagedAndWeak<T> {
+    public let b: Bool = false
+    public unowned(unsafe) var y: AnyObject?
+    public let z: Bool = false
+    public let x: T
+    public weak var w: AnyObject?
+
+    public init(x: T) {
+        self.x = x
+    }
+}
+
 public enum ResilientSinglePayloadEnumGeneric<T> {
     case empty0
     case empty1
@@ -56,6 +68,25 @@ public enum ResilientSinglePayloadEnumSimple {
     case nonEmpty(AnyObject)
 }
 
+public enum MyString {
+    case immortal(UInt64)
+    case s(AnyObject)
+    case t(AnyObject)
+}
+
+public enum ResilientSinglePayloadEnumSimpleMultiExtraTagPayload {
+    case empty0
+    case empty1
+    case empty2
+    case empty3
+    case empty4
+    case empty5
+    case empty6
+    case empty7
+    case empty8
+    case nonEmpty(MyString)
+}
+
 public enum ResilientSingletonEnum {
     case nonEmpty(AnyObject)
 }
@@ -90,6 +121,10 @@ public func getResilientSinglePayloadEnumSimpleEmpty0() -> ResilientSinglePayloa
 
 public func getResilientSingletonEnumNonEmpty(_ x: AnyObject) -> ResilientSingletonEnum {
     return .nonEmpty(x)
+}
+
+public func getResilientSinglePayloadEnumSimpleMultiExtraTagPayloadEmpty3() -> ResilientSinglePayloadEnumSimpleMultiExtraTagPayload {
+    return .empty3
 }
 
 public enum ResilientSinglePayloadEnum {

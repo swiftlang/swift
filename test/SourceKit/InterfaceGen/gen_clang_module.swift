@@ -31,7 +31,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN:      == -req=cursor -pos=204:67 | %FileCheck -check-prefix=CHECK1 %s
+// RUN:      == -req=cursor -pos=190:57 | %FileCheck -check-prefix=CHECK1 %s
 // The cursor points to 'FooClassBase' inside the list of base classes, see 'gen_clang_module.swift.response'
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
@@ -47,7 +47,7 @@ var x: FooClassBase
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN:      == -req=cursor -pos=231:20 | %FileCheck -check-prefix=CHECK2 %s
+// RUN:      == -req=cursor -pos=210:15 | %FileCheck -check-prefix=CHECK2 %s
 // The cursor points inside the interface, see 'gen_clang_module.swift.response'
 
 // CHECK2: source.lang.swift.decl.function.method.instance ({{.*}}Foo.framework/Headers/Foo.h:170:10-170:27)
@@ -61,7 +61,7 @@ var x: FooClassBase
 // RUN:      == -req=find-usr -usr "c:objc(cs)FooClassDerived(im)fooInstanceFunc0" | %FileCheck -check-prefix=CHECK-USR %s
 // The returned line:col points inside the interface, see 'gen_clang_module.swift.response'
 
-// CHECK-USR: (231:15-231:33)
+// CHECK-USR: (210:15-210:33)
 
 // RUN: %sourcekitd-test -req=interface-gen-open -module Foo -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t \

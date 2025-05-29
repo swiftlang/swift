@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %S/Inputs/cse_metatype_conformanceA.swift -module-name moda -emit-module -emit-module-path %t/moda.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/cse_metatype_conformanceB.swift -module-name modb -emit-module -emit-module-path %t/modb.swiftmodule -I %t
 // RUN: %target-swift-frontend %S/Inputs/cse_metatype_conformanceC.swift -module-name modc -emit-module -emit-module-path %t/modc.swiftmodule -I %t
-// RUN: %target-swift-frontend  -I %t -O -emit-sil -sil-verify-all -parse-as-library %s | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend  -I %t -O -Xllvm -sil-print-types -emit-sil -sil-verify-all -parse-as-library %s | %FileCheck %s --check-prefix=CHECK
 
 // Test CSE of init_existential_metatype. Combine instructions with
 // conformance from the same module. Don't combine instructions with

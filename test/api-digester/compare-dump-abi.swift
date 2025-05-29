@@ -20,3 +20,6 @@
 
 // CHECK: cake_current/cake.swift:39:15: error: ABI breakage: struct C6 is now with @frozen
 // CHECK: cake_current/cake.swift:41:13: error: ABI breakage: enum IceKind is now without @frozen
+
+
+

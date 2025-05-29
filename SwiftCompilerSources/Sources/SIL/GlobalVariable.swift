@@ -11,9 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
+  public var varDecl: VarDecl? {
+    bridged.getDecl().getAs(VarDecl.self)
+  }
+
   public var name: StringRef {
     return StringRef(bridged: bridged.getName())
   }
@@ -24,7 +29,11 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
 
   public var shortDescription: String { name.string }
 
+  public var type: Type { Type(bridged: bridged.getType()) }
+
   public var isLet: Bool { bridged.isLet() }
+
+  public var linkage: Linkage { bridged.getLinkage().linkage }
 
   /// True, if the linkage of the global variable indicates that it is visible outside the current
   /// compilation unit and therefore not all of its uses are known.
@@ -38,9 +47,7 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   /// current compilation unit.
   ///
   /// For example, `public_external` linkage.
-  public var isAvailableExternally: Bool {
-    return bridged.isAvailableExternally()
-  }
+  public var isDefinedExternally: Bool { linkage.isExternal }
 
   public var staticInitializerInstructions: InstructionList? {
     if let firstStaticInitInst = bridged.getFirstStaticInitInst().instruction {
@@ -66,6 +73,14 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
     return bridged.mustBeInitializedStatically()
   }
 
+  public var isConst: Bool {
+    return bridged.isConstValue()
+  }
+  
+  public var sourceLocation: SourceLoc? {
+    return SourceLoc(bridged: bridged.getSourceLocation())
+  }
+
   public static func ==(lhs: GlobalVariable, rhs: GlobalVariable) -> Bool {
     lhs === rhs
   }
@@ -75,101 +90,6 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   }
 
   public var bridged: BridgedGlobalVar { BridgedGlobalVar(SwiftObject(self)) }
-}
-
-extension Instruction {
-  public var isValidInStaticInitializerOfGlobal: Bool {
-    // Rule out SILUndef and SILArgument.
-    if operands.contains(where: { $0.value.definingInstruction == nil }) {
-      return false
-    }
-    switch self {
-    case let bi as BuiltinInst:
-      switch bi.id {
-      case .ZeroInitializer:
-        let type = bi.type.isBuiltinVector ? bi.type.builtinVectorElementType : bi.type
-        return type.isBuiltinInteger || type.isBuiltinFloat
-      case .PtrToInt:
-        return bi.operands[0].value is StringLiteralInst
-      case .IntToPtr:
-        return bi.operands[0].value is IntegerLiteralInst
-      case .StringObjectOr:
-        // The first operand can be a string literal (i.e. a pointer), but the
-        // second operand must be a constant. This enables creating a
-        // a pointer+offset relocation.
-        // Note that StringObjectOr requires the or'd bits in the first
-        // operand to be 0, so the operation is equivalent to an addition.
-        return bi.operands[1].value is IntegerLiteralInst
-      case .ZExtOrBitCast:
-        return true;
-      case .USubOver:
-        // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
-        // This pattern appears in UTF8 String literal construction.
-        if let tei = bi.uses.getSingleUser(ofType: TupleExtractInst.self),
-           tei.isResultOfOffsetSubtract {
-          return true
-        }
-        return false
-      case .OnFastPath:
-        return true
-      default:
-        return false
-      }
-    case let tei as TupleExtractInst:
-      // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
-      // This pattern appears in UTF8 String literal construction.
-      if tei.isResultOfOffsetSubtract,
-         let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
-         bi.id == .StringObjectOr {
-        return true
-      }
-      return false
-    case let sli as StringLiteralInst:
-      switch sli.encoding {
-      case .Bytes, .UTF8:
-        return true
-      case .ObjCSelector:
-        // Objective-C selector string literals cannot be used in static
-        // initializers.
-        return false
-      }
-    case let fri as FunctionRefInst:
-      // TODO: support async function pointers in static globals.
-      return !fri.referencedFunction.isAsync
-    case is StructInst,
-         is TupleInst,
-         is EnumInst,
-         is IntegerLiteralInst,
-         is FloatLiteralInst,
-         is ObjectInst,
-         is ValueToBridgeObjectInst,
-         is ConvertFunctionInst,
-         is ThinToThickFunctionInst,
-         is AddressToPointerInst,
-         is GlobalAddrInst:
-      return true
-    default:
-      return false
-    }
-  }
-}
-
-// Match the pattern:
-// tuple_extract(usub_with_overflow(x, integer_literal, integer_literal 0), 0)
-private extension TupleExtractInst {
-  var isResultOfOffsetSubtract: Bool {
-    if fieldIndex == 0,
-       let bi = tuple as? BuiltinInst,
-       bi.id == .USubOver,
-       bi.operands[1].value is IntegerLiteralInst,
-       let overflowLiteral = bi.operands[2].value as? IntegerLiteralInst,
-       let overflowValue = overflowLiteral.value,
-       overflowValue == 0
-    {
-      return true
-    }
-    return false
-  }
 }
 
 // Bridging utilities

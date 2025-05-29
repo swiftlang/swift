@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-codemotion"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -26,11 +27,12 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include <optional>
 
 STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
@@ -916,6 +918,8 @@ static const int SinkSearchWindow = 6;
 
 /// Returns True if we can sink this instruction to another basic block.
 static bool canSinkInstruction(SILInstruction *Inst) {
+  if (hasOwnershipOperandsOrResults(Inst))
+    return false;
   return !Inst->hasUsesOfAnyResult() && !isa<TermInst>(Inst);
 }
 
@@ -1065,7 +1069,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
 /// to the successor instead of the whole instruction.
 /// Return None if no such operand could be found, otherwise return the index
 /// of a suitable operand.
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 cheaperToPassOperandsAsArguments(SILInstruction *First,
                                  SILInstruction *Second) {
   // This will further enable to sink strong_retain_unowned instructions,
@@ -1082,33 +1086,33 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   auto *SecondStruct = dyn_cast<StructInst>(Second);
 
   if (!FirstStruct || !SecondStruct)
-    return llvm::None;
+    return std::nullopt;
 
   assert(FirstStruct->getNumOperands() == SecondStruct->getNumOperands() &&
          FirstStruct->getType() == SecondStruct->getType() &&
          "Types should be identical");
 
-  llvm::Optional<unsigned> DifferentOperandIndex;
+  std::optional<unsigned> DifferentOperandIndex;
 
   // Check operands.
   for (unsigned i = 0, e = First->getNumOperands(); i != e; ++i) {
     if (FirstStruct->getOperand(i) != SecondStruct->getOperand(i)) {
       // Only track one different operand for now
       if (DifferentOperandIndex)
-        return llvm::None;
+        return std::nullopt;
       DifferentOperandIndex = i;
     }
   }
 
   if (!DifferentOperandIndex)
-    return llvm::None;
+    return std::nullopt;
 
   // Found a different operand, now check to see if its type is something
   // cheap enough to sink.
   // TODO: Sink more than just integers.
   SILType ArgTy = FirstStruct->getOperand(*DifferentOperandIndex)->getType();
   if (!ArgTy.is<BuiltinIntegerType>())
-    return llvm::None;
+    return std::nullopt;
 
   return *DifferentOperandIndex;
 }
@@ -1177,6 +1181,19 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
   if (!FSI || !hasOneNonDebugUse(FSI))
     return false;
 
+  if (hasOwnershipOperandsOrResults(FSI))
+    return false;
+
+  // Even if the incoming instruction has no ownership, the argument may have.
+  // This can happen with enums which are constructed with a non-payload case:
+  //
+  //   %1 = enum $Optional<C>, #Optional.none!enumelt
+  //   br bb3(%1)
+  // bb1(%3 : @owned $Optional<C>):
+  //
+  if (BB->getArgument(ArgNum)->getOwnershipKind() != OwnershipKind::None)
+    return false;
+
   // The list of identical instructions.
   SmallVector<SingleValueInstruction *, 8> Clones;
   Clones.push_back(FSI);
@@ -1192,7 +1209,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
 
   // If the instructions are different, but only in terms of a cheap operand
   // then we can still sink it, and create new arguments for this operand.
-  llvm::Optional<unsigned> DifferentOperandIndex;
+  std::optional<unsigned> DifferentOperandIndex;
 
   // Check if the Nth argument in all predecessors is identical.
   for (auto P : BB->getPredecessorBlocks()) {
@@ -1238,7 +1255,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
     Clones.push_back(SI);
   }
 
-  auto *Undef = SILUndef::get(FSI->getType(), *BB->getParent());
+  auto *Undef = SILUndef::get(FSI);
 
   // Delete the debug info of the instruction that we are about to sink.
   deleteAllDebugUses(FSI);
@@ -1742,38 +1759,43 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     LLVM_DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
     State.mergePredecessorStates();
 
-    // If our predecessors cover any of our enum values, attempt to hoist
-    // releases up the CFG onto enum payloads or sink retains out of switch
-    // regions.
-    LLVM_DEBUG(llvm::dbgs() << "    Attempting to move releases into "
-                               "predecessors!\n");
+    if (!F->hasOwnership()) {
+      // If our predecessors cover any of our enum values, attempt to hoist
+      // releases up the CFG onto enum payloads or sink retains out of switch
+      // regions.
+      LLVM_DEBUG(llvm::dbgs() << "    Attempting to move releases into "
+                                 "predecessors!\n");
 
-    // Perform a relatively local forms of retain sinking and release hoisting
-    // regarding switch regions and SILargument. This are not handled by retain
-    // release code motion.
-    if (HoistReleases) {
-      Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+      // Perform a relatively local forms of retain sinking and release hoisting
+      // regarding switch regions and SILargument. This are not handled by retain
+      // release code motion.
+      if (HoistReleases) {
+        Changed |= State.hoistDecrementsIntoSwitchRegions(AA);
+      }
+
+      // Sink switch related retains.
+      Changed |= sinkIncrementsIntoSwitchRegions(State.getBB(), AA, RCIA);
+      Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
+
+      // Then attempt to sink code from predecessors. This can include retains
+      // which is why we always attempt to move releases up the CFG before sinking
+      // code from predecessors. We will never sink the hoisted releases from
+      // predecessors since the hoisted releases will be on the enum payload
+      // instead of the enum itself.
+      Changed |= canonicalizeRefCountInstrs(State.getBB());
     }
-
-    // Sink switch related retains.
-    Changed |= sinkIncrementsIntoSwitchRegions(State.getBB(), AA, RCIA);
-    Changed |= State.sinkIncrementsOutOfSwitchRegions(AA, RCIA);
-
-    // Then attempt to sink code from predecessors. This can include retains
-    // which is why we always attempt to move releases up the CFG before sinking
-    // code from predecessors. We will never sink the hoisted releases from
-    // predecessors since the hoisted releases will be on the enum payload
-    // instead of the enum itself.
-    Changed |= canonicalizeRefCountInstrs(State.getBB());
     Changed |= sinkCodeFromPredecessors(BBToStateMap, State.getBB());
     Changed |= sinkArgumentsFromPredecessors(BBToStateMap, State.getBB());
     Changed |= sinkLiteralsFromPredecessors(State.getBB());
-    // Try to hoist release of a SILArgument to predecessors.
-    Changed |= hoistSILArgumentReleaseInst(State.getBB());
 
-    // Then perform the dataflow.
-    LLVM_DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
-    Changed |= State.process();
+    if (!F->hasOwnership()) {
+      // Try to hoist release of a SILArgument to predecessors.
+      Changed |= hoistSILArgumentReleaseInst(State.getBB());
+
+      // Then perform the dataflow.
+      LLVM_DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
+      Changed |= State.process();
+    }
   }
 
   return Changed;
@@ -1790,9 +1812,6 @@ public:
   /// The entry point to the transformation.
   void run() override {
     auto *F = getFunction();
-    // Skip functions with ownership for now.
-    if (F->hasOwnership())
-      return;
 
     auto *AA = getAnalysis<AliasAnalysis>(F);
     auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);

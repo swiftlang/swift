@@ -10,6 +10,7 @@
 
 // GLKit is not available on watchOS.
 // UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=xros
 
 import GLKit
 

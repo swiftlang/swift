@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
+// RUN: %target-swift-frontend %s -module-name Class -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/class.h
 // RUN: %FileCheck %s < %t/class.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h)
 
-// RUN: %target-swift-frontend %s -typecheck -module-name Class -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/class-evo.h
+// RUN: %target-swift-frontend %s -module-name Class -enable-library-evolution -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/class-evo.h
 // RUN: %FileCheck %s < %t/class-evo.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class-evo.h)
@@ -38,7 +38,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Class::ClassWithIntField> = true;
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
@@ -89,7 +89,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Class::ClassWithIntField> {
-// CHECK-NEXT:   SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return Class::_impl::$s5Class0A12WithIntFieldCMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -102,13 +102,13 @@ public final class ClassWithIntField {
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace Class SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Class") {
 
-// CHECK: SWIFT_INLINE_THUNK ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class011passThroughA12WithIntFieldyAA0adeF0CADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));
-// CHECK-NEXT: }
-
 public final class register { }
 
 // CHECK: class SWIFT_SYMBOL("s:5Class8registerC") register_ final : public swift::_impl::RefCountedClass {
+
+// CHECK: SWIFT_INLINE_THUNK ClassWithIntField passThroughClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class011passThroughA12WithIntFieldyAA0adeF0CADF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT:  return _impl::_impl_ClassWithIntField::makeRetained(Class::_impl::$s5Class011passThroughA12WithIntFieldyAA0adeF0CADF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x)));
+// CHECK-NEXT: }
 
 public func returnClassWithIntField() -> ClassWithIntField {
   return ClassWithIntField()
@@ -130,13 +130,13 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
 }
 
 // CHECK: SWIFT_INLINE_THUNK ClassWithIntField returnClassWithIntField() noexcept SWIFT_SYMBOL("s:5Class06returnA12WithIntFieldAA0acdE0CyF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_ClassWithIntField::makeRetained(_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
+// CHECK-NEXT:   return _impl::_impl_ClassWithIntField::makeRetained(Class::_impl::$s5Class06returnA12WithIntFieldAA0acdE0CyF());
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeClassWithIntField(const ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class04takeA12WithIntFieldyyAA0acdE0CF") {
-// CHECK-NEXT:  return _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x));
+// CHECK-NEXT:  _impl::$s5Class04takeA12WithIntFieldyyAA0acdE0CF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x));
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK void takeClassWithIntFieldInout(ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF") {
-// CHECK-NEXT:    return _impl::$s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(&::swift::_impl::_impl_RefCountedClass::getOpaquePointerRef(x));
+// CHECK-NEXT:    _impl::$s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(&::swift::_impl::_impl_RefCountedClass::getOpaquePointerRef(x));
 // CHECK-NEXT:  }

@@ -16,16 +16,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Option/SanitizerOptions.h"
-#include "swift/Basic/Platform.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/Basic/OptionSet.h"
+#include "swift/Basic/Platform.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/TargetParser/Triple.h"
+#include <optional>
 
 using namespace swift;
 
@@ -47,11 +47,11 @@ static StringRef toFileName(const SanitizerKind kind) {
   llvm_unreachable("Unknown sanitizer");
 }
 
-static llvm::Optional<SanitizerKind> parse(const char *arg) {
-  return llvm::StringSwitch<llvm::Optional<SanitizerKind>>(arg)
+static std::optional<SanitizerKind> parse(const char *arg) {
+  return llvm::StringSwitch<std::optional<SanitizerKind>>(arg)
 #define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
 #include "swift/Basic/Sanitizers.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
@@ -92,6 +92,12 @@ llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
     } else if (StringRef(A->getValue(i)) == "trace-pc-guard") {
       opts.TracePCGuard = true;
       continue;
+    } else if (StringRef(A->getValue(i)) == "inline-8bit-counters") {
+      opts.Inline8bitCounters = true;
+      continue;
+    } else if (StringRef(A->getValue(i)) == "pc-table") {
+      opts.PCTable = true;
+      continue;
     }
 
     // Argument is not supported.
@@ -131,7 +137,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
 
   // Find the sanitizer kind.
   for (const char *arg : A->getValues()) {
-    llvm::Optional<SanitizerKind> optKind = parse(arg);
+    std::optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
     if (!optKind.has_value()) {
@@ -162,7 +168,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
   }
 
   // Check that we're one of the known supported targets for sanitizers.
-  if (!(Triple.isOSDarwin() || Triple.isOSLinux() || Triple.isOSWindows())) {
+  if (!(Triple.isOSDarwin() || Triple.isOSLinux() || Triple.isOSWindows() || Triple.isOSWASI())) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() +
@@ -213,7 +219,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerRecoverArgValues(
 
   // Find the sanitizer kind.
   for (const char *arg : A->getValues()) {
-    llvm::Optional<SanitizerKind> optKind = parse(arg);
+    std::optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
     if (!optKind.has_value()) {
@@ -252,6 +258,20 @@ OptionSet<SanitizerKind> swift::parseSanitizerRecoverArgValues(
 // Note this implementation cannot be inlined at its use site because it calls
 // `toStringRef(const SanitizerKind).`
 bool swift::parseSanitizerAddressUseODRIndicator(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags) {
+  // Warn if ASan isn't enabled.
+  if (!(enabledSanitizers & SanitizerKind::Address)) {
+    Diags.diagnose(
+        SourceLoc(), diag::warning_option_requires_specific_sanitizer,
+        A->getOption().getPrefixedName(), toStringRef(SanitizerKind::Address));
+    return false;
+  }
+
+  return true;
+}
+
+bool swift::parseSanitizerUseStableABI(
     const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
     DiagnosticEngine &Diags) {
   // Warn if ASan isn't enabled.

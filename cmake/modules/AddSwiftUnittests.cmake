@@ -111,6 +111,9 @@ function(add_swift_unittest test_dirname)
     endif()
   endif()
 
+  is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" HAS_DEBUG_INFO)
+  target_compile_options("${test_dirname}" PRIVATE $<$<BOOL:${HAS_DEBUG_INFO}>:-g>)
+
   file(RELATIVE_PATH relative_lib_path "${CMAKE_CURRENT_BINARY_DIR}" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -130,11 +133,11 @@ function(add_swift_unittest test_dirname)
     if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
       set_property(
         TARGET ${test_dirname}
-        APPEND PROPERTY INSTALL_RPATH "@executable_path/${relative_lib_path}/swift/host")
+        APPEND PROPERTY INSTALL_RPATH "@executable_path/${relative_lib_path}/swift/host/compiler")
     elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
       set_property(
         TARGET ${test_dirname}
-        APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}/swift/host")
+        APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}/swift/host/compiler")
     endif()
   endif()
 endfunction()

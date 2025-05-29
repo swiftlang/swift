@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 { 
@@ -74,7 +74,7 @@ struct V<T : Canidae> {}
 
 // CHECK-LABEL: .inferSuperclassRequirement1@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Canidae>
-func inferSuperclassRequirement1<T : Carnivora>( // expected-warning {{redundant superclass constraint 'T' : 'Carnivora'}}
+func inferSuperclassRequirement1<T : Carnivora>(
 	_ v: V<T>) {}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
@@ -113,7 +113,6 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) {
 }
 
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
-// expected-warning@-1{{redundant conformance constraint 'U.P4Assoc' : 'P2'}}
 
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {
 }
@@ -132,7 +131,7 @@ protocol P7 : P6 {
 
 // CHECK-LABEL: P7@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.[P6]AssocP6.[P5]Element : P6, τ_0_0.[P6]AssocP6.[P5]Element == τ_0_0.[P7]AssocP7.[P6]AssocP6.[P5]Element>
-extension P7 where AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element' : 'P6'}}
+extension P7 where AssocP6.Element : P6,
         AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
@@ -160,7 +159,6 @@ func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == I
 // CHECK-LABEL: sameTypeConcrete2@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.[P8]B == X3, τ_0_0.[P10]C == X3>
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
-// expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
 
 // Note: a standard-library-based stress test to make sure we don't inject
 // any additional requirements.
@@ -172,17 +170,11 @@ extension RangeReplaceableCollection
 	func f() { }
 }
 
-// FIXME(rqm-diagnostics): Bogus warning
-
 // CHECK-LABEL: X14.recursiveConcreteSameType
 // CHECK: Generic signature: <T, V where T == Range<Int>>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0, τ_1_0 where τ_0_0 == Range<Int>>
 struct X14<T> where T.Iterator == IndexingIterator<T> {
-	func recursiveConcreteSameType<V>(_: V) where T == Range<Int> { } // expected-warning {{redundant conformance constraint 'Range<Int>' : 'Collection'}}
-  // expected-warning@-1 {{redundant conformance constraint 'Int' : 'Strideable'}}
-  // expected-warning@-2 {{redundant conformance constraint 'Int' : 'SignedInteger'}}
-  // expected-warning@-3 {{redundant same-type constraint 'Range<Int>.Iterator' (aka 'IndexingIterator<Range<Int>>') == 'IndexingIterator<T>'}}
-  // expected-warning@-4 {{redundant same-type constraint 'T' == 'Range<Int>'}}
+	func recursiveConcreteSameType<V>(_: V) where T == Range<Int> { }
 }
 
 // rdar://problem/30478915
@@ -208,7 +200,7 @@ struct X9<T: P12, U: P12> where T.B == U.B {
   // CHECK-LABEL: X9.upperSameTypeConstraint
 	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.[P12]B == X7>
   // CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 == X8, τ_0_1 : P12, τ_0_1.[P12]B == X7>
-	func upperSameTypeConstraint<V>(_: V) where T == X8 { } // expected-warning {{redundant conformance constraint 'X8' : 'P12'}}
+	func upperSameTypeConstraint<V>(_: V) where T == X8 { }
 }
 
 protocol P13 {
@@ -224,7 +216,7 @@ struct X11<T: P12, U: P12> where T.B == U.B.A {
 	// CHECK-LABEL: X11.upperSameTypeConstraint
 	// CHECK: Generic signature: <T, U, V where T : P12, U == X10, T.[P12]B == X10>
 	// CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 : P12, τ_0_1 == X10, τ_0_0.[P12]B == X10>
-	func upperSameTypeConstraint<V>(_: V) where U == X10 { } // expected-warning {{redundant conformance constraint 'X10' : 'P12'}}
+	func upperSameTypeConstraint<V>(_: V) where U == X10 { }
 }
 
 protocol P16 {
@@ -240,8 +232,7 @@ struct X16<X, Y> : P16 {
 // CHECK-LABEL: .X17.bar@
 // CHECK: Generic signature: <S, T, U, V where S == X16<X3, X15>, T == X3, U == X15>
 struct X17<S: P16, T, U> where S.A == (T, U) {
-	func bar<V>(_: V) where S == X16<X3, X15> { } // expected-warning {{redundant conformance constraint 'X16<X3, X15>' : 'P16'}}
-  // expected-warning@-1 {{redundant same-type constraint 'X16<X3, X15>.A' (aka '(X3, X15)') == '(T, U)'}}
+	func bar<V>(_: V) where S == X16<X3, X15> { }
 }
 
 // Same-type constraints that are self-derived via a parent need to be
@@ -256,13 +247,10 @@ struct X18: P18, P17 {
   typealias A = X18
 }
 
-// FIXME(rqm-diagnostics): Bogus warning
-
 // CHECK-LABEL: .X19.foo@
 // CHECK: Generic signature: <T, U where T == X18>
 struct X19<T: P18> where T == T.A {
-  func foo<U>(_: U) where T == X18 { } // expected-warning {{redundant conformance constraint 'X18' : 'P18'}}
-  // expected-warning@-1 {{redundant same-type constraint 'T' == 'X18'}}
+  func foo<U>(_: U) where T == X18 { }
 }
 
 // rdar://problem/31520386
@@ -282,23 +270,15 @@ struct X22<T, U> {
                   U == X20<T> { }
 }
 
-// CHECK: Generic signature: <Self where Self : P22>
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P22>
-// CHECK: Protocol requirement signature:
 // CHECK: .P22@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P22]A == X20<Self.[P22]B>, Self.[P22]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P22]A == X20<τ_0_0.[P22]B>, τ_0_0.[P22]B : P20>
 protocol P22 {
   associatedtype A
   associatedtype B: P20 where A == X20<B>
 }
 
-// CHECK: Generic signature: <Self where Self : P23>
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P23>
-// CHECK: Protocol requirement signature:
 // CHECK: .P23@
 // CHECK-NEXT: Requirement signature: <Self where Self.[P23]A == X20<Self.[P23]B>, Self.[P23]B : P20>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.[P23]A == X20<τ_0_0.[P23]B>, τ_0_0.[P23]B : P20>
 protocol P23 {
   associatedtype A
   associatedtype B: P20
@@ -332,8 +312,7 @@ struct X28 : P2 {
 }
 
 // CHECK-LABEL: .P28@
-// CHECK-NEXT: Requirement signature: <Self where Self : P3, Self.[P3]P3Assoc == X28>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : P3, τ_0_0.[P3]P3Assoc == X28>
+// CHECK: Requirement signature: <Self where Self : P3, Self.[P3]P3Assoc == X28>
 protocol P28: P3 {
   typealias P3Assoc = X28   // expected-warning{{typealias overriding associated type}}
 }

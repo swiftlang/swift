@@ -9,8 +9,8 @@ func test1() {
 }
 
 func test2(arg1: Int?, arg2: (Int, String)?) {
-  if let xRenamed = arg1 {
-    print(xRenamed)
+  if let <base>x</base> = arg1 {
+    print(<base>x</base>)
   } else if let (x, y) = arg2 {
     print(x, y)
   }

@@ -17,8 +17,10 @@
 #include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
@@ -37,28 +39,16 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
     ptai = dyn_cast<PointerToAddressInst>(iai->getOperand(0));
   if (!ptai)
     return nullptr;
+  auto *mdi = dyn_cast<MarkDependenceInst>(
+      ptai->getOperand()->getDefiningInstruction());
+  if (!mdi)
+    return nullptr;
   // Return the `array.uninitialized_intrinsic` application, if it exists.
   if (auto *dti = dyn_cast<DestructureTupleInst>(
-          ptai->getOperand()->getDefiningInstruction()))
+          mdi->getValue()->getDefiningInstruction()))
     return ArraySemanticsCall(dti->getOperand(),
                               semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;
-}
-
-DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
-  bool foundDestructureTupleUser = false;
-  if (!value->getType().is<TupleType>())
-    return nullptr;
-  DestructureTupleInst *result = nullptr;
-  for (auto *use : value->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-      assert(!foundDestructureTupleUser &&
-             "There should only be one `destructure_tuple` user of a tuple");
-      foundDestructureTupleUser = true;
-      result = dti;
-    }
-  }
-  return result;
 }
 
 bool isSemanticMemberAccessor(SILFunction *original) {
@@ -109,7 +99,7 @@ void forEachApplyDirectResult(
       resultCallback(ai);
       return;
     }
-    if (auto *dti = getSingleDestructureTupleUser(ai))
+    if (auto *dti = ai->getSingleUserOfType<DestructureTupleInst>())
       for (auto directResult : dti->getResults())
         resultCallback(directResult);
     break;
@@ -157,6 +147,20 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
     auto *argument = function.getArgumentsWithoutIndirectResults()[i];
     results.push_back(argument);
   }
+  // Treat yields as semantic results. Note that we can only differentiate
+  // @yield_once with simple control flow, so we can assume that the function
+  // contains only a single `yield` instruction
+  auto yieldIt =
+    std::find_if(function.begin(), function.end(),
+      [](const SILBasicBlock &BB) -> bool {
+        const TermInst *TI = BB.getTerminator();
+        return isa<YieldInst>(TI);
+    });
+  if (yieldIt != function.end()) {
+    auto *yieldInst = cast<YieldInst>(yieldIt->getTerminator());
+    for (auto yield : yieldInst->getOperandValues())
+      results.push_back(yield);
+  }
 }
 
 void collectAllDirectResultsInTypeOrder(SILFunction &function,
@@ -173,30 +177,30 @@ void collectAllDirectResultsInTypeOrder(SILFunction &function,
 }
 
 void collectAllActualResultsInTypeOrder(
-    ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
+    FullApplySite fai, ArrayRef<SILValue> extractedDirectResults,
     SmallVectorImpl<SILValue> &results) {
-  auto calleeConvs = ai->getSubstCalleeConv();
+  auto calleeConvs = fai.getSubstCalleeConv();
   unsigned indResIdx = 0, dirResIdx = 0;
   for (auto &resInfo : calleeConvs.getResults()) {
     results.push_back(resInfo.isFormalDirect()
                           ? extractedDirectResults[dirResIdx++]
-                          : ai->getIndirectSILResults()[indResIdx++]);
+                          : fai.getIndirectSILResults()[indResIdx++]);
   }
 }
 
 void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, const AutoDiffConfig &parentConfig,
+    FullApplySite ai, const AutoDiffConfig &parentConfig,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
-  auto calleeFnTy = ai->getSubstCalleeType();
-  auto calleeConvs = ai->getSubstCalleeConv();
+  auto calleeFnTy = ai.getSubstCalleeType();
+  auto calleeConvs = ai.getSubstCalleeConv();
 
   // Parameter indices are indices (in the callee type signature) of parameter
   // arguments that are varied or are arguments.
   // Record all parameter indices in type order.
   unsigned currentParamIdx = 0;
-  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
+  for (auto applyArg : ai.getArgumentsWithoutIndirectResults()) {
     if (activityInfo.isActive(applyArg, parentConfig))
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
@@ -208,7 +212,7 @@ void collectMinimalIndicesForFunctionCall(
   forEachApplyDirectResult(ai, [&](SILValue directResult) {
     directResults.push_back(directResult);
   });
-  auto indirectResults = ai->getIndirectSILResults();
+  auto indirectResults = ai.getIndirectSILResults();
   // Record all results and result indices in type order.
   results.reserve(calleeFnTy->getNumResults());
   unsigned dirResIdx = 0;
@@ -237,8 +241,18 @@ void collectMinimalIndicesForFunctionCall(
     if (!param.isAutoDiffSemanticResult())
       continue;
     unsigned idx = paramAndIdx.index() + calleeFnTy->getNumIndirectFormalResults();
-    results.push_back(ai->getArgument(idx));
+    results.push_back(ai.getArgument(idx));
     resultIndices.push_back(semanticResultParamResultIndex++);
+  }
+
+  // Record all yields. While we do not have a way to represent direct yields
+  // (_read accessors) we run activity analysis for them. These will be
+  // diagnosed later.
+  if (BeginApplyInst *bai = dyn_cast<BeginApplyInst>(*ai)) {
+    for (const auto &yieldAndIdx : enumerate(calleeConvs.getYields())) {
+      results.push_back(bai->getYieldedValues()[yieldAndIdx.index()]);
+      resultIndices.push_back(semanticResultParamResultIndex++);
+    }
   }
 
   // Make sure the function call has active results.
@@ -250,15 +264,15 @@ void collectMinimalIndicesForFunctionCall(
 #endif
 }
 
-llvm::Optional<std::pair<SILDebugLocation, SILDebugVariable>>
+std::optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
-    return swift::transform(asi->getVarInfo(),  [&](SILDebugVariable var) {
+    return swift::transform(asi->getVarInfo(false),  [&](SILDebugVariable var) {
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      return swift::transform(dvi->getVarInfo(), [&](SILDebugVariable var) {
+      return swift::transform(dvi->getVarInfo(false), [&](SILDebugVariable var) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)
@@ -267,7 +281,7 @@ findDebugLocationAndVariable(SILValue originalValue) {
         return std::make_pair(dvi->getDebugLocation(), var);
       });
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -402,7 +416,8 @@ SILValue emitMemoryLayoutSize(
   return builder.createBuiltin(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
-          builtin->getGenericSignature(), ArrayRef<Type>{type}, {}),
+          builtin->getGenericSignature(), ArrayRef<Type>{type},
+          LookUpConformanceInModule()),
       {metatypeVal});
 }
 
@@ -449,11 +464,11 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
   return nullptr;
 }
 
-llvm::Optional<AutoDiffConfig>
+std::optional<AutoDiffConfig>
 findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
                                    IndexSubset *parameterIndices,
                                    IndexSubset *&minimalASTParameterIndices) {
-  llvm::Optional<AutoDiffConfig> minimalConfig = llvm::None;
+  std::optional<AutoDiffConfig> minimalConfig = std::nullopt;
   auto configs = original->getDerivativeFunctionConfigurations();
   for (auto &config : configs) {
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
@@ -461,7 +476,6 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
         original->getInterfaceType()->castTo<AnyFunctionType>());
 
     if (silParameterIndices->getCapacity() < parameterIndices->getCapacity()) {
-      assert(original->getCaptureInfo().hasLocalCaptures());
       silParameterIndices =
         silParameterIndices->extendingCapacity(original->getASTContext(),
                                                parameterIndices->getCapacity());
@@ -524,9 +538,14 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "definitions with explicit differentiable attributes");
 
   return SILDifferentiabilityWitness::createDeclaration(
-      module, SILLinkage::PublicExternal, original, kind,
-      minimalConfig->parameterIndices, minimalConfig->resultIndices,
-      minimalConfig->derivativeGenericSignature);
+      module,
+      // Witness for @_alwaysEmitIntoClient original function must be emitted,
+      // otherwise a linker error would occur due to undefined reference to the
+      // witness symbol.
+      original->markedAsAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
+                                               : SILLinkage::PublicExternal,
+      original, kind, minimalConfig->parameterIndices,
+      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
 }
 
 } // end namespace autodiff

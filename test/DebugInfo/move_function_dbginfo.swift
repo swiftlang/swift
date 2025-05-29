@@ -1,4 +1,3 @@
-// REQUIRES: CPU=arm64
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-as-library -g -c %s -o %t/out.o
@@ -6,7 +5,7 @@
 
 // This test checks that:
 //
-// 1. At the IR level, we insert the appropriate llvm.dbg.addr, llvm.dbg.value.
+// 1. At the IR level, we insert the appropriate #dbg_addr, #dbg_value.
 //
 // 2. At the Dwarf that we have proper locations with PC validity ranges where
 //    the value isn't valid.
@@ -39,15 +38,15 @@ public var falseValue: Bool { false }
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo17copyableValueTestyyF"()
 //
 // In contrast, we should have a dbg.declare for m since we aren't
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug, metadata ![[M_COPYABLE_VALUE_TEST:[0-9]*]],
+// CHECK: #dbg_declare(ptr %m.debug, ![[M_COPYABLE_VALUE_TEST:[0-9]*]],
 //
-// We should have a llvm.dbg.value for k since we moved it.
-// CHECK: call void @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_COPYABLE_VALUE_METADATA:[0-9]*]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// We should have a #dbg_value for k since we moved it.
+// CHECK: #dbg_value(ptr %k.debug, ![[K_COPYABLE_VALUE_METADATA:[0-9]*]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
-// Our undef should be an llvm.dbg.value. Importantly though its metadata
+// Our undef should be an #dbg_value. Importantly though its metadata
 // should be for k since that is the variable that we are telling the debugger
 // is no longer defined.
-// CHECK: call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VALUE_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VALUE_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // CHECK-NOT: br label
 //
 // CHECK: ret void
@@ -86,15 +85,15 @@ public func copyableValueTest() {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo15copyableArgTestyyAA5KlassCnF"(ptr %0)
 //
 // In contrast, we should have a dbg.declare for m since we aren't
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug, metadata ![[M_COPYABLE_VALUE_TEST:[0-9]*]],
+// CHECK: #dbg_declare(ptr %m.debug, ![[M_COPYABLE_VALUE_TEST:[0-9]*]],
 //
-// We should have a llvm.dbg.value for k since we moved it.
-// CHECK: call void @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_COPYABLE_VALUE_METADATA:[0-9]*]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// We should have a #dbg_value for k since we moved it.
+// CHECK: #dbg_value(ptr %k.debug, ![[K_COPYABLE_VALUE_METADATA:[0-9]*]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
-// Our undef should be an llvm.dbg.value. Importantly though its metadata
+// Our undef should be an #dbg_value. Importantly though its metadata
 // should be for k since that is the variable that we are telling the debugger
 // is no longer defined.
-// CHECK: call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VALUE_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VALUE_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // CHECK-NOT: br label
 //
 // CHECK: ret void
@@ -128,11 +127,11 @@ public func copyableArgTest(_ k: __owned Klass) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo15copyableVarTestyyF"()
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_COPYABLE_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK: call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VAR_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VAR_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_COPYABLE_VAR_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -171,11 +170,11 @@ public func copyableVarTest() {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18copyableVarArgTestyyAA5KlassCzF"(
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_COPYABLE_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK: call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VAR_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_COPYABLE_VAR_METADATA]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -212,8 +211,8 @@ public func copyableVarArgTest(_ k: inout Klass) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo20addressOnlyValueTestyyxAA1PRzlF"(ptr noalias %0, ptr %T, ptr %T.P)
-// CHECK: @llvm.dbg.value(metadata ptr %{{.*}}, metadata ![[K_ADDR_LET_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK: @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDR_LET_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr %{{.*}}, ![[K_ADDR_LET_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr undef, ![[K_ADDR_LET_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -238,6 +237,12 @@ public func copyableVarArgTest(_ k: inout Klass) {
 // DWARF-NEXT: DW_AT_artificial        (true)
 //
 // DWARF: DW_TAG_variable
+// DWARF: DW_AT_location    
+// DWARF: DW_AT_name    ("$WT\317\204_0_0$$$s3out1P_pD")
+// DWARF: DW_AT_type    (
+// DWARF: DW_AT_artificial  (true)
+//
+// DWARF: DW_TAG_variable
 // DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
 // DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
 // DWARF-NEXT: DW_AT_name      ("k")
@@ -245,12 +250,6 @@ public func copyableVarArgTest(_ k: inout Klass) {
 // DWARF-NEXT: DW_AT_decl_line (
 // DWARF-NEXT: DW_AT_type      (
 //
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("m")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueTest<T : P>(_ x: T) {
     let k = x
     k.doSomething()
@@ -259,40 +258,13 @@ public func addressOnlyValueTest<T : P>(_ x: T) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo23addressOnlyValueArgTestyyxnAA1PRzlF"(
-// CHECK: @llvm.dbg.declare(metadata ptr %T1,
-// CHECK: @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_ADDR_LET_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK: @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDR_LET_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_declare(ptr %T1,
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDR_LET_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr undef, ![[K_ADDR_LET_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
-// DWARF: DW_AT_linkage_name   ("$s3out23addressOnlyValueArgTestyyxnAA1PRzlF")
-// DWARF-NEXT: DW_AT_name      ("addressOnlyValueArgTest")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
-// DWARF-NEXT: DW_AT_external  (
-//
-// DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
-// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// DWARF-NEXT: DW_AT_name      ("k")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
-//
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("$\317\204_0_0")
-// DWARF-NEXT: DW_AT_type      (
-// DWARF-NEXT: DW_AT_artificial        (true)
-//
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("m")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
     k.doSomething()
     let m = consume k
@@ -300,42 +272,13 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18addressOnlyVarTestyyxAA1PRzlF"(ptr noalias %0, ptr %T, ptr %T.P)
-// CHECK: @llvm.dbg.value(metadata ptr %{{.*}}, metadata ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr %{{.*}}, ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 // CHECK-NEXT: br
-// CHECK: @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
-// CHECK: @llvm.dbg.value(metadata ptr %{{.*}}, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr %{{.*}}, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
-// DWARF: DW_AT_linkage_name   ("$s3out18addressOnlyVarTestyyxAA1PRzlF")
-// DWARF-NEXT: DW_AT_name      ("addressOnlyVarTest")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
-// DWARF-NEXT: DW_AT_external  (
-//
-// DWARF: DW_TAG_formal_parameter
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("x")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
-//
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (
-// DWARF-NEXT: DW_AT_name      ("$\317\204_0_0")
-// DWARF-NEXT: DW_AT_type      (
-// DWARF-NEXT: DW_AT_artificial        (true)
-//
-// DWARF: DW_TAG_variable
-// DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
-// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// TODO: Missing def in dbg info here.
-// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
-// DWARF-NEXT: DW_AT_name      ("k")
-// DWARF-NEXT: DW_AT_decl_file (
-// DWARF-NEXT: DW_AT_decl_line (
-// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyVarTest<T : P>(_ x: T) {
     var k = x // << this
     k.doSomething()
@@ -346,9 +289,9 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo21addressOnlyVarArgTestyyxz_xtAA1PRzlF"(
-// CHECK: call void @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
-// CHECK: @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
-// CHECK: @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr undef, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -393,12 +336,12 @@ public func addressOnlyVarArgTest<T : P>(_ k: inout T, _ x: T) {
 ///////////////////////
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo23copyableValueCCFlowTestyyF"(
-// CHECK: call void @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_COPYABLE_LET_CCFLOW_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]+]]
 //
 // CHECK:    br i1 {{%[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:    call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK:    #dbg_value(ptr undef, ![[K_COPYABLE_LET_CCFLOW_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 public func copyableValueCCFlowTest() {
     let k = Klass()
     k.doSomething()
@@ -409,12 +352,12 @@ public func copyableValueCCFlowTest() {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo26copyableValueArgCCFlowTestyyAA5KlassCnF"(
-// CHECK: call void @llvm.dbg.value(metadata ptr %k.debug, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]+]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_COPYABLE_LET_CCFLOW_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]+]]
 //
 // CHECK:    br i1 {{%[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:    call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_LET_CCFLOW_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK:    #dbg_value(ptr undef, ![[K_COPYABLE_LET_CCFLOW_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 public func copyableValueArgCCFlowTest(_ k: __owned Klass) {
     k.doSomething()
     if trueValue {
@@ -424,13 +367,13 @@ public func copyableValueArgCCFlowTest(_ k: __owned Klass) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037copyableVarTestCCFlowReinitOutOfBlockF0yyF"(
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // CHECK:      br label %[[CONT_BB:[0-9]+]],
 //
 // CHECK: [[RHS]]:
@@ -438,7 +381,7 @@ public func copyableValueArgCCFlowTest(_ k: __owned Klass) {
 //
 // CHECK: [[CONT_BB]]:
 // TODO: Should this be a deref like the original?
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func copyableVarTestCCFlowReinitOutOfBlockTest() {
@@ -453,20 +396,20 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo040copyableVarArgTestCCFlowReinitOutOfBlockG0yyAA5KlassCzF"(
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:      br label %[[CONT_BB:[0-9]+]],
 //
 // CHECK: [[RHS]]:
 // CHECK:      br label %[[CONT_BB]],
 //
 // CHECK: [[CONT_BB]]:
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
@@ -481,15 +424,15 @@ public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo034copyableVarTestCCFlowReinitInBlockF0yyF"(
 // CHECK: entry:
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK:      call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
@@ -512,15 +455,15 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037copyableVarArgTestCCFlowReinitInBlockG0yyAA5KlassCzF"(
 // CHECK: entry:
-// CHECK: call void @llvm.dbg.declare(metadata ptr %m.debug,
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_declare(ptr %m.debug,
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK:      call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
@@ -542,12 +485,12 @@ public func copyableVarArgTestCCFlowReinitInBlockTest(_ k: inout Klass) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo040addressOnlyVarTestCCFlowReinitOutOfBlockG0yyxmAA1PRzlF"(
 // CHECK: entry:
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[RHS]]:
@@ -555,7 +498,7 @@ public func copyableVarArgTestCCFlowReinitInBlockTest(_ k: inout Klass) {
 //
 // CHECK: [[CONT_BB]]:
 // TODO: Should this be a deref like the original?
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
@@ -571,12 +514,12 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo043addressOnlyVarArgTestCCFlowReinitOutOfBlockH0yyAA1P_pz_xmtAaCRzlF"(
 // CHECK: entry:
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[RHS]]:
@@ -584,7 +527,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 //
 // CHECK: [[CONT_BB]]:
 // TODO: Should this be a deref like the original?
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func addressOnlyVarArgTestCCFlowReinitOutOfBlockTest<T : P>(_ k: inout (any P), _ x: T.Type) {
@@ -599,14 +542,14 @@ public func addressOnlyVarArgTestCCFlowReinitOutOfBlockTest<T : P>(_ k: inout (a
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037addressOnlyVarTestCCFlowReinitInBlockG0yyxmAA1PRzlF"(
 // CHECK: entry:
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK:      call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
@@ -629,14 +572,14 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo040addressOnlyVarArgTestCCFlowReinitInBlockH0yyAA1P_pz_xmtAaCRzlF"(
 // CHECK: entry:
-// CHECK: call void @llvm.dbg.value(metadata ptr [[VAR:%.*]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      call void @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK:      call void @llvm.dbg.value(metadata ptr [[VAR]], metadata ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], metadata !DIExpression(DW_OP_deref, DW_OP_deref)), !dbg ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
@@ -657,7 +600,7 @@ public func addressOnlyVarArgTestCCFlowReinitInBlockTest<T : P>(_ k: inout (any 
 }
 
 //////////////////////////
-// Late Metadata Checks //
+// Late Checks //
 //////////////////////////
 
 // CHECK-DAG: ![[K_COPYABLE_VALUE_METADATA]] = !DILocalVariable(name: "k",

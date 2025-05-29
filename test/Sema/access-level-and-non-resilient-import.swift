@@ -4,8 +4,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
-// REQUIRES: asserts
-
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/DefaultLib.swift -o %t
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t
@@ -21,9 +19,6 @@
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
 // RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 6 -verify \
-// RUN:   -package-name pkg
-// RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -verify -package-name pkg
@@ -34,11 +29,11 @@
 // RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
-// RUN:   -swift-version 6 \
-// RUN:   -package-name pkg
-// RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -package-name pkg
+
+// REQUIRES: swift_feature_AccessLevelOnImport
+// REQUIRES: swift_feature_InternalImportsByDefault
 
 //--- DefaultLib.swift
 //--- PublicLib.swift

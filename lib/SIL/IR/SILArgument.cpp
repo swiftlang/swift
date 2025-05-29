@@ -11,11 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILArgument.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -27,7 +29,7 @@ using namespace swift;
 SILArgument::SILArgument(ValueKind subClassKind,
                          SILBasicBlock *inputParentBlock, SILType type,
                          ValueOwnershipKind ownershipKind,
-                         const ValueDecl *inputDecl, bool reborrow,
+                         ValueDecl *inputDecl, bool reborrow,
                          bool pointerEscape)
     : ValueBase(subClassKind, type), parentBlock(inputParentBlock),
       decl(inputDecl) {
@@ -35,6 +37,7 @@ SILArgument::SILArgument(ValueKind subClassKind,
   sharedUInt8().SILArgument.reborrow = reborrow;
   sharedUInt8().SILArgument.pointerEscape = pointerEscape;
   inputParentBlock->insertArgument(inputParentBlock->args_end(), this);
+  ASSERT(!type.hasTypeParameter());
 }
 
 SILFunction *SILArgument::getFunction() {
@@ -62,6 +65,15 @@ bool SILFunctionArgument::isIndirectResult() const {
   auto numIndirectResults =
       getFunction()->getConventions().getNumIndirectSILResults();
   return getIndex() < numIndirectResults;
+}
+
+bool SILFunctionArgument::isIndirectErrorResult() const {
+  auto numIndirectResults =
+      getFunction()->getConventions().getNumIndirectSILResults();
+  auto numIndirectErrorResults =
+      getFunction()->getConventions().getNumIndirectSILErrorResults();
+  return ((getIndex() >= numIndirectResults) &&
+          (getIndex() < numIndirectResults + numIndirectErrorResults));
 }
 
 SILArgumentConvention SILFunctionArgument::getArgumentConvention() const {
@@ -282,7 +294,8 @@ bool SILPhiArgument::visitTransitiveIncomingPhiOperands(
     argument->getIncomingPhiOperands(operands);
 
     for (auto *operand : operands) {
-      SILPhiArgument *forwarded = dyn_cast<SILPhiArgument>(operand->get());
+      SILValue opVal = lookThroughBorrowedFromDef(operand->get());
+      SILPhiArgument *forwarded = dyn_cast<SILPhiArgument>(opVal);
       if (forwarded && forwarded->isPhi()) {
         worklist.insert(forwarded);
       }
@@ -303,6 +316,7 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     llvm_unreachable("Have terminator that implies no successors?!");
   case TermKind::TryApplyInst:
@@ -419,4 +433,12 @@ bool SILFunctionArgument::isSelf() const {
   // function has a call signature with self.
   return getFunction()->hasSelfParam() &&
          getParent()->getArguments().back() == this;
+}
+
+bool SILFunctionArgument::isSending() const {
+  if (isIndirectErrorResult())
+    return false;
+  if (isIndirectResult())
+    return getFunction()->getLoweredFunctionType()->hasSendingResult();
+  return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
 }

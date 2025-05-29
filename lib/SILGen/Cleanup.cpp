@@ -16,6 +16,7 @@
 #include "Scope.h"
 #include "SILGenBuilder.h"
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -101,7 +102,7 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
     // This is necessary both because we might need to pop the cleanup and
     // because the cleanup might push other cleanups that will invalidate
     // references onto the stack.
-    llvm::Optional<CleanupBuffer> copiedCleanup;
+    std::optional<CleanupBuffer> copiedCleanup;
     if (stackCleanup.isActive() && SGF.B.hasValidInsertionPoint()) {
       copiedCleanup.emplace(stackCleanup);
     }
@@ -142,6 +143,14 @@ void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation loc) {
   emitCleanups(depth, loc, NotForUnwind, /*popCleanups*/ true);
 }
 
+/// Leave a scope, emitting all the cleanups that are currently active but leaving them on the stack so they
+/// can be reenabled on other pattern match branches.
+void CleanupManager::endNoncopyablePatternMatchBorrow(CleanupsDepth depth,
+                                                      CleanupLocation loc,
+                                                      bool popCleanups) {
+  emitCleanups(depth, loc, NotForUnwind, popCleanups);
+}
+
 bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
                                           CleanupsDepth to) {
   return ::hasAnyActiveCleanups(stack.find(from), stack.find(to));
@@ -154,15 +163,27 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
 /// emitBranchAndCleanups - Emit a branch to the given jump destination,
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
-void CleanupManager::emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
+void CleanupManager::emitBranchAndCleanups(JumpDest dest,
+                                           SILLocation branchLoc,
+                                           ArrayRef<SILValue> args,
+                                           ForUnwind_t forUnwind) {
+  emitCleanupsForBranch(dest, branchLoc, args, forUnwind);
+  SGF.getBuilder().createBranch(branchLoc, dest.getBlock(), args);
+}
+
+/// emitBranchAndCleanups - Emit the cleanups necessary before branching to
+/// the given jump destination. This does not pop the cleanup stack, nor does
+/// it emit the actual branch.
+void CleanupManager::emitCleanupsForBranch(JumpDest dest,
+                                           SILLocation branchLoc,
                                            ArrayRef<SILValue> args,
                                            ForUnwind_t forUnwind) {
   SILGenBuilder &builder = SGF.getBuilder();
   assert(builder.hasValidInsertionPoint() && "Emitting branch in invalid spot");
   emitCleanups(dest.getDepth(), dest.getCleanupLocation(),
                forUnwind, /*popCleanups=*/false);
-  builder.createBranch(branchLoc, dest.getBlock(), args);
 }
+
 
 void CleanupManager::emitCleanupsForReturn(CleanupLocation loc,
                                            ForUnwind_t forUnwind) {
@@ -226,7 +247,7 @@ bool CleanupManager::isFormalAccessCleanup(CleanupHandle depth) {
   return RawTy(std::get<0>(state)) & RawTy(Cleanup::Flags::FormalAccessCleanup);
 }
 
-std::tuple<Cleanup::Flags, llvm::Optional<SILValue>>
+std::tuple<Cleanup::Flags, std::optional<SILValue>>
 CleanupManager::getFlagsAndWritebackBuffer(CleanupHandle depth) {
   auto iter = stack.find(depth);
   assert(iter != stack.end() && "can't change end of cleanups stack");
@@ -234,7 +255,7 @@ CleanupManager::getFlagsAndWritebackBuffer(CleanupHandle depth) {
          "Trying to get writeback buffer of a dead cleanup?!");
 
   auto resultFlags = iter->getFlags();
-  llvm::Optional<SILValue> result;
+  std::optional<SILValue> result;
   bool foundValue = iter->getWritebackBuffer([&](SILValue v) { result = v; });
   (void)foundValue;
   assert(result.has_value() == foundValue);
@@ -365,7 +386,7 @@ void CleanupStateRestorationScope::pop() && { popImpl(); }
 //===----------------------------------------------------------------------===//
 
 CleanupCloner::CleanupCloner(SILGenFunction &SGF, const ManagedValue &mv)
-    : SGF(SGF), writebackBuffer(llvm::None), hasCleanup(mv.hasCleanup()),
+    : SGF(SGF), writebackBuffer(std::nullopt), hasCleanup(mv.hasCleanup()),
       isLValue(mv.isLValue()), isFormalAccess(false) {
   if (hasCleanup) {
     auto handle = mv.getCleanup();

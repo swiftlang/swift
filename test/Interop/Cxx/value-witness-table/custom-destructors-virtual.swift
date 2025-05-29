@@ -1,12 +1,7 @@
-// With RTTI some of the objects with virtual bases / destructors in this test
-// will cause linker errors because of undefined vtables.
-// FIXME: Once we can link with libc++ we can start using RTTI.
-// 
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fno-rtti)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -fno-rtti -O)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -O)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
 
 import CustomDestructor
 import StdlibUnittest

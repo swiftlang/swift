@@ -36,10 +36,10 @@ public func overflowWithUnsafeBytes() {
   }
 }
 
-// CHECK-LABEL: sil [stack_protection] @$s4test31owerflowWithUnsafeBorrowedBytes5valueySi_tF
+// CHECK-LABEL: sil [stack_protection] @$s4test31overflowWithUnsafeBorrowedBytes5valueySi_tF
 // CHECK-NOT:     copy_addr
-// CHECK:       } // end sil function '$s4test31owerflowWithUnsafeBorrowedBytes5valueySi_tF'
-public func owerflowWithUnsafeBorrowedBytes(value: Int) {
+// CHECK:       } // end sil function '$s4test31overflowWithUnsafeBorrowedBytes5valueySi_tF'
+public func overflowWithUnsafeBorrowedBytes(value: Int) {
   withUnsafeBytes(of: value) {
     potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
   }
@@ -60,6 +60,16 @@ public func onlyLoads(value: Int) -> Int {
 public func unprotectedUnsafeBytes() {
   var x = 0
   _withUnprotectedUnsafeBytes(of: &x) {
+    potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
+  }
+}
+
+// CHECK-LABEL: sil @$s4test29unprotectedUnsafeMutableBytesyyF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test29unprotectedUnsafeMutableBytesyyF'
+public func unprotectedUnsafeMutableBytes() {
+  var x = 0
+  _withUnprotectedUnsafeMutableBytes(of: &x) {
     potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
   }
 }

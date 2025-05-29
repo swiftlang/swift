@@ -312,8 +312,8 @@ class AbstractionPattern {
 
       EncodedForeignInfo(
           Async_t, unsigned completionParameterIndex,
-          llvm::Optional<unsigned> completionErrorParameterIndex,
-          llvm::Optional<unsigned> completionErrorFlagParameterIndex,
+          std::optional<unsigned> completionErrorParameterIndex,
+          std::optional<unsigned> completionErrorFlagParameterIndex,
           bool completionErrorFlagIsZeroOnError)
           : Value(1 + (unsigned(IsAsync) - 1) +
                   (unsigned(completionParameterIndex)
@@ -342,8 +342,8 @@ class AbstractionPattern {
 
   public:
     static EncodedForeignInfo
-    encode(const llvm::Optional<ForeignErrorConvention> &foreignError,
-           const llvm::Optional<ForeignAsyncConvention> &foreignAsync);
+    encode(const std::optional<ForeignErrorConvention> &foreignError,
+           const std::optional<ForeignAsyncConvention> &foreignAsync);
 
     bool hasValue() const { return Value != 0; }
     ForeignKind getKind() const {
@@ -374,25 +374,25 @@ class AbstractionPattern {
         >> AsyncCompletionParameterIndexShift;
     }
 
-    llvm::Optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
+    std::optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
       assert(getKind() == IsAsync);
 
       unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorParameterIndexMask)
         >> AsyncCompletionErrorParameterIndexShift;
       if (encodedValue == 0) {
-        return llvm::None;
+        return std::nullopt;
       }
       return encodedValue - 1;
     }
 
-    llvm::Optional<unsigned>
+    std::optional<unsigned>
     getAsyncCompletionHandlerErrorFlagParamIndex() const {
       assert(getKind() == IsAsync);
 
       unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorFlagParameterIndexMask)
         >> AsyncCompletionErrorFlagParameterIndexShift;
       if (encodedValue == 0) {
-        return llvm::None;
+        return std::nullopt;
       }
       return encodedValue - 1;
     }
@@ -691,8 +691,8 @@ public:
   /// Objective-C method.
   static AbstractionPattern getCurriedObjCMethod(
       CanType origType, const clang::ObjCMethodDecl *method,
-      const llvm::Optional<ForeignErrorConvention> &foreignError,
-      const llvm::Optional<ForeignAsyncConvention> &foreignAsync);
+      const std::optional<ForeignErrorConvention> &foreignError,
+      const std::optional<ForeignAsyncConvention> &foreignAsync);
 
   /// Return an abstraction pattern for the uncurried type of a C function
   /// imported as a method.
@@ -882,8 +882,8 @@ public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                const llvm::Optional<ForeignErrorConvention> &foreignError,
-                const llvm::Optional<ForeignAsyncConvention> &foreignAsync);
+                const std::optional<ForeignErrorConvention> &foreignError,
+                const std::optional<ForeignAsyncConvention> &foreignAsync);
 
 private:
   /// Return an abstraction pattern for the uncurried type of an
@@ -1014,6 +1014,10 @@ public:
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  bool conformsToKnownProtocol(
+    CanType substTy, KnownProtocolKind protocolKind) const;
+  bool isNoncopyable(CanType substTy) const;
+  bool isEscapable(CanType substTy) const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.
@@ -1352,8 +1356,7 @@ public:
   ///
   /// If the surviving element came from an expansion element, the
   /// returned element is the pattern type of the expansion.
-  llvm::Optional<AbstractionPattern>
-  getVanishingTupleElementPatternType() const;
+  std::optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
 
   /// Does this tuple type vanish, i.e. is it flattened to a singleton
   /// non-expansion element under substitution?
@@ -1513,6 +1516,10 @@ public:
   /// the abstraction pattern for its self type.
   AbstractionPattern getDynamicSelfSelfType() const;
 
+  /// Given that the value being abstracted is a protocol composition
+  /// type, return the abstraction pattern for one of its member types.
+  AbstractionPattern getProtocolCompositionMemberType(unsigned i) const;
+
   /// Given that the value being abstracted is a parameterized protocol
   /// type, return the abstraction pattern for one of its argument types.
   AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
@@ -1520,6 +1527,27 @@ public:
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
   AbstractionPattern getFunctionResultType() const;
+
+  /// Given that the value being abstracted is a function, return the
+  /// abstraction pattern for its thrown error type.
+  std::optional<AbstractionPattern> getFunctionThrownErrorType() const;
+
+  /// Utility method to adjust a thrown error pattern and thrown error type
+  /// to account for some quirks in type lowering.
+  ///
+  /// When lowered with an opaque pattern,
+  ///
+  /// - () -> () becomes () -> (),
+  /// - () throws(any Error) -> () becomes () -> (@error any Error),
+  ///
+  /// *not* () -> (@error_indirect Never) or () -> (@error_indirect any Error).
+  std::optional<std::pair<AbstractionPattern, CanType>>
+  getFunctionThrownErrorType(CanAnyFunctionType substFnInterfaceType) const;
+
+  /// For the abstraction pattern produced by `getFunctionThrownErrorType()`,
+  /// produce the effective thrown error type to be used when we don't have
+  /// a substituted error type.
+  CanType getEffectiveThrownErrorType() const;
 
   /// Given that the value being abstracted is a function type, return
   /// the abstraction pattern for one of its parameter types.
@@ -1529,6 +1557,18 @@ public:
   /// this is not an opaque abstraction pattern, return the parameter flags
   /// for one of its parameters.
   ParameterTypeFlags getFunctionParamFlags(unsigned index) const;
+
+  /// Given that the value being abstracted is a function type, return whether
+  /// the indicated parameter should be treated as addressable, meaning
+  /// calls should preserve the in-memory address of the argument for as
+  /// long as any dependencies may live.
+  ///
+  /// This may be true either because the type is structurally addressable for
+  /// dependencies, or because it was explicitly marked as `@_addressable`
+  /// in its declaration.
+  bool isFunctionParamAddressable(unsigned index) const;
+  
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
   /// Given that the value being abstracted is a function type, and that
   /// this is not an opaque abstraction pattern, return the number of
@@ -1549,6 +1589,16 @@ public:
   void forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
                             bool ignoreFinalParam,
     llvm::function_ref<void(FunctionParamGenerator &param)> function) const;
+
+  /// Return the start index of the given formal parameter in the lowered
+  /// parameter sequence corresponding to a function with this abstraction
+  /// pattern.
+  unsigned getLoweredParamIndex(unsigned formalIndex) const;
+
+  /// If this abstraction pattern is recursively expanded and flattened
+  /// in the normal way for parameters and results, how many values does
+  /// it correspond to?
+  unsigned getFlattenedValueCount() const;
 
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
@@ -1611,15 +1661,19 @@ public:
   /// Given that this is a pack expansion, do the pack elements need to be
   /// passed indirectly?
   bool arePackElementsPassedIndirectly(TypeConverter &TC) const;
-  
+
   /// If this abstraction pattern appears in function return position, how is
   /// the corresponding value returned?
   CallingConventionKind getResultConvention(TypeConverter &TC) const;
-  
+
   /// If this abstraction pattern appears in function parameter position, how
   /// is the corresponding value passed?
   CallingConventionKind getParameterConvention(TypeConverter &TC) const;
-  
+
+  /// If this abstraction pattern appears in function thrown error position, how
+  /// is the corresponding value passed?
+  CallingConventionKind getErrorConvention(TypeConverter &TC) const;
+
   /// Generate the abstraction pattern for lowering the substituted SIL
   /// function type for a function type matching this abstraction pattern.
   ///

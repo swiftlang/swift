@@ -13,9 +13,10 @@ public class BridgedClass : NSObject, NSCopying {
 
 public class BridgedClassSub : BridgedClass { }
 
-// Attempt to bridge to a type from another module. We only allow this for a
-// few specific types, like String.
-extension LazyFilterSequence.Iterator : @retroactive _ObjectiveCBridgeable { // expected-error{{conformance of 'Iterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
+// Attempt to bridge to a type from another module.
+// We used to work hard to prevent this, but doing so was getting in the
+// way of layering for the swift-foundation project.
+extension LazyFilterSequence.Iterator : @retroactive _ObjectiveCBridgeable {
   public typealias _ObjectiveCType = BridgedClassSub
 
   public func _bridgeToObjectiveC() -> _ObjectiveCType {
@@ -364,6 +365,28 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   z = h // expected-error{{value of type 'String' expected to be an instance of a class or class-constrained type in assignment}}
 
   _ = z
+}
+
+do {
+  func f(an : Any, oan: Any?) -> AnyObject? {
+    let a1 : AnyObject
+    a1 = an
+    // expected-error@-1:8 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{none}}
+    // expected-note@-2:8 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{12-12= as AnyObject}}
+    let a2 : AnyObject?
+    a2 = an
+    // expected-error@-1:10 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{12-12= as AnyObject}}
+    let a3 : AnyObject!
+    a3 = an
+    // expected-error@-1:10 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{12-12= as AnyObject}}
+
+    let obj: AnyObject = an
+    // expected-error@-1:26 {{value of type 'Any' expected to be instance of class or class-constrained type}}{{none}}
+    // expected-note@-2:26 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{28-28= as AnyObject}}
+
+    return oan
+    // expected-error@-1:12 {{return expression of type 'Any' expected to be an instance of a class or class-constrained type}}{{15-15= as AnyObject}}
+  }
 }
 
 func bridgeAnyContainerToAnyObject(x: [Any], y: [NSObject: Any]) {

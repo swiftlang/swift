@@ -44,6 +44,46 @@ class OuterClass {
   protocol InnerProtocol : OuterClass { }
 }
 
+// Name lookup circularity tests.
+
+protocol SomeBaseProtocol {}
+
+struct ConformanceOnDecl: ConformanceOnDecl.P {
+    protocol P: SomeBaseProtocol {}
+}
+struct ConformanceOnDecl_2: ConformanceOnDecl_2.P {
+    protocol P where Self: SomeBaseProtocol {}
+}
+struct ConformanceOnDecl_3: Self.P {
+    protocol P: SomeBaseProtocol {}
+}
+struct ConformanceOnDecl_4: ConformanceOnDecl_4.Q {
+    protocol P: SomeBaseProtocol {}
+    protocol Q: P {}
+}
+
+
+struct ConformanceInExtension {
+    protocol P: SomeBaseProtocol {}
+}
+extension ConformanceInExtension: ConformanceInExtension.P {}
+
+struct ConformanceInExtension_2 {
+    protocol P where Self: SomeBaseProtocol {}
+}
+extension ConformanceInExtension_2: ConformanceInExtension_2.P {}
+
+struct ConformanceInExtension_3 {
+    protocol P: SomeBaseProtocol {}
+}
+extension ConformanceInExtension_3: Self.P {}
+
+struct ConformanceInExtension_4 {
+    protocol P: SomeBaseProtocol {}
+    protocol Q: P {}
+}
+extension ConformanceInExtension_4: ConformanceInExtension_4.Q {}
+
 // Protocols can be nested in actors.
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -197,7 +237,7 @@ extension OuterProtocol {
 
 struct ConformsToOuterProtocol : OuterProtocol {
   typealias Hen = Int
-  func f() { let _ = InnerProtocol.self } // expected-error {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
+  func f() { let _ = InnerProtocol.self } // expected-warning {{use of protocol 'InnerProtocol' as a type must be written 'any InnerProtocol'}}
 }
 
 extension OuterProtocol {
@@ -217,7 +257,7 @@ extension OuterProtocol {
 // 'OtherGenericClass', so the occurrence of 'OtherGenericClass'
 // in 'InnerProtocol' is not "in context" with implicitly
 // inferred generic arguments <T, U>.
-class OtherGenericClass<T, U> { // expected-note {{generic type 'OtherGenericClass' declared here}}
+class OtherGenericClass<T, U> { // expected-note {{generic class 'OtherGenericClass' declared here}}
   protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1 {{protocol 'InnerProtocol' cannot be nested in a generic context}}
   // expected-error@-2 {{reference to generic type 'OtherGenericClass' requires arguments in <...>}}
@@ -235,9 +275,9 @@ extension OtherGenericClass {
 // A nested protocol does not satisfy an associated type requirement.
 
 protocol HasAssoc {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
 }
-struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}}
+struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}} expected-note {{add stubs for conformance}} 
   protocol A {}
 }
 
@@ -298,7 +338,7 @@ enum SillyRawEnum : SillyProtocol.InnerClass {} // expected-error {{an enum with
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
-  // expected-note@-1 {{generic type 'InnerClass' declared here}}
+  // expected-note@-1 {{generic class 'InnerClass' declared here}}
 }
 
 protocol SelfDotTest {

@@ -15,14 +15,13 @@ Ninja build
 # ----------------------------------------------------------------------------
 
 import os.path
-import platform
-import sys
+import re
 
 from build_swift.build_swift import cache_utils
-from build_swift.build_swift.wrappers import xcrun
 
 from . import product
 from .. import shell
+from ..utils import log_time_in_scope
 
 
 class Ninja(product.Product):
@@ -35,7 +34,7 @@ class Ninja(product.Product):
         return False
 
     @classmethod
-    def new_builder(cls, args, toolchain, workspace, host):
+    def new_builder(cls, args, toolchain, workspace):
         return NinjaBuilder(cls, args, toolchain, workspace)
 
 
@@ -56,28 +55,47 @@ class NinjaBuilder(product.ProductBuilder):
         if os.path.exists(self.ninja_bin_path):
             return
 
-        env = None
-        if platform.system() == "Darwin":
-            sysroot = xcrun.sdk_path("macosx")
-            assert sysroot is not None
-            env = {
-                "CXX": shell._quote(self.toolchain.cxx),
-                "CFLAGS": (
-                    "-isysroot {sysroot}"
-                ).format(sysroot=shell._quote(sysroot)),
-                "LDFLAGS": (
-                    "-isysroot {sysroot}"
-                ).format(sysroot=shell._quote(sysroot)),
-            }
-        elif self.toolchain.cxx:
-            env = {
-                "CXX": shell._quote(self.toolchain.cxx),
-            }
+        print("--- Local Ninja Build ---")
+        with log_time_in_scope('local ninja'):
+            shell.call([
+                self.toolchain.cmake,
+                "-S", self.source_dir,
+                "-B", self.build_dir,
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-DBUILD_TESTING=OFF",
+                f"-DCMAKE_C_COMPILER={self.toolchain.cc}",
+                f"-DCMAKE_CXX_COMPILER={self.toolchain.cxx}"])
+            shell.call([self.toolchain.cmake, "--build", self.build_dir])
 
-        # Ninja can only be built in-tree.  Copy the source tree to the build
-        # directory.
-        shell.rmtree(self.build_dir)
-        shell.copytree(self.source_dir, self.build_dir, ignore_pattern=".git")
-        with shell.pushd(self.build_dir):
-            shell.call([sys.executable, 'configure.py', '--bootstrap'],
-                       env=env)
+
+def get_ninja_version(ninja_bin_path):
+    if not ninja_bin_path or not os.path.isfile(ninja_bin_path):
+        return
+    ninja_version_pattern = re.compile(r'^(\d+)\.(\d+)\.(\d+).*')
+    version = shell.capture([ninja_bin_path, "--version"], dry_run=False,
+                            echo=True, optional=True)
+    m = ninja_version_pattern.match(version)
+    if m is None:
+        return
+    (major, minor, patch) = map(int, m.groups())
+    return (major, minor, patch)
+
+
+def get_ninja_path(toolchain, args, workspace):
+    min_ninja_version = (1, 8, 2)
+
+    built_ninja_path = os.path.join(workspace.build_dir('build', 'ninja'), 'ninja')
+    built_ninja_version = get_ninja_version(built_ninja_path)
+    if built_ninja_version and min_ninja_version <= built_ninja_version:
+        return built_ninja_path
+
+    toolchain_ninja_version = get_ninja_version(toolchain.ninja)
+    if toolchain_ninja_version and min_ninja_version <= toolchain_ninja_version:
+        return toolchain.ninja
+
+    # Build ninja from source
+    ninja_build = Ninja.new_builder(args=args,
+                                    toolchain=toolchain,
+                                    workspace=workspace)
+    ninja_build.build()
+    return ninja_build.ninja_bin_path

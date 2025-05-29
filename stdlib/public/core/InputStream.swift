@@ -30,15 +30,15 @@ import SwiftShims
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
   var utf8Start: UnsafeMutablePointer<UInt8>?
-  let utf8Count = swift_stdlib_readLine_stdin(&utf8Start)
+  let utf8Count = unsafe swift_stdlib_readLine_stdin(&utf8Start)
   defer {
-    _swift_stdlib_free(utf8Start)
+    unsafe _swift_stdlib_free(utf8Start)
   }
   guard utf8Count > 0 else {
     return nil
   }
-  let utf8Buffer = UnsafeBufferPointer(start: utf8Start, count: utf8Count)
-  var result = String._fromUTF8Repairing(utf8Buffer).result
+  let utf8Buffer = unsafe UnsafeBufferPointer(start: utf8Start, count: utf8Count)
+  var result = unsafe String._fromUTF8Repairing(utf8Buffer).result
   if strippingNewline, result.last == "\n" || result.last == "\r\n" {
     _ = result.removeLast()
   }

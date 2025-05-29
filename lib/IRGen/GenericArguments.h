@@ -1,4 +1,4 @@
-//===--- MetadataRequest.cpp - IR generation for metadata requests --------===//
+//===--- GenericArguments.h - IR generation for metadata requests ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -64,8 +64,7 @@ struct GenericArguments {
   }
 
   void collect(IRGenFunction &IGF, CanType type) {
-    auto decl = type.getNominalOrBoundGenericNominal();
-    auto subs = type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
+    auto subs = type->getContextSubstitutionMap();
     collect(IGF, subs);
   }
 

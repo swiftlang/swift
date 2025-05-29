@@ -62,6 +62,7 @@ def unrpathize(filename):
         'libswiftSwiftPrivateLibcExtras.dylib',
         'libswiftSwiftPrivateThreadExtras.dylib',
         'libswiftSwiftReflectionTest.dylib',
+        'libswiftGenericMetadataBuilder.dylib',
     }
 
     # The output from dyldinfo -dylibs is a line of header followed by one

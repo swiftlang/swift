@@ -36,9 +36,9 @@ class SwiftInterfaceGenContext :
 public:
   static SwiftInterfaceGenContextRef
   create(StringRef DocumentName, bool IsModule, StringRef ModuleOrHeaderName,
-         llvm::Optional<StringRef> Group, swift::CompilerInvocation Invocation,
+         std::optional<StringRef> Group, swift::CompilerInvocation Invocation,
          std::string &ErrorMsg, bool SynthesizedExtensions,
-         llvm::Optional<StringRef> InterestedUSR);
+         std::optional<StringRef> InterestedUSR);
 
   static SwiftInterfaceGenContextRef
     createForTypeInterface(swift::CompilerInvocation Invocation,
@@ -87,7 +87,8 @@ public:
 
   /// Searches for a declaration with the given USR and returns the
   /// (offset,length) pair into the interface source if it finds one.
-  llvm::Optional<std::pair<unsigned, unsigned>> findUSRRange(StringRef USR) const;
+  std::optional<std::pair<unsigned, unsigned>>
+  findUSRRange(StringRef USR) const;
 
   void applyTo(swift::CompilerInvocation &CompInvok) const;
 

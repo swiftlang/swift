@@ -24,7 +24,7 @@
 
 #include "chrono_utils.h"
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "swift/Threading/Errors.h"
 
@@ -60,7 +60,7 @@ bool thread_is_main();
 inline bool threads_same(thread_id a, thread_id b) {
   return ::thrd_equal(a, b);
 }
-inline llvm::Optional<stack_bounds> thread_get_current_stack_bounds() {
+inline std::optional<stack_bounds> thread_get_current_stack_bounds() {
   return {};
 }
 
@@ -95,9 +95,8 @@ struct lazy_mutex_handle {
   std::int32_t once; // -1 = initialized, 0 = uninitialized, 1 = initializing
 };
 
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return (lazy_mutex_handle){};
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER ((threading_impl::lazy_mutex_handle){})
+
 inline void lazy_mutex_init(lazy_mutex_handle &handle) {
   // Sadly, we can't use call_once() for this as it doesn't have a context
   if (std::atomic_load_explicit((std::atomic<std::int32_t> *)&handle.once,
@@ -146,6 +145,25 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   lazy_mutex_init(handle);
   (void)::mtx_unlock(&handle.mutex);
+}
+
+// .. Recursive mutex support .................................................
+
+using recursive_mutex_handle = ::mtx_t;
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {
+  SWIFT_C11THREADS_CHECK(::mtx_init(&handle, ::mtx_recursive));
+}
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {
+  ::mtx_destroy(&handle);
+}
+
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::mtx_lock(&handle));
+}
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
+  SWIFT_C11THREADS_CHECK(::mtx_unlock(&handle));
 }
 
 // .. ConditionVariable support ..............................................
@@ -222,7 +240,7 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 #endif
 
 using tls_key_t = ::tss_t;
-using tls_dtor_t = void (*)(void *);
+using tls_dtor_t = ::tss_dtor_t;
 
 inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
   return ::tss_create(&key, dtor) == thrd_success;

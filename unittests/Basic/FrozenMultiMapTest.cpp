@@ -18,7 +18,6 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -27,6 +26,7 @@
 #include "gtest/gtest.h"
 #include <chrono>
 #include <map>
+#include <optional>
 #include <random>
 #include <set>
 
@@ -113,7 +113,7 @@ TEST(FrozenMultiMapCustomTest, TestResetWorks) {
 
   map.setFrozen();
 
-  // Just do a quick sanity test.
+  // Just do a quick soundness test.
   auto range = map.getRange();
   auto begin = range.begin();
   auto end = range.end();

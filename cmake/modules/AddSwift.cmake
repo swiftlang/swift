@@ -1,6 +1,5 @@
 include(macCatalystUtils)
 include(SwiftList)
-include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
 include(SwiftCXXUtils)
@@ -82,36 +81,6 @@ function(_set_target_prefix_and_suffix target kind sdk)
   endif()
 endfunction()
 
-function(_add_host_variant_swift_sanitizer_flags target)
-  if(LLVM_USE_SANITIZER)
-    if(LLVM_USE_SANITIZER STREQUAL "Address")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=address" "-Xclang-linker" "-fsanitize=address")
-    elseif(LLVM_USE_SANITIZER STREQUAL "HWAddress")
-      # Not supported?
-    elseif(LLVM_USE_SANITIZER MATCHES "Memory(WithOrigins)?")
-      # Not supported
-      if(LLVM_USE_SANITIZER STREQUAL "MemoryWithOrigins")
-        # Not supported
-      endif()
-    elseif(LLVM_USE_SANITIZER STREQUAL "Undefined")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined" "-Xclang-linker" "-fsanitize=undefined")
-    elseif(LLVM_USE_SANITIZER STREQUAL "Thread")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=thread" "-Xclang-linker" "-fsanitize=thread")
-    elseif(LLVM_USE_SANITIZER STREQUAL "DataFlow")
-      # Not supported
-    elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
-           LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=address" "-sanitize=undefined" "-Xclang-linker" "-fsanitize=address" "-Xclang-linker" "-fsanitize=undefined")
-    elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
-      # Not supported
-    else()
-      message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
-    endif()
-
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:${_Swift_SANITIZER_FLAGS}>)
-  endif()
-endfunction()
-
 function(swift_get_host_triple out_var)
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
@@ -137,6 +106,12 @@ function(_add_host_variant_c_compile_link_flags name)
     if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
       target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+    elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "EMSCRIPTEN") # emcc options
+      # some older emcc don't understand -target=<triple>
+      # FIXME: remove this when we no longer support Emscripten < 3.1.44
+      # https://github.com/emscripten-core/emscripten/pull/19840
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target=${SWIFT_HOST_TRIPLE}>)
     else()
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
       target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
@@ -145,8 +120,6 @@ function(_add_host_variant_c_compile_link_flags name)
 
   if (CMAKE_Swift_COMPILER)
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
-
-   _add_host_variant_swift_sanitizer_flags(${name})
   endif()
 
   set(_sysroot
@@ -178,6 +151,12 @@ function(_add_host_variant_c_compile_link_flags name)
   if (_lto_flag_out)
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${_lto_flag_out}>)
     target_link_options(${name} PRIVATE ${_lto_flag_out})
+  endif()
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+     set(_cov_flags $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
+     target_compile_options(${name} PRIVATE ${_cov_flags})
+     target_link_options(${name} PRIVATE ${_cov_flags})
   endif()
 endfunction()
 
@@ -221,7 +200,7 @@ function(_add_host_variant_c_compile_flags target)
       if(_lto_flag_out)
         target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-gline-tables-only>)
       else()
-        target_compile_options(${target} PRIVATE -g)
+        target_compile_options(${target} PRIVATE ${SWIFT_DEBUGINFO_NON_LTO_ARGS})
       endif()
     else()
       target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-g0>)
@@ -322,11 +301,6 @@ function(_add_host_variant_c_compile_flags target)
   target_compile_definitions(${target} PRIVATE
     "SWIFT_THREADING_${_threading_package}")
 
-  if(SWIFT_ANALYZE_CODE_COVERAGE)
-    target_compile_options(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
-  endif()
-
   if((SWIFT_HOST_VARIANT_ARCH STREQUAL "armv7" OR
       SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64") AND
      (SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" OR
@@ -350,6 +324,9 @@ function(_add_host_variant_c_compile_flags target)
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_LARGEFILE_SOURCE _FILE_OFFSET_BITS=64>)
   endif()
+
+  target_compile_definitions(${target} PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>,$<BOOL:${SWIFT_ENABLE_SWIFT_IN_SWIFT}>>:SWIFT_ENABLE_SWIFT_IN_SWIFT>)
 endfunction()
 
 function(_add_host_variant_link_flags target)
@@ -440,6 +417,18 @@ function(_add_host_variant_link_flags target)
         "SHELL:-Xlinker -dead_strip")
     endif()
   endif()
+
+  if(SWIFT_LINKER_SUPPORTS_NO_WARN_DUPLICATE_LIBRARIES)
+    target_link_options(${target} PRIVATE
+      "SHELL:-Xlinker -no_warn_duplicate_libraries")
+  endif()
+
+  # Enable build IDs
+  if(SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_USE_BUILD_ID)
+    target_link_options(${target} PRIVATE
+      "SHELL:-Xlinker --build-id=sha1")
+  endif()
+
 endfunction()
 
 function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
@@ -459,6 +448,21 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
 
     set(sdk_dir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift")
+
+    # Note we only check this for bootstrapping, since you ought to
+    # be able to build using hosttools with the stdlib disabled.
+    if(ASRLF_BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*" AND SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+      # HostCompatibilityLibs is defined as an interface library that
+      # does not generate any concrete build target
+      # (https://cmake.org/cmake/help/latest/command/add_library.html#interface-libraries)
+      # In order to specify a dependency to it using `add_dependencies`
+      # we need to manually "expand" its underlying targets
+      get_property(compatibility_libs
+        TARGET HostCompatibilityLibs
+        PROPERTY INTERFACE_LINK_LIBRARIES)
+      set(compatibility_libs_path
+        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
+    endif()
 
     # If we found a swift compiler and are going to use swift code in swift
     # host side tools but link with clang, add the appropriate -L paths so we
@@ -497,9 +501,14 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       # Add the SDK directory for the host platform.
       target_link_directories(${target} PRIVATE "${sdk_dir}")
 
-      # A backup in case the toolchain doesn't have one of the compatibility libraries.
-      target_link_directories(${target} PRIVATE
-        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      if(compatibility_libs_path)
+        # A backup in case the toolchain doesn't have one of the compatibility libraries.
+        # We are using on purpose `add_dependencies` instead of `target_link_libraries`,
+        # since we want to ensure the linker is pulling the matching archives
+        # only if needed
+        target_link_directories(${target} PRIVATE "${compatibility_libs_path}")
+        add_dependencies(${target} ${compatibility_libs})
+      endif()
 
       # Include the abi stable system stdlib in our rpath.
       set(swift_runtime_rpath "/usr/lib/swift")
@@ -510,9 +519,14 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       get_bootstrapping_swift_lib_dir(bs_lib_dir "${bootstrapping}")
       target_link_directories(${target} PRIVATE ${bs_lib_dir})
 
-      # Required to pick up the built libswiftCompatibility<n>.a libraries
-      target_link_directories(${target} PRIVATE
-        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      if(compatibility_libs_path)
+        # Required to pick up the built libswiftCompatibility<n>.a libraries
+        # We are using on purpose `add_dependencies` instead of `target_link_libraries`,
+        # since we want to ensure the linker is pulling the matching archives
+        # only if needed
+        target_link_directories(${target} PRIVATE "${compatibility_libs_path}")
+        add_dependencies(${target} ${compatibility_libs})
+      endif()
 
       # At runtime link against the built swift libraries from the current
       # bootstrapping stage.
@@ -521,36 +535,34 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
 
-    # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
-    # to the linker command line.
-    set(swift_ast_path_flags " -Wl")
-    get_property(modules GLOBAL PROPERTY swift_compiler_modules)
-    foreach(module ${modules})
-      get_target_property(module_file "SwiftModule${module}" "module_file")
-      string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
-    endforeach()
-
-    set_property(TARGET ${target} APPEND_STRING PROPERTY
-                 LINK_FLAGS ${swift_ast_path_flags})
-
     # Workaround for a linker crash related to autolinking: rdar://77839981
     set_property(TARGET ${target} APPEND_STRING PROPERTY
                  LINK_FLAGS " -lobjc ")
 
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD|WINDOWS")
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASRLF_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and run time, link against the swift libraries in the
-      # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-      set(swiftrt "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}/swiftrt.o")
+      if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+        # At build time and run time, link against the swift libraries in the
+        # installed host toolchain.
+        if(SWIFT_PATH_TO_SWIFT_SDK)
+          set(swift_dir "${SWIFT_PATH_TO_SWIFT_SDK}/usr")
+        else()
+          get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+          get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+        endif()
+        set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      else()
+        set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      endif()
+      set(host_lib_arch_dir "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}")
 
+      set(swiftrt "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
+      target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
 
       # At runtime, use swiftCore in the current toolchain.
       # For building stdlib, LD_LIBRARY_PATH will be set to builder's stdlib
@@ -605,6 +617,14 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           set(swift_runtime_rpath "${host_lib_dir}")
         endif()
       endif()
+    endif()
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_ALLOW_LINKING_SWIFT_CONTENT_IN_DARWIN_TOOLCHAIN)
+      get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+      target_link_directories(${target} BEFORE PUBLIC ${TOOLCHAIN_LIB_DIR})
+    endif()
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND SWIFT_USE_LINKER STREQUAL "lld")
+      target_link_options(${target} PRIVATE "SHELL:-Xlinker -z -Xlinker nostart-stop-gc")
     endif()
   endif()
 
@@ -675,24 +695,6 @@ function(add_swift_host_library name)
   # As a workaround, include `demangle` component whenever `support` is mentioned.
   if("support" IN_LIST ASHL_LLVM_LINK_COMPONENTS)
     list(APPEND ASHL_LLVM_LINK_COMPONENTS "demangle")
-  endif()
-
-  if(XCODE)
-    get_filename_component(base_dir ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-  
-    file(GLOB_RECURSE ASHL_HEADERS
-      ${SWIFT_SOURCE_DIR}/include/swift/${base_dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift/${base_dir}/*.def
-      ${CMAKE_CURRENT_SOURCE_DIR}/*.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
-    file(GLOB_RECURSE ASHL_TDS
-      ${SWIFT_SOURCE_DIR}/include/swift${base_dir}/*.td)
-
-    set_source_files_properties(${ASHL_HEADERS} ${ASHL_TDS} PROPERTIES
-      HEADER_FILE_ONLY true)
-    source_group("TableGen descriptions" FILES ${ASHL_TDS})
-
-    set(ASHL_SOURCES ${ASHL_SOURCES} ${ASHL_HEADERS} ${ASHL_TDS})
   endif()
 
   if(ASHL_SHARED)
@@ -966,6 +968,11 @@ function(add_swift_host_tool executable)
     endif()
   endif()
 
+  # Opt-out of OpenBSD BTCFI if instructed where it is enforced by default.
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "OPENBSD" AND SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64" AND NOT SWIFT_OPENBSD_BTCFI)
+    target_link_options(${executable} PRIVATE "LINKER:-z,nobtcfi")
+  endif()
+
   if(SWIFT_BUILD_SWIFT_SYNTAX)
     set(extra_relative_rpath "")
     if(NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "")
@@ -978,12 +985,12 @@ function(add_swift_host_tool executable)
       set_property(
         TARGET ${executable}
         APPEND PROPERTY INSTALL_RPATH
-          "@executable_path/../${extra_relative_rpath}lib/swift/host")
+          "@executable_path/../${extra_relative_rpath}lib/swift/host/compiler")
     else()
       set_property(
         TARGET ${executable}
         APPEND PROPERTY INSTALL_RPATH
-          "$ORIGIN/../${extra_relative_rpath}lib/swift/host")
+          "$ORIGIN/../${extra_relative_rpath}lib/swift/host/compiler")
     endif()
   endif()
 

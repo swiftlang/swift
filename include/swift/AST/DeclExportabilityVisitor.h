@@ -33,6 +33,11 @@ public:
   DeclExportabilityVisitor(){};
 
   bool visit(const Decl *D) {
+    // Declarations nested in fragile functions are exported.
+    if (D->getDeclContext()->getFragileFunctionKind().kind !=
+        FragileFunctionKind::None)
+      return true;
+
     if (auto value = dyn_cast<ValueDecl>(D)) {
       // A decl is exportable if it has a public access level.
       auto accessScope =
@@ -127,7 +132,7 @@ public:
 #define DEFAULT_TO_ACCESS_LEVEL(KIND)                                          \
   bool visit##KIND##Decl(const KIND##Decl *D) {                                \
     static_assert(std::is_convertible<KIND##Decl *, ValueDecl *>::value,       \
-                  "##KIND##Decl must be a ValueDecl");                         \
+                  #KIND "Decl must be a ValueDecl");                           \
     return false;                                                              \
   }
   DEFAULT_TO_ACCESS_LEVEL(NominalType);
@@ -145,16 +150,12 @@ public:
   // exportability queries.
 #define UNREACHABLE(KIND)                                                      \
   bool visit##KIND##Decl(const KIND##Decl *D) {                                \
-    llvm_unreachable("unexpected decl kind");                                  \
+    llvm_unreachable("unexpected " #KIND "Decl");                              \
     return true;                                                               \
   }
   UNREACHABLE(Module);
-  UNREACHABLE(TopLevelCode);
-  UNREACHABLE(Import);
-  UNREACHABLE(PoundDiagnostic);
   UNREACHABLE(Missing);
   UNREACHABLE(MissingMember);
-  UNREACHABLE(MacroExpansion);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
 
@@ -168,13 +169,31 @@ public:
   // context has already been checked.
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
-  UNINTERESTING(IfConfig);
+  UNINTERESTING(TopLevelCode);
+  UNINTERESTING(Import);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
+  UNINTERESTING(MacroExpansion);
 
 #undef UNINTERESTING
 };
+
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
+/// FIXME: This is legacy that should be subsumed by `DeclExportabilityVisitor`
+bool isExported(const Decl *D);
+
+/// A specialization of `isExported` for `ValueDecl`.
+bool isExported(const ValueDecl *VD);
+
+/// A specialization of `isExported` for `ExtensionDecl`.
+bool isExported(const ExtensionDecl *ED);
+
+/// Returns true if the extension declares any protocol conformances that
+/// require the extension to be exported.
+bool hasConformancesToPublicProtocols(const ExtensionDecl *ED);
+
 } // end namespace swift
 
 #endif

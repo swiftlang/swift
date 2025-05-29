@@ -20,12 +20,12 @@ func test3(arg: Int?) {
   switch arg {
   case let .some(x) where x == 0:
     print(x)
-  case let .some(xRenamed) where xRenamed == 1,
-       let .some(xRenamed) where xRenamed == 2:
-    print(xRenamed)
+  case let .some(<base>x</base>) where <base>x</base> == 1,
+       let .some(<base>x</base>) where <base>x</base> == 2:
+    print(<base>x</base>)
     fallthrough
-  case let .some(xRenamed) where xRenamed == 3:
-    print(xRenamed)
+  case let .some(<base>x</base>) where <base>x</base> == 3:
+    print(<base>x</base>)
   default:
     break
   }

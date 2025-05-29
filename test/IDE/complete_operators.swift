@@ -1,5 +1,8 @@
 // RUN: %batch-code-completion
 
+// temporarily disabled for build stability (rdar://124942971)
+// UNSUPPORTED: OS=linux-gnu
+
 struct S {}
 postfix operator ++ {}
 postfix func ++(x: inout S) -> S { return x }
@@ -209,8 +212,8 @@ func testInfix15<T: P where T.T == S2>() {
 // INFIX_15-DAG: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(:)
 // INFIX_15-DAG: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
 // INFIX_15-DAG: Keyword/CurrNominal:                .Type[#T.Type#]; name=Type
-// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#(any Any.Type)?#}[#Bool#];
-// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#(any Any.Type)?#}[#Bool#];
+// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
+// INFIX_15-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#(any (~Copyable & ~Escapable).Type)?#}[#Bool#];
 
 func testInfix16<T: P where T.T == S2>() {
   T.foo#^INFIX_16^#

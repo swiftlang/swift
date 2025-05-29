@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/PersistentParserState.h"
 
@@ -28,8 +29,7 @@ PersistentParserState::~PersistentParserState() { }
 
 void PersistentParserState::setIDEInspectionDelayedDeclState(
     SourceManager &SM, unsigned BufferID, IDEInspectionDelayedDeclKind Kind,
-    unsigned Flags, DeclContext *ParentContext, SourceRange BodyRange,
-    SourceLoc PreviousLoc) {
+    DeclContext *ParentContext, SourceRange BodyRange, SourceLoc PreviousLoc) {
   assert(!IDEInspectionDelayedDeclStat.get() &&
          "only one decl can be delayed for code completion");
   unsigned startOffset = SM.getLocOffsetInBuffer(BodyRange.Start, BufferID);
@@ -39,12 +39,12 @@ void PersistentParserState::setIDEInspectionDelayedDeclState(
     prevOffset = SM.getLocOffsetInBuffer(PreviousLoc, BufferID);
 
   IDEInspectionDelayedDeclStat.reset(new IDEInspectionDelayedDeclState(
-      Kind, Flags, ParentContext, startOffset, endOffset, prevOffset));
+      Kind, ParentContext, startOffset, endOffset, prevOffset));
 }
 
 void PersistentParserState::restoreIDEInspectionDelayedDeclState(
     const IDEInspectionDelayedDeclState &other) {
   IDEInspectionDelayedDeclStat.reset(new IDEInspectionDelayedDeclState(
-      other.Kind, other.Flags, other.ParentContext,
-      other.StartOffset, other.EndOffset, other.PrevOffset));
+      other.Kind, other.ParentContext, other.StartOffset, other.EndOffset,
+      other.PrevOffset));
 }

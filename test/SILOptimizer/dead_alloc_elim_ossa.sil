@@ -28,6 +28,11 @@ class ArrayStorage {
   init()
 }
 
+class Kl2 {
+  @_hasStorage var i: Int64
+}
+
+
 protocol P { }
 struct X : P { }
 
@@ -63,6 +68,19 @@ bb0(%0 : @owned $NontrivialDestructor):
   dealloc_ref %0 : $NontrivialDestructor
   %7 = tuple()
   return %7 : $()
+}
+
+sil [ossa] @$s4main3Kl2CfD : $@convention(method) (@owned Kl2) -> () {
+bb0(%0 : @owned $Kl2):
+  %1 = begin_borrow %0
+  %2 = unchecked_ref_cast %1 to $Builtin.NativeObject
+  %3 = unchecked_ownership_conversion %2, @guaranteed to @owned
+  end_borrow %1
+  end_lifetime %0
+  %6 = unchecked_ref_cast %3 to $Kl2
+  dealloc_ref %6
+  %8 = tuple ()
+  return %8
 }
 
 sil @ptr_user : $@convention(thin) (Builtin.NativeObject) -> ()
@@ -539,5 +557,25 @@ bb0(%0 : @owned $_ContiguousArrayStorage<Element>):
   dealloc_ref %0 : $_ContiguousArrayStorage<Element>
   %15 = tuple ()
   return %15 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_alloc_with_complex_ossa_destructor
+// CHECK-NOT:     alloc_ref
+// CHECK:       } // end sil function 'dead_alloc_with_complex_ossa_destructor'
+sil [ossa] @dead_alloc_with_complex_ossa_destructor : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = alloc_ref $Kl2
+  %1 = move_value [lexical] %0
+  %2 = end_init_let_ref %1
+  %3 = begin_borrow %2
+  %4 = integer_literal $Builtin.Int64, 27
+  %5 = struct $Int64 (%4)
+  %6 = ref_element_addr %3, #Kl2.i
+  store %5 to [trivial] %6
+  end_borrow %3
+  %9 = move_value [lexical] [var_decl] %2
+  debug_value %9, let, name "k"
+  destroy_value %9
+  return %5
 }
 

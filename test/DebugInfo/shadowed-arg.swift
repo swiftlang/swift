@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -parse-as-library -emit-ir -g -o - \
 // RUN:   -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend %s -parse-as-library -emit-sil \
-// RUN:   -Xllvm -sil-print-debuginfo -o - \
+// RUN: %target-swift-frontend %s -parse-as-library -Xllvm -sil-print-types -emit-sil \
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -o - \
 // RUN:   -module-name main | %FileCheck %s --check-prefix=SIL
 
 // The variable i and the argument i must be in different scopes or the debugger

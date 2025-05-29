@@ -1,10 +1,10 @@
-// RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 -verify
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx50.3 -verify
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx50.3 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
-@available(macOS 10.50, *)
+@available(macOS 50.3, *)
 public struct TopLevelStruct<T> {
   @usableFromInline var t: T
 
@@ -13,7 +13,7 @@ public struct TopLevelStruct<T> {
   // CHECK: bb0([[SELF_OUT:%.*]] : $*TopLevelStruct<T>, [[T_ARG:%.*]] : $*T, [[METATYPE_ARG:%.*]] : $@thin TopLevelStruct<T>.Type):
   // CHECK:   [[SELF:%.*]] = alloc_box $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>, var, name "self"
   // CHECK:   [[MARKED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>
-  // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [lexical] [[MARKED_SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>
+  // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>
   // CHECK:   [[BOX:%.*]] = project_box [[BORROWED_SELF]] : $<τ_0_0> { var TopLevelStruct<τ_0_0> } <T>, 0
   // CHECK:   [[T_STACK:%.*]] = alloc_stack $T
   // CHECK:   copy_addr [[T_ARG]] to [init] [[T_STACK]] : $*T
@@ -30,10 +30,10 @@ public struct TopLevelStruct<T> {
   // CHECK:   return [[RESULT]] : $()
 
   // -- Back deployment thunk for TopLevelStruct.init(_:)
-  // CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfCTwb : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
+  // CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfCTwb : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
   // CHECK: bb0([[SELF_OUT:%.*]] : $*TopLevelStruct<T>, [[T_ARG:%.*]] : $*T, [[METATYPE_ARG:%.*]] : $@thin TopLevelStruct<T>.Type):
-  // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
-  // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 52
+  // CHECK:   [[MAJOR:%.*]] = integer_literal $Builtin.Word, 52
+  // CHECK:   [[MINOR:%.*]] = integer_literal $Builtin.Word, 1
   // CHECK:   [[PATCH:%.*]] = integer_literal $Builtin.Word, 0
   // CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
   // CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -54,9 +54,9 @@ public struct TopLevelStruct<T> {
   // CHECK:   return [[RESULT]] : $()
 
   // -- Original definition of TopLevelStruct.init(_:)
-  // CHECK-LABEL: sil [available 10.52] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfC : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
-  @available(macOS 10.51, *)
-  @backDeployed(before: macOS 10.52)
+  // CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy14TopLevelStructVyACyxGxcfC : $@convention(method) <T> (@in T, @thin TopLevelStruct<T>.Type) -> @out TopLevelStruct<T>
+  @available(macOS 51.0, *)
+  @backDeployed(before: macOS 52.1)
   public init(_ t: T) {
     self.t = t
   }
@@ -64,9 +64,9 @@ public struct TopLevelStruct<T> {
 
 struct S {}
 
-// CHECK-LABEL: sil hidden [available 10.51] [ossa] @$s11back_deploy6calleryyAA1SVF : $@convention(thin) (S) -> ()
+// CHECK-LABEL: sil hidden [available 51.0] [ossa] @$s11back_deploy6calleryyAA1SVF : $@convention(thin) (S) -> ()
 // CHECK: bb0([[STRUCT_ARG:%.*]] : $S):
-@available(macOS 10.51, *)
+@available(macOS 51.0, *)
 func caller(_ s: S) {
   // -- Verify the thunk is called
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructVyACyxGxcfCTwb : $@convention(method) <τ_0_0> (@in τ_0_0, @thin TopLevelStruct<τ_0_0>.Type) -> @out TopLevelStruct<τ_0_0>

@@ -1,11 +1,12 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
-// RUN: %target-run-simple-swift(-Osize -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Extern -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Extern -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Osize -enable-experimental-feature Extern -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
 @main
 struct Main {
@@ -21,13 +22,14 @@ extension StaticString {
     }
 }
 
-@_silgen_name("putchar")
-func putchar(_: UInt8)
+@_extern(c, "putchar")
+@discardableResult
+func putchar(_: CInt) -> CInt
 
 extension Array<UInt8> {
     func print() {
         for byte in self {
-            putchar(byte)
+            putchar(CInt(byte))
         }
         putchar(10)
     }

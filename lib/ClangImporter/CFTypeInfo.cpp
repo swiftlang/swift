@@ -102,7 +102,7 @@ StringRef importer::getCFTypeName(
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
     if (pointee.isRecord() || pointee.isTypedef())
-      if (name.endswith(SWIFT_CFTYPE_SUFFIX))
+      if (name.ends_with(SWIFT_CFTYPE_SUFFIX))
         return name.drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
 
     return name;

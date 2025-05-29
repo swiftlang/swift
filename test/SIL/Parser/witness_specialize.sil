@@ -20,8 +20,8 @@ struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {
 
 // CHECK-LABEL: sil_witness_table <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module
 // CHECK: associated_type AssocType: GenericAssocType<DD>
-// CHECK: associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module
+// CHECK: associated_conformance (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module
 sil_witness_table <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module witness_specialize {
   associated_type AssocType: GenericAssocType<DD>
-  associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_specialize)
+  associated_conformance (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_specialize)
 }

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature NoImplicitCopy
 
+// REQUIRES: swift_feature_NoImplicitCopy
+
 class Klass {
     var k: Klass? = nil
 }

@@ -22,7 +22,7 @@ namespace refactoring {
 StringRef correctNameInternal(ASTContext &Ctx, StringRef Name,
                               ArrayRef<ValueDecl *> AllVisibles);
 
-StringRef correctNewDeclName(DeclContext *DC, StringRef Name);
+StringRef correctNewDeclName(SourceLoc Loc, DeclContext *DC, StringRef Name);
 
 /// If \p NTD is a protocol, return all the protocols it inherits from. If it's
 /// a type, return all the protocols it conforms to.

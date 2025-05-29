@@ -329,3 +329,23 @@ func fn63834_3() -> String {} // expected-note {{found candidate with type 'Stri
 func fn63834_3() -> Double {} // expected-note {{found candidate with type 'Double'}}
 
 fn63834_3() as Int // expected-error {{no exact matches in call to global function 'fn63834_3'}}
+
+// Make sure that Copyable and/or Escapable don't change overloading behavior
+do {
+  struct S {
+    var v: Int
+  }
+
+  func test(data: [S]) {
+    let transformed = data.flatMap { e in
+      if true {
+        return Array<S>()
+      }
+      return Array(arrayLiteral: e)
+    }
+
+    _ = transformed.map {
+      _ = $0.v // Ok
+    }
+  }
+}

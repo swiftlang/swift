@@ -1,0 +1,159 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -semantic-arc-opts -destroy-hoisting | %FileCheck %s
+
+import Swift
+
+class Klass {
+  init()
+}
+
+struct NonTrivial {
+  @_hasStorage let k: Klass { get }
+  init(k: Klass)
+}
+
+sil @foo : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+
+// test1 is the reduction from rdar://146142041. test2 and test3 are mutations of test1 and may not be created from swift code in practice
+// CHECK-LABEL: sil [ossa] @test1 :
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK: [[COPY:%.*]] = copy_value [[PA]] 
+// CHECK-LABEL: } // end sil function 'test1'
+sil [ossa] @test1 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb2, bb1
+
+bb1:
+  %1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb7(%1)
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = alloc_box ${ var Optional<NonTrivial> }
+  %5 = begin_borrow [lexical] %4
+  %6 = project_box %5, 0
+  inject_enum_addr %6, #Optional.none!enumelt
+  cond_br undef, bb4, bb5
+
+bb4:
+  unreachable
+
+bb5:
+  br bb6
+
+bb6:
+  %11 = function_ref @foo : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+  %12 = partial_apply [callee_guaranteed] %11(%6) : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+  %13 = copy_value %12
+  %14 = convert_escape_to_noescape %13 to $@noescape @callee_guaranteed () -> ()
+  %15 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %13
+  end_borrow %5
+  destroy_value %12
+  destroy_value %4
+  destroy_value %14
+  br bb7(%15)
+
+bb7(%21 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %21
+  br bb8
+
+bb8:
+  %24 = tuple ()
+  return %24
+}
+
+// CHECK-LABEL: sil [ossa] @test2 :
+// CHECK: [[PA:%.*]] = partial_apply
+// CHECK: [[COPY:%.*]] = copy_value [[PA]] 
+// CHECK-LABEL: } // end sil function 'test2'
+sil [ossa] @test2 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb2, bb1
+
+bb1:
+  %1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb7(%1)
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = alloc_box ${ var Optional<NonTrivial> }
+  %5 = begin_borrow [lexical] %4
+  %6 = project_box %5, 0
+  inject_enum_addr %6, #Optional.none!enumelt
+  cond_br undef, bb4, bb5
+
+bb4:
+  unreachable
+
+bb5:
+  br bb6
+
+bb6:
+  %11 = function_ref @foo : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+  %12 = partial_apply [callee_guaranteed] %11(%6) : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+  %13 = copy_value %12
+  destroy_value %12
+  %14 = convert_escape_to_noescape %13 to $@noescape @callee_guaranteed () -> ()
+  %15 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %13
+  end_borrow %5
+  destroy_value %4
+  destroy_value %14
+  br bb7(%15)
+
+bb7(%21 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %21
+  br bb8
+
+bb8:
+  %24 = tuple ()
+  return %24
+}
+
+// Ensure no ownership verification error 
+sil [ossa] @test3 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb2, bb1
+
+bb1:
+  %1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb7(%1)
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = alloc_box ${ var Optional<NonTrivial> }
+  %5 = begin_borrow [lexical] %4
+  %6 = project_box %5, 0
+  inject_enum_addr %6, #Optional.none!enumelt
+  cond_br undef, bb4, bb5
+
+bb4:
+  unreachable
+
+bb5:
+  br bb6
+
+bb6:
+  %11 = function_ref @foo : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+  %12 = partial_apply [callee_guaranteed] %11(%6) : $@convention(thin) (@inout_aliasable Optional<NonTrivial>) -> ()
+  %13 = copy_value %12
+  %14 = convert_escape_to_noescape %13 to $@noescape @callee_guaranteed () -> ()
+  %15 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %13
+  end_borrow %5
+  destroy_value %4
+  destroy_value %12
+  destroy_value %14
+  br bb7(%15)
+
+bb7(%21 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %21
+  br bb8
+
+bb8:
+  %24 = tuple ()
+  return %24
+}

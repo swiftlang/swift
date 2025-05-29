@@ -67,7 +67,7 @@
 // CHECK-SAME:    $s4main5ValueVwet
 // CHECK-SAME:    $s4main5ValueVwst
 // CHECK-SAME:    [[INT]] {{[0-9]+}},
-// CHECK-SAMEL    [[INT]] {{[0-9]+}},
+// CHECK-SAME:    [[INT]] {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}},
 // CHECK-SAME:    i32 {{[0-9]+}}
 // CHECK-SAME: },

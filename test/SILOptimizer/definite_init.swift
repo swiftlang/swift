@@ -76,3 +76,15 @@ class AgainCheckCompilerInitAttr {
     whenever = 0
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
+
+class Super {
+  init(_ i: Int) {}
+}
+
+class Sub : Super {
+  init() {
+    super.init(try! get())
+  }
+}
+
+func get() throws -> Int { 0 }

@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s
+// RUN: %target-sil-opt -update-borrowed-from -enable-sil-verify-all %s
+
 import Swift
 import Builtin
 
@@ -332,4 +333,29 @@ bb3(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
   destroy_value %0 : $Wrapper1
   %9999 = tuple()
   return %9999 : $()
+}
+
+sil hidden [ossa] @borrowed_from_reborrow : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = load_borrow %0
+  %2 = begin_borrow [lexical] %1
+  br bb1(%1, %2)
+
+bb1(%4 : @reborrow $Klass, %5 : @reborrow $Klass):
+  %6 = borrowed %5 from (%4)
+  %7 = borrowed %4 from ()
+  br bb2(%7, %6)
+
+bb2(%9 : @reborrow $Klass, %10 : @reborrow $Klass):
+  %11 = borrowed %10 from (%9)
+  %12 = borrowed %9 from ()
+  br bb3(%12, %11)
+
+bb3(%14 : @reborrow $Klass, %15 : @reborrow $Klass):
+  %16 = borrowed %15 from (%14)
+  %17 = borrowed %14 from ()
+  end_borrow %16
+  end_borrow %17
+  %20 = tuple ()
+  return %20
 }

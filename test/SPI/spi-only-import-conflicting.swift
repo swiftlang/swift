@@ -60,6 +60,7 @@ import Lib // expected-error {{'Lib' inconsistently imported for SPI only}}
 // expected-warning @-1 {{'Lib' inconsistently imported as implementation-only}}
 @_implementationOnly import Lib // expected-error {{'Lib' inconsistently imported for SPI only}}
 // expected-note @-1 {{imported as implementation-only here}}
+// expected-warning @-2 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 /// Many confliciting imports lead to many diagnostics.
 //--- SPIOnly_IOI_Exported_Default.swift
@@ -67,6 +68,7 @@ import Lib // expected-error {{'Lib' inconsistently imported for SPI only}}
 // expected-warning @-1 {{'Lib' inconsistently imported as implementation-only}}
 @_implementationOnly import Lib // expected-error {{'Lib' inconsistently imported for SPI only}}
 // expected-note @-1 3 {{imported as implementation-only here}}
+// expected-warning @-2 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 @_exported import Lib // expected-error {{'Lib' inconsistently imported for SPI only}}
 // expected-warning @-1 {{'Lib' inconsistently imported as implementation-only}}
 import Lib // expected-error {{'Lib' inconsistently imported for SPI only}}
@@ -82,6 +84,7 @@ import Lib
 /// Different IOI in different files of the same module are still rejected.
 //--- IOI_Default_FileA.swift
 @_implementationOnly import Lib // expected-note {{imported as implementation-only here}}
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 //--- IOI_Default_FileB.swift
 import Lib // expected-warning {{'Lib' inconsistently imported as implementation-only}}

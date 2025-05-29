@@ -23,6 +23,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
@@ -75,7 +76,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
     auto fromParam = fromParameters[index];
     auto toParam = toParameters[index];
     // To convert guaranteed argument to be owned, create a copy.
-    if (fromParam.isConsumed() && !toParam.isConsumed()) {
+    if (fromParam.isConsumedInCaller() && !toParam.isConsumedInCallee()) {
       // If the argument has an object type, create a `copy_value`.
       if (arg->getType().isObject()) {
         auto argCopy = builder.emitCopyValueOperation(loc, arg);
@@ -91,7 +92,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
       continue;
     }
     // To convert owned argument to be guaranteed, borrow the argument.
-    if (fromParam.isGuaranteed() && !toParam.isGuaranteed()) {
+    if (fromParam.isGuaranteedInCaller() && !toParam.isGuaranteedInCaller()) {
       auto bbi = builder.emitBeginBorrowOperation(loc, arg);
       forwardedArgs.push_back(bbi);
       valuesToCleanup.push_back(bbi);
@@ -123,7 +124,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(module.getASTContext());
   std::string name = mangler.mangleReabstractionThunkHelper(
       thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
       module.getSwiftModule());
@@ -326,6 +327,41 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   return thunk;
 }
 
+// FIXME: This is pretty rudimentary as of now as there is no proper AST type
+// for coroutine and therefore we cannot e.g. store a coroutine into a tuple or
+// do other things that are allowed with first-class function types. For now we
+// have to unsafely bitcast coroutine to function type and vice versa. This
+// function should be rethought when we will have proper AST coroutine types.
+SILValue reabstractCoroutine(
+    SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
+    SILValue fn, CanSILFunctionType toType,
+    std::function<SubstitutionMap(SubstitutionMap)> remapSubstitutions) {
+  auto &module = *fn->getModule();
+  auto fromType = fn->getType().getAs<SILFunctionType>();
+  auto unsubstFromType = fromType->getUnsubstitutedType(module);
+  auto unsubstToType = toType->getUnsubstitutedType(module);
+
+  LLVM_DEBUG(auto &s = getADDebugStream() << "Converting coroutine\n";
+             s << "  From type: " << fromType << '\n';
+             s << "  To type: " << toType << '\n'; s << '\n');
+  
+  if (fromType != unsubstFromType)
+    fn = builder.createConvertFunction(
+        loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
+        /*withoutActuallyEscaping*/ false);
+
+  fn = builder.createConvertFunction(loc, fn,
+                                     SILType::getPrimitiveObjectType(unsubstToType),
+                                     /*withoutActuallyEscaping*/ false);
+  
+  if (toType != unsubstToType)
+    fn = builder.createConvertFunction(loc, fn,
+                                       SILType::getPrimitiveObjectType(toType),
+                                       /*withoutActuallyEscaping*/ false);
+
+  return fn;
+}
+
 SILValue reabstractFunction(
     SILBuilder &builder, SILOptFunctionBuilder &fb, SILLocation loc,
     SILValue fn, CanSILFunctionType toType,
@@ -379,7 +415,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
                                   /*withoutActuallyEscaping*/ true,
                                   DifferentiationThunkKind::Reabstraction);
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(parentThunk->getASTContext());
   auto fromInterfaceType =
       linearMapType->mapTypeOutOfContext()->getCanonicalType();
 
@@ -419,9 +455,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto zeroSILType = zeroSILParameter.getSILStorageInterfaceType();
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
-    auto *swiftMod = parentThunk->getModule().getSwiftModule();
     auto tangentSpace =
-        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
+        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule());
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector: {
@@ -430,14 +465,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
       builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
         arguments.push_back(buf);
-        if (zeroSILParameter.isGuaranteed()) {
+        if (zeroSILParameter.isGuaranteedInCaller()) {
           valuesToCleanup.push_back(buf);
         }
       } else {
         auto arg = builder.emitLoadValueOperation(loc, buf,
                                                   LoadOwnershipQualifier::Take);
         arguments.push_back(arg);
-        if (zeroSILParameter.isGuaranteed()) {
+        if (zeroSILParameter.isGuaranteedInCaller()) {
           valuesToCleanup.push_back(arg);
         }
       }
@@ -680,7 +715,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = fb.getModule();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
@@ -722,7 +757,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                    ->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(adContext.getASTContext());
   auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
       origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
       kind, actualConfig.parameterIndices, actualConfig.resultIndices,
@@ -730,9 +765,9 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      loc, thunkName, thunkType, IsBare, IsTransparent,
+      caller->getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};

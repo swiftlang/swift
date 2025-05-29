@@ -1,17 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++14 -Xcc -fmodules-cache-path=%t
 // RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++17 -Xcc -fmodules-cache-path=%t
-// RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t -Xcc -D_LIBCPP_DISABLE_AVAILABILITY
-
-// RUN: find %t | %FileCheck %s
+// RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t
 
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++17 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB
-// RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB -Xcc -D_LIBCPP_DISABLE_AVAILABILITY
-// FIXME: remove _LIBCPP_DISABLE_AVAILABILITY above (https://github.com/apple/swift/issues/67841)
+// RUN: %target-swift-frontend %s -c -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -fmodules-cache-path=%t -DADD_CXXSTDLIB
 
-// REQUIRES: OS=macosx || OS=linux-gnu
+// RUN: ls -R %/t | %FileCheck %s
 
 #if canImport(Foundation)
 import Foundation

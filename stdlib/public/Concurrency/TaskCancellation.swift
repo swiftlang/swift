@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // ==== Task Cancellation ------------------------------------------------------
 
@@ -22,7 +21,44 @@ import Swift
 /// and reacting to it in that the cancellation handler is _always_ and
 /// _immediately_ invoked when the task is canceled. For example, even if the
 /// operation is running code that never checks for cancellation, a cancellation
-/// handler still runs and provides a chance to run some cleanup code.
+/// handler still runs and provides a chance to run some cleanup code:
+///
+/// ```
+/// await withTaskCancellationHandler {
+///   var sum = 0
+///   while condition {
+///     sum += 1
+///   }
+///   return sum
+/// } onCancel: {
+///   // This onCancel closure might execute concurrently with the operation.
+///   condition.cancel()
+/// }
+/// ```
+///
+/// ### Execution order and semantics
+/// The `operation` closure is always invoked, even when the
+/// `withTaskCancellationHandler(operation:onCancel:)` method is called from a task
+/// that was already cancelled.
+///
+/// When `withTaskCancellationHandler(operation:onCancel:)` is used in a task that has already been
+/// cancelled, the cancellation handler will be executed
+/// immediately before the `operation` closure gets to execute.
+///
+/// This allows the cancellation handler to set some external "cancelled" flag
+/// that the operation may be *atomically* checking for in order to avoid
+/// performing any actual work once the operation gets to run.
+///
+/// The `operation` closure executes on the calling execution context, and doesn't
+/// suspend or change execution context unless code contained within the closure
+/// does so. In other words, the potential suspension point of the
+/// `withTaskCancellationHandler(operation:onCancel:)` never suspends by itself before
+/// executing the operation.
+///
+/// If cancellation occurs while the operation is running, the cancellation
+/// handler executes *concurrently* with the operation.
+///
+/// ### Cancellation handlers and locks
 ///
 /// Cancellation handlers which acquire locks must take care to avoid deadlock.
 /// The cancellation handler may be invoked while holding internal locks
@@ -30,30 +66,40 @@ import Swift
 /// as resuming a continuation, may acquire these same internal locks.
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
-///
-/// Doesn't check for cancellation, and always executes the passed `operation`.
-///
-/// The `operation` executes on the calling execution context and does not suspend by itself,
-/// unless the code contained within the closure does. If cancellation occurs while the
-/// operation is running, the cancellation `handler` will execute *concurrently* with the `operation`.
-///
-/// ### Already cancelled tasks
-/// When `withTaskCancellationHandler` is used in a `Task` that has already been cancelled,
-/// the `onCancel` cancellation ``handler`` will be executed immediately before operation gets
-/// to execute. This allows the cancellation handler to set some external "cancelled" flag that the
-/// operation may be *atomically* checking for in order to avoid performing any actual work once
-/// the operation gets to run.
-@_unsafeInheritExecutor // the operation runs on the same executor as we start out with
 @available(SwiftStdlib 5.1, *)
-@backDeployed(before: SwiftStdlib 5.8)
+#if !$Embedded
+@backDeployed(before: SwiftStdlib 6.0)
+#endif
 public func withTaskCancellationHandler<T>(
+  operation: () async throws -> T,
+  onCancel handler: @Sendable () -> Void,
+  isolation: isolated (any Actor)? = #isolation
+) async rethrows -> T {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+  let record = _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+
+  return try await operation()
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
+@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("$ss27withTaskCancellationHandler9operation8onCancelxxyYaKXE_yyYbXEtYaKlF")
+public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
   let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -80,8 +126,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
-     withUnsafeCurrentTask { task in
-       task?.isCancelled ?? false
+     unsafe withUnsafeCurrentTask { task in
+       unsafe task?.isCancelled ?? false
      }
   }
 }

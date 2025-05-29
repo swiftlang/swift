@@ -437,16 +437,24 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
 
   Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
 
-  llvm::Optional<SILDebugVariable> getVarInfo() const {
+  /// Returns the debug variable information attached to the instruction.
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getVarInfo();
+      return cast<DebugValueInst>(**this)->getVarInfo(complete);
     case Kind::AllocStack:
-      return cast<AllocStackInst>(**this)->getVarInfo();
+      return cast<AllocStackInst>(**this)->getVarInfo(complete);
     case Kind::AllocBox:
-      return cast<AllocBoxInst>(**this)->getVarInfo();
+      return cast<AllocBoxInst>(**this)->getVarInfo(complete);
     }
     llvm_unreachable("covered switch");
   }
@@ -488,11 +496,11 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getUsesMoveableValueDebugInfo();
+      return cast<DebugValueInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocStack:
-      return cast<AllocStackInst>(**this)->getUsesMoveableValueDebugInfo();
+      return cast<AllocStackInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocBox:
-      return cast<AllocBoxInst>(**this)->getUsesMoveableValueDebugInfo();
+      return cast<AllocBoxInst>(**this)->usesMoveableValueDebugInfo();
     }
   }
 
@@ -529,6 +537,19 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
       varName = decl->getBaseName().userFacingName();
     }
     return varName;
+  }
+
+  std::optional<StringRef> maybeGetName() const {
+    assert(getKind() != Kind::Invalid);
+    if (auto varInfo = getVarInfo()) {
+      return varInfo->Name;
+    }
+
+    if (auto *decl = getDecl()) {
+      return decl->getBaseName().userFacingName();
+    }
+
+    return {};
   }
 
   /// Take in \p inst, a potentially invalid DebugVarCarryingInst, and returns a

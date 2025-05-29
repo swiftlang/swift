@@ -15,26 +15,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/InitializeSwiftModules.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/SIL/SILRemarkStreamer.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/Parse/ParseVersion.h"
+#include "swift/SIL/SILRemarkStreamer.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/Serialization/SerializationOptions.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -59,14 +61,14 @@ enum class OptGroup {
   Lowering
 };
 
-llvm::Optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
+std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   switch (defaultable) {
   case llvm::cl::BOU_TRUE:
     return true;
   case llvm::cl::BOU_FALSE:
     return false;
   case llvm::cl::BOU_UNSET:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
 }
@@ -77,13 +79,34 @@ enum class EnforceExclusivityMode {
   DynamicOnly,
   None,
 };
+
+enum class SILOptStrictConcurrency {
+  None = 0,
+  Complete,
+  Targeted,
+  Minimal,
+};
+
 } // end anonymous namespace
+
+std::optional<StrictConcurrency>
+convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
+  switch (level) {
+  case SILOptStrictConcurrency::None:
+    return {};
+  case SILOptStrictConcurrency::Complete:
+    return StrictConcurrency::Complete;
+  case SILOptStrictConcurrency::Targeted:
+    return StrictConcurrency::Targeted;
+  case SILOptStrictConcurrency::Minimal:
+    return StrictConcurrency::Minimal;
+  }
+}
 
 namespace llvm {
 
 inline raw_ostream &
-operator<<(raw_ostream &os,
-           const llvm::Optional<CopyPropagationOption> option) {
+operator<<(raw_ostream &os, const std::optional<CopyPropagationOption> option) {
   if (option) {
     switch (*option) {
     case CopyPropagationOption::Off:
@@ -104,14 +127,14 @@ operator<<(raw_ostream &os,
 
 namespace cl {
 template <>
-class parser<llvm::Optional<CopyPropagationOption>>
-    : public basic_parser<llvm::Optional<CopyPropagationOption>> {
+class parser<std::optional<CopyPropagationOption>>
+    : public basic_parser<std::optional<CopyPropagationOption>> {
 public:
-  parser(Option &O) : basic_parser<llvm::Optional<CopyPropagationOption>>(O) {}
+  parser(Option &O) : basic_parser<std::optional<CopyPropagationOption>>(O) {}
 
   // parse - Return true on error.
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
-             llvm::Optional<CopyPropagationOption> &Value) {
+             std::optional<CopyPropagationOption> &Value) {
     if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
         Arg == "1") {
       Value = CopyPropagationOption::On;
@@ -142,8 +165,8 @@ public:
 
   // Instantiate the macro PRINT_OPT_DIFF of llvm_project's CommandLine.cpp at
   // Optional<CopyPropagationOption>.
-  void printOptionDiff(const Option &O, llvm::Optional<CopyPropagationOption> V,
-                       OptionValue<llvm::Optional<CopyPropagationOption>> D,
+  void printOptionDiff(const Option &O, std::optional<CopyPropagationOption> V,
+                       OptionValue<std::optional<CopyPropagationOption>> D,
                        size_t GlobalWidth) const {
     size_t MaxOptWidth = 8;
     printOptionName(O, GlobalWidth);
@@ -194,8 +217,13 @@ struct SILOptOptions {
                                         "default"));
 
   llvm::cl::opt<bool>
+  StrictImplicitModuleContext = llvm::cl::opt<bool>("strict-implicit-module-context",
+                              llvm::cl::desc("Enable the strict forwarding of compilation "
+                                             "context to downstream implicit module dependencies"));
+
+  llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
+      "disable-sil-ownership-verifier",
       llvm::cl::desc(
           "Do not verify SIL ownership invariants during SIL verification"));
 
@@ -205,7 +233,10 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   EnableOSSACompleteLifetimes = llvm::cl::opt<bool>("enable-ossa-complete-lifetimes",
-                        llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+                        llvm::cl::desc("Require linear OSSA lifetimes after SILGenCleanup."));
+  llvm::cl::opt<bool>
+  EnableOSSAVerifyComplete = llvm::cl::opt<bool>("enable-ossa-verify-complete",
+                        llvm::cl::desc("Verify linear OSSA lifetimes after SILGenCleanup."));
 
   llvm::cl::opt<bool>
   EnableObjCInterop = llvm::cl::opt<bool>("enable-objc-interop",
@@ -215,25 +246,31 @@ struct SILOptOptions {
   DisableObjCInterop = llvm::cl::opt<bool>("disable-objc-interop",
                      llvm::cl::desc("Disable Objective-C interoperability."));
 
+  llvm::cl::opt<bool>
+  DisableImplicitModules = llvm::cl::opt<bool>("disable-implicit-swift-modules",
+                     llvm::cl::desc("Disable implicit swift modules."));
+
+  llvm::cl::opt<std::string>
+  ExplicitSwiftModuleMapPath = llvm::cl::opt<std::string>(
+    "explicit-swift-module-map-file",
+    llvm::cl::desc("Explict swift module map file path"));
+
   llvm::cl::list<std::string>
   ExperimentalFeatures = llvm::cl::list<std::string>("enable-experimental-feature",
                        llvm::cl::desc("Enable the given experimental feature."));
+
+  llvm::cl::list<std::string> UpcomingFeatures = llvm::cl::list<std::string>(
+      "enable-upcoming-feature",
+      llvm::cl::desc("Enable the given upcoming feature."));
 
   llvm::cl::opt<bool>
   EnableExperimentalConcurrency = llvm::cl::opt<bool>("enable-experimental-concurrency",
                      llvm::cl::desc("Enable experimental concurrency model."));
 
-  llvm::cl::opt<llvm::cl::boolOrDefault>
-  EnableLexicalLifetimes = llvm::cl::opt<llvm::cl::boolOrDefault>(
-      "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
-      llvm::cl::desc("Enable lexical lifetimes. Mutually exclusive with "
-                     "enable-lexical-borrow-scopes and "
-                     "disable-lexical-lifetimes."));
-
-  llvm::cl::opt<llvm::cl::boolOrDefault>
-      EnableLexicalBorrowScopes = llvm::cl::opt<llvm::cl::boolOrDefault>("enable-lexical-borrow-scopes",
-                                llvm::cl::init(llvm::cl::BOU_UNSET),
-                                llvm::cl::desc("Enable lexical borrow scopes."));
+  llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes =
+      llvm::cl::opt<llvm::cl::boolOrDefault>(
+          "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
+          llvm::cl::desc("Enable lexical lifetimes."));
 
   llvm::cl::opt<llvm::cl::boolOrDefault>
   EnableExperimentalMoveOnly = llvm::cl::opt<llvm::cl::boolOrDefault>(
@@ -262,12 +299,19 @@ struct SILOptOptions {
                     llvm::cl::desc("Enables an optimization pass to demote async functions."));
 
   llvm::cl::opt<bool>
+  EnableThrowsPrediction = llvm::cl::opt<bool>("enable-throws-prediction",
+                     llvm::cl::desc("Enables optimization assumption that functions rarely throw errors."));
+
+  llvm::cl::opt<bool>
+  EnableNoReturnCold = llvm::cl::opt<bool>("enable-noreturn-prediction",
+                     llvm::cl::desc("Enables optimization assumption that calls to no-return functions are cold."));
+
+  llvm::cl::opt<bool>
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
-  llvm::cl::opt<bool>
-  EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
+  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
+      "enable-ossa-modules", llvm::cl::init(true),
       llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                      "this is disabled we do not serialize in OSSA "
                      "form when optimizing."));
@@ -358,6 +402,12 @@ struct SILOptOptions {
   VerifyMode = llvm::cl::opt<bool>("verify",
              llvm::cl::desc("verify diagnostics against expected-"
                             "{error|warning|note} annotations"));
+
+  llvm::cl::list<std::string> VerifyAdditionalPrefixes =
+      llvm::cl::list<std::string>(
+          "verify-additional-prefix",
+          llvm::cl::desc("Check for diagnostics with the prefix "
+                         "expected-<PREFIX> as well as expected-"));
 
   llvm::cl::opt<unsigned>
   AssertConfId = llvm::cl::opt<unsigned>("assert-conf-id", llvm::cl::Hidden,
@@ -477,6 +527,21 @@ struct SILOptOptions {
       cl::desc("The format used for serializing remarks (default: YAML)"),
       cl::value_desc("format"), cl::init("yaml"));
 
+  // Strict Concurrency
+  llvm::cl::opt<SILOptStrictConcurrency> StrictConcurrencyLevel =
+      llvm::cl::opt<SILOptStrictConcurrency>(
+          "strict-concurrency", cl::desc("strict concurrency level"),
+          llvm::cl::init(SILOptStrictConcurrency::None),
+          llvm::cl::values(
+              clEnumValN(SILOptStrictConcurrency::Complete, "complete",
+                         "Enable complete strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::Targeted, "targeted",
+                         "Enable targeted strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::Minimal, "minimal",
+                         "Enable minimal strict concurrency"),
+              clEnumValN(SILOptStrictConcurrency::None, "disabled",
+                         "Strict concurrency disabled")));
+
   llvm::cl::opt<bool>
       EnableCxxInterop = llvm::cl::opt<bool>("enable-experimental-cxx-interop",
                        llvm::cl::desc("Enable C++ interop."),
@@ -487,9 +552,9 @@ struct SILOptOptions {
                          llvm::cl::desc("Ignore [always_inline] attribute."),
                          llvm::cl::init(false));
   using CPStateOpt =
-      llvm::cl::opt<llvm::Optional<CopyPropagationOption>,
+      llvm::cl::opt<std::optional<CopyPropagationOption>,
                     /*ExternalStorage*/ false,
-                    llvm::cl::parser<llvm::Optional<CopyPropagationOption>>>;
+                    llvm::cl::parser<std::optional<CopyPropagationOption>>>;
   CPStateOpt
   CopyPropagationState = CPStateOpt(
         "enable-copy-propagation",
@@ -518,6 +583,33 @@ struct SILOptOptions {
                       swift::UnavailableDeclOptimization::Complete, "complete",
                       "Eliminate unavailable decls from lowered SIL/IR")),
               llvm::cl::init(swift::UnavailableDeclOptimization::None));
+
+  llvm::cl::list<std::string> ClangXCC = llvm::cl::list<std::string>(
+      "Xcc",
+      llvm::cl::desc("option to pass to clang"));
+
+  llvm::cl::opt<std::string> SwiftVersionString = llvm::cl::opt<std::string>(
+      "swift-version",
+      llvm::cl::desc(
+          "The swift version to assume AST declarations correspond to"));
+
+  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
+      "enable-address-dependencies",
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
+
+  llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "enable-callee-allocated-coro-abi",
+      llvm::cl::desc("Override per-platform settings and use yield_once_2."),
+      llvm::cl::init(false));
+  llvm::cl::opt<bool> DisableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
+      "disable-callee-allocated-coro-abi",
+      llvm::cl::desc(
+          "Override per-platform settings and don't use yield_once_2."),
+      llvm::cl::init(false));
+
+  llvm::cl::opt<bool> MergeableTraps = llvm::cl::opt<bool>(
+      "mergeable-traps",
+      llvm::cl::desc("Enable cond_fail merging."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -546,15 +638,18 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       Module, SILPassPipelinePlan::getPassPipelineForKinds(opts, options.Passes),
       isMandatory, IRGenMod);
 
-  if (Module->getOptions().VerifyAll)
+  if (Module->getOptions().VerifyAll) {
     Module->verify();
+    SILPassManager pm(Module, isMandatory, IRGenMod);
+    pm.runSwiftModuleVerification();
+  }
 }
 
 namespace {
 using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
 } // end anonymous namespace
 
-static llvm::Optional<ASTVerifierOverrideKind>
+static std::optional<ASTVerifierOverrideKind>
 getASTOverrideKind(const SILOptOptions &options) {
   assert(!(options.EnableASTVerifier && options.DisableASTVerifier) &&
          "Can only set one of EnableASTVerifier/DisableASTVerifier?!");
@@ -564,7 +659,7 @@ getASTOverrideKind(const SILOptOptions &options) {
   if (options.DisableASTVerifier)
     return ASTVerifierOverrideKind::DisableVerifier;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
@@ -585,8 +680,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(options.ImportPaths);
-  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options.ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> FramePaths;
   for (const auto &path : options.FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
@@ -608,10 +707,35 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setRuntimeResourcePath(options.ResourceDir);
   Invocation.getFrontendOptions().EnableLibraryEvolution
     = options.EnableLibraryEvolution;
+  Invocation.getFrontendOptions().StrictImplicitModuleContext
+    = options.StrictImplicitModuleContext;
+
+  Invocation.getFrontendOptions().DisableImplicitModules =
+    options.DisableImplicitModules;
+  Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath =
+    options.ExplicitSwiftModuleMapPath;
+
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = options.ModuleCachePath;
   Invocation.setParseStdlib();
+  if (options.SwiftVersionString.size()) {
+    auto vers = VersionParser::parseVersionString(options.SwiftVersionString,
+                                                  SourceLoc(), nullptr);
+    bool isValid = false;
+    if (vers.has_value()) {
+      if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {
+        Invocation.getLangOptions().EffectiveLanguageVersion =
+            effectiveVers.value();
+        isValid = true;
+      }
+    }
+    if (!isValid) {
+      llvm::errs() << "error: invalid swift version "
+                   << options.SwiftVersionString << '\n';
+      exit(-1);
+    }
+  }
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
@@ -621,24 +745,47 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     options.EnableExperimentalConcurrency;
-  llvm::Optional<bool> enableExperimentalMoveOnly =
+  std::optional<bool> enableExperimentalMoveOnly =
       toOptionalBool(options.EnableExperimentalMoveOnly);
   if (enableExperimentalMoveOnly && *enableExperimentalMoveOnly) {
     // FIXME: drop addition of Feature::MoveOnly once its queries are gone.
-    Invocation.getLangOptions().Features.insert(Feature::MoveOnly);
-    Invocation.getLangOptions().Features.insert(Feature::NoImplicitCopy);
-    Invocation.getLangOptions().Features.insert(
+    Invocation.getLangOptions().enableFeature(Feature::MoveOnly);
+    Invocation.getLangOptions().enableFeature(Feature::NoImplicitCopy);
+    Invocation.getLangOptions().enableFeature(
         Feature::OldOwnershipOperatorSpellings);
   }
+
   Invocation.getLangOptions().BypassResilienceChecks =
       options.BypassResilienceChecks;
-  Invocation.getDiagnosticOptions().PrintDiagnosticNames =
-      options.DebugDiagnosticNames;
+  if (options.DebugDiagnosticNames) {
+    Invocation.getDiagnosticOptions().PrintDiagnosticNames =
+        PrintDiagnosticNamesMode::Identifier;
+  }
+
+  for (auto &featureName : options.UpcomingFeatures) {
+    auto feature = Feature::getUpcomingFeature(featureName);
+    if (!feature) {
+      llvm::errs() << "error: unknown upcoming feature "
+                   << QuotedString(featureName) << "\n";
+      exit(-1);
+    }
+
+    if (auto firstVersion = feature->getLanguageVersion()) {
+      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+        llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
+                     << " is already enabled as of Swift version "
+                     << *firstVersion << '\n';
+        exit(-1);
+      }
+    }
+    Invocation.getLangOptions().enableFeature(*feature);
+  }
+
   for (auto &featureName : options.ExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureName)) {
-      Invocation.getLangOptions().Features.insert(*feature);
+    if (auto feature = Feature::getExperimentalFeature(featureName)) {
+      Invocation.getLangOptions().enableFeature(*feature);
     } else {
-      llvm::errs() << "error: unknown feature "
+      llvm::errs() << "error: unknown experimental feature "
                    << QuotedString(featureName) << "\n";
       exit(-1);
     }
@@ -648,7 +795,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
 
-  Invocation.getLangOptions().Features.insert(Feature::LayoutPrespecialization);
+  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
 
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
@@ -656,20 +803,52 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       createOptRemarkRegex(options.PassRemarksMissed);
 
   if (options.EnableExperimentalStaticAssert)
-    Invocation.getLangOptions().Features.insert(Feature::StaticAssert);
+    Invocation.getLangOptions().enableFeature(Feature::StaticAssert);
 
   if (options.EnableExperimentalDifferentiableProgramming) {
-    Invocation.getLangOptions().Features.insert(
+    Invocation.getLangOptions().enableFeature(
         Feature::DifferentiableProgramming);
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
 
+  // Enable strict concurrency if we have the feature specified or if it was
+  // specified via a command line option to sil-opt.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
+    Invocation.getLangOptions().StrictConcurrencyLevel =
+        StrictConcurrency::Complete;
+  } else if (auto level = convertSILOptToRawStrictConcurrencyLevel(
+                 options.StrictConcurrencyLevel)) {
+    // If strict concurrency was enabled from the cmdline so the feature flag as
+    // well.
+    if (*level == StrictConcurrency::Complete)
+      Invocation.getLangOptions().enableFeature(Feature::StrictConcurrency);
+    Invocation.getLangOptions().StrictConcurrencyLevel = *level;
+  }
+
+  // If we have strict concurrency set as a feature and were told to turn off
+  // region-based isolation... do so now.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
+    Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
+  }
+
   Invocation.getDiagnosticOptions().VerifyMode =
-    options.VerifyMode ? DiagnosticOptions::Verify : DiagnosticOptions::NoVerify;
+      options.VerifyMode ? DiagnosticOptions::Verify
+                         : DiagnosticOptions::NoVerify;
+  for (auto &additionalPrefixes : options.VerifyAdditionalPrefixes) {
+    Invocation.getDiagnosticOptions()
+        .AdditionalDiagnosticVerifierPrefixes.push_back(additionalPrefixes);
+  }
+
+  ClangImporterOptions &clangImporterOptions =
+      Invocation.getClangImporterOptions();
+  for (const auto &xcc : options.ClangXCC) {
+    clangImporterOptions.ExtraArgs.push_back(xcc);
+  }
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
@@ -681,7 +860,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.VerifySILOwnership = !options.DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = options.RemarksFilename;
   SILOpts.OptRecordPasses = options.RemarksPasses;
-  SILOpts.checkSILModuleLeaks = true;
   SILOpts.EnableStackProtection = true;
   SILOpts.EnableMoveInoutStackProtection = options.EnableMoveInoutStackProtection;
 
@@ -716,11 +894,14 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
+  SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
+  SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
-
+  SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
+  SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
   }
@@ -735,37 +916,23 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   if (SILOpts.CopyPropagation == CopyPropagationOption::Off)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
-  llvm::Optional<bool> enableLexicalLifetimes =
+  std::optional<bool> enableLexicalLifetimes =
       toOptionalBool(options.EnableLexicalLifetimes);
-  llvm::Optional<bool> enableLexicalBorrowScopes =
-      toOptionalBool(options.EnableLexicalBorrowScopes);
 
-  // Enable lexical lifetimes if it is set or if experimental move only is
-  // enabled. This is because move only depends on lexical lifetimes being
-  // enabled and it saved some typing ; ).
-  bool specifiedLexicalLifetimesEnabled =
-      enableExperimentalMoveOnly && *enableExperimentalMoveOnly &&
-      enableLexicalLifetimes && *enableLexicalLifetimes;
-  if (specifiedLexicalLifetimesEnabled && enableLexicalBorrowScopes &&
-      !*enableLexicalBorrowScopes) {
-    fprintf(
-        stderr,
-        "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
-        "either -enable-lexical-lifetimes or -enable-experimental-move-only.");
-    exit(-1);
-  }
   if (enableLexicalLifetimes)
     SILOpts.LexicalLifetimes =
         *enableLexicalLifetimes ? LexicalLifetimesOption::On
                                 : LexicalLifetimesOption::DiagnosticMarkersOnly;
-  if (enableLexicalBorrowScopes)
-    SILOpts.LexicalLifetimes =
-        *enableLexicalBorrowScopes
-            ? LexicalLifetimesOption::DiagnosticMarkersOnly
-            : LexicalLifetimesOption::Off;
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
+
+  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.EnableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
+  if (options.DisableCalleeAllocatedCoroAbi)
+    SILOpts.CoroutineAccessorsUseYieldOnce2 = false;
+  SILOpts.MergeableTraps = options.MergeableTraps;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)
@@ -832,7 +999,11 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
     llvm::errs() << InstanceSetupError << '\n';
-    return finishDiagProcessing(1);
+    // Rather than finish Diag processing, exit -1 here to show we failed to
+    // setup here. The reason we do this is if the setup fails, we want to fail
+    // hard. We shouldn't be testing that we setup correctly with
+    // -verify/etc. We should be testing that later.
+    exit(-1);
   }
 
   CI.performSema();
@@ -912,6 +1083,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
+    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

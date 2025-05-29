@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-optimize-block-arguments"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
@@ -368,7 +369,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
 
   VarDecl *field = nullptr;
   SILType newType;
-  llvm::Optional<SILLocation> loc;
+  std::optional<SILLocation> loc;
 
   // First step: collect all phi-arguments which can be transformed.
   unsigned workIdx = 0;
@@ -439,6 +440,13 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
     }
   
     for (DebugValueInst *dvi : debugValueUsers) {
+      // Recreate the debug_value with a fragment.
+      SILBuilder B(dvi, dvi->getDebugScope());
+      SILDebugVariable var = *dvi->getVarInfo();
+      if (!var.Type)
+        var.Type = initialArg->getType();
+      var.DIExpr.append(SILDebugInfoExpression::createFragment(field));
+      B.createDebugValue(dvi->getLoc(), dvi->getOperand(), var);
       dvi->eraseFromParent();
     }
     for (StructExtractInst *sei : structExtractUsers) {

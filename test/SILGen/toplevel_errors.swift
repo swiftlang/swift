@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -enable-experimental-async-top-level %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-async-top-level %s | %FileCheck %s
 
 enum MyError : Error {
   case A, B

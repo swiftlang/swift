@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
-// RUN: %target-swift-emit-silgen -verify -module-name test -I %t -disable-availability-checking -warn-concurrency %s | %FileCheck %s --implicit-check-not=hop_to_executor --enable-var-scope
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -verify -module-name test -I %t -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s | %FileCheck %s --implicit-check-not=hop_to_executor --enable-var-scope
 // REQUIRES: concurrency
 
 import OtherActors

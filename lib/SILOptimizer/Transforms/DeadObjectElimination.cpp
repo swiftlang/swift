@@ -24,6 +24,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -203,6 +204,10 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
         continue;
       }
 
+      if (isa<BeginBorrowInst>(I) || isa<EndBorrowInst>(I) || isa<EndLifetimeInst>(I)) {
+        continue;
+      }
+
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
@@ -309,6 +314,14 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
 
   if (isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst))
     return true;
+
+  // The value form of zero init is not a user of any operand. The address
+  // form however is easily zappable because it's always a trivial store.
+  if (auto bi = dyn_cast<BuiltinInst>(Inst)) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+      return true;
+    }
+  }
 
   // If Inst does not read or write to memory, have side effects, and is not a
   // terminator, we can zap it.
@@ -595,7 +608,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User) ||
+        isa<EndBorrowInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -614,6 +628,20 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       addStore(Store, StoreAddrNode);
 
       AllUsers.insert(User);
+      continue;
+    }
+    if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
+      if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
+      continue;
+    }
+    if (auto *bb = dyn_cast<BeginBorrowInst>(User)) {
+      if (!recursivelyCollectInteriorUses(bb, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
       continue;
     }
     if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
@@ -717,7 +745,8 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   assert(!Stores.empty());
   SILValue StVal = Stores.front()->getSrc();
 
-  SSAUp.initialize(StVal->getType(), StVal->getOwnershipKind());
+  SSAUp.initialize(StVal->getFunction(), StVal->getType(),
+                   StVal->getOwnershipKind());
 
   for (auto *Store : Stores)
     SSAUp.addAvailableValue(Store->getParent(), Store->getSrc());
@@ -755,6 +784,17 @@ class DeadObjectElimination : public SILFunctionTransform {
   DominanceInfo *domInfo = nullptr;
 
   void removeInstructions(ArrayRef<SILInstruction*> toRemove);
+  
+  /// Try to salvage the debug info for a dead instruction removed by
+  /// DeadObjectElimination.
+  ///
+  /// Dead stores will be replaced by a debug value for the object variable,
+  /// using a fragment expression. By walking from the store to the allocation,
+  /// we can know which member of the object is being assigned, and create
+  /// fragments for each member. Other instructions are not salvaged.
+  /// Currently only supports dead stack-allocated objects.
+  void salvageDebugInfo(SILInstruction *toBeRemoved);
+  std::optional<SILDebugVariable> buildDIExpression(SILInstruction *current);
 
   bool processAllocRef(AllocRefInstBase *ARI);
   bool processAllocStack(AllocStackInst *ASI);
@@ -815,6 +855,56 @@ DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
     // Now we know that I should not have any uses... erase it from its parent.
     deleter.forceDelete(I);
   }
+}
+
+void DeadObjectElimination::salvageDebugInfo(SILInstruction *toBeRemoved) {
+  auto *SI = dyn_cast<StoreInst>(toBeRemoved);
+  if (!SI)
+    return;
+
+  auto *parent = SI->getDest()->getDefiningInstruction();
+  auto varInfo = buildDIExpression(parent);
+  if (!varInfo)
+    return;
+
+  // Note: The instruction should logically be in SI's scope.
+  // However, LLVM does not support variables and stores in different scopes,
+  // so we use the variable's scope.
+  SILBuilder Builder(SI, varInfo->Scope);
+  Builder.createDebugValue(SI->getLoc(), SI->getSrc(), *varInfo);
+}
+
+std::optional<SILDebugVariable>
+DeadObjectElimination::buildDIExpression(SILInstruction *current) {
+  if (!current)
+    return {};
+  if (auto dvci = dyn_cast<AllocStackInst>(current)) {
+    auto var = dvci->getVarInfo();
+    if (!var)
+      return {};
+    if (!var->Type)
+      var->Type = dvci->getElementType();
+    return var;
+  }
+  if (auto *tupleAddr = dyn_cast<TupleElementAddrInst>(current)) {
+    auto *definer = tupleAddr->getOperand().getDefiningInstruction();
+    auto path = buildDIExpression(definer);
+    if (!path)
+      return {};
+    path->DIExpr.append(SILDebugInfoExpression::createTupleFragment(
+      tupleAddr->getTupleType(), tupleAddr->getFieldIndex()));
+    return path;
+  }
+  if (auto *structAddr = dyn_cast<StructElementAddrInst>(current)) {
+    auto *definer = structAddr->getOperand().getDefiningInstruction();
+    auto path = buildDIExpression(definer);
+    if (!path)
+      return {};
+    path->DIExpr.append(SILDebugInfoExpression::createFragment(
+      structAddr->getField()));
+    return path;
+  }
+  return {};
 }
 
 bool DeadObjectElimination::processAllocRef(AllocRefInstBase *ARI) {
@@ -916,6 +1006,9 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
+
+  for (auto *I : UsersToRemove)
+    salvageDebugInfo(I);
 
   if (ASI->getFunction()->hasOwnership()) {
     for (auto *user : UsersToRemove) {
@@ -1163,9 +1256,15 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
+  auto *ARI = dyn_cast<AllocRefInst>(AI->getArgument(0));
+
   deleter.forceDeleteWithUsers(AI);
   for (auto *toDelete : instsDeadAfterInitializerRemoved) {
     deleter.trackIfDead(toDelete);
+  }
+
+  if (ARI) {
+    deleter.forceDeleteWithUsers(ARI);
   }
 
   ++DeadAllocApplyEliminated;

@@ -11,6 +11,17 @@ sil_global public @public_global : $Builtin.Word
 sil_global @staticProp : $Int
 sil [transparent] [serialized] @globalinit_func0 : $@convention(thin) () -> ()
 
+// CHECK-LABEL: sil_global {{.*}}@static_global_vector : $Int32 = {
+// CHECK:         %initval = vector (%1 : $Int32, %3 : $Int32)
+// CHECK-NEXT:  }       
+sil_global [serialized] @static_global_vector : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %initval = vector (%1 : $Int32, %3 : $Int32)
+}
+
 // We should not serialize this.
 // CHECK-NOT: sil public_external @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer {
 sil @_TV18lazy_global_access4Type10staticPropySia : $@convention(thin) () -> Builtin.RawPointer {
@@ -36,9 +47,10 @@ bb0:
   %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
   %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@convention(thin) () -> ()
-  // CHECK: {{%.*}} = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $()
-  %6 = global_addr @staticProp : $*Int
+  // CHECK: [[O:%.*]] = builtin "once"({{%.*}} : $Builtin.RawPointer, {{%.*}} : $@convention(thin) () -> ()) : $Builtin.SILToken
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(thin) () -> ()) : $Builtin.SILToken
+  // CHECK: global_addr @staticProp : $*Int depends_on [[O]]
+  %6 = global_addr @staticProp : $*Int depends_on %5
   %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
   return %7 : $Builtin.RawPointer
 }
@@ -106,6 +118,16 @@ bb0(%0 : $Int):                          // CHECK: bb0(%0 : $Int):
   %3 = load %1 : $*Int
   dealloc_stack %1 : $*Int
   return %3 : $Int                       // CHECK: return {{.*}} : $Int
+}
+
+// CHECK-LABEL: sil public_external @vector_base_addr :
+// CHECK:         %1 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-LABEL: } // end sil function 'vector_base_addr'
+sil [serialized] @vector_base_addr : $@convention(thin) (@inout Builtin.FixedArray<10, Int>) -> Int {
+bb0(%0 : $*Builtin.FixedArray<10, Int>):
+  %1 = vector_base_addr %0
+  %2 = load %1
+  return %2
 }
 
 // CHECK-LABEL: @call_fn_pointer : $@convention(thin) (() -> Int) -> Int {
@@ -1035,8 +1057,8 @@ sil [transparent] [serialized] @test_mark_fn_escape : $@convention(thin) () -> (
   %c = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %ca = project_box %c : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
-  //mark_function_escape %ba : $*Int
-  //mark_function_escape %ba : $*Int, %ca : $*Int
+  // mark_function_escape %ba : $*Int
+  // mark_function_escape %ba : $*Int, %ca : $*Int
 
   %28 = tuple ()
   return %28 : $()
@@ -1467,7 +1489,7 @@ bb0(%0 : $ConformingAssoc):
   return %2 : $()
 }
 
-sil [transparent] [serialized] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@inout ConformingAssoc) -> () {
+sil [transparent] [serialized] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method: AssocReqt) (@in_guaranteed ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
   %2 = function_ref @$s14witness_tables15ConformingAssocV14requiredMethodyyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> ()
@@ -1505,7 +1527,7 @@ sil_witness_table [serialized] InheritedConformance: InheritedProtocol1 module w
 
 sil_witness_table [serialized] InheritedConformance: AnyProtocol module witness_tables {
   associated_type AssocType: SomeAssoc
-  associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
+  associated_conformance (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
 
 sil [transparent] [serialized] @$s9def_basic13serialize_allyyF : $@convention(thin) () -> () {
@@ -1516,6 +1538,7 @@ bb0:
   %4 = function_ref @test2 : $@convention(thin) (Int) -> ()
   %6 = function_ref @named_tuple : $@convention(thin) () -> (Builtin.Word, Builtin.Word)
   %9 = function_ref @return_int : $@convention(thin) (Int) -> Int
+  %10 = function_ref @vector_base_addr : $@convention(thin) (@inout Builtin.FixedArray<10, Int>) -> Int
   %11 = function_ref @call_fn_pointer : $@convention(thin) (() -> Int) -> Int
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
@@ -1602,6 +1625,7 @@ bb0:
   %154 = function_ref @test_access : $@convention(thin) (@guaranteed A) -> ()
   %155 = function_ref @test_builtin_access : $@convention(thin) (@guaranteed A) -> ()
 
+  %160 = global_addr @static_global_vector : $*Int32
   %r = tuple ()
   return %r : $()
 }

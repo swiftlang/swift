@@ -1,6 +1,6 @@
 // RUN: %batch-code-completion
 
-// EMTPY: Token
+// EMPTY: Token
 // EMPTY-NOT: Begin completions
 
 //===--- Helper types that are used in this test
@@ -335,8 +335,8 @@ var foo = {
 func testWithMemoryRebound(_ bar: UnsafePointer<UInt64>) {
     _ = bar.withMemoryRebound(to: Int64.self, capacity: 3) { ptr in
         return ptr #^SINGLE_EXPR_CLOSURE_CONTEXT^#
-        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: .deallocate()[#Void#]; name=deallocate()
-        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem:    .pointee[#Int64#]; name=pointee
+        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Convertible]: .deallocate[#() -> ()#]; name=deallocate
+        // SINGLE_EXPR_CLOSURE_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]: .pointee[#Int64#]; name=pointee
     }
 }
 
@@ -385,11 +385,11 @@ func testClosureInPatternBindingInit() {
     case dragging(translation: Int, predictedLocation: Int)
   }
 
-  func pnChanged(_ action: () -> Void) {}
+  func onChanged(_ action: () -> Void) {}
 
   func foo() {
     var gestureViewState: DragState = .dragging(translation: 0, predictedLocation: 0)
-    let longPressDrag = pnChanged {
+    let longPressDrag = onChanged {
       _ = 1
       gestureViewState = .dragging(translation: 0, #^CLOSURE_IN_PATTERN_BINDING^#predictedLocation: 0)
     }

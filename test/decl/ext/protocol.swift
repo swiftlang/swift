@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 // ----------------------------------------------------------------------------
 // Using protocol requirements from inside protocol extensions
@@ -181,11 +181,11 @@ extension S1 {
 // ----------------------------------------------------------------------------
 
 protocol FooProtocol {}
-extension FooProtocol where Self: FooProtocol {} // expected-warning {{redundant conformance constraint 'Self' : 'FooProtocol'}}
+extension FooProtocol where Self: FooProtocol {}
 
 protocol AnotherFooProtocol {}
 protocol BazProtocol {}
-extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {} // expected-warning {{redundant conformance constraint 'Self' : 'AnotherFooProtocol'}}
+extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {}
 
 protocol AnotherBazProtocol {
   associatedtype BazValue
@@ -605,7 +605,7 @@ extension PConforms9 {
   subscript (i: Self.Assoc) -> Self.Assoc { return Assoc() }
 }
 
-struct SConforms9a : PConforms9 { // expected-error{{type 'SConforms9a' does not conform to protocol 'PConforms9'}}
+struct SConforms9a : PConforms9 { // expected-error{{type 'SConforms9a' does not conform to protocol 'PConforms9'}} expected-note {{add stubs for conformance}}
 }
 
 struct SConforms9b : PConforms9 {
@@ -988,7 +988,7 @@ protocol BadProto5 {
   associatedtype T3 // expected-note{{protocol requires nested type 'T3'}}
 }
 
-class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}}
+class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}} expected-note {{add stubs for conformance}}
 
 typealias A = BadProto1
 typealias B = BadProto1

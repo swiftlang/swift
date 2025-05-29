@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 public struct MyStruct {
 }
@@ -18,5 +18,5 @@ public func copy(_ a: inout [MyStruct]) {
   var a = a
 }
 
-// CHECK: define {{.*}}@"$s4mainAAyyF"
-// CHECK: define {{.*}}@"$s4main4copyyySayAA8MyStructVGzF"
+// CHECK: define {{.*}}@"$e4mainAAyyF"
+// CHECK: define {{.*}}@"$e4main4copyyySayAA8MyStructVGzF"

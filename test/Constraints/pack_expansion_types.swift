@@ -241,8 +241,10 @@ func patternInstantiationConcreteValid() {
 func patternInstantiationConcreteInvalid() {
   let _: Set<Int> = patternInstantiationTupleTest1()
   // expected-error@-1 {{cannot convert value of type '(repeat Array<_>)' to specified type 'Set<Int>'}}
+  // expected-error@-2 {{could not infer pack element #0 from context}}
 
   let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<Int, _>)' is not convertible to '(Array<Int>, Set<String>)', tuples have a different number of elements}}
+  // expected-error@-1 {{could not infer pack element #1 from context}}
 }
 
 func patternInstantiationGenericValid<each T, each U>(t: repeat each T, u: repeat each U)
@@ -273,6 +275,7 @@ func patternInstantiationGenericInvalid<each T: Hashable>(t: repeat each T) {
   // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
   let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<repeat each T, _>)' is not convertible to '(repeat Array<each T>, Set<String>)', tuples have a different number of elements}}
+  // expected-error@-1 {{could not infer pack element #1 from context}}
 }
 
 // rdar://107996926 - Vanishing metatype of tuple not supported

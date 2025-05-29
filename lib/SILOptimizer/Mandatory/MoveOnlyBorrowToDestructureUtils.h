@@ -1,4 +1,4 @@
-//===--- MoveOnlyBorrowToDestructure.h ------------------------------------===//
+//===--- MoveOnlyBorrowToDestructureUtils.h -------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -38,7 +38,7 @@ public:
 
 private:
   /// Lazily initialized allocator.
-  llvm::Optional<Allocator> allocator;
+  std::optional<Allocator> allocator;
 
 public:
   Allocator &get() {

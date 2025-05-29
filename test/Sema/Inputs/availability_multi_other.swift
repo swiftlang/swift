@@ -1,5 +1,5 @@
 // This file was used by Sema/availability_versions_multi.swift to
-// test that we build enough of the type refinement context as needed to
+// test that we build enough of the availability scope tree as needed to
 // validate declarations when resolving declaration signatures.
 //
 // These days, we don't validate availability in secondary files at all,

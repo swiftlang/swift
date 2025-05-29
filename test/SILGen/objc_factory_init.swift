@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -25,7 +25,7 @@ extension Hive {
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MU]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
@@ -47,7 +47,7 @@ extension Hive {
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK-NEXT:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK-NEXT:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK-NEXT:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MU]]
   // CHECK-NEXT:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
   // CHECK:   [[FOREIGN_ERROR_STACK:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
@@ -95,7 +95,7 @@ class SubHive : Hive {
   // CHECK: bb0([[METATYPE:%.*]] : $@thick SubHive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SubHive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var SubHive }
-  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MU]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var SubHive }, 0
   // CHECK:   [[UP_METATYPE:%.*]] = upcast [[METATYPE]]
   // CHECK:   [[OBJC_METATYPE:%.*]] = thick_to_objc_metatype [[UP_METATYPE]]

@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-// expected-error@+1{{unexpected platform condition argument: expected feature name}}
+// expected-error@+1:5{{'hasFeature' requires a single unlabeled argument for the feature}}
 #if hasFeature(17)
 #endif

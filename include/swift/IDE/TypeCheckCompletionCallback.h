@@ -119,8 +119,9 @@ private:
   static void setInterfaceType(VarDecl *VD, Type Ty);
 };
 
-/// Whether the given completion expression is the only expression in its
-/// containing closure or function body and its value is implicitly returned.
+/// Whether the given completion expression is an implied result of a closure
+/// or function (e.g in a single-expression closure where the return is
+/// implicit).
 ///
 /// If these conditions are met, code completion needs to avoid penalizing
 /// completion results that don't match the expected return type when
@@ -128,8 +129,7 @@ private:
 /// written by the user, it's possible they intend the single expression not
 /// as the return value but merely the first entry in a multi-statement body
 /// they just haven't finished writing yet.
-bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
-                                      Expr *CompletionExpr);
+bool isImpliedResult(const constraints::Solution &S, Expr *CompletionExpr);
 
 /// Returns \c true iff the decl context \p DC allows calling async functions.
 bool isContextAsync(const constraints::Solution &S, DeclContext *DC);

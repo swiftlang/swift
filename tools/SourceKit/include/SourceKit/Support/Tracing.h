@@ -18,7 +18,7 @@
 #include "SourceKit/Support/UIdent.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include <vector>
 
@@ -95,8 +95,8 @@ class TracedOperation final {
   using DiagnosticProvider = std::function<void(SmallVectorImpl<DiagnosticEntryInfo> &)>;
 
   OperationKind OpKind;
-  llvm::Optional<uint64_t> OpId;
-  llvm::Optional<DiagnosticProvider> DiagProvider;
+  std::optional<uint64_t> OpId;
+  std::optional<DiagnosticProvider> DiagProvider;
   bool Enabled;
 
 public:

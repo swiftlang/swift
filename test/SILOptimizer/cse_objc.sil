@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Builtin
@@ -277,3 +277,30 @@ sil_vtable Bar {
   #Bar.walk: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
   #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }
+
+@objc public protocol P {
+  @objc optional func f() -> Bool
+}
+
+// CHECK-LABEL: sil @test_open_existential :
+// CHECK:         partial_apply [callee_guaranteed] {{%[0-9]+}}(%1) : $@convention(objc_method) (@opened("2FD52A00-DA20-11EE-8801-0EA13E3AABAF", any P) Self) -> ObjCBool // type-defs: %1
+// CHECK:       } // end sil function 'test_open_existential'
+sil @test_open_existential : $@convention(thin) (@guaranteed P) -> () {
+bb0(%0 : $any P):
+  %1 = open_existential_ref %0 : $any P to $@opened("2FD52A00-DA20-11EE-8801-0EA13E3AABAF", any P) Self
+  fix_lifetime %1 : $@opened("2FD52A00-DA20-11EE-8801-0EA13E3AABAF", any P) Self
+  %2 = open_existential_ref %0 : $any P to $@opened("2FD52A04-DA20-11EE-8801-0EA13E3AABAF", any P) Self
+  br bb2
+
+bb1(%4 : $@convention(objc_method) (@opened("2FD52A04-DA20-11EE-8801-0EA13E3AABAF", any P) Self) -> ObjCBool):
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(objc_method) (@opened("2FD52A04-DA20-11EE-8801-0EA13E3AABAF", any P) Self) -> ObjCBool
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  dynamic_method_br %2 : $@opened("2FD52A04-DA20-11EE-8801-0EA13E3AABAF", any P) Self, #P.f!foreign, bb1, bb3
+
+bb3:
+  unreachable
+}
+

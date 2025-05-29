@@ -117,8 +117,8 @@ public:
 
 private:
   /// Returns .Some(MatchingSetFlags) on success and .None on failure.
-  llvm::Optional<MatchingSetFlags> matchIncrementsToDecrements();
-  llvm::Optional<MatchingSetFlags> matchDecrementsToIncrements();
+  std::optional<MatchingSetFlags> matchIncrementsToDecrements();
+  std::optional<MatchingSetFlags> matchDecrementsToIncrements();
 };
 
 } // end swift namespace

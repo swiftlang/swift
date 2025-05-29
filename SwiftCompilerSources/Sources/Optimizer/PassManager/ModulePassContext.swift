@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -21,7 +22,7 @@ import OptimizerBridging
 struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
 
-  public var description: String {
+  var description: String {
     return String(taking: _bridged.getModuleDescription())
   }
 
@@ -54,14 +55,14 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   struct VTableArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedPassContext.VTableArray
+    fileprivate let bridgedCtxt: BridgedPassContext
 
     var startIndex: Int { return 0 }
-    var endIndex: Int { return bridged.count }
+    var endIndex: Int { return bridgedCtxt.getNumVTables() }
 
     subscript(_ index: Int) -> VTable {
       assert(index >= startIndex && index < endIndex)
-      return VTable(bridged: BridgedVTable(vTable: bridged.base![index]))
+      return VTable(bridged: bridgedCtxt.getVTable(index))
     }
   }
 
@@ -101,9 +102,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
     GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
   }
 
-  var vTables: VTableArray {
-    VTableArray(bridged: _bridged.getVTables())
-  }
+  var vTables: VTableArray { VTableArray(bridgedCtxt: _bridged) }
   
   var witnessTables: WitnessTableList {
     WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
@@ -123,13 +122,111 @@ struct ModulePassContext : Context, CustomStringConvertible {
     _bridged.endTransformFunction();
   }
 
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
+  }
+
+  func specialize(function: Function, for substitutions: SubstitutionMap) -> Function? {
+    return _bridged.specializeFunction(function.bridged, substitutions.bridged).function
+  }
+
+  enum DeserializationMode {
+    case allFunctions
+    case onlySharedFunctions
+  }
+
+  func deserializeAllCallees(of function: Function, mode: DeserializationMode) {
+    _bridged.deserializeAllCallees(function.bridged, mode == .allFunctions ? true : false)
+  }
+
+  @discardableResult
+  func createSpecializedWitnessTable(entries: [WitnessTable.Entry],
+                          conformance: Conformance,
+                          linkage: Linkage,
+                          serialized: Bool) -> WitnessTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedWitnessTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createSpecializedWitnessTable(linkage.bridged, serialized, conformance.bridged, $0)
+    }
+    return WitnessTable(bridged: bridgedWitnessTable)
+  }
+
+  @discardableResult
+  func createSpecializedVTable(entries: [VTable.Entry],
+                               for classType: Type,
+                               isSerialized: Bool) -> VTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedVTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createSpecializedVTable(classType.bridged, isSerialized, $0)
+    }
+    return VTable(bridged: bridgedVTable)
+  }
+
+  func replaceVTableEntries(of vTable: VTable, with entries: [VTable.Entry]) {
+    let bridgedEntries = entries.map { $0.bridged }
+    bridgedEntries.withBridgedArrayRef {
+      vTable.bridged.replaceEntries($0)
+    }
+    notifyFunctionTablesChanged()
+  }
+
+  func createEmptyFunction(
+    name: String,
+    parameters: [ParameterInfo],
+    hasSelfParameter: Bool,
+    fromOriginal originalFunction: Function
+  ) -> Function {
+    return name._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = parameters.map { $0._bridged }
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+        _bridged.createEmptyFunction(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                     hasSelfParameter, originalFunction.bridged).function
+      }
+    }
+  }
+
+  func moveFunctionBody(from sourceFunc: Function, to destFunc: Function) {
+    precondition(!destFunc.isDefinition, "cannot move body to non-empty function")
+    _bridged.moveFunctionBody(sourceFunc.bridged, destFunc.bridged)
+  }
+
   func mangleAsyncRemoved(from function: Function) -> String {
     return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
+  }
+
+  func mangle(withDeadArguments: [Int], from function: Function) -> String {
+    withDeadArguments.withUnsafeBufferPointer { bufPtr in
+      bufPtr.withMemoryRebound(to: Int.self) { valPtr in
+        String(taking: _bridged.mangleWithDeadArgs(valPtr.baseAddress,
+                                                   withDeadArguments.count,
+                                                   function.bridged))
+      }
+    }
+  }
+
+  func notifyFunctionTablesChanged() {
+    _bridged.asNotificationHandler().notifyChanges(.functionTablesChanged)
   }
 }
 
 extension GlobalVariable {
   func setIsLet(to value: Bool, _ context: ModulePassContext) {
     bridged.setLet(value)
+  }
+}
+
+extension Function {
+  func set(linkage: Linkage, _ context: ModulePassContext) {
+    bridged.setLinkage(linkage.bridged)
+  }
+
+  func set(isSerialized: Bool, _ context: ModulePassContext) {
+    bridged.setIsSerialized(isSerialized)
   }
 }

@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature MoveOnlyPartialConsumption) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature MoveOnlyPartialConsumption) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -306,4 +306,3 @@ simpleTestVar6a(false)
 simpleTestVar6a(true)
 simpleTestVar6b(false)
 simpleTestVar6b(true)
-

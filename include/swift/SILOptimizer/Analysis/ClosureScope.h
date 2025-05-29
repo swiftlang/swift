@@ -50,6 +50,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_CLOSURESCOPE_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_CLOSURESCOPE_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"

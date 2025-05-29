@@ -46,7 +46,8 @@ scopedFunction = 42
 // FIXME: Should be an error -- a type name and a function cannot overload.
 var _ : Int = TypeNameWins(42)
 
-TypeNameWins = 42 // expected-error {{cannot assign to immutable expression of type 'Int'}}
+// FIXME: This should be an ambiguity where both candidates are mentioned as notes.
+TypeNameWins = 42 // expected-error {{cannot assign to immutable expression of type '(Int) -> Int'}}
 var _ : TypeNameWins // no-warning
 
 // rdar://problem/21739333

@@ -19,10 +19,11 @@
 // RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -package-name package -verify
-// REQUIRES: asserts
 
 /// swiftinterfaces don't need the flag.
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
+
+// REQUIRES: swift_feature_InternalImportsByDefault
 
 //--- PublicLib.swift
 //--- PackageLib.swift

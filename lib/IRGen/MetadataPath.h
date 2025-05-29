@@ -63,6 +63,9 @@ class MetadataPath {
       /// Type metadata at requirement index P of a generic nominal type.
       NominalTypeArgument,
 
+      /// Value at requirement index P of a generic nominal type.
+      NominalValueArgument,
+
       /// Conditional conformance at index P (i.e. the P'th element) of a
       /// conformance.
       ConditionalConformance,
@@ -122,6 +125,7 @@ class MetadataPath {
       case Kind::NominalTypeArgumentConformance:
       case Kind::NominalTypeArgumentShape:
       case Kind::NominalTypeArgument:
+      case Kind::NominalValueArgument:
       case Kind::ConditionalConformance:
       case Kind::TupleShape:
         return OperationCost::Load;
@@ -187,6 +191,13 @@ public:
   /// requirement index n in a generic type metadata.
   void addNominalTypeArgumentShapeComponent(unsigned index) {
     Path.push_back(Component(Component::Kind::NominalTypeArgumentShape,
+                             index));
+  }
+
+  /// Add a step to this path which gets the value stored at requirement
+  /// index n in a generic type metadata.
+  void addNominalValueArgumentComponent(unsigned index) {
+    Path.push_back(Component(Component::Kind::NominalValueArgument,
                              index));
   }
 

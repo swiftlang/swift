@@ -41,7 +41,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 %   Self = floatName(bits)
 
 % if bits == 80:
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 % elif bits == 16:
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 % end
@@ -169,9 +169,9 @@ extension ${Self}: LosslessStringConvertible {
       self.init(Substring(text))
     } else {
       self = 0.0
-      let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
-        text.withCString { chars -> Bool in
-          switch chars[0] {
+      let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
+        unsafe text.withCString { chars -> Bool in
+          switch unsafe chars[0] {
           case 9, 10, 11, 12, 13, 32:
             return false // Reject leading whitespace
           case 0:
@@ -179,9 +179,9 @@ extension ${Self}: LosslessStringConvertible {
           default:
             break
           }
-          let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+          let endPtr = unsafe _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
           // Succeed only if endPtr points to end of C string
-          return endPtr != nil && endPtr![0] == 0
+          return unsafe endPtr != nil && endPtr![0] == 0
         }
       }
       if !success {
@@ -198,9 +198,9 @@ extension ${Self}: LosslessStringConvertible {
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
     self = 0.0
-    let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
-      text.withCString { chars -> Bool in
-        switch chars[0] {
+    let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
+      unsafe text.withCString { chars -> Bool in
+        switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
           return false // Reject leading whitespace
         case 0:
@@ -208,9 +208,9 @@ extension ${Self}: LosslessStringConvertible {
         default:
           break
         }
-        let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+        let endPtr = unsafe _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
         // Succeed only if endPtr points to end of C string
-        return endPtr != nil && endPtr![0] == 0
+        return unsafe endPtr != nil && endPtr![0] == 0
       }
     }
     if !success {

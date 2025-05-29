@@ -41,6 +41,13 @@ extern "C" {
 # endif
 #endif
 
+#if defined(__clang__)
+#define SWIFT_REMOTE_MIRROR_DEPRECATED(MSG, FIX)                               \
+  __attribute__((__deprecated__(MSG, FIX)))
+#else
+#define SWIFT_REMOTE_MIRROR_DEPRECATED(MSG, FIX) [[deprecated(MSG)]]
+#endif
+
 #if defined(__cplusplus)
 }
 #endif

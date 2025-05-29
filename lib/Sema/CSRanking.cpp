@@ -15,10 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -88,16 +90,32 @@ static bool shouldIgnoreScoreIncreaseForCodeCompletion(
     return true;
   }
 
-  // The sibling argument is the code completion expression, this allows e.g.
-  // non-default literal values in sibling arguments.
-  // E.g. we allow a 1 to be a double in
-  // foo(1, #^COMPLETE^#)
   if (auto parent = cs.getParentExpr(expr)) {
+    // The sibling argument is the code completion expression, this allows e.g.
+    // non-default literal values in sibling arguments.
+    // E.g. we allow a 1 to be a double in
+    // foo(1, #^COMPLETE^#)
     if (exprHasCodeCompletionAsArgument(parent, cs)) {
       return true;
     }
+    // If we are completing a member of a literal, consider completion results
+    // for all possible literal types. E.g. show completion results for `let a:
+    // Double = 1.#^COMPLETE^#
+    if (isa_and_nonnull<CodeCompletionExpr>(parent) &&
+        kind == SK_NonDefaultLiteral) {
+      return true;
+    }
   }
+
   return false;
+}
+
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
+
+  if (solverState && value > 0)
+    recordChange(SolverTrail::Change::IncreasedScore(kind, value));
 }
 
 void ConstraintSystem::increaseScore(ScoreKind kind,
@@ -125,8 +143,28 @@ void ConstraintSystem::increaseScore(ScoreKind kind,
     llvm::errs() << ")\n";
   }
 
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  increaseScore(kind, value);
+}
+
+void ConstraintSystem::replayScore(const Score &score) {
+  if (solverState) {
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = score.Data[i])
+        recordChange(
+          SolverTrail::Change::IncreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore += score;
+}
+
+void ConstraintSystem::clearScore() {
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CurrentScore.Data[i]) {
+      recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore = Score();
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
@@ -197,6 +235,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return x.getTupleIndex() == y.getTupleIndex();
 
   case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     return true;
   }
 
@@ -287,7 +326,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = dc->getParentModule()->lookupConformance(modelTy, proto);
+  auto conformance = lookupConformance(modelTy, proto);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 
@@ -336,9 +375,16 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
         auto p2 = params2[i];
-          
-        int np1 = static_cast<int>(sig1->getRequiredProtocols(p1).size());
-        int np2 = static_cast<int>(sig2->getRequiredProtocols(p2).size());
+
+        int np1 =
+            llvm::count_if(sig1->getRequiredProtocols(p1), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+        int np2 =
+            llvm::count_if(sig2->getRequiredProtocols(p2), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+
         int aDelta = np1 - np2;
           
         if (aDelta)
@@ -378,16 +424,19 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
-  ConstraintSystem cs(dc1, llvm::None);
-  OpenedTypeMap replacements;
+  ConstraintSystem cs(dc1, std::nullopt);
+  SmallVector<OpenedType, 4> replacements;
   cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
   Type selfType1 = sig1.getGenericParams()[0];
   Type selfType2 = sig2.getGenericParams()[0];
+  ASSERT(selfType1->isEqual(selfType2));
+  ASSERT(replacements[0].first->isEqual(selfType2));
+
   cs.addConstraint(ConstraintKind::Bind,
-                   replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
+                   replacements[0].second,
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
@@ -417,16 +466,18 @@ static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                                   ValueDecl *decl2,
-                                  bool isDynamicOverloadComparison = false) {
+                                  bool isDynamicOverloadComparison = false,
+                                  bool allowMissingConformances = true) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
-                               dc, decl1, decl2, isDynamicOverloadComparison},
+                               dc, decl1, decl2, isDynamicOverloadComparison,
+                               allowMissingConformances},
                            false);
 }
 
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
-    bool isDynamicOverloadComparison) const {
+    bool isDynamicOverloadComparison, bool allowMissingConformances) const {
   auto &C = decl1->getASTContext();
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(dc, ConstraintSystemOptions());
@@ -530,7 +581,7 @@ bool CompareDeclSpecializationRequest::evaluate(
 
   auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
                       DeclContext *outerDC, Type type,
-                      OpenedTypeMap &replacements,
+                      SmallVectorImpl<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
     if (auto *funcType = type->getAs<AnyFunctionType>()) {
       return cs.openFunctionType(funcType, locator, replacements, outerDC);
@@ -548,12 +599,11 @@ bool CompareDeclSpecializationRequest::evaluate(
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
-  OpenedTypeMap unused, replacements;
-  auto openedType2 = openType(cs, innerDC1, outerDC2, type2, unused, locator);
-  auto openedType1 =
-      openType(cs, innerDC2, outerDC1, type1, replacements, locator);
+  SmallVector<OpenedType, 4> unused, replacements;
+  auto openedType2 = openType(cs, innerDC2, outerDC2, type2, unused, locator);
+  auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
-  for (const auto &replacement : replacements) {
+  for (auto replacement : replacements) {
     if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
       cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                        locator);
@@ -642,7 +692,7 @@ bool CompareDeclSpecializationRequest::evaluate(
       MatchCallArgumentListener listener;
       SmallVector<AnyFunctionType::Param> args(params1);
       auto matching = matchCallArguments(
-          args, params2, paramListInfo, llvm::None,
+          args, params2, paramListInfo, std::nullopt,
           /*allowFixes=*/false, listener, TrailingClosureMatching::Forward);
 
       if (!matching)
@@ -653,11 +703,16 @@ bool CompareDeclSpecializationRequest::evaluate(
            paramIdx != numParams; ++paramIdx) {
         const auto &param = params2[paramIdx];
         auto paramTy = param.getOldType();
+        auto argIndices = matching->parameterBindings[paramIdx];
+        if (argIndices.empty())
+          continue;
 
         if (paramListInfo.isVariadicGenericParameter(paramIdx) &&
-            isPackExpansionType(paramTy)) {
+            isPackExpansionType(paramTy) &&
+            (argIndices.size() > 1 ||
+             !isPackExpansionType(args[argIndices.front()].getOldType()))) {
           SmallVector<Type, 2> argTypes;
-          for (auto argIdx : matching->parameterBindings[paramIdx]) {
+          for (auto argIdx : argIndices) {
             // Don't prefer `T...` over `repeat each T`.
             if (args[argIdx].isVariadic())
               return completeResult(false);
@@ -671,7 +726,7 @@ bool CompareDeclSpecializationRequest::evaluate(
           continue;
         }
 
-        for (auto argIdx : matching->parameterBindings[paramIdx]) {
+        for (auto argIdx : argIndices) {
           const auto &arg = args[argIdx];
           // Always prefer non-variadic version when possible.
           if (arg.isVariadic())
@@ -759,9 +814,16 @@ bool CompareDeclSpecializationRequest::evaluate(
     // Solve the system.
     auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-    // Ban value-to-optional conversions.
-    if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
-      return completeResult(true);
+    if (solution) {
+      auto score = solution->getFixedScore();
+
+      // Ban value-to-optional conversions and
+      // missing conformances if they are disallowed.
+      if (score.Data[SK_ValueToOptional] == 0 &&
+          (allowMissingConformances ||
+           score.Data[SK_MissingSynthesizableConformance] == 0))
+        return completeResult(true);
+    }
   }
 
   // If the first function has fewer effective parameters than the
@@ -785,10 +847,10 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 }
 
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
-  return type.transform([&](Type type) -> Type {
-    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+  return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
+    if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return ParenType::get(ctx, tupleType->getElementType(0));
+        return tupleType->getElementType(0);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
@@ -798,7 +860,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
       return TupleType::get(elts, ctx);
     }
 
-    return type;
+    return std::nullopt;
   });
 }
 
@@ -856,7 +918,7 @@ struct TypeBindingsToCompare {
 /// Given the bound types of two constructor overloads, returns their parameter
 /// list types as tuples to compare for solution ranking, or \c None if they
 /// shouldn't be compared.
-static llvm::Optional<TypeBindingsToCompare>
+static std::optional<TypeBindingsToCompare>
 getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
   auto choiceTy1 =
       boundTy1->lookThroughAllOptionalTypes()->getAs<FunctionType>();
@@ -866,19 +928,19 @@ getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
   // If the type variables haven't been bound to functions yet, let's not try
   // and rank them.
   if (!choiceTy1 || !choiceTy2)
-    return llvm::None;
+    return std::nullopt;
 
   auto initParams1 = choiceTy1->getParams();
   auto initParams2 = choiceTy2->getParams();
   if (initParams1.size() != initParams2.size())
-    return llvm::None;
+    return std::nullopt;
 
   // Don't compare if there are variadic differences. This preserves the
   // behavior of when we'd compare through matchTupleTypes with the parameter
   // flags intact.
   for (auto idx : indices(initParams1)) {
     if (initParams1[idx].isVariadic() != initParams2[idx].isVariadic())
-      return llvm::None;
+      return std::nullopt;
   }
 
   // Awful hack needed to preserve source compatibility: If we have single
@@ -936,7 +998,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
              ? SolutionCompareResult::Better
              : SolutionCompareResult::Worse;
   }
-  
+
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
@@ -1011,18 +1073,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (cs.isForCodeCompletion()) {
       // Don't rank based on overload choices of function calls that contain the
       // code completion token.
-      ASTNode anchor = simplifyLocatorToAnchor(overload.locator);
-      if (auto expr = getAsExpr(anchor)) {
-        // If the anchor is a called function, also don't rank overload choices
-        // if any of the arguments contain the code completion token.
-        if (auto apply = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(expr))) {
-          if (apply->getFn() == expr) {
-            anchor = apply;
-          }
-        }
-      }
-      if (anchor && cs.containsIDEInspectionTarget(anchor)) {
-        continue;
+      if (auto anchor = simplifyLocatorToAnchor(overload.locator)) {
+        if (cs.containsIDEInspectionTarget(cs.includingParentApply(anchor)))
+          continue;
       }
     }
 
@@ -1097,6 +1150,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
     case OverloadChoiceKind::MaterializePack:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
       continue;
 
     case OverloadChoiceKind::KeyPathApplication:
@@ -1121,12 +1175,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
     if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
     if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }
@@ -1299,6 +1355,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   const auto &bindings2 = solutions[idx2].typeBindings;
 
   for (const auto &binding1 : bindings1) {
+    if (!binding1.second)
+      continue;
+
     auto *typeVar = binding1.first;
     auto *loc = typeVar->getImpl().getLocator();
 
@@ -1322,6 +1381,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // let's consider it.
     auto binding2 = bindings2.find(typeVar);
     if (binding2 == bindings2.end())
+      continue;
+
+    if (!binding2->second)
       continue;
 
     TypeBindingsToCompare typesToCompare(binding1.second, binding2->second);
@@ -1354,7 +1416,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
-    // (when it's sane) would help us do much better here.
+    // (when it's sound) would help us do much better here.
     if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
       identical = false;
       continue;
@@ -1487,15 +1549,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                   : SolutionCompareResult::Incomparable;
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
                                    bool minimize) {
   // Don't spend time filtering solutions if we already hit a threshold.
   if (isTooComplex(viable))
-    return llvm::None;
+    return std::nullopt;
 
   if (viable.empty())
-    return llvm::None;
+    return std::nullopt;
   if (viable.size() == 1)
     return 0;
 
@@ -1543,7 +1605,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     // Give up if we're out of time.
     if (isTooComplex(/*solutions=*/{}))
-      return llvm::None;
+      return std::nullopt;
   }
 
   // Make sure that our current best is better than all of the solved systems.
@@ -1569,7 +1631,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     case SolutionCompareResult::Incomparable:
       // If we're not supposed to minimize the result set, just return eagerly.
       if (!minimize)
-        return llvm::None;
+        return std::nullopt;
 
       ambiguous = true;
       break;
@@ -1577,7 +1639,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     // Give up if we're out of time.
     if (isTooComplex(/*solutions=*/{}))
-      return llvm::None;
+      return std::nullopt;
   }
 
   // If the result was not ambiguous, we're done.
@@ -1587,7 +1649,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   }
 
   if (!minimize)
-    return llvm::None;
+    return std::nullopt;
 
   // Remove any solution that is worse than some other solution.
   unsigned outIndex = 0;
@@ -1607,7 +1669,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   viable.erase(viable.begin() + outIndex, viable.end());
   NumDiscardedSolutions += viable.size() - outIndex;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {

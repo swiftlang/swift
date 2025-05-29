@@ -20,11 +20,8 @@ var testDeprecatedReferencingDeprecated2: () {
   x - y // no-warning
 }
 
-// FIXME: This doesn't work because the file is parsed in script mode.
 @available(*, deprecated)
 var testDeprecatedReferencingDeprecated3: () = DummyType() - DummyType()
-// expected-warning@-1 {{'-' is deprecated}}
-// expected-note@-2 {{use '&-' instead}}
 
 struct HasDeprecatedMembers {
   @available(*, deprecated)

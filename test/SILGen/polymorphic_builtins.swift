@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-builtin-module -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
+
+import Builtin
 
 // CHECK-LABEL: sil hidden [ossa] @$s20polymorphic_builtins{{.*}}concreteAddTest{{.*}} : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
 // CHECK: bb0([[ARG0:%.*]] : $Builtin.Vec4xInt32, [[ARG1:%.*]] : $Builtin.Vec4xInt32):

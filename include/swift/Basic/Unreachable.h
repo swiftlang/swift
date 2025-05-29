@@ -35,11 +35,10 @@
 
 #include "swift/Runtime/Config.h"
 
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_ALWAYS_INLINE
 inline static void swift_unreachable(const char *msg) {
-  assert(false && msg);
   (void)msg;
-  abort();
+  SWIFT_RUNTIME_BUILTIN_TRAP;
 }
 
 #endif

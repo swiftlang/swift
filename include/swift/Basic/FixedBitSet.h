@@ -78,18 +78,25 @@ class FixedBitSet {
   static size_t chunkIndex(ValueType i) {
     return size_t(i) / chunkSize;
   }
-  static size_t chunkMask(ValueType i) {
+  static ChunkType chunkMask(ValueType i) {
     return ChunkType(1) << (size_t(i) % chunkSize);
   }
 
 public:
   /// Build an empty set.
-  FixedBitSet() {}
+  constexpr FixedBitSet() {}
 
   /// Build a set containing the given elements.
   FixedBitSet(std::initializer_list<ValueType> elements) {
     for (const auto &elt : elements)
       insert(elt);
+  }
+
+  /// Build a set filled with all possible elements, i.e., a "full" set.
+  static FixedBitSet full() {
+    FixedBitSet set;
+    set.insertAll();
+    return set;
   }
 
   /// Return true if the set is empty.

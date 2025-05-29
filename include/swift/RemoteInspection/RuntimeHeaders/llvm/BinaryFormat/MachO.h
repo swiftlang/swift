@@ -508,6 +508,8 @@ enum PlatformType {
   PLATFORM_TVOSSIMULATOR = 8,
   PLATFORM_WATCHOSSIMULATOR = 9,
   PLATFORM_DRIVERKIT = 10,
+  PLATFORM_XROS = 11,
+  PLATFORM_XROS_SIMULATOR = 12
 };
 
 // Values for tools enum in build_tool_version.

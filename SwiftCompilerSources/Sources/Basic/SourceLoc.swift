@@ -10,34 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ASTBridging
+import BasicBridging
 
+/// Represents a location in source code.
+/// It is basically a pointer into a buffer of the loaded source file (managed by `DiagnosticEngine`).
+/// In contrast to just having a filename+line+column, this allows displaying the context around
+/// the location when printing diagnostics.
 public struct SourceLoc {
-  /// Points into a source file.
-  let locationInFile: UnsafePointer<UInt8>
-
-  public init?(locationInFile: UnsafePointer<UInt8>?) {
-    guard let locationInFile = locationInFile else {
-      return nil
-    }
-    self.locationInFile = locationInFile
-  }
+  public let bridged: BridgedSourceLoc
 
   public init?(bridged: BridgedSourceLoc) {
-    guard bridged.isValid() else {
+    guard bridged.isValid else {
       return nil
     }
-    self.locationInFile = bridged.uint8Pointer()!
-  }
-
-  public var bridged: BridgedSourceLoc {
-    .init(locationInFile)
+    self.bridged = bridged
   }
 }
 
 extension SourceLoc {
   public func advanced(by n: Int) -> SourceLoc {
-    SourceLoc(locationInFile: locationInFile.advanced(by: n))!
+    SourceLoc(bridged: bridged.advanced(by: n))!
   }
 }
 

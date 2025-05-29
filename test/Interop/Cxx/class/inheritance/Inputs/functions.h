@@ -22,6 +22,10 @@ struct Base {
       __attribute__((swift_attr("import_unsafe"))) {
     return "Base::constInBase";
   }
+  inline const char *rvalueThisInBase() const&&
+      __attribute__((swift_attr("import_unsafe"))) {
+    return "Base::rvalueThisInBase";
+  }
   // TODO: if these are unnamed we hit an (unrelated) SILGen bug. Same for
   // subscripts.
   inline const char *takesArgsInBase(int a, int b, int c) const
@@ -50,7 +54,7 @@ struct Base {
     return i * 2;
   }
 
-  void pure() const __attribute__((pure)) {}
+  int pure() const __attribute__((pure)) { return 123; }
 
   inline int sameMethodNameSameSignature() const {
     return 42;

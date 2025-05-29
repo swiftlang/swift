@@ -15,6 +15,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -217,7 +218,8 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   }
   case SILInstructionKind::BuiltinInst: {
     auto bi = cast<BuiltinInst>(memInst);
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       // `zeroInitializer` with an address operand zeroes out the address operand
       return true;
     }
@@ -251,6 +253,9 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
     auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && !CAI->isInitializationOfDest();
   }
+  case SILInstructionKind::MarkDependenceAddrInst: {
+    return true;
+  }
   case SILInstructionKind::YieldInst: {
     auto *yield = cast<YieldInst>(memInst);
     return yield->getYieldInfoForOperand(*memOper).isIndirectInOut();
@@ -277,27 +282,38 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
 
   SILInstruction *memInst = memOper->getUser();
 
-  // FIXME: drop_deinit must be handled here!
   switch (memInst->getKind()) {
   default:
     return false;
 
+  case SILInstructionKind::ApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::TryApplyInst: {
+    FullApplySite applySite(memInst);
+    return applySite.getCaptureConvention(*memOper).isOwnedConventionInCaller();
+  }
+  case SILInstructionKind::BeginAccessInst:
+    return cast<BeginAccessInst>(memInst)->getAccessKind() ==
+           SILAccessKind::Deinit;
   case SILInstructionKind::CopyAddrInst: {
     auto *CAI = cast<CopyAddrInst>(memInst);
     return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
+  case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::EndLifetimeInst:
+    return true;
+  case SILInstructionKind::DropDeinitInst:
+    assert(memOper->get()->getType().isValueTypeWithDeinit());
+    return true;
   case SILInstructionKind::ExplicitCopyAddrInst: {
     auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return (CAI->getSrc() == address && CAI->isTakeOfSrc()) ||
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::TryApplyInst:
-  case SILInstructionKind::ApplyInst: {
-    FullApplySite applySite(memInst);
-    return applySite.getCaptureConvention(*memOper).isOwnedConvention();
-  }
+  case SILInstructionKind::LoadInst:
+    return cast<LoadInst>(memInst)->getOwnershipQualifier() ==
+           LoadOwnershipQualifier::Take;
   case SILInstructionKind::PartialApplyInst: {
     // If we are on the stack or have an inout convention, we do not
     // consume. Otherwise, we do.
@@ -308,11 +324,10 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
     auto convention = applySite.getArgumentConvention(*memOper);
     return !convention.isInoutConvention();
   }
-  case SILInstructionKind::DestroyAddrInst:
-    return true;
-  case SILInstructionKind::LoadInst:
-    return cast<LoadInst>(memInst)->getOwnershipQualifier() ==
-           LoadOwnershipQualifier::Take;
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
+    auto *utedai = cast<UncheckedTakeEnumDataAddrInst>(memInst);
+    return utedai->isDestructive();
+  }
   }
 }
 
@@ -327,8 +342,7 @@ static bool isLetAllocation(MarkUnresolvedNonCopyableValueInst *mmci) {
   }
 
   if (auto *asi = dyn_cast<AllocStackInst>(mmci->getOperand()))
-    if (auto varInfo = asi->getVarInfo())
-      return varInfo->isLet();
+    return asi->isLet();
 
   return false;
 }
@@ -542,7 +556,7 @@ struct SimpleTemporaryAllocStackElimVisitor
     state.setFinalUser(op);
 
     // We found an instruction that we did not understand.
-    return true;
+    return false;
   }
 };
 
@@ -574,6 +588,7 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
   };
   FindCopyAddrWalker walker(copiesToVisit);
   std::move(walker).walk(markedInst);
+  // FIXME: should check walk() == AddressUseKind::NonEscaping.
 
   bool madeChange = false;
 
@@ -603,6 +618,8 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
       nextCAI = nullptr;
       SimpleTemporaryAllocStackElimVisitor visitor(state, cai, nextCAI);
 
+      // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
+      // PointerEscape.
       if (AddressUseKind::Unknown == std::move(visitor).walk(cai->getDest()))
         return false;
 
@@ -633,7 +650,7 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
 
     // Then check that our final use and initialCAI are in the same block and
     // that all instructions in between them with side-effects are instructions
-    // that we visited. This is a sanity check.
+    // that we visited. This is a soundness check.
     if (finalUse->getParentBlock() != initialCAI->getParent() ||
         llvm::any_of(llvm::make_range(initialCAI->getIterator(),
                                       finalUse->getUser()->getIterator()),

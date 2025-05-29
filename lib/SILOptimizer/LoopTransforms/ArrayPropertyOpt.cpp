@@ -53,6 +53,7 @@
 #define DEBUG_TYPE "array-property-opt"
 
 #include "ArrayOpt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -64,6 +65,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallSet.h"
@@ -323,7 +325,7 @@ private:
       return false;
     }
 
-    // Otherwise, all of our users are sane. The array does not escape.
+    // Otherwise, all of our users are sound. The array does not escape.
     return true;
   }
 
@@ -528,7 +530,7 @@ protected:
       return;
 
     // Update SSA form.
-    SSAUp.initialize(V->getType(), V->getOwnershipKind());
+    SSAUp.initialize(V->getFunction(), V->getType(), V->getOwnershipKind());
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
@@ -834,6 +836,8 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
       // Verify that no illegal critical edges were created.
       if (getFunction()->getModule().getOptions().VerifyAll)
         getFunction()->verifyCriticalEdges();
+
+      updateAllGuaranteedPhis(getPassManager(), Fn);
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.

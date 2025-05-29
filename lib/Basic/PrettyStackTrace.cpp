@@ -18,6 +18,7 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/Version.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -30,7 +31,7 @@ void PrettyStackTraceStringAction::print(llvm::raw_ostream &out) const {
 void PrettyStackTraceFileContents::print(llvm::raw_ostream &out) const {
   out << "Contents of " << Buffer.getBufferIdentifier() << ":\n---\n"
       << Buffer.getBuffer();
-  if (!Buffer.getBuffer().endswith("\n"))
+  if (!Buffer.getBuffer().ends_with("\n"))
     out << '\n';
   out << "---\n";
 }

@@ -13,9 +13,11 @@
 #include "swift/IDE/ConformingMethodList.h"
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -124,13 +126,15 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
     return;
 
   T = T->getRValueType();
-  if (T->hasArchetype())
-    T = T->mapTypeOutOfContext();
 
   // If there are no (instance) members for this type, bail.
   if (!T->mayHaveMembers() || T->is<ModuleType>()) {
     return;
   }
+
+  auto interfaceTy = T;
+  if (T->hasArchetype())
+    interfaceTy = interfaceTy->mapTypeOutOfContext();
 
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {
@@ -140,7 +144,7 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
   }
 
   // Collect the matching methods.
-  ConformingMethodListResult result(CurDeclContext, T);
+  ConformingMethodListResult result(CurDeclContext, interfaceTy);
   getMatchingMethods(T, expectedProtocols, result.Members);
 
   Consumer.handleResult(result);
@@ -152,8 +156,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
-    ModuleDecl *CurModule;
-
     /// The type of the parsed expression.
     Type T;
 
@@ -172,14 +174,25 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       if (FD->isStatic() || FD->isOperator())
         return false;
 
-      auto resultTy = T->getTypeOfMember(CurModule, FD,
-                                         FD->getResultInterfaceType());
+      assert(!T->hasTypeParameter());
+
+      // T may contain primary archetypes from some fixed generic signature G.
+      // This might be unrelated to the generic signature of FD. However if
+      // FD has a generic parameter of its own and it returns a type containing
+      // that parameter, we want to map it to the corresponding archetype
+      // from the generic environment of FD, because all we do with the
+      // resulting type is check conformance. If the conformance is conditional,
+      // we might run into trouble with really complicated cases but the fake
+      // archetype setup will mostly work.
+      auto substitutions = T->getMemberSubstitutionMap(
+          FD, FD->getGenericEnvironment());
+      auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->conformsToProtocol(resultTy, Proto))
+        if (checkConformance(resultTy, Proto))
           return true;
       }
 
@@ -190,8 +203,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     LocalConsumer(DeclContext *DC, Type T,
                   llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
-        : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
-          Result(result) {}
+        : T(T), ExpectedTypes(expectedTypes), Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                    DynamicLookupInfo) override {

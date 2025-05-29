@@ -99,7 +99,8 @@ private func insertEndInitInstructions(
   atEndOf initRegion: InstructionRange,
   _ context: FunctionPassContext
 ) {
-  var ssaUpdater = SSAUpdater(type: markUninitialized.type, ownership: .owned, context)
+  var ssaUpdater = SSAUpdater(function: markUninitialized.parentFunction,
+                              type: markUninitialized.type, ownership: .owned, context)
   ssaUpdater.addAvailableValue(markUninitialized, in: markUninitialized.parentBlock)
 
   for endInst in initRegion.ends {
@@ -135,8 +136,8 @@ private func constructLetInitRegion(
   // root-class initializer).
   initRegion.insert(markUninitialized)
 
-  var beginBorrows = Stack<BeginBorrowInst>(context)
-  defer { beginBorrows.deinitialize() }
+  var borrows = Stack<BeginBorrowInstruction>(context)
+  defer { borrows.deinitialize() }
 
   for inst in markUninitialized.parentFunction.instructions {
     switch inst {
@@ -152,17 +153,22 @@ private func constructLetInitRegion(
 
     case let copy as CopyAddrInst
          where copy.destination.isLetFieldAddress(of: markUninitialized):
-      assert(copy.isInitializationOfDest)
+      assert(copy.isInitializationOfDestination)
       initRegion.insert(inst)
 
     case let beginAccess as BeginAccessInst
-         where beginAccess.accessKind == .Deinit &&
+         where beginAccess.accessKind == .deinit &&
                beginAccess.address.isLetFieldAddress(of: markUninitialized):
       // Include let-field partial de-initializations in the region.
       initRegion.insert(inst)
 
-    case let beginBorrow as BeginBorrowInst:
-      beginBorrows.append(beginBorrow)
+    case let beginBorrow as BeginBorrowInst
+           where beginBorrow.borrowedValue.isReferenceDerived(from: markUninitialized):
+      borrows.append(beginBorrow)
+
+    case let storeBorrow as StoreBorrowInst
+           where storeBorrow.source.isReferenceDerived(from: markUninitialized):
+      borrows.append(storeBorrow)
 
     default:
       break
@@ -171,8 +177,8 @@ private func constructLetInitRegion(
 
   // Extend the region to whole borrow scopes to avoid that we insert an `end_init_let_ref` in the
   // middle of a borrow scope.
-  for beginBorrow in beginBorrows where initRegion.contains(beginBorrow) {
-    initRegion.insert(contentsOf: beginBorrow.endBorrows)
+  for borrow in borrows where initRegion.contains(borrow) {
+    initRegion.insert(borrowScopeOf: borrow, context)
   }
 }
 
@@ -197,10 +203,28 @@ private extension RefElementAddrInst {
 }
 
 private extension Value {
+  func isReferenceDerived(from root: Value) -> Bool {
+    var parent: Value = self
+    while true {
+      if parent == root {
+        return true
+      }
+      if let operand = parent.forwardingInstruction?.singleForwardedOperand {
+        parent = operand.value
+        continue
+      }
+      if let transition = parent.definingInstruction as? OwnershipTransitionInstruction {
+        parent = transition.operand.value
+        continue
+      }
+      return false
+    }
+  }
+
   func isLetFieldAddress(of markUninitialized: MarkUninitializedInst) -> Bool {
     if case .class(let rea) = self.accessBase,
        rea.fieldIsLet,
-       rea.instance.referenceRoot == markUninitialized
+       rea.instance.isReferenceDerived(from: markUninitialized)
     {
       return true
     }

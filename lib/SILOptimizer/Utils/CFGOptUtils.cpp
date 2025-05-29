@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -19,6 +20,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -74,21 +76,22 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
   return newBr;
 }
 
-static void
-deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
-                                          unsigned deadArgIndex) {
+static void deleteTriviallyDeadOperandsOfDeadArgument(
+    MutableArrayRef<Operand> termOperands, unsigned deadArgIndex,
+    InstModCallbacks callbacks = InstModCallbacks()) {
   Operand &op = termOperands[deadArgIndex];
   auto *i = op.get()->getDefiningInstruction();
   if (!i)
     return;
-  op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
-  eliminateDeadInstruction(i);
+  op.set(SILUndef::get(op.get()));
+  eliminateDeadInstruction(i, callbacks);
 }
 
 // Our implementation assumes that our caller is attempting to remove a dead
 // SILPhiArgument from a SILBasicBlock and has already RAUWed the argument.
 TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                                 size_t argIndex, bool cleanupDeadPhiOps) {
+                                 size_t argIndex, bool cleanupDeadPhiOps,
+                                 InstModCallbacks callbacks) {
   if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
     SmallVector<SILValue, 8> trueArgs;
     SmallVector<SILValue, 8> falseArgs;
@@ -99,7 +102,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     if (destBlock == cbi->getTrueBB()) {
       if (cleanupDeadPhiOps) {
         deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
-                                                  argIndex);
+                                                  argIndex, callbacks);
       }
       trueArgs.erase(trueArgs.begin() + argIndex);
     }
@@ -107,7 +110,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     if (destBlock == cbi->getFalseBB()) {
       if (cleanupDeadPhiOps) {
         deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
-                                                  argIndex);
+                                                  argIndex, callbacks);
       }
       falseArgs.erase(falseArgs.begin() + argIndex);
     }
@@ -125,7 +128,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     SmallVector<SILValue, 8> args;
     llvm::copy(bi->getArgs(), std::back_inserter(args));
     if (cleanupDeadPhiOps) {
-      deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+      deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex,
+                                                callbacks);
     }
     args.erase(args.begin() + argIndex);
     auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(),
@@ -138,9 +142,14 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 }
 
 void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
-                             bool cleanupDeadPhiOps) {
-  assert(block->getArgument(argIndex)->isPhi()
-         && "Only should be used on phi arguments");
+                             bool cleanupDeadPhiOps,
+                             InstModCallbacks callbacks) {
+  SILArgument *arg = block->getArgument(argIndex);
+  assert(arg->isPhi() && "Only should be used on phi arguments");
+  if (auto *bfi = getBorrowedFromUser(arg)) {
+    bfi->replaceAllUsesWith(arg);
+    bfi->eraseFromParent();
+  }
   block->eraseArgument(argIndex);
 
   // Determine the set of predecessors in case any predecessor has
@@ -155,7 +164,8 @@ void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
     predBlocks.insert(pred);
 
   for (auto *pred : predBlocks)
-    deleteEdgeValue(pred->getTerminator(), block, argIndex, cleanupDeadPhiOps);
+    deleteEdgeValue(pred->getTerminator(), block, argIndex, cleanupDeadPhiOps,
+                    callbacks);
 }
 
 /// Changes the edge value between a branch and destination basic block
@@ -496,7 +506,7 @@ bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(
   return true;
 }
 
-static bool isSafeNonExitTerminator(TermInst *ti) {
+bool isSafeNonExitTerminator(TermInst *ti) {
   switch (ti->getTermKind()) {
   case TermKind::BranchInst:
   case TermKind::CondBranchInst:
@@ -510,6 +520,7 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     return false;
   // yield is special because it can do arbitrary,
@@ -524,14 +535,13 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   llvm_unreachable("Unhandled TermKind in switch.");
 }
 
-static bool isTrapNoReturnFunction(ApplyInst *ai) {
+bool swift::isTrapNoReturnFunction(SILFunction *f) {
   const char *fatalName = MANGLE_AS_STRING(
       MANGLE_SYM(s18_fatalErrorMessageyys12StaticStringV_AcCSutF));
-  auto *fn = ai->getReferencedFunctionOrNull();
 
-  // We use endswith here since if we specialize fatal error we will always
+  // We use ends_with here since if we specialize fatal error we will always
   // prepend the specialization records to fatalName.
-  if (!fn || !fn->getName().endswith(fatalName))
+  if (!f || !f->getName().ends_with(fatalName))
     return false;
 
   return true;
@@ -566,7 +576,8 @@ bool swift::findAllNonFailureExitBBs(
     // non-failure exit bb. Add it to our list and continue.
     auto prevIter = std::prev(SILBasicBlock::iterator(ti));
     if (auto *ai = dyn_cast<ApplyInst>(&*prevIter)) {
-      if (ai->isCalleeNoReturn() && !isTrapNoReturnFunction(ai)) {
+      if (ai->isCalleeNoReturn() &&
+          !isTrapNoReturnFunction(ai->getReferencedFunctionOrNull())) {
         bbs.push_back(&bb);
         continue;
       }

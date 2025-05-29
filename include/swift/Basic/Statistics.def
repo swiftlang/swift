@@ -115,6 +115,7 @@ FRONTEND_STATISTIC(AST, NumASTBytesAllocated)
 /// AST context's dependency collector.
 FRONTEND_STATISTIC(AST, NumDependencies)
 FRONTEND_STATISTIC(AST, NumIncrementalDependencies)
+FRONTEND_STATISTIC(AST, NumMacroPluginDependencies)
 
 /// Number of top-level, dynamic, and member names referenced in this frontend
 /// job's source file, as tracked by the AST context's referenced-name tracker.
@@ -164,6 +165,9 @@ FRONTEND_STATISTIC(AST, ModuleVisibilityCacheMiss)
 FRONTEND_STATISTIC(AST, ModuleShadowCacheHit)
 FRONTEND_STATISTIC(AST, ModuleShadowCacheMiss)
 
+/// Number of types deserialized.
+FRONTEND_STATISTIC(AST, NumDepScanFilesystemLookups)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
@@ -183,9 +187,14 @@ FRONTEND_STATISTIC(Sema, NumCrossImportsChecked)
 /// Number of pairs of modules we've actually found cross-imports for.
 FRONTEND_STATISTIC(Sema, NumCrossImportsFound)
 
+/// Number of steps recorded in the trail while solving expression type
+/// constraints. A rough proxy for "how much work the expression
+/// type checker did".
+FRONTEND_STATISTIC(Sema, NumTrailSteps)
+
 /// Number of constraint-solving scopes created in the typechecker, while
-/// solving expression type constraints. A rough proxy for "how much work the
-/// expression typechecker did".
+/// solving expression type constraints. Another rough proxy for "how much
+/// work the expression type checker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
 /// Number of constraint-solving scopes that were created but which
@@ -250,6 +259,10 @@ FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
 
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
+
+/// Number of Swift 6 errors, including those that are downgraded to
+/// warnings in Swift 5 mode.
+FRONTEND_STATISTIC(Sema, NumSwift6Errors)
 
 /// Number of lookups into a module and its imports.
 

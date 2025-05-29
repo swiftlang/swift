@@ -1,6 +1,5 @@
 
-@_moveOnly
-public struct ExecutorJob {}
+public struct ExecutorJob: ~Copyable {}
 
 public typealias Job = ExecutorJob
 

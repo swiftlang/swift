@@ -112,6 +112,10 @@ class Serializer : public SerializerBase {
 
   SmallVector<DeclID, 16> exportedPrespecializationDecls;
 
+  /// Will be set to true if any serialization step failed, for example due to
+  /// an error in the AST.
+  bool hadError = false;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting
@@ -173,9 +177,9 @@ class Serializer : public SerializerBase {
     /// Returns the next entity to be written.
     ///
     /// If there is nothing left to serialize, returns None.
-    llvm::Optional<T> peekNext() const {
+    std::optional<T> peekNext() const {
       if (!hasMoreToSerialize())
-        return llvm::None;
+        return std::nullopt;
       return EntitiesToWrite.front();
     }
 
@@ -183,9 +187,9 @@ class Serializer : public SerializerBase {
     /// it so it can be written.
     ///
     /// If there is nothing left to serialize, returns None.
-    llvm::Optional<T> popNext(BitOffset offset) {
+    std::optional<T> popNext(BitOffset offset) {
       if (!hasMoreToSerialize())
-        return llvm::None;
+        return std::nullopt;
       T result = EntitiesToWrite.front();
       EntitiesToWrite.pop();
       Offsets.push_back(offset);
@@ -233,6 +237,10 @@ class Serializer : public SerializerBase {
   ASTBlockRecordKeeper<ProtocolConformance *, ProtocolConformanceID,
                        index_block::PROTOCOL_CONFORMANCE_OFFSETS>
   ConformancesToSerialize;
+
+  ASTBlockRecordKeeper<AbstractConformance *, ProtocolConformanceID,
+                       index_block::ABSTRACT_CONFORMANCE_OFFSETS>
+  AbstractConformancesToSerialize;
 
   ASTBlockRecordKeeper<PackConformance *, ProtocolConformanceID,
                        index_block::PACK_CONFORMANCE_OFFSETS>
@@ -378,8 +386,15 @@ private:
 
   void writeLocalNormalProtocolConformance(NormalProtocolConformance *);
 
+  /// Writes an abstract conformance.
+  void writeASTBlockEntity(AbstractConformance *conformance);
+
   /// Writes a pack conformance.
   void writeASTBlockEntity(PackConformance *conformance);
+
+  /// Writes lifetime dependencies
+  void writeLifetimeDependencies(
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -416,7 +431,8 @@ private:
                     const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M, bool serializeAllSIL);
+  void writeSIL(const SILModule *M, bool serializeAllSIL,
+                bool serializeDebugInfo);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
@@ -570,6 +586,19 @@ public:
   void writePrimaryAssociatedTypes(ArrayRef<AssociatedTypeDecl *> assocTypes);
 
   bool allowCompilerErrors() const;
+
+private:
+  /// If the declaration is invalid, records that an error occurred and returns
+  /// true if the decl should be skipped.
+  bool skipDeclIfInvalid(const Decl *decl);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, TypeRepr *tyRepr);
+
+  /// If the type is invalid, records that an error occurred and returns
+  /// true if the type should be skipped.
+  bool skipTypeIfInvalid(Type ty, SourceLoc loc);
 };
 
 } // end namespace serialization

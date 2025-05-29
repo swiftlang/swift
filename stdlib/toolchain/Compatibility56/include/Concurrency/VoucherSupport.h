@@ -17,10 +17,10 @@
 #ifndef SWIFT_CONCURRENCY_VOUCHERSUPPORT_H
 #define SWIFT_CONCURRENCY_VOUCHERSUPPORT_H
 
-#include "llvm/ADT/Optional.h"
 #include "Concurrency/Task.h"
 #include "Concurrency/VoucherShims.h"
 #include "TaskPrivate.h"
+#include <optional>
 
 namespace swift {
 
@@ -29,7 +29,7 @@ class VoucherManager {
   /// The original voucher that was set on the thread before Swift started
   /// doing async work. This must be restored on the thread after we finish
   /// async work.
-  llvm::Optional<voucher_t> OriginalVoucher;
+  std::optional<voucher_t> OriginalVoucher;
 
   /// Determine whether vouchers are disabled entirely. This evaluates
   /// true on platforms whose concurrency library does not support the
@@ -59,7 +59,7 @@ public:
       } else {
         swift_voucher_release(*OriginalVoucher);
       }
-      OriginalVoucher = llvm::None;
+      OriginalVoucher = std::nullopt;
     } else
       SWIFT_TASK_DEBUG_LOG("[%p] Leaving empty VoucherManager", this);
   }
@@ -130,7 +130,7 @@ public:
     }
 
     // We've given up ownership of OriginalVoucher, clear it out.
-    OriginalVoucher = llvm::None;
+    OriginalVoucher = std::nullopt;
   }
 };
 

@@ -12,8 +12,23 @@
 
 import SIL
 
-extension DestructureTupleInst : OnoneSimplifyable {
+extension DestructureTupleInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+
+    // If the tuple is trivial, replace
+    // ```
+    //   (%1, %2) = destructure_tuple %t
+    // ```
+    // ->
+    // ```
+    //   %1 = tuple_extract %t, 0
+    //   %2 = tuple_extract %t, 1
+    // ```
+    // This canonicalization helps other optimizations to e.g. CSE tuple_extracts.
+    //
+    if replaceWithTupleExtract(context) {
+      return
+    }
 
     // Eliminate the redundant instruction pair
     // ```
@@ -26,28 +41,109 @@ extension DestructureTupleInst : OnoneSimplifyable {
       tryReplaceConstructDestructPair(construct: tuple, destruct: self, context)
     }
   }
+
+  private func replaceWithTupleExtract(_ context: SimplifyContext) -> Bool {
+    guard self.tuple.type.isTrivial(in: parentFunction) else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    for (elementIdx, result) in results.enumerated() {
+      let elementValue = builder.createTupleExtract(tuple: self.tuple, elementIndex: elementIdx)
+      result.uses.replaceAll(with: elementValue, context)
+    }
+    context.erase(instruction: self)
+    return true
+  }
 }
 
-extension DestructureStructInst : OnoneSimplifyable {
+extension DestructureStructInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
-    // Eliminate the redundant instruction pair
+    // If the struct is trivial, replace
     // ```
-    //   %s = struct (%0, %1, %2)
-    //   (%3, %4, %5) = destructure_struct %s
+    //   (%1, %2) = destructure_struct %s
     // ```
-    // and replace the results %3, %4, %5 with %0, %1, %2, respectively
+    // ->
+    // ```
+    //   %1 = struct_extract %s, #S.field0
+    //   %2 = struct_extract %s, #S.field1
+    // ```
+    // This canonicalization helps other optimizations to e.g. CSE tuple_extracts.
     //
-    if let str = self.struct as? StructInst {
-      tryReplaceConstructDestructPair(construct: str, destruct: self, context)
+    if replaceWithStructExtract(context) {
+      return
     }
+
+    switch self.struct {
+    case let str as StructInst:
+      // Eliminate the redundant instruction pair
+      // ```
+      //   %s = struct (%0, %1, %2)
+      //   (%3, %4, %5) = destructure_struct %s
+      // ```
+      // and replace the results %3, %4, %5 with %0, %1, %2, respectively
+      //
+      tryReplaceConstructDestructPair(construct: str, destruct: self, context)
+
+    case let copy as CopyValueInst:
+      // Similar to the pattern above, but with a copy_value:
+      // Replace
+      // ```
+      //   %s = struct (%0, %1, %2)
+      //   %c = copy_value %s           // can also be a chain of multiple copies
+      //   (%3, %4, %5) = destructure_struct %c
+      // ```
+      // with
+      // ```
+      //   %c0 = copy_value %0
+      //   %c1 = copy_value %1
+      //   %c2 = copy_value %2
+      //   %s = struct (%0, %1, %2)    // keep the original struct
+      // ```
+      // and replace the results %3, %4, %5 with %c0, %c1, %c2, respectively.
+      //
+      // This transformation has the advantage that we can do it even if the `struct` instruction
+      // has other uses than the `copy_value`.
+      //
+      if copy.uses.singleUse?.instruction == self,
+         let structInst = copy.fromValue.lookThroughCopy as? StructInst,
+         structInst.parentBlock == self.parentBlock
+      {
+        for (result, operand) in zip(self.results, structInst.operands) {
+          if operand.value.type.isTrivial(in: parentFunction) {
+            result.uses.replaceAll(with: operand.value, context)
+          } else {
+            let builder = Builder(before: structInst, context)
+            let copiedOperand = builder.createCopyValue(operand: operand.value)
+            result.uses.replaceAll(with: copiedOperand, context)
+          }
+        }
+        context.erase(instruction: self)
+        context.erase(instruction: copy)
+      }
+    default:
+      break
+    }
+  }
+
+  private func replaceWithStructExtract(_ context: SimplifyContext) -> Bool {
+    guard self.struct.type.isTrivial(in: parentFunction) else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    for (fieldIdx, result) in results.enumerated() {
+      let fieldValue = builder.createStructExtract(struct: self.struct, fieldIndex: fieldIdx)
+      result.uses.replaceAll(with: fieldValue, context)
+    }
+    context.erase(instruction: self)
+    return true
   }
 }
 
 private func tryReplaceConstructDestructPair(construct: SingleValueInstruction,
                                              destruct: MultipleValueInstruction,
                                              _ context: SimplifyContext) {
-  let singleUse = context.preserveDebugInfo ? construct.uses.singleUse : construct.uses.singleNonDebugUse
+  let singleUse = context.preserveDebugInfo ? construct.uses.singleUse : construct.uses.ignoreDebugUses.singleUse
   let canEraseFirst = singleUse?.instruction == destruct
 
   if !canEraseFirst && construct.parentFunction.hasOwnership && construct.ownership == .owned {

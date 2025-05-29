@@ -65,6 +65,8 @@
 // RUN: cat %t/ClientLib.swiftinterface | %FileCheck --check-prefixes=CLIENT-PUBLIC %s
 // RUN: cat %t/ClientLib.private.swiftinterface | %FileCheck --check-prefixes=CLIENT-PRIVATE %s
 
+// REQUIRES: swift_feature_ModuleInterfaceExportAs
+
 //--- PrivateLib.swift
 
 public struct PrivateNameStruct {}

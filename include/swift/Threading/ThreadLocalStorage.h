@@ -115,6 +115,15 @@ public:
   T get() { return value; }
 
   void set(T newValue) { value = newValue; }
+
+  T swap(T newValue) {
+    // There's an implicit optimization here because we implicitly
+    // materialize the address of the thread-local once instead of
+    // separately for two calls to get and set.
+    auto curValue = get();
+    set(newValue);
+    return curValue;
+  }
 };
 #else
 // A wrapper around a TLS key that is lazily initialized using swift::once.
@@ -167,6 +176,12 @@ public:
     void *storedValue;
     memcpy(&storedValue, &newValue, sizeof(T));
     tls_set(key.getKey(), storedValue);
+  }
+
+  T swap(T newValue) {
+    auto curValue = get();
+    set(newValue);
+    return curValue;
   }
 };
 #endif

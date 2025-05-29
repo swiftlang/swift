@@ -12,6 +12,7 @@
 
 #include "RefactoringActions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift::refactoring;
 
@@ -62,7 +63,7 @@ public:
   getContextFromCursorInfo(ResolvedCursorInfoPtr Tok);
 
   ArrayRef<ValueDecl *> getFillingContents() const {
-    return llvm::makeArrayRef(FillingContents);
+    return llvm::ArrayRef(FillingContents);
   }
 
   DeclContext *getFillingContext() const { return DC; }

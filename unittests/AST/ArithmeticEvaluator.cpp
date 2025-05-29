@@ -33,9 +33,9 @@ class ArithmeticExpr {
   } kind;
 
   // Note: used for internal caching.
-  Optional<double> cachedValue;
+  std::optional<double> cachedValue;
 
- protected:
+protected:
   ArithmeticExpr(Kind kind) : kind(kind) { }
 };
 
@@ -174,7 +174,7 @@ struct ExternallyCachedEvaluationRule
     }
   }
 
-  Optional<double> getCachedResult() const {
+  std::optional<double> getCachedResult() const {
     auto expr = std::get<0>(getStorage());
 
     return expr->cachedValue;

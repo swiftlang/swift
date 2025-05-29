@@ -12,7 +12,6 @@ class C {}
 class D: P, Q { func paul() {}; func d() {} }
 
 
-func asUnwrappedOptionalBase() -> (some P)! { return 1 } // expected-warning{{using '!' is not allowed here; treating this as '?' instead}}
 //
 // FIXME: We should be able to support this
 func asHOFRetRet() -> () -> some P { return { 1 } } // expected-error{{cannot convert value of type 'Int' to closure result type 'some P'}}

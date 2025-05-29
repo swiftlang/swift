@@ -22,7 +22,7 @@ fileprivate protocol R : Q {
 private protocol S : R {
   func privateRequirement()
   func privateRequirementCannotWork()
-  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'; add a stub for conformance}}
+  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'}}
 }
 
 extension S {
@@ -37,6 +37,7 @@ extension S {
 
 public struct T : S {}
 // expected-error@-1 {{type 'T' does not conform to protocol 'S'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 protocol Qpkg : Pkg {
   func internalRequirement()
@@ -48,7 +49,7 @@ fileprivate protocol Rpkg : Qpkg {
 private protocol Spkg : Rpkg {
   func privateRequirement()
   func privateRequirementCannotWork()
-  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'; add a stub for conformance}}
+  // expected-note@-1 {{protocol requires function 'privateRequirementCannotWork()' with type '() -> ()'}}
 }
 
 extension Spkg {
@@ -64,6 +65,7 @@ extension Spkg {
 
 public struct Tpkg : Spkg {}
 // expected-error@-1 {{type 'Tpkg' does not conform to protocol 'Spkg'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 // This is also OK
 @usableFromInline

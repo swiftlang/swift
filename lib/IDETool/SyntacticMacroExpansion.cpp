@@ -15,6 +15,7 @@
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
@@ -25,11 +26,13 @@ using namespace ide;
 
 std::shared_ptr<SyntacticMacroExpansionInstance>
 SyntacticMacroExpansion::getInstance(ArrayRef<const char *> args,
+                                     llvm::MemoryBuffer *inputBuf,
                                      std::string &error) {
   // Create and configure a new instance.
   auto instance = std::make_shared<SyntacticMacroExpansionInstance>();
 
-  bool failed = instance->setup(SwiftExecutablePath, args, Plugins, error);
+  bool failed =
+      instance->setup(SwiftExecutablePath, args, inputBuf, Plugins, error);
   if (failed)
     return nullptr;
 
@@ -38,7 +41,8 @@ SyntacticMacroExpansion::getInstance(ArrayRef<const char *> args,
 
 bool SyntacticMacroExpansionInstance::setup(
     StringRef SwiftExecutablePath, ArrayRef<const char *> args,
-    std::shared_ptr<PluginRegistry> plugins, std::string &error) {
+    llvm::MemoryBuffer *inputBuf, std::shared_ptr<PluginRegistry> plugins,
+    std::string &error) {
   SmallString<256> driverPath(SwiftExecutablePath);
   llvm::sys::path::remove_filename(driverPath);
   llvm::sys::path::append(driverPath, "swiftc");
@@ -62,6 +66,7 @@ bool SyntacticMacroExpansionInstance::setup(
       invocation.getLangOptions(), invocation.getTypeCheckerOptions(),
       invocation.getSILOptions(), invocation.getSearchPathOptions(),
       invocation.getClangImporterOptions(), invocation.getSymbolGraphOptions(),
+      invocation.getCASOptions(), invocation.getSerializationOptions(),
       SourceMgr, Diags));
   registerParseRequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
@@ -71,37 +76,17 @@ bool SyntacticMacroExpansionInstance::setup(
   pluginLoader->setRegistry(plugins.get());
   Ctx->setPluginLoader(std::move(pluginLoader));
 
-  // Create a module where SourceFiles reside.
+  // Create the ModuleDecl and SourceFile.
   Identifier ID = Ctx->getIdentifier(invocation.getModuleName());
-  TheModule = ModuleDecl::create(ID, *Ctx);
+  TheModule = ModuleDecl::create(ID, *Ctx,
+                                 [&](ModuleDecl *TheModule, auto addFile) {
+    SF = new (*Ctx) SourceFile(*TheModule, SourceFileKind::Main,
+                               SourceMgr.addMemBufferCopy(inputBuf));
+    SF->setImports({});
+    addFile(SF);
+  });
 
   return false;
-}
-
-SourceFile *
-SyntacticMacroExpansionInstance::getSourceFile(llvm::MemoryBuffer *inputBuf) {
-
-  // If there is a SourceFile with the same name and the content, use it.
-  // Note that this finds the generated source file that was created in the
-  // previous expansion requests.
-  if (auto bufID =
-          SourceMgr.getIDForBufferIdentifier(inputBuf->getBufferIdentifier())) {
-    if (inputBuf->getBuffer() == SourceMgr.getEntireTextForBuffer(*bufID)) {
-      SourceLoc bufLoc = SourceMgr.getLocForBufferStart(*bufID);
-      if (SourceFile *existing =
-              TheModule->getSourceFileContainingLocation(bufLoc)) {
-        return existing;
-      }
-    }
-  }
-
-  // Otherwise, create a new SourceFile.
-  SourceFile *SF = new (getASTContext()) SourceFile(
-      *TheModule, SourceFileKind::Main, SourceMgr.addMemBufferCopy(inputBuf));
-  SF->setImports({});
-  TheModule->addFile(*SF);
-
-  return SF;
 }
 
 MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
@@ -177,8 +162,8 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
 /// Create a unique name of the expansion. The result is *appended* to \p out.
 static void addExpansionDiscriminator(
     SmallString<32> &out, const SourceFile *SF, SourceLoc loc,
-    llvm::Optional<SourceLoc> supplementalLoc = llvm::None,
-    llvm::Optional<MacroRole> role = llvm::None) {
+    std::optional<SourceLoc> supplementalLoc = std::nullopt,
+    std::optional<MacroRole> role = std::nullopt) {
   SourceManager &SM = SF->getASTContext().SourceMgr;
 
   StableHasher hasher = StableHasher::defaultHasher();
@@ -230,7 +215,7 @@ expandFreestandingMacro(MacroDecl *macro,
   SourceFile *expandedSource =
       swift::evaluateFreestandingMacro(expansion, discriminator);
   if (expandedSource)
-    bufferIDs.push_back(*expandedSource->getBufferID());
+    bufferIDs.push_back(expandedSource->getBufferID());
 
   return bufferIDs;
 }
@@ -253,7 +238,7 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     SourceFile *expandedSource = swift::evaluateAttachedMacro(
         macro, target, attr, passParent, role, discriminator);
     if (expandedSource)
-      bufferIDs.push_back(*expandedSource->getBufferID());
+      bufferIDs.push_back(expandedSource->getBufferID());
   };
 
   MacroRoles roles = macro->getMacroRoles();
@@ -286,6 +271,15 @@ expandAttachedMacro(MacroDecl *macro, CustomAttr *attr, Decl *attachedDecl) {
     if (isa<NominalTypeDecl>(attachedDecl))
       evaluate(attachedDecl, /*passParent=*/false, MacroRole::Extension);
   }
+  if (roles.contains(MacroRole::Preamble)) {
+    if (isa<AbstractFunctionDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Preamble);
+  }
+  if (roles.contains(MacroRole::Body)) {
+    if (isa<AbstractFunctionDecl>(attachedDecl))
+      evaluate(attachedDecl, /*passParent=*/false, MacroRole::Body);
+  }
+
   return bufferIDs;
 }
 
@@ -320,7 +314,7 @@ struct ExpansionNode {
 class MacroExpansionFinder : public ASTWalker {
   SourceManager &SM;
   SourceLoc locToResolve;
-  llvm::Optional<ExpansionNode> result;
+  std::optional<ExpansionNode> result;
 
   bool rangeContainsLocToResolve(SourceRange Range) const {
     return SM.rangeContainsTokenLoc(Range, locToResolve);
@@ -330,7 +324,7 @@ public:
   MacroExpansionFinder(SourceManager &SM, SourceLoc locToResolve)
       : SM(SM), locToResolve(locToResolve) {}
 
-  llvm::Optional<ExpansionNode> getResult() const { return result; }
+  std::optional<ExpansionNode> getResult() const { return result; }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::None;
@@ -341,7 +335,7 @@ public:
     // include its attribute ranges (because attributes are part of PBD.)
     if (!isa<VarDecl>(D) &&
         !rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
 
     // Check the attributes.
@@ -371,7 +365,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (!rangeContainsLocToResolve(E->getSourceRange())) {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
 
     // Check 'MacroExpansionExpr'.
@@ -389,38 +383,37 @@ public:
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (!rangeContainsLocToResolve(S->getSourceRange())) {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     return Action::Continue(S);
   }
   PreWalkResult<ArgumentList *>
   walkToArgumentListPre(ArgumentList *AL) override {
     if (!rangeContainsLocToResolve(AL->getSourceRange())) {
-      return Action::SkipChildren(AL);
+      return Action::SkipNode(AL);
     }
     return Action::Continue(AL);
   }
   PreWalkAction walkToParameterListPre(ParameterList *PL) override {
     if (!rangeContainsLocToResolve(PL->getSourceRange())) {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     return Action::Continue();
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     // TypeRepr cannot have macro expansions in it.
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 };
 } // namespace
 
 void SyntacticMacroExpansionInstance::expand(
-    SourceFile *SF, const MacroExpansionSpecifier &expansion,
-    SourceEditConsumer &consumer) {
+    const MacroExpansionSpecifier &expansion, SourceEditConsumer &consumer) {
 
   // Find the expansion at 'expansion.offset'.
   MacroExpansionFinder expansionFinder(
       SourceMgr,
-      SourceMgr.getLocForOffset(*SF->getBufferID(), expansion.offset));
+      SourceMgr.getLocForOffset(SF->getBufferID(), expansion.offset));
   SF->walk(expansionFinder);
   auto expansionNode = expansionFinder.getResult();
   if (!expansionNode)
@@ -464,13 +457,9 @@ void SyntacticMacroExpansionInstance::expand(
 }
 
 void SyntacticMacroExpansionInstance::expandAll(
-    llvm::MemoryBuffer *inputBuf, ArrayRef<MacroExpansionSpecifier> expansions,
+    ArrayRef<MacroExpansionSpecifier> expansions,
     SourceEditConsumer &consumer) {
-
-  // Create a source file.
-  SourceFile *SF = getSourceFile(inputBuf);
-
   for (const auto &expansion : expansions) {
-    expand(SF, expansion, consumer);
+    expand(expansion, consumer);
   }
 }

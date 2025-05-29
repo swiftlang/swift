@@ -43,8 +43,9 @@ SIL_ANALYSIS(PostDominance)
 SIL_ANALYSIS(PostOrder)
 SIL_ANALYSIS(ProtocolConformance)
 SIL_ANALYSIS(RCIdentity)
-SIL_ANALYSIS(TypeExpansion)
 SIL_ANALYSIS(PassManagerVerifier)
 SIL_ANALYSIS(DeadEndBlocks)
+SIL_ANALYSIS(Region)
+SIL_ANALYSIS(IsSelfRecursive)
 
 #undef SIL_ANALYSIS

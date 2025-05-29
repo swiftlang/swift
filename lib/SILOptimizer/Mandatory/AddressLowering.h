@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -134,11 +135,11 @@ struct ValueStorage {
 
   /// The latest instruction which opens an archetype involved in the value's
   /// type.  Just a cache of getLatestOpeningInst(value).
-  mutable llvm::Optional<SILInstruction *> latestOpeningInst = llvm::None;
+  mutable std::optional<SILInstruction *> latestOpeningInst = std::nullopt;
 
   /// When either isDefProjection or isUseProjection is set, this refers to the
   /// storage whose "def" this value projects out of or whose operand this
-  /// storage projects into via its "use.
+  /// storage projects into via its "use".
   uint32_t projectedStorageID = InvalidID;
 
   /// For use-projections, identifies the operand index of the composing use.

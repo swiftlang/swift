@@ -25,6 +25,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
@@ -158,7 +159,7 @@ RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
       }
 
       if (!SRCs.empty())
-        return RawComment(ctx.AllocateCopy(llvm::makeArrayRef(SRCs)));
+        return RawComment(ctx.AllocateCopy(llvm::ArrayRef(SRCs)));
     }
 
     // Otherwise check to see if we have a comment available in the swiftdoc.
@@ -185,37 +186,37 @@ RawComment Decl::getRawComment() const {
   return evaluateOrDefault(eval, RawCommentRequest{this}, RawComment());
 }
 
-llvm::Optional<StringRef> Decl::getGroupName() const {
+std::optional<StringRef> Decl::getGroupName() const {
   if (hasClangNode())
-    return llvm::None;
+    return std::nullopt;
   if (auto *Unit =
           dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
     return Unit->getGroupNameForDecl(this);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<StringRef> Decl::getSourceFileName() const {
+std::optional<StringRef> Decl::getSourceFileName() const {
   if (hasClangNode())
-    return llvm::None;
+    return std::nullopt;
   if (auto *Unit =
           dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext())) {
     // We can only get group information from deserialized module files.
     return Unit->getSourceFileNameForDecl(this);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<unsigned> Decl::getSourceOrder() const {
+std::optional<unsigned> Decl::getSourceOrder() const {
   if (hasClangNode())
-    return llvm::None;
+    return std::nullopt;
   if (auto *Unit =
       dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
     // We can only get source orders from deserialized module files.
     return Unit->getSourceOrderForDecl(this);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 CharSourceRange RawComment::getCharSourceRange() {
@@ -241,14 +242,14 @@ static bool hasDoubleUnderscore(const Decl *D) {
   // If it's a function or subscript with a parameter with leading
   // double underscore, it's a private function or subscript.
   if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
-    auto *params = getParameterList(cast<ValueDecl>(const_cast<Decl *>(D)));
+    auto *params = cast<ValueDecl>(D)->getParameterList();
     if (params->hasInternalParameter(Prefix))
       return true;
   }
 
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     auto Name = VD->getBaseName();
-    if (!Name.isSpecial() && Name.getIdentifier().str().startswith(Prefix)) {
+    if (!Name.isSpecial() && Name.getIdentifier().str().starts_with(Prefix)) {
       return true;
     }
   }

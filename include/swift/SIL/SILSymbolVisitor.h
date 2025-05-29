@@ -31,14 +31,17 @@ struct SILSymbolVisitorOptions {
   /// are needed (e.g. decls with `@_originallyDefinedIn`.
   bool LinkerDirectivesOnly = false;
 
-  /// Whether to only visit symbols with public linkage.
-  bool PublicSymbolsOnly = true;
+  /// Whether to only visit symbols with public or package linkage.
+  bool PublicOrPackageSymbolsOnly = true;
 
   /// Whether LLVM IR Virtual Function Elimination is enabled.
   bool VirtualFunctionElimination = false;
 
   /// Whether LLVM IR Witness Method Elimination is enabled.
   bool WitnessMethodElimination = false;
+
+  /// Whether resilient protocols should be emitted fragile.
+  bool FragileResilientProtocols = false;
 };
 
 /// Context for `SILSymbolVisitor` symbol enumeration.
@@ -97,6 +100,7 @@ public:
   virtual void addAsyncFunctionPointer(SILDeclRef declRef) {}
   virtual void addBaseConformanceDescriptor(BaseConformance BC) {}
   virtual void addClassMetadataBaseOffset(ClassDecl *CD) {}
+  virtual void addCoroFunctionPointer(SILDeclRef declRef) {}
   virtual void addDispatchThunk(SILDeclRef declRef) {}
   virtual void addDynamicFunction(AbstractFunctionDecl *AFD,
                                   DynamicKind dynKind) {}
@@ -109,6 +113,7 @@ public:
   virtual void addMethodLookupFunction(ClassDecl *CD) {}
   virtual void addNominalTypeDescriptor(NominalTypeDecl *NTD) {}
   virtual void addObjCInterface(ClassDecl *CD) {}
+  virtual void addObjCMetaclass(ClassDecl *CD) {}
   virtual void addObjCMethod(AbstractFunctionDecl *AFD) {}
   virtual void addObjCResilientClassStub(ClassDecl *CD) {}
   virtual void addOpaqueTypeDescriptor(OpaqueTypeDecl *OTD) {}

@@ -5,7 +5,7 @@
 
 // UNSUPPORTED: asserts
 
-// REQUIRES: rdar89986815
+// REQUIRES: rdar135847553
 
 class Klass {}
 

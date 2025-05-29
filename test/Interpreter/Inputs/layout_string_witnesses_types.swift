@@ -1,4 +1,5 @@
 import Swift
+import CTypes
 
 public class SimpleClass {
     public let x: Int
@@ -39,6 +40,25 @@ public struct Simple {
     }
 }
 
+public struct CTypeAligned {
+    let x = BigAlignment()
+    let y: SimpleClass
+
+    public init(_ y: SimpleClass) {
+        self.y = y
+    }
+}
+
+public struct CTypeUnderAligned {
+    let w: Int32 = 0
+    let x: UnderAligned? = UnderAligned()
+    let y: SimpleClass
+
+    public init(_ y: SimpleClass) {
+        self.y = y
+    }
+}
+
 public struct GenericStruct<T> {
     let x: Int = 0
     let y: T
@@ -57,17 +77,17 @@ public class GenericClass<T> {
 }
 
 public struct GenericBig<T> {
-    let x: T   
-    let x1: T  
-    let x2: T  
-    let x3: T  
-    let x4: T  
-    let x5: T  
-    let x6: T  
-    let x7: T  
-    let x8: T  
-    let x9: T  
-    let x10: T 
+    let x: T
+    let x1: T
+    let x2: T
+    let x3: T
+    let x4: T
+    let x5: T
+    let x6: T
+    let x7: T
+    let x8: T
+    let x9: T
+    let x10: T
 
     public init(x: T) {
         self.x = x
@@ -347,6 +367,11 @@ public struct ContainsSinglePayloadSimpleClassEnum {
     }
 }
 
+public enum TestOptional<T> {
+    case empty
+    case nonEmpty(T)
+}
+
 public enum SinglePayloadEnum<T> {
     case empty
     case nonEmpty(Int, T?)
@@ -380,6 +405,12 @@ public struct MultiPayloadEnumWrapper {
     }
 }
 
+public enum MultiPayloadEnumMultiLarge {
+    case empty
+    case nonEmpty(Int, SimpleClass, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+    case nonEmpty2(SimpleClass, Int, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+}
+
 public struct MixedEnumWrapper {
     let x: SinglePayloadSimpleClassEnum
     let y: MultiPayloadEnum
@@ -406,6 +437,16 @@ public struct SinglePayloadEnumExtraTagBytesWrapper {
 
     public init(x: SinglePayloadEnumExtraTagBytes, y: SimpleClass) {
         self.x = x
+        self.y = y
+    }
+}
+
+public struct NotBitwiseTakableBridge<T> {
+    let x: Int = 0
+    let y: [T]
+    weak var z: AnyObject? = nil
+
+    public init(_ y: [T]) {
         self.y = y
     }
 }
@@ -543,6 +584,110 @@ public enum PrespecializedMultiPayloadEnum<T> {
     case nonEmpty1(T, Int)
 }
 
+public enum SinglePayloadEnumExistential {
+    case a(SomeProtocol, AnyObject)
+    case b
+    case c
+}
+
+public struct TupleLargeAlignment<T> {
+    let x: AnyObject? = nil
+    let x1: AnyObject? = nil
+    let x2: AnyObject? = nil
+    let x3: (T, SIMD4<Int64>)
+
+    public init(_ t: T) {
+        self.x3 = (t, .init(Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32, Int64(Int32.max) + 32))
+    }
+}
+
+public enum NestedMultiPayloadInner {
+    case a(UInt)
+    case b(AnyObject)
+    case c(AnyObject)
+}
+
+public enum NestedMultiPayloadOuter {
+    case a(NestedMultiPayloadInner)
+    case b(NestedMultiPayloadInner)
+    case c(NestedMultiPayloadInner)
+}
+
+public enum MultiPayloadError {
+    case empty
+    case error1(Int, Error)
+    case error2(Int, Error)
+    case error3(Int, Error)
+}
+
+public enum TwoPayloadInner {
+    case x(Int)
+    case y(AnyObject)
+}
+
+public enum TwoPayloadOuter {
+    case x(Int)
+    case y(TwoPayloadInner)
+}
+
+public enum OneExtraTagValue {
+    public enum E0 {
+        case a(Bool)
+        case b(Bool)
+    }
+
+    public enum E1 {
+        case a(E0)
+        case b(Bool)
+    }
+    public enum E2 {
+        case a(E1)
+        case b(Bool)
+    }
+    public enum E3 {
+        case a(E2)
+        case b(Bool)
+    }
+
+    public enum E4 {
+        case a(E3)
+        case b(Bool)
+    }
+
+    case x0(E4, Int8, Int16, Int32)
+    case x1(E4, Int8, Int16, Int32)
+    case x2(E4, Int8, Int16, Int32)
+    case x3(E4, Int8, Int16, Int32)
+    case y(SimpleClass)
+    case z
+}
+
+public enum ErrorWrapper {
+    case x(Error)
+    case y(Error)
+}
+
+public enum MultiPayloadAnyObject {
+    case x(AnyObject)
+    case y(AnyObject)
+    case z(AnyObject)
+}
+
+public struct NonCopyableGenericStruct<T>: ~Copyable {
+    let x: Int
+    let y: T
+
+    public init(x: Int, y: T) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public enum NonCopyableGenericEnum<T>: ~Copyable {
+    case x(Int, T?)
+    case y(Int)
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -571,8 +716,8 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 }
 
 @inline(never)
-public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
-    ptr.assign(from: x, count: 1)
+public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
+    ptr.update(from: &x, count: 1)
 }
 
 @inline(never)
@@ -581,8 +726,13 @@ public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
 }
 
 @inline(never)
+public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
+    ptr.initialize(to: consume x)
+}
+
+@inline(never)
 public func testDestroy<T>(_ ptr: UnsafeMutablePointer<T>) {
-    ptr.deinitialize(count: 1)
+    _ = ptr.move()
 }
 
 @inline(never)
@@ -617,11 +767,16 @@ public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) 
 }
 
 @inline(never)
+public func testGenericArrayDestroy<T: ~Copyable>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    buffer.deinitialize()
+}
+
+@inline(never)
 public func testGenericArrayInitWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
-    dest.initialize(fromContentsOf: src)
+    _ = dest.initialize(fromContentsOf: src)
 }
 
 @inline(never)
 public func testGenericArrayAssignWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
-    dest.update(fromContentsOf: src)
+    _ = dest.update(fromContentsOf: src)
 }

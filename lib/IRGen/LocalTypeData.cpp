@@ -28,6 +28,8 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -221,7 +223,7 @@ LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
   auto &chain = it->second;
 
   CacheEntry *best = nullptr;
-  llvm::Optional<OperationCost> bestCost;
+  std::optional<OperationCost> bestCost;
 
   CacheEntry *next = chain.Root;
   while (next) {
@@ -304,6 +306,84 @@ LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
   llvm_unreachable("bad cache entry kind");
 }
 
+LocalTypeDataCache::StateAdvancement LocalTypeDataCache::advanceStateInScope(
+    IRGenFunction &IGF, LocalTypeDataKey key, MetadataState state) {
+  // Use the caching key.
+  key = key.getCachingKey();
+
+  auto iterator = Map.find(key);
+  // There's no chain of entries, so no entry which could possibly be used.
+  if (iterator == Map.end())
+    return StateAdvancement::NoEntry;
+  auto &chain = iterator->second;
+
+  // Scan the chain for an entry with the appropriate relationship to the active
+  // dominance scope, and "promote its state".  The existence of a concrete
+  // entry whose state is already at least as complete as `state` is
+  // unaffected, and results in exiting early.
+  //
+  // There are two cases of interest:
+  //
+  // (1) DominancePoint(entry) dominates ActiveDominancePoint .
+  // (2) DominancePoint(entry) is dominated by ActiveDominancePoint .
+  //
+  // For (1), a new cache entry is created at ActiveDominancePoint.
+  // For (2), the state of the existing entry would be updated.
+  //
+  // Because of the order in which IRGen lowers, however, (2) can't actually
+  // happen: metadata whose dominance point is dominated by
+  // ActiveDominancePoint would not have been emitted yet.
+
+  // Find the best entry in the chain from which to produce a new entry.
+  CacheEntry *best = nullptr;
+  for (auto *link = chain.Root; link; link = link->getNext()) {
+    // In case (1)?
+    if (!IGF.isActiveDominancePointDominatedBy(link->DefinitionPoint))
+      continue;
+
+    switch (link->getKind()) {
+    case CacheEntry::Kind::Concrete: {
+      auto entry = cast<ConcreteCacheEntry>(link);
+      // If the entry is already as complete as `state`, it doesn't need to be
+      // used to create a new entry.  In fact, no new entry needs to be created
+      // at all: this entry will be seen to be best if locally cached metadata
+      // is requested later.  Stop traversal and return.
+      if (isAtLeast(entry->Value.getStaticLowerBoundOnState(), state))
+        return StateAdvancement::AlreadyAtLeast;
+
+      // Any suitable concrete entry is equally ideal.
+      best = entry;
+      break;
+    }
+    case CacheEntry::Kind::Abstract: {
+      // TODO: Consider the cost to materialize the abstract entry in order to
+      //       determine which is best.
+      break;
+    }
+    }
+  }
+
+  if (!best)
+    return StateAdvancement::NoEntry;
+
+  switch (best->getKind()) {
+  case CacheEntry::Kind::Concrete: {
+    auto *entry = cast<ConcreteCacheEntry>(best);
+    // Create a new entry at the ActiveDominancePoint.
+    auto response =
+        MetadataResponse::forBounded(entry->Value.getMetadata(), state);
+    IGF.setScopedLocalTypeData(key, response,
+                               /*mayEmitDebugInfo=*/false);
+
+    return StateAdvancement::Advanced;
+  }
+  case CacheEntry::Kind::Abstract:
+    // TODO: Advance abstract entries.
+    return StateAdvancement::NoEntry;
+  }
+  llvm_unreachable("covered switch!?");
+}
+
 MetadataResponse
 LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
                                                AbstractSource &source,
@@ -328,26 +408,59 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   // functions that were inlined into transparent functions. Correct would be to
   // check which instruction requests the type metadata and see whether its
   // inlined function is transparent.
-  auto * DS = IGF.getDebugScope();
+  auto *DS = IGF.getDebugScope();
   if (DS && DS->getInlinedFunction() &&
       DS->getInlinedFunction()->isTransparent())
     return;
-  
-  // Only for formal type metadata.
-  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
+  // For formal type metadata and witness tables.
+  ProtocolDecl *proto = nullptr;
+
+  if (key.Kind.isAbstractProtocolConformance())
+    proto = key.Kind.getAbstractProtocolConformance();
+  else if (key.Kind.isConcreteProtocolConformance())
+    proto = key.Kind.getConcreteProtocolConformance()->getProtocol();
+  else if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;
 
   // Only for archetypes, and not for opened/opaque archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (!type->isRoot())
+  if (!type->isRoot() && !proto)
     return;
   if (!isa<PrimaryArchetypeType>(type) && !isa<PackArchetypeType>(type))
     return;
 
-  auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
-  auto name = typeParam->getName().str();
+  auto interfaceType = type->getInterfaceType();
+  llvm::SmallString<16> name;
+  llvm::SmallString<16> displayName;
+  if (auto DMT =
+          llvm::dyn_cast<DependentMemberType>(interfaceType.getPointer())) {
+    std::function<void(DependentMemberType *)> visitDependentMembers =
+        [&](DependentMemberType *member) {
+          if (member == nullptr)
+            return;
+          if (auto *parent =
+                  llvm::dyn_cast<DependentMemberType>(member->getBase())) {
+            visitDependentMembers(parent);
+            name.append("$");
+            displayName.append(".");
+          }
+          name.append(member->getName().str());
+          displayName.append(member->getName().str());
+        };
+    name.append(DMT->getRootGenericParam()->getCanonicalName().str());
+    name.append("$");
+    displayName.append(DMT->getRootGenericParam()->getName().str());
+    displayName.append(".");
+    visitDependentMembers(DMT);
+  } else if (auto GTPT = llvm::dyn_cast<GenericTypeParamType>(
+                 interfaceType.getPointer())) {
+    name = GTPT->getCanonicalName().str();
+    displayName = GTPT->getName().str();
+  } else {
+    return;
+  }
 
   llvm::Value *data = value.getMetadata();
 
@@ -358,7 +471,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   // though; see the comment in IRGenFunctionSIL::emitShadowCopyIfNeeded().
   if (!IGF.IGM.IRGen.Opts.shouldOptimize() && !IGF.isAsync()) {
     auto alloca =
-        IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(), name);
+        IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(), displayName);
     IGF.Builder.CreateStore(data, alloca);
     data = alloca.getAddress();
   }
@@ -367,10 +480,12 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (!IGF.IGM.DebugInfo)
     return;
 
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data,
-                                      typeParam->getDepth(),
-                                      typeParam->getIndex(),
-                                      name);
+  if (proto) {
+    IGF.IGM.DebugInfo->emitWitnessTable(IGF, data, name, proto);
+  } else {
+    auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
+    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam);
+  }
 }
 
 void
@@ -381,10 +496,112 @@ IRGenFunction::setScopedLocalTypeMetadataForLayout(SILType type,
   setScopedLocalTypeData(key, response);
 }
 
-void IRGenFunction::setScopedLocalTypeMetadata(CanType type,
-                                               MetadataResponse response) {
+namespace {
+
+void setScopedLocalTypeMetadataImpl(IRGenFunction &IGF, CanType type,
+                                    MetadataResponse response) {
   auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
-  setScopedLocalTypeData(key, response);
+  IGF.setScopedLocalTypeData(key, response);
+}
+
+/// Walks the types upon whose corresponding metadata records' completeness the
+/// completeness of \p rootTy's metadata record depends.  For each such type,
+/// marks the corresponding locally cached metadata record, if any, complete.
+class TransitiveMetadataCompletion {
+  IRGenFunction &IGF;
+  LocalTypeDataCache &cache;
+  CanType rootTy;
+  GraphNodeWorklist<CanType, 4> worklist;
+
+public:
+  TransitiveMetadataCompletion(IRGenFunction &IGF, LocalTypeDataCache &cache,
+                               CanType rootTy)
+      : IGF(IGF), cache(cache), rootTy(rootTy) {}
+
+  void complete();
+
+private:
+  /// Marks the metadata record currently locally cached corresponding to \p ty
+  /// complete.
+  ///
+  /// Returns whether \p ty's transitive metadata should be marked complete.
+  bool visit(CanType ty) {
+    // If it's the root type, it's already been marked complete, but we want to
+    // mark its transitively dependent metadata as complete.
+    if (ty == rootTy)
+      return true;
+    auto key = LocalTypeDataKey(ty, LocalTypeDataKind::forFormalTypeMetadata());
+    // The metadata record was already marked complete.  When that was done, the
+    // records for types it has transitive completeness requirements on would
+    // have been marked complete, if they had already been materialized.
+    //
+    // Such records may have been materialized since then in an abstract state,
+    // but that is an unlikely case and scanning again would incur compile-time
+    // overhead.
+    if (cache.advanceStateInScope(IGF, key, MetadataState::Complete) ==
+        LocalTypeDataCache::StateAdvancement::AlreadyAtLeast)
+      return false;
+    return true;
+  }
+};
+
+void TransitiveMetadataCompletion::complete() {
+  worklist.initialize(rootTy);
+
+  while (auto ty = worklist.pop()) {
+    if (!visit(ty)) {
+      // The transitively dependent metadata of `ty` doesn't need to be marked
+      // complete.
+      continue;
+    }
+
+    // Walk into every type that `ty` has transitive completeness requirements
+    // on and mark each one transitively complete.
+    //
+    // This should mirror findAnyTransitiveMetadata: every type whose metadata
+    // is visited (i.e. has predicate called on it) by that function should be
+    // pushed onto the worklist.
+    if (auto ct = dyn_cast<ClassType>(ty)) {
+      if (auto rawSuperTy = ct->getSuperclass()) {
+        auto superTy = rawSuperTy->getCanonicalType();
+        worklist.insert(superTy);
+      }
+    } else if (auto bgt = dyn_cast<BoundGenericType>(ty)) {
+      if (auto ct = dyn_cast<BoundGenericClassType>(bgt)) {
+        if (auto rawSuperTy = ct->getSuperclass()) {
+          auto superTy = rawSuperTy->getCanonicalType();
+          worklist.insert(superTy);
+        }
+      }
+      for (auto arg : bgt->getExpandedGenericArgs()) {
+        auto childTy = arg->getCanonicalType();
+        worklist.insert(childTy);
+      }
+    } else if (auto tt = dyn_cast<TupleType>(ty)) {
+      for (auto elt : tt.getElementTypes()) {
+        worklist.insert(elt);
+      }
+    }
+  }
+}
+
+} // end anonymous namespace
+
+void IRGenFunction::setScopedLocalTypeMetadata(CanType rootTy,
+                                               MetadataResponse response) {
+  setScopedLocalTypeMetadataImpl(*this, rootTy, response);
+
+  if (response.getStaticLowerBoundOnState() != MetadataState::Complete)
+    return;
+
+  // If the metadata record is complete, then it is _transitively_ complete.
+  // So every metadata record that it has transitive completeness requirements
+  // on must also be complete.
+  //
+  // Mark all such already materialized metadata that the given type has
+  // transitive completeness requirements on as complete.
+  TransitiveMetadataCompletion(*this, getOrCreateLocalTypeData(), rootTy)
+      .complete();
 }
 
 void IRGenFunction::setScopedLocalTypeData(CanType type,
@@ -404,8 +621,10 @@ void IRGenFunction::setScopedLocalTypeDataForLayout(SILType type,
 }
 
 void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
-                                           MetadataResponse value) {
-  maybeEmitDebugInfoForLocalTypeData(*this, key, value);
+                                           MetadataResponse value,
+                                           bool mayEmitDebugInfo) {
+  if (mayEmitDebugInfo)
+    maybeEmitDebugInfoForLocalTypeData(*this, key, value);
 
   // Register with the active ConditionalDominanceScope if necessary.
   bool isConditional = isConditionalDominancePoint();
@@ -415,6 +634,17 @@ void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
                                          isConditional, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    if (isConditional) {
+      registerConditionalLocalTypeDataKey(reifiedKey);
+    }
+    getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
+                                           isConditional, reifiedKey, value);
+  }
 }
 
 void IRGenFunction::setUnscopedLocalTypeMetadata(CanType type,
@@ -443,6 +673,15 @@ void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
                                          /*conditional*/ false, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
+                                           /*conditional*/ false, reifiedKey,
+                                           value);
+  }
 }
 
 void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
@@ -531,11 +770,20 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
-  if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
-                                       metadata.getStaticLowerBoundOnState(),
-                                       /*source*/ 0, MetadataPath(),
-                                       callbacks)) {
-    return;
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (!fulfillments.searchTupleTypeMetadata(IGF.IGM, tupleType, isExact,
+                                              metadata.getStaticLowerBoundOnState(),
+                                              /*source*/ 0, MetadataPath(),
+                                              callbacks)) {
+      return;
+    }
+  } else {
+    if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                         metadata.getStaticLowerBoundOnState(),
+                                         /*source*/ 0, MetadataPath(),
+                                         callbacks)) {
+      return;
+    }
   }
 
   addAbstractForFulfillments(IGF, std::move(fulfillments),
@@ -548,7 +796,7 @@ void LocalTypeDataCache::
 addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
                            llvm::function_ref<AbstractSource()> createSource) {
   // Add the source lazily.
-  llvm::Optional<unsigned> sourceIndex;
+  std::optional<unsigned> sourceIndex;
   auto getSourceIndex = [&]() -> unsigned {
     if (!sourceIndex) {
       AbstractSources.emplace_back(createSource());
@@ -596,6 +844,11 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
       break;
     }
+
+    case GenericRequirement::Kind::Value: {
+      localDataKind = LocalTypeDataKind::forValue();
+      break;
+    }
     }
 
     // Find the chain for the key.
@@ -604,7 +857,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
     // Check whether there's already an entry that's at least as good as the
     // fulfillment.
-    llvm::Optional<OperationCost> fulfillmentCost;
+    std::optional<OperationCost> fulfillmentCost;
     auto getFulfillmentCost = [&]() -> OperationCost {
       if (!fulfillmentCost)
         fulfillmentCost = fulfillment.second.Path.cost();
@@ -745,6 +998,8 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "ValueWitnessTable";
   } else if (Value == Shape) {
     out << "Shape";
+  } else if (Value == GenericValue) {
+    out << "GenericValue";
   } else {
     assert(isSingletonKind());
     if (Value >= ValueWitnessDiscriminatorBase) {

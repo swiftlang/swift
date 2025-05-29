@@ -31,13 +31,13 @@ public:
   virtual ~StorageVisitor() = default;
 };
 
-/// \returns true if the conformance to Copyable was successfully validated.
-bool checkCopyableConformance(ProtocolConformance *conformance);
+/// Checks that all stored properties or associated values are Copyable.
+void checkCopyableConformance(DeclContext *dc,
+                              ProtocolConformanceRef conformance);
 
-/// You should be using `ImplicitKnownProtocolConformanceRequest` instead
-ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
-                                                    NominalTypeDecl *nominal,
-                                                    KnownProtocolKind kp);
+/// Checks that all stored properties or associated values are Escapable.
+void checkEscapableConformance(DeclContext *dc,
+                               ProtocolConformanceRef conformance);
 }
 
 

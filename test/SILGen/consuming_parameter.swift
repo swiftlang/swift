@@ -6,11 +6,12 @@ func bar(_: String) {}
 func foo(y: consuming String, z: String) -> () -> String {
     // CHECK: bb0(%0 : @noImplicitCopy @_eagerMove @owned $String, %1 : @guaranteed $String):
     // CHECK:   [[BOX:%.*]] = alloc_box ${ var @moveOnly String }
-    // CHECK:   [[Y:%.*]] = project_box [[BOX]]
+    // CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+    // CHECK:   [[Y:%.*]] = project_box [[BOX_LIFETIME]]
     // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[Y]]
     // CHECK:   store %0 to [init] [[UNWRAP]]
 
-    // CHECK:   [[YCAPTURE:%.*]] = copy_value [[BOX]]
+    // CHECK:   [[YCAPTURE:%.*]] = copy_value [[BOX_LIFETIME]]
     // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_box [[YCAPTURE]]
     // CHECK:   partial_apply {{.*}} {{%.*}}([[UNWRAP]])
     let r = { y }
@@ -42,11 +43,12 @@ struct Butt {
     consuming func merged(with other: Butt) -> () -> Butt {
         // CHECK: bb0(%0 : @guaranteed $Butt, %1 : @noImplicitCopy @_eagerMove @owned $Butt):
         // CHECK:   [[BOX:%.*]] = alloc_box ${ var @moveOnly Butt }
-        // CHECK:   [[SELF:%.*]] = project_box [[BOX]]
+        // CHECK:   [[BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+        // CHECK:   [[SELF:%.*]] = project_box [[BOX_LIFETIME]]
         // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[SELF]]
         // CHECK:   store %1 to [init] [[UNWRAP]]
 
-        // CHECK:   [[SELFCAPTURE:%.*]] = copy_value [[BOX]]
+        // CHECK:   [[SELFCAPTURE:%.*]] = copy_value [[BOX_LIFETIME]]
         // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_box [[SELFCAPTURE]]
         // CHECK:   partial_apply {{.*}} {{%.*}}([[UNWRAP]])
         let r = { self }

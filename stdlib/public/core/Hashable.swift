@@ -158,7 +158,7 @@ internal func Hashable_isEqual_indirect<T: Hashable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>
 ) -> Bool {
-  return lhs.pointee == rhs.pointee
+  return unsafe lhs.pointee == rhs.pointee
 }
 
 // Called by the SwiftValue implementation.
@@ -166,5 +166,5 @@ internal func Hashable_isEqual_indirect<T: Hashable>(
 internal func Hashable_hashValue_indirect<T: Hashable>(
   _ value: UnsafePointer<T>
 ) -> Int {
-  return value.pointee.hashValue
+  return unsafe value.pointee.hashValue
 }

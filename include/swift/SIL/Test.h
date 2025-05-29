@@ -108,6 +108,7 @@ class SILFunctionTransform;
 class SILPassManager;
 class DominanceAnalysis;
 class DominanceInfo;
+class DeadEndBlocks;
 
 namespace test {
 
@@ -120,6 +121,9 @@ class TestRunner;
 /// Tests are instantiated once at program launch.  At that time, they are
 /// stored in a registry name -> test.  When an specify_test instruction
 /// naming a particular test is processed, that test is run.
+///
+/// This is a value type because we have no persistent location in which to
+/// store SwiftCompilerSources tests.
 class FunctionTest final {
 public:
   /// Wraps a test lambda.
@@ -144,17 +148,23 @@ public:
   /// To create a new test, just write
   ///
   ///     namespace swift::test {
-  ///     static FunctionTest myTest("my-test", [](
+  ///     static FunctionTest myTest("my_new_test", [](
   ///       SILFunction &function, Arguments &arguments, FunctionTest &test){
   ///         // test code
   ///       });
   ///     } // end namespace swift::test
   FunctionTest(StringRef name, Invocation invocation);
 
-  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
+  /// Creates a test that will run \p invocation and stores it in the global
+  /// registry.
+  static void createNativeSwiftFunctionTest(StringRef name,
+                                            NativeSwiftInvocation invocation);
 
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
+
+  /// The function's dead-end blocks.
+  DeadEndBlocks *getDeadEndBlocks();
 
   /// Returns the active pass manager.
   SILPassManager *getPassManager();
@@ -166,6 +176,8 @@ public:
   ///       depend on it.  See `Layering` below for more details.
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
+
+  SILFunctionTransform *getPass();
 
   SwiftPassInvocation *getSwiftPassInvocation();
 
@@ -187,7 +199,7 @@ private:
            SILFunctionTransform &pass, Dependencies &dependencies);
 
   /// Retrieve the test with named \p name from the global registry.
-  static FunctionTest *get(StringRef name);
+  static FunctionTest get(StringRef name);
 
   /// The instance of the TestRunner pass currently running this test.  Only
   /// non-null when FunctionTest::run is executing.
@@ -246,6 +258,7 @@ private:
   /// are visible: TestRunner::FunctionTestDependenciesImpl.
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;
+    virtual DeadEndBlocks *getDeadEndBlocks() = 0;
     virtual SILPassManager *getPassManager() = 0;
     virtual SwiftPassInvocation *getSwiftPassInvocation() = 0;
     virtual ~Dependencies(){};
@@ -254,6 +267,11 @@ private:
   /// The vendor for dependencies provided to the test by TestRunner.  Only
   /// non-null when FunctionTest::run is executing.
   Dependencies *dependencies;
+
+public:
+  /// Creates a test that will run \p invocation.  For use by
+  /// createNativeSwiftFunctionTest.
+  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
 };
 
 /// Thunks for delaying template instantiation.
@@ -291,6 +309,8 @@ template <typename Analysis, typename Transform>
 Analysis *FunctionTest::getAnalysis() {
   return impl::getAnalysisFromTransform<Analysis, Transform>(pass);
 }
+
+inline SILFunctionTransform *FunctionTest::getPass() { return pass; }
 } // namespace test
 } // namespace swift
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -typecheck -verify %s
 
 // rdar://75978086 - static member lookup doesn't work with opaque types
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -31,6 +31,8 @@ var global3: Int = 7
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Android)
+import Android
 #elseif canImport(CRT)
 import CRT
 #endif

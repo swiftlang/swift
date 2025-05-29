@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s %S/Inputs/print.swift -enable-experimental-feature Embedded -enable-builtin-module -c -o %t/main.o
+// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -enable-builtin-module -c -o %t/main.o
 // RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 import Builtin
 
@@ -31,6 +31,11 @@ struct Large : P {
   }
 }
 
+enum Enum {
+  case nontrivial(Noisy)
+  case trivial(Int)
+}
+
 func exerciseArrayValueWitnesses<T>(_ value: T) {
   let buf = UnsafeMutablePointer<T>.allocate(capacity: 5)
 
@@ -52,6 +57,8 @@ func test() {
     exerciseArrayValueWitnesses(44)
     exerciseArrayValueWitnesses(Noisy())
     exerciseArrayValueWitnesses(Large())
+    exerciseArrayValueWitnesses(Enum.trivial(42))
+    exerciseArrayValueWitnesses(Enum.nontrivial(Noisy()))
   }
   precondition(NoisyLifeCount == NoisyDeathCount)
   print("Checks out")

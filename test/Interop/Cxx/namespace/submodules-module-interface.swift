@@ -10,10 +10,10 @@
 // CHECK-NEXT:       init()
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct BasicB {
+// CHECK-NEXT:   struct BasicA {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct BasicA {
+// CHECK-NEXT:   struct BasicB {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
 // CHECK-NEXT: }

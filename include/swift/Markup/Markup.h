@@ -53,7 +53,7 @@ public:
 
   StringRef allocateCopy(StringRef Str) {
     ArrayRef<char> Result =
-      allocateCopy(llvm::makeArrayRef(Str.data(), Str.size()));
+        allocateCopy(llvm::ArrayRef(Str.data(), Str.size()));
     return StringRef(Result.data(), Result.size());
   }
 

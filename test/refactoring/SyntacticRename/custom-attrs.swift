@@ -57,17 +57,12 @@ struct Bar {
 }
 
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %empty-directory(%t.ranges)
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="wrapper" -is-non-protocol-type -old-name "Foo" -new-name "Foo2" >> %t.result/custom-attrs-Foo.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="wrapper" -is-non-protocol-type -old-name "Foo" >> %t.ranges/custom-attrs-Foo.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="wrapped" -old-name "foo" -new-name "descriptive" >> %t.result/custom-attrs-wrapped.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="wrapped" -old-name "foo" >> %t.ranges/custom-attrs-wrapped.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="builder" -is-non-protocol-type -old-name "Other" -new-name "OtherBuilder" >> %t.result/custom-attrs-Other.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="builder" -is-non-protocol-type -old-name "Other" >> %t.ranges/custom-attrs-Other.swift
-// RUN: diff -u %S/Outputs/custom-attrs/Foo.swift.expected %t.result/custom-attrs-Foo.swift
-// RUN: diff -u %S/FindRangeOutputs/custom-attrs/Foo.swift.expected %t.ranges/custom-attrs-Foo.swift
-// RUN: diff -u %S/Outputs/custom-attrs/wrapped.swift.expected %t.result/custom-attrs-wrapped.swift
-// RUN: diff -u %S/FindRangeOutputs/custom-attrs/wrapped.swift.expected %t.ranges/custom-attrs-wrapped.swift
-// RUN: diff -u %S/Outputs/custom-attrs/Other.swift.expected %t.result/custom-attrs-Other.swift
-// RUN: diff -u %S/FindRangeOutputs/custom-attrs/Other.swift.expected %t.ranges/custom-attrs-Other.swift
+// RUN: diff -u %S/Outputs/custom-attrs/Foo.swift.expected %t.ranges/custom-attrs-Foo.swift
+// RUN: diff -u %S/Outputs/custom-attrs/wrapped.swift.expected %t.ranges/custom-attrs-wrapped.swift
+// RUN: diff -u %S/Outputs/custom-attrs/Other.swift.expected %t.ranges/custom-attrs-Other.swift

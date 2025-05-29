@@ -18,8 +18,8 @@
 #ifndef SWIFT_BASIC_EDITORPLACEHOLDER_H
 #define SWIFT_BASIC_EDITORPLACEHOLDER_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace swift {
 
@@ -43,7 +43,7 @@ struct EditorPlaceholderData {
 
 /// Deconstructs a placeholder string and returns info about it.
 /// \returns None if the \c PlaceholderText is not a valid placeholder string.
-llvm::Optional<EditorPlaceholderData>
+std::optional<EditorPlaceholderData>
 parseEditorPlaceholder(llvm::StringRef PlaceholderText);
 
 /// Checks if an identifier with the given text is an editor placeholder

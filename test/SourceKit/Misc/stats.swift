@@ -1,5 +1,6 @@
 func foo() {}
 
+// REQUIRES: swift_swift_parser
 // RUN: %sourcekitd-test -req=syntax-map %s == -req=stats | %FileCheck %s -check-prefix=SYNTAX_1
 
 // SYNTAX_1:   {{.*}} source.statistic.instruction-count

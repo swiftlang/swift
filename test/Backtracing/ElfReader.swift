@@ -15,7 +15,16 @@
 // REQUIRES: OS=linux-gnu
 // REQUIRES: backtracing
 
-@_spi(ElfTest) import _Backtracing
+@_spi(ElfTest) import Runtime
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(SwiftWASILibc)
+import SwiftWASILibc
+#elseif canImport(ucrt)
+import ucrt
+#elseif canImport(SwiftGlibc)
+import SwiftGlibc
+#endif
 
 @main
 struct ElfReader {

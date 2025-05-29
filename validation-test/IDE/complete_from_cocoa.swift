@@ -5,7 +5,6 @@
 
 // FIXME: iOS has no Cocoa.framework
 // REQUIRES: OS=macosx
-
 // A smoketest for code completion in Cocoa.
 
 import Cocoa

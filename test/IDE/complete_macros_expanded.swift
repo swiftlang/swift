@@ -83,14 +83,14 @@ func testLocal() {
   @PeerWithSuffix func localFunc() {}
 
   do {
-    #^LOCAL?skip=FIXME^#
-// FIXME: macros in replace function bodies are not handled correclty.
-// FIXME: decls instroduced by #defineDeclsWithKnownNames are missing.
-// LOCAL-DAG: Decl[FreeFunction]/Local:           localFunc()[#Void#]; name=localFunc()
-// LOCAL-DAG: Decl[LocalVar]/Local:               localFunc_peer[#Int#]; name=localFunc_peer
-// LOCAL-DAG: Decl[Struct]/Local:            A[#A#]; name=A
-// LOCAL-DAG: Decl[Struct]/Local:            B[#B#]; name=B
-// LOCAL-DAG: Decl[LocalVar]/Local:         foo[#Int#]; name=foo
-// LOCAL-DAG: Decl[LocalVar]/Local:         addOne[#(Int) -> Int#]; name=addOne
+    #^LOCAL?check=LOCAL;check=LOCAL_MACRO^#
+// LOCAL-DAG:       Decl[FreeFunction]/Local: localFunc()[#Void#]; name=localFunc()
+
+// Local macros cannot introduce peer decls, so make sure they don't show up.
+// LOCAL_MACRO-NOT: Decl[LocalVar]/Local: localFunc_peer[#Int#]; name=localFunc_peer
+// LOCAL_MACRO-NOT: Decl[Struct]/Local:   A[#A#]; name=A
+// LOCAL_MACRO-NOT: Decl[Struct]/Local:   B[#B#]; name=B
+// LOCAL_MACRO-NOT: Decl[LocalVar]/Local: foo[#Int#]; name=foo
+// LOCAL_MACRO-NOT: Decl[LocalVar]/Local: addOne[#(Int) -> Int#]; name=addOne
   }
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -enable-experimental-async-top-level -swift-version 5 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level -swift-version 5 %s -verify
 
 // enable-experimental-async-top-level is passed and an await is used in the
 // top-level, so the top-level code is a concurrent context. Variables are
@@ -22,9 +22,9 @@ func isolatedSync() {
 func nonIsolatedAsync() async {
     await print(a)
     a = a + 10
-    // expected-error@-1:5 {{main actor-isolated var 'a' can not be mutated from a non-isolated context}}
-    // expected-error@-2:9 {{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-3:9 {{property access is 'async'}}
+    // expected-warning@-1:5 {{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
+    // expected-warning@-2:9 {{main actor-isolated var 'a' cannot be accessed from outside of the actor}}{{9-9=await }}
+    // expected-note@-3 {{consider declaring an isolated method on 'MainActor' to perform the mutation}}
 }
 
 @MainActor

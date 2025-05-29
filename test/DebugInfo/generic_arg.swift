@@ -3,11 +3,11 @@ import StdlibUnittest
 func foo<T>(_ x: T) -> () {
   // CHECK: define {{.*}} @"$s11generic_arg3fooyyxlF"
   // CHECK: %[[T:.*]] = alloca ptr
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[T]],
-  // CHECK-SAME:               metadata ![[T1:.*]], metadata !DIExpression())
+  // CHECK: #dbg_declare(ptr %[[T]],
+  // CHECK-SAME:               ![[T1:.*]], !DIExpression()
   // CHECK: %[[X:.*]] = alloca ptr
-  // CHECK: call void @llvm.dbg.declare(metadata ptr %[[X]],
-  // CHECK-SAME: metadata ![[X1:.*]], metadata !DIExpression(DW_OP_deref))
+  // CHECK: #dbg_declare(ptr %[[X]],
+  // CHECK-SAME: ![[X1:.*]], !DIExpression(DW_OP_deref)
   // CHECK: store ptr %T, ptr %[[T]],
   // CHECK: store ptr %0, ptr %[[X]],
   // CHECK-DAG: ![[T1]] = !DILocalVariable(name: "$\CF\84_0_0",{{.*}}flags: DIFlagArtificial)

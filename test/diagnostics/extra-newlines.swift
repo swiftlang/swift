@@ -11,11 +11,11 @@
 // Check that there are no extra newlines between diagnostics lines
 
 // CHECK:      SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}extra-newlines.swift:[[#LINE:]]:5
-// CHECK-NEXT: [[#LINE-2]] │
-// CHECK-NEXT: [[#LINE-1]] │ func foo(a: Int, b: Int) {
-// CHECK-NEXT: [[#LINE]]   │   a + b
-// CHECK-NEXT:             │   ╰─ warning: result of operator '+' is unused
-// CHECK-NEXT: [[#LINE+1]] │ }
+// CHECK-NEXT: [[#LINE-2]] |
+// CHECK-NEXT: [[#LINE-1]] | func foo(a: Int, b: Int) {
+// CHECK-NEXT: [[#LINE]]   |   a + b
+// CHECK-NEXT:             |   `- warning: result of operator '+' is unused
+// CHECK-NEXT: [[#LINE+1]] | }
 
 func foo(a: Int, b: Int) {
   a + b

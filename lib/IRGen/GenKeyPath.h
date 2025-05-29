@@ -29,10 +29,11 @@ class Explosion;
 class IRGenFunction;
 class StackAddress;
 
-std::pair<llvm::Value *, llvm::Value *> emitKeyPathArgument(
-    IRGenFunction &IGF, SubstitutionMap subs, const CanGenericSignature &sig,
-    ArrayRef<SILType> indiceTypes, Explosion &indiceValues,
-    llvm::Optional<StackAddress> &dynamicArgsBuf);
+std::pair<llvm::Value *, llvm::Value *>
+emitKeyPathArgument(IRGenFunction &IGF, SubstitutionMap subs,
+                    const CanGenericSignature &sig,
+                    ArrayRef<SILType> indiceTypes, Explosion &indiceValues,
+                    std::optional<StackAddress> &dynamicArgsBuf);
 } // end namespace irgen
 } // end namespace swift
 

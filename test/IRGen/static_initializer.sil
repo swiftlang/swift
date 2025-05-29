@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi -check-prefix CHECK-%target-abi-%target-cpu
 
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: CPU=aarch64 || CPU=arm64 || CPU=x86_64
+
+// Android x86_64 doesn't expose Float80.
+// UNSUPPORTED: OS=linux-android && CPU=x86_64
 
 // Generated from
 // var x : Int32 = 2
@@ -71,6 +74,31 @@ sil_global @static_array : $TestArrayStorage = {
   %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
 }
 // CHECK: @static_array = {{(dllexport )?}}{{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems0c { [1 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems0 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [4 x i8] undef, %Ts5Int64V <{ i64 10 }>, %Ts5Int64V <{ i64 20 }> }> }, align 8
+
+sil_global @static_vector : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 2
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = integer_literal $Builtin.Int64, 20
+  %3 = struct $Int64 (%0 : $Builtin.Int64)
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %5 = struct $Int64 (%2 : $Builtin.Int64)
+  %initval = vector (%3 : $Int64, %4 : $Int64, %5 : $Int64)
+}
+// CHECK: @static_vector = {{(dllexport )?}}{{(protected )?}}global [3 x %Ts5Int64V] [%Ts5Int64V <{ i64 2 }>, %Ts5Int64V <{ i64 10 }>, %Ts5Int64V <{ i64 20 }>], align 8
+
+sil_global @static_optional_int_vector : $Optional<Int32> = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = integer_literal $Builtin.Int32, 10
+  %2 = integer_literal $Builtin.Int32, 20
+  %3 = struct $Int32 (%0 : $Builtin.Int32)
+  %4 = struct $Int32 (%1 : $Builtin.Int32)
+  %5 = struct $Int32 (%2 : $Builtin.Int32)
+  %6 = enum $Optional<Int32>, #Optional.some!enumelt, %3 : $Int32
+  %7 = enum $Optional<Int32>, #Optional.some!enumelt, %4 : $Int32
+  %8 = enum $Optional<Int32>, #Optional.some!enumelt, %5 : $Int32
+  %initval = vector (%6 : $Optional<Int32>, %7 : $Optional<Int32>, %8 : $Optional<Int32>)
+}
+// CHECK: @static_optional_int_vector = {{(dllexport )?}}{{(protected )?}}global [3 x <{ i32, i8, i8, i8, i8 }>] [<{ i32, i8, i8, i8, i8 }> <{ i32 2, i8 0, i8 undef, i8 undef, i8 undef }>, <{ i32, i8, i8, i8, i8 }> <{ i32 10, i8 0, i8 undef, i8 undef, i8 undef }>, <{ i32, i8, i8, i8, i8 }> <{ i32 20, i8 0, i8 undef, i8 undef, i8 undef }>], align 4
 
 sil_global @static_aligned_array : $TestArrayStorage = {
   %0 = integer_literal $Builtin.Int32, 2
@@ -162,8 +190,8 @@ bb0:
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i32 } @"$s6nested1fAA2S2VyF"() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: load i32, ptr @"$s6nested1xAA2S2Vv"
-// CHECK-NEXT: load i32, ptr getelementptr inbounds (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 1)
-// CHECK-NEXT: load i32, ptr getelementptr inbounds (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 2)
+// CHECK-NEXT: load i32, ptr getelementptr inbounds{{.*}} (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 1)
+// CHECK-NEXT: load i32, ptr getelementptr inbounds{{.*}} (%T18static_initializer2S2V, ptr @"$s6nested1xAA2S2Vv", i32 0, i32 2)
 sil @$s6nested1fAA2S2VyF : $@convention(thin) () -> S2 {
 bb0:
   %0 = global_addr @$s6nested1xAA2S2Vv : $*S2
@@ -176,7 +204,7 @@ sil @return_static_array : $@convention(thin) () -> TestArray {
 bb0:
   // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18static_initializer16TestArrayStorageCMa"(i64 0)
   // CHECK: [[MD:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
-  // CHECK: [[O:%[0-9a-z]+]] = call ptr @swift_initStaticObject(ptr [[MD]], ptr getelementptr inbounds (%T18static_initializer16TestArrayStorageC_tailelems0c, ptr @static_array, i32 0, i32 1))
+  // CHECK: [[O:%[0-9a-z]+]] = call ptr @swift_initStaticObject(ptr [[MD]], ptr getelementptr{{.*}} (%T18static_initializer16TestArrayStorageC_tailelems0c, ptr @static_array, i32 0, i32 1))
   // CHECK: ret ptr [[O]]
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)

@@ -18,6 +18,8 @@ internal protocol RemoteProcess: AnyObject {
 
   var process: ProcessHandle { get }
   var context: SwiftReflectionContextRef! { get }
+  var processIdentifier: ProcessIdentifier { get }
+  var processName: String { get }
 
   typealias QueryDataLayoutFunction =
       @convention(c) (UnsafeMutableRawPointer?, DataLayoutQueryType,
@@ -41,12 +43,6 @@ internal protocol RemoteProcess: AnyObject {
 
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?)
   func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void)
-}
-
-extension RemoteProcess {
-  static var Free: FreeFunction? {
-    return nil
-  }
 }
 
 extension RemoteProcess {

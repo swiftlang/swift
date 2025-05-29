@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -swift-version 5 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -362,7 +362,7 @@ class Hoozit : Gizmo {
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC7bellsOnACSi_tcfc : $@convention(method) (Int, @owned Hoozit) -> @owned Hoozit {
   // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Hoozit }
   // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK: [[LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK: [[PB_BOX:%.*]] = project_box [[LIFETIME]]
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
   // CHECK: [[BORROWED_GIZMO:%.*]] = begin_borrow [[GIZMO]]

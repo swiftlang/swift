@@ -23,6 +23,8 @@
 
 namespace swift {
 
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+
 // liboainject patches the function pointers and calls the functions below.
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*SWIFT_RT_DECLARE_ENTRY _swift_allocObject)(
@@ -39,6 +41,8 @@ SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 void (*SWIFT_RT_DECLARE_ENTRY _swift_release_n)(HeapObject *object, uint32_t n);
+SWIFT_RUNTIME_EXPORT
+std::atomic<bool> _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly;
 SWIFT_RUNTIME_EXPORT
 size_t swift_retainCount(HeapObject *object);
 
@@ -59,6 +63,8 @@ SWIFT_RUNTIME_EXPORT
 size_t _swift_indexToSize(size_t idx);
 SWIFT_RUNTIME_EXPORT
 void _swift_zone_init(void);
+
+#endif // SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
 
 }
 

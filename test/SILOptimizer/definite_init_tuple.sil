@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify
 
 import Builtin
 import Swift
@@ -24,4 +24,68 @@ bb0(%0 : $*S<T>, %1 : $@thin S<T>.Type):
   destroy_value %3 : $<τ_0_0> { var S<τ_0_0> } <T>
   %12 = tuple ()
   return %12 : $()
+}
+
+struct MyText<V> {
+  let label: String
+  // expected-note @-1 {{'self.label' not initialized}}
+  let value: V
+  // expected-note @-1 {{'self.value.0' not initialized}}
+  // expected-note @-2 {{'self.value.1' not initialized}} 
+}
+
+sil [ossa] @tuple_addr_constructor_1 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
+bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
+  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self"
+  %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
+  %7 = copy_value %0 : $String
+  %8 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
+  %9 = struct_element_addr %8 : $*MyText<(Int, Int)>, #MyText.label
+  assign %7 to %9 : $*String
+  end_access %8 : $*MyText<(Int, Int)>
+  %12 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
+  %13 = struct_element_addr %12 : $*MyText<(Int, Int)>, #MyText.value
+  tuple_addr_constructor [assign] %13 : $*(Int, Int) with (%1 : $Int, %1 : $Int)
+  end_access %12 : $*MyText<(Int, Int)>
+  %16 = load [copy] %4 : $*MyText<(Int, Int)>
+  destroy_value %0 : $String
+  destroy_addr %4 : $*MyText<(Int, Int)>
+  dealloc_stack %3 : $*MyText<(Int, Int)>
+  return %16 : $MyText<(Int, Int)>
+}
+
+sil [ossa] @tuple_addr_constructor_2 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
+bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
+  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self"
+  %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
+  %7 = copy_value %0 : $String
+  %8 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
+  %9 = struct_element_addr %8 : $*MyText<(Int, Int)>, #MyText.label
+  destroy_value %7 : $String
+  end_access %8 : $*MyText<(Int, Int)>
+  %12 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
+  %13 = struct_element_addr %12 : $*MyText<(Int, Int)>, #MyText.value
+  tuple_addr_constructor [assign] %13 : $*(Int, Int) with (%1 : $Int, %1 : $Int)
+  end_access %12 : $*MyText<(Int, Int)>
+  %16 = load [copy] %4 : $*MyText<(Int, Int)> // expected-error {{return from initializer without initializing all stored properties}}
+  destroy_value %0 : $String
+  destroy_addr %4 : $*MyText<(Int, Int)>
+  dealloc_stack %3 : $*MyText<(Int, Int)>
+  return %16 : $MyText<(Int, Int)>
+}
+
+sil [ossa] @tuple_addr_constructor_3 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
+bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
+  %3 = alloc_stack $MyText<(Int, Int)>, var, name "self"
+  %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
+  %7 = copy_value %0 : $String
+  %8 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
+  %9 = struct_element_addr %8 : $*MyText<(Int, Int)>, #MyText.label
+  assign %7 to %9 : $*String
+  end_access %8 : $*MyText<(Int, Int)>
+  %16 = load [copy] %4 : $*MyText<(Int, Int)> // expected-error {{return from initializer without initializing all stored properties}}
+  destroy_value %0 : $String
+  destroy_addr %4 : $*MyText<(Int, Int)>
+  dealloc_stack %3 : $*MyText<(Int, Int)>
+  return %16 : $MyText<(Int, Int)>
 }

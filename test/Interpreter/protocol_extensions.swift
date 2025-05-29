@@ -3,6 +3,7 @@
 
 import StdlibUnittest
 
+defer { runAllTests() }
 
 var ProtocolExtensionTestSuite = TestSuite("ProtocolExtensions")
 
@@ -363,4 +364,34 @@ ProtocolExtensionTestSuite.test("WitnessSelf") {
   }
 }
 
-runAllTests()
+@_marker protocol Addable {}
+extension Addable {
+    func increment(this x: Int) -> Int { return x + 100 }
+}
+extension String: Addable {}
+
+ProtocolExtensionTestSuite.test("MarkerProtocolExtensions") {
+    expectTrue("hello".increment(this: 11) == 111)
+}
+
+protocol DefaultArgumentsInExtension {
+    func foo(a: Int, b: Int) -> (Int, Int)
+}
+extension DefaultArgumentsInExtension {
+    func foo(a: Int, b: Int = 1) -> (Int, Int) {
+        self.foo(a: a * 10, b: b * 10)
+    }
+}
+struct DefaultArgumentsInExtensionImpl: DefaultArgumentsInExtension {
+    func foo(a: Int, b: Int) -> (Int, Int) {
+        (a * 2, b * 2)
+    }
+}
+
+ProtocolExtensionTestSuite.test("DefaultArgumentsInExtension") {
+    let instance = DefaultArgumentsInExtensionImpl()
+    expectEqual((4, 6), instance.foo(a: 2, b: 3))
+    expectEqual((4, 6), (instance as any DefaultArgumentsInExtension).foo(a: 2, b: 3))
+    expectEqual((40, 20), instance.foo(a: 2))
+    expectEqual((40, 20), (instance as any DefaultArgumentsInExtension).foo(a: 2))
+}

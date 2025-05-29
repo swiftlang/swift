@@ -6,3 +6,8 @@
 
 @end
 
+@interface ObjCClass2 : NSObject
+
+@end
+
+void CImplFunc(void);

@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Unzippered -target arm64e-apple-ios15.0-macabi
+import Swift
+public func unzipperedFunc() { }

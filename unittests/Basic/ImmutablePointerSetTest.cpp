@@ -19,7 +19,7 @@ using namespace swift;
 
 TEST(ImmutableSortedSet, OneElementSets) {
   llvm::BumpPtrAllocator BPA;
-  ImmutablePointerSetFactory<unsigned> F(BPA);
+  ImmutablePointerSetFactory<unsigned *> F(BPA);
 
   unsigned *ptr1 = (unsigned *)3;
   auto *OneEltSet1 = F.get(ptr1);
@@ -54,7 +54,7 @@ TEST(ImmutableSortedSet, OneElementSets) {
 
 TEST(ImmutablePointerSet, MultipleElementSets) {
   llvm::BumpPtrAllocator BPA;
-  ImmutablePointerSetFactory<unsigned> F(BPA);
+  ImmutablePointerSetFactory<unsigned *> F(BPA);
 
   unsigned *Ptr1 = (unsigned *)3;
   unsigned *Ptr2 = (unsigned *)4;
@@ -62,8 +62,8 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
   unsigned *Ptr4 = (unsigned *)5;
   unsigned *Ptr5 = (unsigned *)6;
   llvm::SmallVector<unsigned *, 2> Data1 = {Ptr1, Ptr2};
-
-  auto *TwoEltSet = F.get(Data1);
+  llvm::MutableArrayRef<unsigned *> Array = Data1;
+  auto *TwoEltSet = F.get(Array);
   EXPECT_FALSE(TwoEltSet->empty());
   EXPECT_EQ(TwoEltSet->size(), 2u);
   EXPECT_TRUE(TwoEltSet->count(Ptr1));
@@ -110,7 +110,7 @@ TEST(ImmutablePointerSet, MultipleElementSets) {
 
 TEST(ImmutablePointerSet, EmptyIntersectionTests) {
   llvm::BumpPtrAllocator BPA;
-  ImmutablePointerSetFactory<unsigned> F(BPA);
+  ImmutablePointerSetFactory<unsigned *> F(BPA);
 
   unsigned *Ptr1 = (unsigned *)3;
   unsigned *Ptr2 = (unsigned *)4;

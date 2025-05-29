@@ -13,8 +13,8 @@ struct GenericTangentVectorMember<T: Differentiable>: Differentiable,
 // CHECK-AST:   internal var x: T.TangentVector
 // CHECK-AST:   internal static func + (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
 // CHECK-AST:   internal static func - (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
-// CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTangentVectorMember<T>, _ b: GenericTangentVectorMember<T>) -> Bool
 // CHECK-AST:   internal typealias TangentVector = GenericTangentVectorMember<T>
+// CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTangentVectorMember<T>, _ b: GenericTangentVectorMember<T>) -> Bool
 // CHECK-AST:   internal init(x: T.TangentVector)
 // CHECK-AST:   internal static var zero: GenericTangentVectorMember<T> { get }
 

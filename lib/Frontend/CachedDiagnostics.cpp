@@ -16,19 +16,25 @@
 
 #include "swift/Frontend/CachedDiagnostics.h"
 
+#include "swift/AST/DiagnosticBridge.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -82,6 +88,7 @@ struct SerializedDiagnosticInfo {
 struct SerializedFile {
   std::string FileName;
   SerializedSourceLoc IncludeLoc = SerializedSourceLoc();
+  std::string ContentCASID;
   StringRef Content;
 };
 
@@ -96,12 +103,13 @@ struct SerializedGeneratedFileInfo {
   unsigned FileID;
   SerializedCharSourceRange OriginalRange;
   SerializedCharSourceRange GeneratedRange;
+  std::string MacroName;
 };
 
 struct DiagnosticSerializer {
   DiagnosticSerializer(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS,
-                       llvm::PrefixMapper &Mapper)
-      : SrcMgr(FS), Mapper(Mapper) {}
+                       llvm::PrefixMapper &Mapper, llvm::cas::ObjectStore &CAS)
+      : SrcMgr(FS), Mapper(Mapper), CAS(CAS) {}
 
   using ReplayFunc = llvm::function_ref<llvm::Error(const DiagnosticInfo &)>;
 
@@ -111,31 +119,40 @@ struct DiagnosticSerializer {
   llvm::Error serializeEmittedDiagnostics(llvm::raw_ostream &os);
 
   static llvm::Error
-  emitDiagnosticsFromCached(llvm::StringRef Buffer, SourceManager &SrcMgr,
-                            DiagnosticEngine &Diags,
-                            llvm::PrefixMapper &Mapper,
+  emitDiagnosticsFromCached(llvm::StringRef Buffer,
+                            DiagnosticEngine &Diags, llvm::PrefixMapper &Mapper,
+                            llvm::cas::ObjectStore &CAS,
                             const FrontendInputsAndOutputs &InAndOut) {
     // Create a new DiagnosticSerializer since this cannot be shared with a
-    // serialization instance.
-    DiagnosticSerializer DS(SrcMgr.getFileSystem(), Mapper);
-    DS.addInputsToSourceMgr(InAndOut);
+    // serialization instance. Using an empty in-memory file system as
+    // underlying file system because the replay logic should not touch file
+    // system.
+    auto FS = llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+    DiagnosticSerializer DS(std::move(FS), Mapper, CAS);
     return DS.doEmitFromCached(Buffer, Diags);
   }
 
   SourceManager &getSourceMgr() { return SrcMgr; }
 
-  void addInputsToSourceMgr(const FrontendInputsAndOutputs &InAndOut) {
+  void addInputsToSourceMgr(SourceManager &SM,
+                            const FrontendInputsAndOutputs &InAndOut) {
     // Extract all the input file names so they can be added to the source
     // manager when replaying the diagnostics. All input files are needed even
     // they don't contain diagnostics because FileSpecificDiagConsumer need
     // has references to input files to find subconsumer.
     auto addInputToSourceMgr = [&](const InputFile &Input) {
-      if (Input.getFileName() != "-")
-        SrcMgr.getExternalSourceBufferID(remapFilePath(Input.getFileName()));
+      auto Path = remapFilePath(Input.getFileName());
+      SrcMgr.getExternalSourceBufferID(Path);
+
+      // Fetch the source buffer from original SourceManager and create a
+      // serialized file from it.
+      auto Idx = SM.getExternalSourceBufferID(Path);
+      if (Idx != 0)
+        getFileIDFromBufferID(SM, Idx);
+
       return false;
     };
-    InAndOut.forEachInputProducingSupplementaryOutput(addInputToSourceMgr);
-    InAndOut.forEachNonPrimaryInput(addInputToSourceMgr);
+    InAndOut.forEachInput(addInputToSourceMgr);
   }
 
 private:
@@ -159,11 +176,17 @@ private:
   llvm::Expected<DiagnosticInfo::FixIt>
   deserializeFixIt(const SerializedFixIt &);
 
+  // Stores the temporary data from deserialization.
+  struct DiagnosticStorage {
+    SmallVector<DiagnosticInfo, 2> ChildDiag;
+    SmallVector<CharSourceRange, 2> Ranges;
+    SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+  };
   llvm::Error deserializeDiagnosticInfo(const SerializedDiagnosticInfo &,
-                                        ReplayFunc);
+                                        DiagnosticStorage &, ReplayFunc);
 
   // Deserialize File and return the bufferID in serializing SourceManager.
-  unsigned deserializeFile(const SerializedFile &File);
+  llvm::Expected<unsigned> deserializeFile(const SerializedFile &File);
   llvm::Error deserializeVirtualFile(const SerializedVirtualFile &VF);
   llvm::Error deserializeGeneratedFileInfo(const SerializedGeneratedFileInfo &Info);
   std::string remapFilePath(StringRef Path) {
@@ -183,6 +206,9 @@ private:
   // Serializing SourceManager.
   SourceManager SrcMgr;
   llvm::PrefixMapper &Mapper;
+
+  // CAS for file system backing.
+  llvm::cas::ObjectStore &CAS;
 
   // Mapping of the FileID between SourceManager from CompilerInstance vs.
   // the serialized FileID in cached diagnostics. Lookup tables are
@@ -242,6 +268,7 @@ struct MappingTraits<SerializedFile> {
     io.mapRequired("Name", F.FileName);
     io.mapOptional("IncludeLoc", F.IncludeLoc, SerializedSourceLoc());
     io.mapOptional("Content", F.Content, StringRef());
+    io.mapOptional("CASID", F.ContentCASID, "");
   }
 };
 
@@ -261,6 +288,7 @@ struct MappingTraits<SerializedGeneratedFileInfo> {
     io.mapRequired("FileID", Info.FileID);
     io.mapRequired("OriginalRange", Info.OriginalRange);
     io.mapRequired("GeneratedRange", Info.GeneratedRange);
+    io.mapOptional("MacroName", Info.MacroName, "");
   }
 };
 
@@ -288,42 +316,48 @@ void DiagnosticSerializer::handleDiagnostic(SourceManager &SM,
                                             const DiagnosticInfo &Info,
                                             ReplayFunc Fn) {
   DiagInfos.emplace_back(convertDiagnosticInfo(SM, Info));
-  if (Fn)
-    cantFail(deserializeDiagnosticInfo(DiagInfos.back(), Fn));
+  if (Fn) {
+    DiagnosticStorage Storage;
+    cantFail(deserializeDiagnosticInfo(DiagInfos.back(), Storage, Fn));
+  }
 }
 
 unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
                                                      unsigned Idx) {
-  auto &Buf = SM.getLLVMSourceMgr().getBufferInfo(Idx);
-  auto Filename = Buf.Buffer->getBufferIdentifier();
-  bool IsFSBacked = SM.getFileSystem()->exists(Filename);
-
   // See if the file is already constructed.
   auto &Allocated = FileMapper[&SM];
   auto ID = Allocated.find(Idx);
   if (ID != Allocated.end())
     return ID->second;
 
+  auto &Buf = SM.getLLVMSourceMgr().getBufferInfo(Idx);
+  auto Filename = Buf.Buffer->getBufferIdentifier();
+  bool IsFileBacked = !Filename.empty() && SM.getFileSystem()->exists(Filename);
+
   // Construct and add to files. If there is an IncludeLoc, the file from
   // IncludeLoc is added before current file.
   assert(CurrentFileID == Files.size() && "File index mismatch");
-  StringRef FileContent = IsFSBacked ? StringRef() : Buf.Buffer->getBuffer();
+
+  StringRef FileContent = Buf.Buffer->getBuffer();
   SerializedFile File = {Filename.str(),
                          convertSourceLoc(SM, SourceLoc(Buf.IncludeLoc)),
-                         FileContent};
+                         {},
+                         IsFileBacked ? "" : FileContent};
+
   // Add file to serializing source manager.
-  FileMapper[&SrcMgr].insert({CurrentFileID, deserializeFile(File)});
+  unsigned NewIdx = SrcMgr.addMemBufferCopy(Buf.Buffer.get());
+  FileMapper[&SrcMgr].insert({CurrentFileID, NewIdx});
 
   Files.emplace_back(std::move(File));
   Allocated.insert({Idx, ++CurrentFileID});
-
+  unsigned NewFileID = CurrentFileID;
 
   auto Info = SM.getGeneratedSourceInfo(Idx);
   auto convertGeneratedFileInfo =
       [&](const GeneratedSourceInfo &Info) -> SerializedGeneratedFileInfo {
     return {(uint8_t)Info.kind, CurrentFileID,
             convertSourceRange(SM, Info.originalSourceRange),
-            convertSourceRange(SM, Info.generatedSourceRange)};
+            convertSourceRange(SM, Info.generatedSourceRange), Info.macroName};
   };
   if (Info) {
     auto GI = convertGeneratedFileInfo(*Info);
@@ -332,7 +366,7 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
     GeneratedFileInfo.emplace_back(std::move(GI));
   }
 
-  return CurrentFileID;
+  return NewFileID;
 }
 
 SerializedSourceLoc
@@ -437,6 +471,9 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
     return Serialized;
   };
 
+  std::vector<std::string> educationalNotes;
+  if (!Info.CategoryDocumentationURL.empty())
+    educationalNotes.push_back(Info.CategoryDocumentationURL);
   return {(uint32_t)Info.ID,
           convertSourceLoc(SM, Info.Loc),
           (uint8_t)Info.Kind,
@@ -444,8 +481,7 @@ DiagnosticSerializer::convertDiagnosticInfo(SourceManager &SM,
           Info.Category.str(),
           convertSourceLoc(SM, Info.BufferIndirectlyCausingDiagnostic),
           convertDiagnosticInfoArray(Info.ChildDiagnosticInfo),
-          std::vector<std::string>(Info.EducationalNotePaths.begin(),
-                                   Info.EducationalNotePaths.end()),
+          educationalNotes,
           convertSourceRangeArray(Info.Ranges),
           convertFixItArray(Info.FixIts),
           Info.IsChildNote};
@@ -487,21 +523,26 @@ DiagnosticSerializer::deserializeFixIt(const SerializedFixIt &FI) {
   return DiagnosticInfo::FixIt(*Range, FI.Text, {});
 }
 
-unsigned DiagnosticSerializer::deserializeFile(const SerializedFile &File) {
+llvm::Expected<unsigned>
+DiagnosticSerializer::deserializeFile(const SerializedFile &File) {
   assert(File.IncludeLoc.FileID == 0 && "IncludeLoc not supported yet");
   auto FileName = remapFilePath(File.FileName);
-  if (File.Content.empty() && FileName == File.FileName)
-    return SrcMgr.getExternalSourceBufferID(FileName);
 
-  std::unique_ptr<llvm::MemoryBuffer> Content;
-  if (!File.Content.empty())
-    Content = llvm::MemoryBuffer::getMemBufferCopy(File.Content, FileName);
-  else if (auto InputFileOrErr = swift::vfs::getFileOrSTDIN(
-               *SrcMgr.getFileSystem(), File.FileName))
-    Content = llvm::MemoryBuffer::getMemBufferCopy(
-        (*InputFileOrErr)->getBuffer(), FileName);
+  if (!File.ContentCASID.empty()) {
+    auto ID = CAS.parseID(File.ContentCASID);
+    if (!ID)
+      return ID.takeError();
 
-  return Content ? SrcMgr.addNewSourceBuffer(std::move(Content)) : 0u;
+    auto Proxy = CAS.getProxy(*ID);
+    if (!Proxy)
+      return Proxy.takeError();
+
+    auto Content = Proxy->getMemoryBuffer(FileName);
+    return SrcMgr.addNewSourceBuffer(std::move(Content));
+  }
+
+  auto Content = llvm::MemoryBuffer::getMemBufferCopy(File.Content, FileName);
+  return SrcMgr.addNewSourceBuffer(std::move(Content));
 }
 
 llvm::Error
@@ -532,12 +573,14 @@ llvm::Error DiagnosticSerializer::deserializeGeneratedFileInfo(
   if (!GeneratedRange)
     return GeneratedRange.takeError();
   Info.generatedSourceRange = *GeneratedRange;
+  Info.macroName = GI.MacroName;
   SrcMgr.setGeneratedSourceInfo(ID->second, Info);
   return llvm::Error::success();
 }
 
 llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
-    const SerializedDiagnosticInfo &Info, ReplayFunc callback) {
+    const SerializedDiagnosticInfo &Info, DiagnosticStorage &Storage,
+    ReplayFunc callback) {
   DiagID ID = (DiagID)Info.ID;
   auto Loc = deserializeSourceLoc(Info.Loc);
   if (!Loc)
@@ -546,33 +589,32 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
   auto BICD = deserializeSourceLoc(Info.BufferIndirectlyCausingDiagnostic);
   if (!BICD)
     return BICD.takeError();
-  SmallVector<DiagnosticInfo, 2> ChildDiag;
+
+  llvm::TinyPtrVector<DiagnosticInfo *> ChildDiagPtrs;
   for (auto &CD : Info.ChildDiagnosticInfo) {
-    auto E = deserializeDiagnosticInfo(CD, [&](const DiagnosticInfo &Info) {
-      ChildDiag.emplace_back(Info);
-      return llvm::Error::success();
-    });
+    auto E =
+        deserializeDiagnosticInfo(CD, Storage, [&](const DiagnosticInfo &Info) {
+          Storage.ChildDiag.emplace_back(Info);
+          ChildDiagPtrs.push_back(&Storage.ChildDiag.back());
+          return llvm::Error::success();
+        });
     if (E)
       return E;
   }
-  llvm::TinyPtrVector<DiagnosticInfo*> ChildDiagPtrs;
-  llvm::for_each(ChildDiag, [&ChildDiagPtrs](DiagnosticInfo &I) {
-    ChildDiagPtrs.push_back(&I);
-  });
-  SmallVector<CharSourceRange, 2> Ranges;
   for (auto &R : Info.Ranges) {
     auto Range = deserializeSourceRange(R);
     if (!Range)
       return Range.takeError();
-    Ranges.emplace_back(*Range);
+    Storage.Ranges.emplace_back(*Range);
   }
-  SmallVector<DiagnosticInfo::FixIt, 2> FixIts;
+  auto Ranges = ArrayRef(Storage.Ranges).take_back(Info.Ranges.size());
   for (auto &F : Info.FixIts) {
     auto FixIt = deserializeFixIt(F);
     if (!FixIt)
       return FixIt.takeError();
-    FixIts.emplace_back(*FixIt);
+    Storage.FixIts.emplace_back(*FixIt);
   }
+  auto FixIts = ArrayRef(Storage.FixIts).take_back(Info.FixIts.size());
 
   DiagnosticInfo DeserializedInfo{ID,
                                   *Loc,
@@ -585,12 +627,44 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
                                   Ranges,
                                   FixIts,
                                   Info.IsChildNote};
-  DeserializedInfo.EducationalNotePaths = Info.EducationalNotePaths;
+  if (Info.EducationalNotePaths.size() == 1)
+    DeserializedInfo.CategoryDocumentationURL = Info.EducationalNotePaths[0];
   return callback(DeserializedInfo);
 }
 
 llvm::Error
 DiagnosticSerializer::serializeEmittedDiagnostics(llvm::raw_ostream &os) {
+  // If no diagnostics is produced, do not write anything so output is smaller
+  // without referencing any files.
+  if (DiagInfos.empty())
+    return llvm::Error::success();
+
+  // Convert all file backed source file into CASIDs.
+  for (auto &File : Files) {
+    if (!File.Content.empty() || !File.ContentCASID.empty())
+      continue;
+
+    auto Ref =
+        SrcMgr.getFileSystem()->getObjectRefForFileContent(File.FileName);
+    if (!Ref)
+      return llvm::createFileError(File.FileName, Ref.getError());
+
+    if (*Ref) {
+      File.ContentCASID = CAS.getID(**Ref).toString();
+      continue;
+    }
+
+    // Probably a file system that is not CAS based. Ingest the buffer.
+    auto Buf = SrcMgr.getFileSystem()->getBufferForFile(File.FileName);
+    if (!Buf)
+      return llvm::createFileError(File.FileName, Buf.getError());
+
+    auto BufRef = CAS.storeFromString({}, (*Buf)->getBuffer());
+    if (!BufRef)
+      return llvm::createFileError(File.FileName, BufRef.takeError());
+    File.ContentCASID = CAS.getID(*BufRef).toString();
+  }
+
   llvm::yaml::Output yout(os);
   yout << *this;
   return llvm::Error::success();
@@ -608,8 +682,10 @@ llvm::Error DiagnosticSerializer::doEmitFromCached(llvm::StringRef Buffer,
   unsigned ID = 0;
   for (auto &File : Files) {
     assert(File.IncludeLoc.FileID == 0 && "IncludeLoc not supported yet");
-    unsigned Idx = deserializeFile(File);
-    FileMapper[&SrcMgr].insert({ID++, Idx});
+    auto Idx = deserializeFile(File);
+    if (!Idx)
+      return Idx.takeError();
+    FileMapper[&SrcMgr].insert({ID++, *Idx});
   }
 
   for (auto &VF : VFiles) {
@@ -623,11 +699,13 @@ llvm::Error DiagnosticSerializer::doEmitFromCached(llvm::StringRef Buffer,
   }
 
   for (auto &Info : DiagInfos) {
-    auto E = deserializeDiagnosticInfo(Info, [&](const DiagnosticInfo &Info) {
-      for (auto *Diag : Diags.getConsumers())
-        Diag->handleDiagnostic(SrcMgr, Info);
-      return llvm::Error::success();
-    });
+    DiagnosticStorage Storage;
+    auto E = deserializeDiagnosticInfo(Info, Storage,
+                                       [&](const DiagnosticInfo &Info) {
+                                         for (auto *Diag : Diags.getConsumers())
+                                           Diag->handleDiagnostic(SrcMgr, Info);
+                                         return llvm::Error::success();
+                                       });
     if (E)
       return E;
   }
@@ -641,7 +719,7 @@ public:
       : InstanceSourceMgr(Instance.getSourceMgr()),
         InAndOut(
             Instance.getInvocation().getFrontendOptions().InputsAndOutputs),
-        Diags(Instance.getDiags()) {
+        Diags(Instance.getDiags()), CAS(*Instance.getSharedCASInstance()) {
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
     llvm::MappedPrefix::transformJoinedIfValid(
         Instance.getInvocation().getFrontendOptions().CacheReplayPrefixMap,
@@ -671,7 +749,7 @@ public:
 
   llvm::Error replayCachedDiagnostics(llvm::StringRef Buffer) {
     return DiagnosticSerializer::emitDiagnosticsFromCached(
-        Buffer, getDiagnosticSourceMgr(), Diags, Mapper, InAndOut);
+        Buffer, Diags, Mapper, CAS, InAndOut);
   }
 
   void handleDiagnostic(SourceManager &SM,
@@ -679,9 +757,16 @@ public:
     auto &Serializer = getSerializer();
     assert(SM.getFileSystem() == Serializer.getSourceMgr().getFileSystem() &&
            "Caching for a different file system");
+
+    // Bypass the caching.
+    if (BypassDiagIDs.count(Info.ID)) {
+      for (auto *Diag : OrigConsumers)
+        Diag->handleDiagnostic(Serializer.getSourceMgr(), Info);
+      return;
+    }
     Serializer.handleDiagnostic(SM, Info, [&](const DiagnosticInfo &Info) {
       for (auto *Diag : OrigConsumers)
-        Diag->handleDiagnostic(getDiagnosticSourceMgr(), Info);
+        Diag->handleDiagnostic(Serializer.getSourceMgr(), Info);
       return llvm::Error::success();
     });
   }
@@ -708,10 +793,6 @@ public:
   }
 
 private:
-  SourceManager &getDiagnosticSourceMgr() {
-    return getSerializer().getSourceMgr();
-  }
-
   DiagnosticSerializer &getSerializer() {
     // If the DiagnosticSerializer is not setup, create it. It cannot
     // be created on the creation of CachingDiagnosticsProcessor because the
@@ -720,9 +801,9 @@ private:
     // compiler instance on the first diagnostics and assert if the underlying
     // file system changes on later diagnostics.
     if (!Serializer) {
-      Serializer.reset(
-          new DiagnosticSerializer(InstanceSourceMgr.getFileSystem(), Mapper));
-      Serializer->addInputsToSourceMgr(InAndOut);
+      Serializer.reset(new DiagnosticSerializer(
+          InstanceSourceMgr.getFileSystem(), Mapper, CAS));
+      Serializer->addInputsToSourceMgr(InstanceSourceMgr, InAndOut);
     }
 
     return *Serializer;
@@ -737,10 +818,13 @@ private:
   // Processor/Serializer alive until then.
   std::unique_ptr<DiagnosticSerializer> Serializer;
 
+  const llvm::SmallDenseSet<DiagID> BypassDiagIDs = {diag::macro_loaded.ID};
+
   SourceManager &InstanceSourceMgr;
   const FrontendInputsAndOutputs &InAndOut;
   DiagnosticEngine &Diags;
   llvm::PrefixMapper Mapper;
+  llvm::cas::ObjectStore &CAS;
 
   llvm::unique_function<bool(StringRef)> serializedOutputCallback;
 
@@ -752,34 +836,39 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
     : Impl(*new Implementation(Instance)) {
   Impl.serializedOutputCallback = [&](StringRef Output) {
     LLVM_DEBUG(llvm::dbgs() << Output << "\n";);
-    if (!Instance.getInvocation().getFrontendOptions().EnableCaching)
+    if (!Instance.getInvocation().getCASOptions().EnableCaching)
       return false;
 
     // compress the YAML file.
     llvm::SmallVector<uint8_t, 512> Compression;
-    if (llvm::compression::zstd::isAvailable())
-      llvm::compression::zstd::compress(arrayRefFromStringRef(Output),
-                                        Compression);
-    else if (llvm::compression::zlib::isAvailable())
-      llvm::compression::zlib::compress(arrayRefFromStringRef(Output),
-                                        Compression);
+    if (!Output.empty()) {
+      if (llvm::compression::zstd::isAvailable())
+        llvm::compression::zstd::compress(arrayRefFromStringRef(Output),
+                                          Compression);
+      else if (llvm::compression::zlib::isAvailable())
+        llvm::compression::zlib::compress(arrayRefFromStringRef(Output),
+                                          Compression);
+    }
 
     // Write the uncompressed size in the end.
     if (!Compression.empty()) {
       llvm::raw_svector_ostream BufOS((SmallVectorImpl<char> &)Compression);
-      llvm::support::endian::Writer Writer(BufOS, llvm::support::little);
+      llvm::support::endian::Writer Writer(BufOS, llvm::endianness::little);
       Writer.write(uint32_t(Output.size()));
     }
 
     StringRef Content = Compression.empty() ? Output : toStringRef(Compression);
-    // Store CachedDiagnostics in the CAS/Cache. There is no real associated
-    // inputs.
+    // Store CachedDiagnostics in the CAS/Cache.
+    // FIXME: Currently associated with first output producing input file.
     auto Err = Instance.getCASOutputBackend().storeCachedDiagnostics(
-        "<cached-diagnostics>", Content);
+        Instance.getInvocation()
+            .getFrontendOptions()
+            .InputsAndOutputs.getIndexOfFirstOutputProducingInput(),
+        Content);
 
     if (Err) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                   toString(std::move(Err)));
+                                   "storing outputs", toString(std::move(Err)));
       return true;
     }
 
@@ -804,6 +893,10 @@ llvm::Error CachingDiagnosticsProcessor::serializeEmittedDiagnostics(
 
 llvm::Error
 CachingDiagnosticsProcessor::replayCachedDiagnostics(llvm::StringRef Buffer) {
+  // If empty buffer, no diagnostics to replay.
+  if (Buffer.empty())
+    return llvm::Error::success();
+
   SmallVector<uint8_t, 512> Uncompressed;
   if (llvm::compression::zstd::isAvailable() ||
       llvm::compression::zlib::isAvailable()) {
@@ -812,7 +905,7 @@ CachingDiagnosticsProcessor::replayCachedDiagnostics(llvm::StringRef Buffer) {
           std::make_error_code(std::errc::message_size));
 
     uint32_t UncompressedSize =
-        llvm::support::endian::read<uint32_t, llvm::support::little>(
+        llvm::support::endian::read<uint32_t, llvm::endianness::little>(
             Buffer.data() + Buffer.size() - sizeof(uint32_t));
 
     StringRef CompressedData = Buffer.drop_back(sizeof(uint32_t));

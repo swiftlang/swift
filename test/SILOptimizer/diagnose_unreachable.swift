@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -O -emit-sil -primary-file %s -o /dev/null -verify
 
 func ifFalse() -> Int {
-  if false { // expected-note {{always evaluates to false}}
+  if 1 == 0 { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
   } else {
     return 1
@@ -13,7 +13,7 @@ func ifFalse() -> Int {
 
 func ifTrue() -> Int {
   _ = 0
-  if true { // expected-note {{always evaluates to true}}
+  if 1 == 1 { // expected-note {{always evaluates to true}}
     return 1
   }
   return 0 // expected-warning {{will never be executed}}
@@ -68,7 +68,7 @@ func userCode() {}
 
 func whileTrue() {
   var x = 0
-  while true { // expected-note {{always evaluates to true}}
+  while 1 == 1 { // expected-note {{always evaluates to true}}
     x += 1
   }
   userCode() // expected-warning {{will never be executed}}
@@ -92,7 +92,7 @@ func whileTrueReachable(_ v: Int) -> () {
 
 func whileTrueTwoPredecessorsEliminated() -> () {
   var x = 0
-  while (true) { // expected-note {{always evaluates to true}}
+  while (1 == 1) { // expected-note {{always evaluates to true}}
     if false {
       break
     }
@@ -102,7 +102,7 @@ func whileTrueTwoPredecessorsEliminated() -> () {
 }
 
 func unreachableBranch() -> Int {
-  if false { // expected-note {{always evaluates to false}}
+  if 1 == 0 { // expected-note {{always evaluates to false}}
     // FIXME: It'd be nice if the warning were on 'if true' instead of the 
     // body.
     if true {

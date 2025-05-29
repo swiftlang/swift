@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 //
 // This is an interface over the standard OSF uuid library that gives UUIDs
-// sane value semantics and operators.
+// sound value semantics and operators.
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/UUID.h"
-#include "llvm/ADT/None.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -66,14 +66,14 @@ swift::UUID::UUID() {
 #endif
 }
 
-llvm::Optional<swift::UUID> swift::UUID::fromString(const char *s) {
+std::optional<swift::UUID> swift::UUID::fromString(const char *s) {
 #if defined(_WIN32)
   RPC_CSTR t = const_cast<RPC_CSTR>(reinterpret_cast<const unsigned char*>(s));
 
   ::UUID uuid;
   RPC_STATUS status = UuidFromStringA(t, &uuid);
   if (status == RPC_S_INVALID_STRING_UUID) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   swift::UUID result = UUID();
@@ -82,7 +82,7 @@ llvm::Optional<swift::UUID> swift::UUID::fromString(const char *s) {
 #else
   swift::UUID result;
   if (uuid_parse(s, result.Value))
-    return llvm::None;
+    return std::nullopt;
   return result;
 #endif
 }

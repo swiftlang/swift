@@ -112,7 +112,7 @@ protocol HasMutableSubscript {
   subscript(index: Int) -> Int { get set } // expected-note {{protocol requires}}
 }
 
-struct DisobedientImmutableAddressor: HasMutableSubscript { // expected-error {{does not conform}}
+struct DisobedientImmutableAddressor: HasMutableSubscript { // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
   subscript(index: Int) -> Int { // expected-note {{candidate is not settable}}
     unsafeAddress { return someValidAddress() }
   }
@@ -140,7 +140,7 @@ protocol HasMutatingMutableSubscript {
 
 // We allow mutating accessor requirements to be implemented by non-mutating accessors.
 
-struct DisobedientImmutableAddressor2: HasMutatingMutableSubscript { // expected-error {{does not conform}}
+struct DisobedientImmutableAddressor2: HasMutatingMutableSubscript { // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
   subscript(index: Int) -> Int { // expected-note {{candidate is not settable}}
     unsafeAddress { return someValidAddress() }
   }
@@ -165,7 +165,7 @@ protocol HasNonMutatingMutableSubscript {
   subscript(index: Int) -> Int { get nonmutating set } // expected-note {{protocol requires}}
 }
 
-struct DisobedientNonMutatingMutableAddressor: HasNonMutatingMutableSubscript { // expected-error {{does not conform}}
+struct DisobedientNonMutatingMutableAddressor: HasNonMutatingMutableSubscript { // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
   subscript(index: Int) -> Int {
     unsafeAddress { return someValidAddress() }
     unsafeMutableAddress { return someValidAddress() } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}

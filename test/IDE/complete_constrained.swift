@@ -75,7 +75,7 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT: Begin completions, 11 items
 // META_MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>.Type#]; name=self
 // META_MYSTRUCT_INT_DOT-DAG: Keyword/CurrNominal:                Type[#MyStruct<Int>.Type#]; name=Type
-// META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#T#]; name=Assoc
+// META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#Int#]; name=Assoc
 // META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#int: U#})[#MyStruct<Int>#]; name=init(int:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#withConstrainedGenericParam: SomeProto#})[#MyStruct<Int>#]; name=init(withConstrainedGenericParam:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#(self): MyStruct<Int>#})[#(x: SomeProto) -> Int#]; name=methodWithConstrainedGenericParam(:)
@@ -126,7 +126,7 @@ func testVegetarian(chef: Chef<Vegetarian>) {
   let _ = chefMeta.init(.#^CONDITIONAL_OVERLOAD_INIT_ARG^#)
 
   chef.eat(.#^CONDITIONAL_INAPPLICABLE_ARG^#)
-// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to addess that later
+// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to address that later
 //       (e.g. by adding the missing 'Meat' conformance to 'Vegetarian' - clearly not the intention here - but replace 'Meat' with 'Equatable').
 // CONDITIONAL_INAPPLICABLE_ARG: Begin completions, 2 items
 // CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: chicken[#Meat#]; name=chicken

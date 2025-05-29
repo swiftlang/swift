@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/Test.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -213,6 +215,11 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
              "wrong instruction");
       return B.createDeallocStack(Location,
                                   cast<SingleValueInstruction>(Alloc));
+    case SILInstructionKind::BeginApplyInst: {
+      auto *bai = cast<BeginApplyInst>(Alloc);
+      assert(bai->isCalleeAllocated());
+      return B.createDeallocStack(Location, bai->getCalleeAllocationResult());
+    }
     case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocRefInst:
       assert(cast<AllocRefInstBase>(Alloc)->canAllocOnStack());
@@ -241,7 +248,7 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
 bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
                                   const BitVector &AliveAfter,
                                   SILInstruction *InsertionPoint,
-                                  llvm::Optional<SILLocation> Location) {
+                                  std::optional<SILLocation> Location) {
   if (!AliveBefore.test(AliveAfter))
     return false;
 
@@ -294,7 +301,7 @@ StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
       }
       if (insertDeallocs(bd.data.AliveStackLocsAtExit,
                          SuccBI.AliveStackLocsAtEntry, &InsertionBlock->front(),
-                         llvm::None)) {
+                         std::nullopt)) {
         if (changes == Changes::None)
           changes = Changes::Instructions;
       }
@@ -408,3 +415,11 @@ void StackNesting::dumpBits(const BitVector &Bits) {
   }
   llvm::dbgs() << '>';
 }
+
+namespace swift::test {
+static FunctionTest MyNewTest("stack_nesting_fixup",
+                              [](auto &function, auto &arguments, auto &test) {
+                                StackNesting::fixNesting(&function);
+                                function.print(llvm::outs());
+                              });
+} // end namespace swift::test

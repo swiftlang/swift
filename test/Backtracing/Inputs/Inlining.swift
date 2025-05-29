@@ -1,3 +1,13 @@
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(SwiftWASILibc)
+import SwiftWASILibc
+#elseif canImport(ucrt)
+import ucrt
+#elseif canImport(SwiftGlibc)
+import SwiftGlibc
+#endif
+
 func square(_ x: Int) -> Int {
   return x * x
 }

@@ -16,12 +16,12 @@ func /*defaults:def*/withDefaults(_ xx: Int = 4, y: Int = 2, x: Int = 1) {}
 /*defaults:call*/withDefaults(x: 2, y: 3)
 
 
-func /*trailing:def*/betterName(a: Int, b: () -> Int) {}
+func /*trailing:def*/<base>withTrailingClosure</base>(<arglabel index=0>x</arglabel><param index=0></param>: Int, <arglabel index=1>y</arglabel><param index=1></param>: () -> Int) {}
 
 // valid
-/*trailing:call*/betterName(a: 2, b: { return 1})
-/*trailing:call*/betterName(a: 2) { return 1}
-/*trailing:call*/betterName(a: 2)
+/*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>2, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>{ return 1})
+/*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>2) { return 1}
+/*trailing:call*/<base>withTrailingClosure</base>(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>2)
 { return 1}
 // invalid
 /*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}

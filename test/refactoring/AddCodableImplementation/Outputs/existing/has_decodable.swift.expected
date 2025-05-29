@@ -1,0 +1,44 @@
+
+struct User1: Codable {
+  let firstName: String
+  let lastName: String?
+
+  init(from decoder: any Decoder) throws {
+    firstName = ""
+    lastName = ""
+  }
+  func encode(to encoder: any Encoder) throws {}
+}
+
+
+struct User2: Codable {
+  let firstName: String
+  let lastName: String?
+
+  init(from decoder: any Decoder) throws {
+    firstName = ""
+    lastName = ""
+  }
+}
+
+
+struct User3: Codable {
+  let firstName: String
+  let lastName: String?
+
+  func encode(to encoder: any Encoder) throws {}
+
+  private enum CodingKeys: CodingKey {
+    case firstName
+    case lastName
+  }
+
+  init(from decoder: any Decoder) throws {
+    let container: KeyedDecodingContainer<User3.CodingKeys> = try decoder.container(keyedBy: User3.CodingKeys.self)
+
+    self.firstName = try container.decode(String.self, forKey: User3.CodingKeys.firstName)
+    self.lastName = try container.decodeIfPresent(String.self, forKey: User3.CodingKeys.lastName)
+
+  }
+}
+

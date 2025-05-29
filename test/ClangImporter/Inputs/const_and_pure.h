@@ -1,7 +1,7 @@
 
-__attribute__((const)) void const_function();
+__attribute__((const)) int const_function();
 
-__attribute__((pure)) void pure_function();
+__attribute__((pure)) int pure_function();
 
-void normal_function();
+int normal_function();
 

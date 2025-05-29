@@ -14,6 +14,7 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
+
 // REQUIRES: executable_test
 
 import StdlibUnittest

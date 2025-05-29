@@ -25,18 +25,18 @@
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <optional>
 
 namespace swift {
 class ASTContext;
 class ModuleDecl;
+class ImportDecl;
 
 // MARK: - Fundamental import enums
 
@@ -102,6 +102,8 @@ enum class ImportFlags {
 using ImportOptions = OptionSet<ImportFlags>;
 
 void simple_display(llvm::raw_ostream &out, ImportOptions options);
+
+ImportOptions getImportOptions(ImportDecl *ID);
 
 // MARK: - Import Paths
 
@@ -584,7 +586,7 @@ struct AttributedImport {
 
   /// If the import declaration has a `@_documentation(visibility: <access>)`
   /// attribute, this is the given access level.
-  llvm::Optional<AccessLevel> docVisibility;
+  std::optional<AccessLevel> docVisibility;
 
   /// Access level limiting how imported types can be exported.
   AccessLevel accessLevel;
@@ -593,17 +595,22 @@ struct AttributedImport {
   /// if the access level was implicit or explicit.
   SourceRange accessLevelRange;
 
+  /// Location of the `@_implementationOnly` attribute if set.
+  SourceRange implementationOnlyRange;
+
   AttributedImport(ModuleInfo module, SourceLoc importLoc = SourceLoc(),
                    ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
                    SourceRange preconcurrencyRange = {},
-                   llvm::Optional<AccessLevel> docVisibility = llvm::None,
+                   std::optional<AccessLevel> docVisibility = std::nullopt,
                    AccessLevel accessLevel = AccessLevel::Public,
-                   SourceRange accessLevelRange = SourceRange())
+                   SourceRange accessLevelRange = SourceRange(),
+                   SourceRange implementationOnlyRange = SourceRange())
       : module(module), importLoc(importLoc), options(options),
         sourceFileArg(filename), spiGroups(spiGroups),
         preconcurrencyRange(preconcurrencyRange), docVisibility(docVisibility),
-        accessLevel(accessLevel), accessLevelRange(accessLevelRange) {
+        accessLevel(accessLevel), accessLevelRange(accessLevelRange),
+        implementationOnlyRange(implementationOnlyRange) {
     assert(!(options.contains(ImportFlags::Exported) &&
              options.contains(ImportFlags::ImplementationOnly)) ||
            options.contains(ImportFlags::Reserved));
@@ -614,7 +621,8 @@ struct AttributedImport {
     : AttributedImport(module, other.importLoc, other.options,
                        other.sourceFileArg, other.spiGroups,
                        other.preconcurrencyRange, other.docVisibility,
-                       other.accessLevel, other.accessLevelRange) { }
+                       other.accessLevel, other.accessLevelRange,
+                       other.implementationOnlyRange) { }
 
   friend bool operator==(const AttributedImport<ModuleInfo> &lhs,
                          const AttributedImport<ModuleInfo> &rhs) {
@@ -624,7 +632,8 @@ struct AttributedImport {
            lhs.spiGroups == rhs.spiGroups &&
            lhs.docVisibility == rhs.docVisibility &&
            lhs.accessLevel == rhs.accessLevel &&
-           lhs.accessLevelRange == rhs.accessLevelRange;
+           lhs.accessLevelRange == rhs.accessLevelRange &&
+           lhs.implementationOnlyRange == rhs.implementationOnlyRange;
   }
 
   AttributedImport<ImportedModule> getLoaded(ModuleDecl *loadedModule) const {
@@ -772,20 +781,16 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
   static inline AttributedImport getEmptyKey() {
-    return AttributedImport(ModuleInfoDMI::getEmptyKey(),
-                            SourceLocDMI::getEmptyKey(),
-                            ImportOptionsDMI::getEmptyKey(),
-                            StringRefDMI::getEmptyKey(),
-                            {}, {}, llvm::None,
-                            swift::AccessLevel::Public, {});
+    return AttributedImport(
+        ModuleInfoDMI::getEmptyKey(), SourceLocDMI::getEmptyKey(),
+        ImportOptionsDMI::getEmptyKey(), StringRefDMI::getEmptyKey(), {}, {},
+        std::nullopt, swift::AccessLevel::Public, {});
   }
   static inline AttributedImport getTombstoneKey() {
-    return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
-                            SourceLocDMI::getEmptyKey(),
-                            ImportOptionsDMI::getTombstoneKey(),
-                            StringRefDMI::getTombstoneKey(),
-                            {}, {}, llvm::None,
-                            swift::AccessLevel::Public, {});
+    return AttributedImport(
+        ModuleInfoDMI::getTombstoneKey(), SourceLocDMI::getEmptyKey(),
+        ImportOptionsDMI::getTombstoneKey(), StringRefDMI::getTombstoneKey(),
+        {}, {}, std::nullopt, swift::AccessLevel::Public, {});
   }
   static inline unsigned getHashValue(const AttributedImport &import) {
     return detail::combineHashValue(

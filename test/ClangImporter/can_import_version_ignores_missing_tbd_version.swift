@@ -23,14 +23,17 @@ import Simple
 
 func canImportUnderlyingVersion() {
 #if canImport(Simple, _underlyingVersion: 2) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Simple'; version number ignored}}
   let a = 1  // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Simple, _underlyingVersion: 3) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Simple'; version number ignored}}
   let b = 1 // expected-warning {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
   
 #if canImport(Simple, _underlyingVersion: 4) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
+  // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Simple'; version number ignored}}
   let c = 1 // expected-warning {{initialization of immutable value 'c' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 

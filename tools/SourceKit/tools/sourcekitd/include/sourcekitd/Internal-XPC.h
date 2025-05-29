@@ -26,6 +26,7 @@ static const char *KeyMsgResponse = "response";
 static const char *KeyCancelToken = "cancel_token";
 static const char *KeyCancelRequest = "cancel_request";
 static const char *KeyDisposeRequestHandle = "dispose_request_handle";
+static const char *KeyPlugins = "plugins";
 
 enum class Message {
   Initialization,

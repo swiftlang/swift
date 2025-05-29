@@ -136,6 +136,7 @@
 
 #include "PhiStorageOptimizer.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -363,7 +364,7 @@ static bool isStoreCopy(SILValue value) {
     if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
       return true;
     }
-    if (!liveness.isWithinBoundary(storeInst)) {
+    if (!liveness.isWithinBoundary(storeInst, /*deadEndBlocks=*/nullptr)) {
       return true;
     }
     return false;
@@ -645,12 +646,12 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       SILArgument *arg = pass.function->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
       auto loc = SILValue(arg).getLoc();
-      SILValue undefAddress = SILUndef::get(addrType, *pass.function);
+      SILValue undefAddress = SILUndef::get(pass.function, addrType);
       SingleValueInstruction *load;
       if (addrType.isTrivial(*pass.function)) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Trivial);
-      } else if (param.isConsumed()) {
+      } else if (param.isConsumedInCallee()) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Take);
       } else {
@@ -947,6 +948,9 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
     return nullptr;
 
+  case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
+
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
 
@@ -1006,6 +1010,8 @@ static Operand *getReusedStorageOperand(SILValue value) {
   default:
     break;
 
+  case ValueKind::CopyableToMoveOnlyWrapperValueInst:
+  case ValueKind::MoveOnlyWrapperToCopyableValueInst:
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -2264,7 +2270,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // Allocate temporary storage for a loadable operand.
   AllocStackInst *allocInst =
       argBuilder.createAllocStack(callLoc, argValue->getType());
-  if (apply.getCaptureConvention(*operand).isOwnedConvention()) {
+  if (apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
     apply.insertAfterApplication([&](SILBuilder &callBuilder) {
@@ -2643,7 +2649,7 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     if (oldResult.getType().isAddressOnly(*pass.function)) {
       auto info = newCall->getSubstCalleeConv().getYieldInfoForOperandIndex(i);
       assert(info.isFormalIndirect());
-      if (info.isConsumed()) {
+      if (info.isConsumedInCaller()) {
         // Because it is legal to have uses of an owned value produced by a
         // begin_apply after a coroutine's range, AddressLowering must move the
         // value into local storage so that such out-of-coroutine-range uses can
@@ -2655,9 +2661,9 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
         auto destAddr = addrMat.materializeAddress(&oldResult);
         storage.storageAddress = destAddr;
         storage.markRewritten();
-        resultBuilder.createCopyAddr(callLoc, &newResult, destAddr,
-                                     info.isConsumed() ? IsTake : IsNotTake,
-                                     IsInitialization);
+        resultBuilder.createCopyAddr(
+            callLoc, &newResult, destAddr,
+            info.isConsumedInCaller() ? IsTake : IsNotTake, IsInitialization);
       } else {
         // [in_guaranteed_begin_apply_results] Because OSSA ensures that all
         // uses of a guaranteed value produced by a begin_apply are used within
@@ -2676,8 +2682,8 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
       SILValue load =
           resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
       oldResult.replaceAllUsesWith(load);
-      for (auto *user : origCall->getTokenResult()->getUsers()) {
-        pass.getBuilder(user->getIterator())
+      for (auto *use : origCall->getEndApplyUses()) {
+        pass.getBuilder(use->getUser()->getIterator())
             .createEndBorrow(pass.genLoc(), load);
       }
     } else {
@@ -2798,7 +2804,7 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
   // Temporarily redirect all uses to Undef. They will be fixed in
   // replaceDirectResults().
   replaceTermResult(
-      SILUndef::get(resultArg->getType().getAddressType(), *pass.function));
+      SILUndef::get(pass.function, resultArg->getType().getAddressType()));
 }
 
 // Replace all formally direct results by rewriting the destructure_tuple.
@@ -2918,7 +2924,8 @@ public:
     }
 
     termBuilder.createCheckedCastAddrBranch(
-        castLoc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        castLoc, ccb->getIsolatedConformances(),
+        CastConsumptionKind::TakeOnSuccess, srcAddr,
         ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
         successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
 
@@ -3014,7 +3021,8 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   }
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      uncondCheckedCast->getLoc(), uncondCheckedCast->getIsolatedConformances(),
+      srcAddr, srcAddr->getType().getASTType(),
       destAddr, destAddr->getType().getASTType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
@@ -3222,6 +3230,7 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return;
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
     ownership = OwnershipKind::Owned;
     break;
@@ -3384,11 +3393,6 @@ protected:
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
-    case BuiltinValueKind::Copy: {
-      SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(0, opAddr);
-      break;
-    }
     case BuiltinValueKind::AddressOfBorrowOpaque:
       visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/true);
       break;
@@ -3406,6 +3410,19 @@ protected:
 
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
 
+  void visitCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createCopyableToMoveOnlyWrapperAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
+
   void visitEndBorrowInst(EndBorrowInst *end) {}
 
   void visitFixLifetimeInst(FixLifetimeInst *fli) {
@@ -3418,7 +3435,7 @@ protected:
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
-    use->set(SILUndef::get(use->get()->getType(), *pass.function));
+    use->set(SILUndef::get(use->get()));
   }
 
   // Copy from an opaque source operand.
@@ -3480,7 +3497,30 @@ protected:
   // types.
   void visitOpenExistentialValueInst(OpenExistentialValueInst *openExistential);
 
+  void visitMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+
+    auto address = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    auto *replacement = builder.createMarkUnresolvedNonCopyableValueInst(
+        inst->getLoc(), address, inst->getCheckKind());
+    markRewritten(inst, replacement);
+  }
+
   void visitMoveValueInst(MoveValueInst *mvi);
+
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createMoveOnlyWrapperToCopyableAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
 
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
@@ -4043,14 +4083,6 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
-    case BuiltinValueKind::Copy: {
-      SILValue addr = addrMat.materializeAddress(bi);
-      builder.createBuiltin(
-          bi->getLoc(), bi->getName(),
-          SILType::getEmptyTupleType(bi->getType().getASTContext()),
-          bi->getSubstitutions(), {addr, bi->getOperand(0)});
-      break;
-    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");

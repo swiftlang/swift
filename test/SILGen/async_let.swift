@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -parse-stdlib -sil-verify-all | %FileCheck %s --dump-input always
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple -parse-stdlib -sil-verify-all | %FileCheck %s --dump-input always
 // REQUIRES: concurrency
 
 import Swift

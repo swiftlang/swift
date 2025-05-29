@@ -18,6 +18,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -26,6 +27,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -83,13 +85,13 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  return (bool)SGM.SwiftModule->lookupConformance(type, errorProtocol);
+  return (bool) lookupConformance(type, errorProtocol);
 }
 
 /// Bridge the given Swift value to its corresponding Objective-C
 /// object, using the appropriate witness for the
 /// _ObjectiveCBridgeable._bridgeToObjectiveC requirement.
-static llvm::Optional<ManagedValue>
+static std::optional<ManagedValue>
 emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
                              ManagedValue swiftValue, CanType swiftValueType,
                              CanType bridgedType,
@@ -97,7 +99,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
   // Find the _bridgeToObjectiveC requirement.
   auto requirement = SGF.SGM.getBridgeToObjectiveCRequirement(loc);
   if (!requirement)
-    return llvm::None;
+    return std::nullopt;
 
   // Retrieve the _bridgeToObjectiveC witness.
   auto witness = conformance->getWitnessDecl(requirement);
@@ -106,7 +108,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq)
-    return llvm::None;
+    return std::nullopt;
 
   Type objcType = conformance->getTypeWitness(objcTypeReq);
 
@@ -125,8 +127,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto typeSubMap = swiftValueType->getContextSubstitutionMap(
-      SGF.SGM.SwiftModule, dc);
+  auto typeSubMap = swiftValueType->getContextSubstitutionMap(dc);
 
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy.substGenericArgs(SGF.SGM.M, typeSubMap,
@@ -177,7 +178,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
 /// Bridge the given Objective-C object to its corresponding Swift
 /// value, using the appropriate witness for the
 /// _ObjectiveCBridgeable._unconditionallyBridgeFromObjectiveC requirement.
-static llvm::Optional<ManagedValue>
+static std::optional<ManagedValue>
 emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
                              ManagedValue objcValue, CanType bridgedType,
                              ProtocolConformance *conformance) {
@@ -185,12 +186,12 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
   auto requirement =
     SGF.SGM.getUnconditionallyBridgeFromObjectiveCRequirement(loc);
   if (!requirement)
-    return llvm::None;
+    return std::nullopt;
 
   // Find the _ObjectiveCType requirement.
   auto objcTypeRequirement = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeRequirement)
-    return llvm::None;
+    return std::nullopt;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
   auto witness = conformance->getWitnessDeclRef(requirement);
@@ -247,7 +248,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF, SILLocation loc,
       std::move(resultPlan), std::move(argScope), loc,
       ManagedValue::forObjectRValueWithoutOwnership(witnessRef), subs,
       {objcValue, ManagedValue::forObjectRValueWithoutOwnership(metatypeValue)},
-      calleeTypeInfo, ApplyOptions(), context, llvm::None);
+      calleeTypeInfo, ApplyOptions(), context, std::nullopt);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -318,12 +319,19 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     return ManagedValue::forLValue(value);
 
   case ParameterConvention::Indirect_In_Guaranteed:
+    if (!value->getType().isAddress())
+      return ManagedValue::forBorrowedObjectRValue(value);
+
     if (valueTL.isLoadable()) {
       return SGF.B.createLoadBorrow(
           loc, ManagedValue::forBorrowedAddressRValue(value));
     } else {
       return ManagedValue::forBorrowedAddressRValue(value);
     }
+
+  case ParameterConvention::Indirect_In_CXX:
+    // Don't emit a cleanup if the parameter is @in_cxx.
+    return ManagedValue::forOwnedRValue(value, CleanupHandle::invalid());
 
   case ParameterConvention::Indirect_In:
     if (valueTL.isLoadable()) {
@@ -392,7 +400,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   if (blockTy->getNumResults() != 0) {
     auto result = blockTy->getSingleResult();
     if (result.getConvention() == ResultConvention::Indirect) {
-      indirectResult = entry->createFunctionArgument(blockResultTy);
+      indirectResult =
+          entry->createFunctionArgument(blockResultTy.getAddressType());
     }
   }
 
@@ -438,6 +447,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Pack_Guaranteed:
       case ParameterConvention::Pack_Owned:
       case ParameterConvention::Pack_Inout:
@@ -478,7 +488,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   ManagedValue result =
       SGF.emitMonomorphicApply(loc, fn, args, formalNativeResultType,
                                formalNativeResultType, ApplyOptions(),
-                               llvm::None, llvm::None, C)
+                               std::nullopt, std::nullopt, C)
           .getAsSingleValue(SGF, loc);
 
   // Bridge the result back to ObjC.
@@ -571,7 +581,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto results = blockInterfaceTy->getResults();
   auto representation = SILFunctionType::Representation::CFunctionPointer;
   auto *clangFnType = getASTContext().getCanonicalClangFunctionType(
-      params, results.empty() ? llvm::Optional<SILResultInfo>() : results[0],
+      params, results.empty() ? std::optional<SILResultInfo>() : results[0],
       representation);
 
   auto extInfo = SILFunctionType::ExtInfoBuilder()
@@ -737,8 +747,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType,
-                                               SGF.F.getGenericSignature());
+    auto openedType = ExistentialArchetypeType::get(nativeType);
 
     FormalEvaluationScope scope(SGF);
 
@@ -759,7 +768,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
       [&](SubstitutableType *t) -> Type {
         return nativeType;
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule());
 
     // The intrinsic takes a T; reabstract to the generic abstraction
     // pattern.
@@ -896,7 +905,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
     // Finally change ownership if we need to. We do not need to care about the
     // case of a +1 parameter being passed to a +0 function since +1 parameters
     // can be "instantaneously" borrowed at the call site.
-    if (blockTy->getParameters()[i].isConsumed()) {
+    if (blockTy->getParameters()[i].isConsumedInCaller()) {
       mv = mv.ensurePlusOne(SGF, loc);
     }
     args.push_back(mv);
@@ -920,7 +929,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
              loc, block, args, formalBlockTy.getResult(), formalResultType,
              ApplyOptions(),
              /*override CC*/ SILFunctionTypeRepresentation::Block,
-             /*foreign error*/ llvm::None, SGFContext(init.get()))
+             /*foreign error*/ std::nullopt, SGFContext(init.get()))
           .getAsSingleValue(SGF, loc);
 
   SILValue r;
@@ -1131,7 +1140,7 @@ static ManagedValue emitCBridgedToNativeValue(
   }
 
   // id-to-Any bridging.
-  if (nativeType->isAny()) {
+  if (nativeType->isMarkerExistential()) {
     // If this is not a call result, use the normal erasure logic.
     if (!isCallResult) {
       return SGF.emitTransformedValue(loc, unwrapBridgedOptionals(v),
@@ -1163,10 +1172,18 @@ static ManagedValue emitCBridgedToNativeValue(
     auto optionalBridgedTy = SILType::getOptionalType(loweredBridgedTy);
     auto optionalMV = SGF.B.createUncheckedBitCast(
         loc, unwrapBridgedOptionals(v), optionalBridgedTy);
-    return SGF.emitApplyOfLibraryIntrinsic(loc,
+    v = SGF.emitApplyOfLibraryIntrinsic(loc,
                            SGF.getASTContext().getBridgeAnyObjectToAny(),
                            SubstitutionMap(), optionalMV, C)
               .getAsSingleValue(SGF, loc);
+    
+    // Convert to the marker existential if necessary.
+    if (!v.isInContext()) {
+      auto anyType = SGF.getASTContext().getAnyExistentialType();
+      v = SGF.emitTransformedValue(loc, v, anyType, nativeType);
+    }
+
+    return v;
   }
 
   // Bridge NSError to Error.
@@ -1299,7 +1316,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
                                            SILValue arg) {
   auto &lowering = SGF.getTypeLowering(arg->getType());
   // If address-only, make a +1 copy and operate on that.
-  if (lowering.isAddressOnly()) {
+  if (lowering.isAddressOnly() && SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
@@ -1322,8 +1339,8 @@ static SILFunctionType *
 emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
                        SmallVectorImpl<SILValue> &args,
                        SILValue &foreignErrorSlot, SILValue &foreignAsyncSlot,
-                       llvm::Optional<ForeignErrorConvention> &foreignError,
-                       llvm::Optional<ForeignAsyncConvention> &foreignAsync,
+                       std::optional<ForeignErrorConvention> foreignError,
+                       std::optional<ForeignAsyncConvention> foreignAsync,
                        CanType &nativeFormalResultTy,
                        CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
@@ -1346,18 +1363,6 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   SmallVector<ManagedValue, 8> bridgedArgs;
   bridgedArgs.reserve(objcFnTy->getParameters().size());
 
-  // Find the foreign error and async conventions if we have one.
-  if (thunk.hasDecl()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(thunk.getDecl())) {
-      foreignError = func->getForeignErrorConvention();
-      foreignAsync = func->getForeignAsyncConvention();
-    }
-  }
-
-  // We don't know what to do with indirect results from the Objective-C side.
-  assert(objcFnTy->getNumIndirectFormalResults() == 0
-         && "Objective-C methods cannot have indirect results");
-
   auto bridgedFormalTypes = getParameterTypes(objcFormalFnTy.getParams());
   bridgedFormalResultTy = objcFormalFnTy.getResult();
 
@@ -1368,11 +1373,16 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   auto inputs = objcFnTy->getParameters();
   auto nativeInputs = swiftFnTy->getParameters();
   auto fnConv = SGF.silConv.getFunctionConventions(swiftFnTy);
-  assert(nativeInputs.size() == bridgedFormalTypes.size());
-  assert(nativeInputs.size() == nativeFormalTypes.size());
+  bool nativeInputsHasImplicitIsolatedParam = false;
+  if (auto param = swiftFnTy->maybeGetIsolatedParameter())
+    nativeInputsHasImplicitIsolatedParam = param->hasOption(SILParameterInfo::ImplicitLeading);
+  assert(nativeInputs.size() - unsigned(nativeInputsHasImplicitIsolatedParam) == bridgedFormalTypes.size());
+  assert(nativeInputs.size() - unsigned(nativeInputsHasImplicitIsolatedParam) == nativeFormalTypes.size());
   assert(inputs.size() ==
            nativeInputs.size() + unsigned(foreignError.has_value())
-                               + unsigned(foreignAsync.has_value()));
+                               + unsigned(foreignAsync.has_value()) -
+         unsigned(nativeInputsHasImplicitIsolatedParam));
+
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = SGF.getSILType(inputs[i], objcFnTy);
     SILValue arg = SGF.F.begin()->createFunctionArgument(argTy);
@@ -1389,7 +1399,7 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       foreignAsyncSlot = SGF.B.createCopyBlock(loc, arg);
       // If the argument is consumed, we're still responsible for releasing the
       // original.
-      if (inputs[i].isConsumed())
+      if (inputs[i].isConsumedInCallee())
         SGF.emitManagedRValueWithCleanup(arg);
       continue;
     }
@@ -1399,12 +1409,12 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto copy = SGF.B.createCopyBlock(loc, arg);
       // If the argument is consumed, we're still responsible for releasing the
       // original.
-      if (inputs[i].isConsumed())
+      if (inputs[i].isConsumedInCallee())
         SGF.emitManagedRValueWithCleanup(arg);
       arg = copy;
     }
     // Convert the argument to +1 if necessary.
-    else if (!inputs[i].isConsumed()) {
+    else if (!inputs[i].isConsumedInCallee()) {
       arg = emitObjCUnconsumedArgument(SGF, loc, arg);
     }
 
@@ -1418,13 +1428,13 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
            + unsigned(foreignAsync.has_value())
         == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
-  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() &&
+  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() - bool(nativeInputsHasImplicitIsolatedParam) &&
          "swift inputs don't match number of arguments?!");
   assert((foreignErrorSlot || !foreignError) &&
          "didn't find foreign error slot");
 
   // Bridge the input types.
-  assert(bridgedArgs.size() == nativeInputs.size());
+  assert(bridgedArgs.size() == nativeInputs.size() - bool(nativeInputsHasImplicitIsolatedParam));
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     // Consider the bridged values to be "call results" since they're coming
     // from potentially nil-unsound ObjC callers.
@@ -1445,9 +1455,9 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       native = SGF.emitManagedBufferWithCleanup(buf);
     }
 
-    if (nativeInputs[i].isConsumed()) {
+    if (nativeInputs[i].isConsumedInCaller()) {
       argValue = native.forward(SGF);
-    } else if (nativeInputs[i].isGuaranteed()) {
+    } else if (nativeInputs[i].isGuaranteedInCaller()) {
       argValue = native.borrow(SGF, loc).getUnmanagedValue();
     } else {
       argValue = native.getValue();
@@ -1488,10 +1498,10 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
       auto argCopy = B.createCopyBlock(loc, arg);
       // If the argument is consumed, we're still responsible for releasing the
       // original.
-      if (input.isConsumed())
+      if (input.isConsumedInCallee())
         emitManagedRValueWithCleanup(arg);
       arg = argCopy;
-    } else if (!input.isConsumed()) {
+    } else if (!input.isConsumedInCallee()) {
       arg = emitObjCUnconsumedArgument(*this, loc, arg);
     }
     auto managedArg = emitManagedRValueWithCleanup(arg);
@@ -1503,9 +1513,9 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   auto closureExtInfo = objcFnTy->getExtInfo().intoBuilder()
     .withRepresentation(SILFunctionTypeRepresentation::Thin)
     .withAsync()
-    .withConcurrent()
+    .withSendable()
     .build();
-  auto closureTy = objcFnTy->getWithExtInfo(closureExtInfo);
+  auto closureTy = objcInfo.SILFnType->getWithExtInfo(closureExtInfo);
   
   SmallString<64> closureName(F.getName().begin(), F.getName().end());
   // Trim off the thunk suffix and mangle this like a closure nested inside the
@@ -1520,19 +1530,13 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   closureName.push_back(thunkSuffix[0]);
 
   SILGenFunctionBuilder fb(SGM);
-  auto closure = fb.getOrCreateSharedFunction(loc, closureName,
-                                              closureTy,
-                                              IsBare,
-                                              IsNotTransparent,
-                                              F.isSerialized(),
-                                              ProfileCounter(),
-                                              IsThunk,
-                                              IsNotDynamic,
-                                              IsNotDistributed,
-                                              IsNotRuntimeAccessible);
-  
+  auto closure = fb.getOrCreateSharedFunction(
+      loc, closureName, closureTy, IsBare, IsNotTransparent,
+      F.getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
+
   auto closureRef = B.createFunctionRef(loc, closure);
-  
+
   auto closureVal = B.createPartialApply(loc, closureRef, subs,
                                       closureArgs,
                                       ParameterConvention::Direct_Guaranteed);
@@ -1544,8 +1548,8 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   scope.pop();
   
   // Return void to the immediate caller.
-  B.createReturn(loc, SILUndef::get(SGM.Types.getEmptyTupleType(), F));
-  
+  B.createReturn(loc, SILUndef::get(&F, SGM.Types.getEmptyTupleType()));
+
   return closure;
 }
 
@@ -1572,85 +1576,83 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
   }
 
+  // Use the same generic environment as the native entry point.
+  // We need to set this before we can call things like
+  // F.getForwardingSubstitutionMap().
+  F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(native));
+
   auto nativeInfo = getConstantInfo(getTypeExpansionContext(), native);
   auto subs = F.getForwardingSubstitutionMap();
   auto substTy = nativeInfo.SILFnType->substGenericArgs(
       SGM.M, subs, getTypeExpansionContext());
   SILFunctionConventions substConv(substTy, SGM.M);
 
-  // Use the same generic environment as the native entry point.
-  F.setGenericEnvironment(SGM.Types.getConstantGenericEnvironment(native));
-
   auto loc = thunk.getAsRegularLocation();
   loc.markAutoGenerated();
   Scope scope(Cleanups, CleanupLocation(loc));
-  
-  // Hop to the actor for the method's actor constraint, if any.
-  // Note that, since an async native-to-foreign thunk only ever runs in a
-  // task purpose-built for running the Swift async code triggering the
-  // completion handler, there is no need for us to hop back to the existing
-  // executor, since the task will end after we invoke the completion handler.
+
+  std::optional<ActorIsolation> isolation;
   if (F.isAsync()) {
-    llvm::Optional<ActorIsolation> isolation;
+    if (thunk.hasDecl())
+      isolation = getActorIsolation(thunk.getDecl());
+  } else if (getASTContext()
+                 .LangOpts.isDynamicActorIsolationCheckingEnabled()) {
     if (thunk.hasDecl()) {
       isolation = getActorIsolation(thunk.getDecl());
+    } else if (auto globalActor = nativeInfo.FormalType->getGlobalActor()) {
+      isolation = ActorIsolation::forGlobalActor(globalActor);
     }
+  }
 
-    // A hop is only needed in the thunk if it is global-actor isolated.
-    // Native, instance-isolated async methods will hop in the prologue.
-    if (isolation && isolation->isGlobalActor()) {
+  // A hop/check is only needed in the thunk if it is global-actor isolated.
+  // Native, instance-isolated async methods will hop in the prologue.
+  if (isolation && isolation->isGlobalActor()) {
+    if (F.isAsync()) {
+      // Hop to the actor for the method's actor constraint.
+      // Note that, since an async native-to-foreign thunk only ever runs in a
+      // task purpose-built for running the Swift async code triggering the
+      // completion handler, there is no need for us to hop back to the existing
+      // executor, since the task will end after we invoke the completion handler.
       emitPrologGlobalActorHop(loc, isolation->getGlobalActor());
+    } else {
+      emitPreconditionCheckExpectedExecutor(loc, *isolation, std::nullopt);
+    }
+  }
+
+  std::optional<ForeignErrorConvention> foreignError;
+  std::optional<ForeignAsyncConvention> foreignAsync;
+
+  // Find the foreign error and async conventions if we have one.
+  if (thunk.hasDecl()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(thunk.getDecl())) {
+      foreignError = func->getForeignErrorConvention();
+      foreignAsync = func->getForeignAsyncConvention();
     }
   }
 
   // If we are bridging a Swift method with Any return value(s), create a
   // stack allocation to hold the result(s), since Any is address-only.
   SmallVector<SILValue, 4> args;
+  SILFunctionConventions funcConv = F.getConventions();
+  bool needsBridging = true;
   if (substConv.hasIndirectSILResults()) {
     for (auto result : substConv.getResults()) {
       if (!substConv.isSILIndirect(result)) {
         continue;
       }
-      args.push_back(emitTemporaryAllocation(
-                loc, substConv.getSILType(result, getTypeExpansionContext())));
-    }
-  }
 
-  // If the '@objc' was inferred due to deprecated rules,
-  // emit a Builtin.swift3ImplicitObjCEntrypoint().
-  //
-  // However, don't do so for 'dynamic' members, which must use Objective-C
-  // dispatch and therefore create many false positives.
-  if (thunk.hasDecl()) {
-    auto decl = thunk.getDecl();
-
-    // For an accessor, look at the storage declaration's attributes.
-    if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-      decl = accessor->getStorage();
-    }
-
-    if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc was inferred based on the Swift 3 @objc inference rules, emit
-      // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
-      // logging of the uses of such entrypoints.
-      if (attr->isSwift3Inferred() && !decl->shouldUseObjCDispatch()) {
-        // Get the starting source location of the declaration so we can say
-        // exactly where to stick '@objc'.
-        SourceLoc objcInsertionLoc =
-          decl->getAttributeInsertionLoc(/*modifier*/ false);
-
-        auto objcInsertionLocArgs
-          = emitSourceLocationArgs(objcInsertionLoc, loc);
-        
-        B.createBuiltin(loc,
-          getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
-          getModule().Types.getEmptyTupleType(), { }, {
-            objcInsertionLocArgs.filenameStartPointer.forward(*this),
-            objcInsertionLocArgs.filenameLength.forward(*this),
-            objcInsertionLocArgs.line.forward(*this),
-            objcInsertionLocArgs.column.forward(*this)
-          });
+      if (!foreignAsync && funcConv.hasIndirectSILResults()) {
+        auto resultTy =
+            funcConv.getSingleSILResultType(getTypeExpansionContext());
+        assert(substConv.getSingleSILResultType(getTypeExpansionContext()) ==
+               resultTy);
+        args.push_back(F.begin()->createFunctionArgument(resultTy));
+        needsBridging = false;
+        break;
       }
+
+      args.push_back(emitTemporaryAllocation(
+          loc, substConv.getSILType(result, getTypeExpansionContext())));
     }
   }
 
@@ -1659,9 +1661,32 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // we will deallocate it too early.
   Scope argScope(Cleanups, CleanupLocation(loc));
 
+  // See if our native function has an implicitly isolated parameter. In such a
+  // case, we need to pass in the isolation.
+  if (auto isolatedParameter = substTy->maybeGetIsolatedParameter();
+      isolatedParameter && isolatedParameter->hasOption(SILParameterInfo::ImplicitLeading)) {
+    assert(F.isAsync() && "Can only be async");
+    assert(isolation && "No isolation?!");
+    switch (isolation->getKind()) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
+      args.push_back(emitNonIsolatedIsolation(loc).getValue());
+      break;
+    case ActorIsolation::ActorInstance:
+      llvm::report_fatal_error("Should never see this");
+      break;
+    case ActorIsolation::GlobalActor:
+      args.push_back(emitLoadGlobalActorExecutor(isolation->getGlobalActor()));
+      break;
+    case ActorIsolation::Erased:
+      llvm::report_fatal_error("Should never see this");
+      break;
+    }
+  }
+
   // Bridge the arguments.
-  llvm::Optional<ForeignErrorConvention> foreignError;
-  llvm::Optional<ForeignAsyncConvention> foreignAsync;
   SILValue foreignErrorSlot;
   SILValue foreignAsyncSlot;
   CanType nativeFormalResultType, bridgedFormalResultType;
@@ -1773,10 +1798,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
                        SILParameterInfo param) {
       auto bridgedTy = param.getInterfaceType();
       auto bridgedArg = emitNativeToBridgedValue(loc,
-                                 arg, nativeFormalTy,
+                                 arg.borrow(*this, loc), nativeFormalTy,
                                  bridgedTy,
                                  SILType::getPrimitiveObjectType(bridgedTy));
-      completionHandlerArgs.push_back(bridgedArg.borrow(*this, loc).getValue());
+      completionHandlerArgs.push_back(bridgedArg.getValue());
     };
  
     Scope completionArgDestructureScope(*this, loc);
@@ -1871,8 +1896,15 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
     
     // The immediate function result is an empty tuple.
-    return SILUndef::get(SGM.Types.getEmptyTupleType(), F);
+    return SILUndef::get(&F, SGM.Types.getEmptyTupleType());
   };
+
+  // If the function we're calling isn't actually polymorphic, drop the
+  // substitutions.  This should only happen in concrete specializations.
+  if (subs && !nativeFn->getType().castTo<SILFunctionType>()->isPolymorphic()) {
+    assert(subs.getGenericSignature()->areAllParamsConcrete());
+    subs = SubstitutionMap();
+  }
     
   if (!substTy->hasErrorResult()) {
     // Create the apply.
@@ -1888,12 +1920,14 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (foreignAsync) {
       result = passResultToCompletionHandler(result);
     } else {
-      if (substConv.hasIndirectSILResults()) {
-        assert(substTy->getNumResults() == 1);
-        result = args[0];
+      if (needsBridging) {
+        if (substConv.hasIndirectSILResults()) {
+          assert(substTy->getNumResults() == 1);
+          result = args[0];
+        }
+        result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
+                                       bridgedFormalResultType, objcResultTy);
       }
-      result = emitBridgeReturnValue(*this, loc, result, nativeFormalResultType,
-                                     bridgedFormalResultType, objcResultTy);
     }
   } else {
     SILBasicBlock *contBB = createBasicBlock();
@@ -1981,8 +2015,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           auto param = completionTy->getParameters()[i];
           auto paramTy = param.getSILStorageInterfaceType();
           if (paramTy.isTrivial(F)) {
-            // If it's trivial, the value passed doesn't matter.
-            completionHandlerArgs.push_back(SILUndef::get(paramTy, F.getModule()));
+            // If it's trivial, pass a zero value of whatever the type is.
+            auto zero = B.createZeroInitValue(loc, paramTy);
+            completionHandlerArgs.push_back(zero);
           } else {
             // If it's not trivial, it must be a nullable class type. Pass
             // nil.
@@ -2018,7 +2053,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     if (foreignAsync) {
       // After invoking the completion handler, our immediate return value is
       // void.
-      result = SILUndef::get(SGM.Types.getEmptyTupleType(), F);
+      result = SILUndef::get(&F, SGM.Types.getEmptyTupleType());
     } else {
       result = contBB->createPhiArgument(objcResultTy, OwnershipKind::Owned);
     }
@@ -2081,13 +2116,18 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   auto foreignFnTy = foreignCI.SILFnType;
 
   // Find the foreign error/async convention and 'self' parameter index.
-  llvm::Optional<Type> thrownErrorType;
-  llvm::Optional<ForeignAsyncConvention> foreignAsync;
+  std::optional<Type> thrownErrorType;
+  std::optional<ForeignAsyncConvention> foreignAsync;
   if (nativeFnTy->isAsync()) {
     foreignAsync = fd->getForeignAsyncConvention();
     assert(foreignAsync && "couldn't find foreign async convention?!");
+
+    // We might switch to to the callee's actor as part of making the call,
+    // but we don't need to switch back afterwards because we're going to
+    // immediately return.
+    ExpectedExecutor.setUnnecessary();
   }
-  llvm::Optional<ForeignErrorConvention> foreignError;
+  std::optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {
     thrownErrorType = nativeFnTy->getErrorResult().getInterfaceType();
     foreignError = fd->getForeignErrorConvention();
@@ -2107,7 +2147,25 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     indirectResult = F.begin()->createFunctionArgument(
         nativeConv.getSingleSILResultType(F.getTypeExpansionContext()));
   }
-  
+
+  // Before we do anything, see if our function type is async and has an
+  // implicit isolated parameter. In such a case, we need to implicitly insert
+  // it here before we insert other parameters.
+  //
+  // NOTE: We do not jump to it or do anything further since as mentioned above,
+  // we might switch to the callee's actor as part of making the call... but we
+  // don't need to do anything further than that because we're going to
+  // immediately return.
+  bool hasImplicitIsolatedParameter = false;
+  if (auto isolatedParameter = nativeFnTy->maybeGetIsolatedParameter();
+      isolatedParameter && nativeFnTy->isAsync() &&
+      isolatedParameter->hasOption(SILParameterInfo::ImplicitLeading)) {
+    auto loweredTy = getLoweredTypeForFunctionArgument(
+        isolatedParameter->getArgumentType(&F));
+    F.begin()->createFunctionArgument(loweredTy);
+    hasImplicitIsolatedParameter = true;
+  }
+
   // Forward the arguments.
   SmallVector<SILValue, 8> params;
 
@@ -2134,7 +2192,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Set up the throw destination if necessary.
   CleanupLocation cleanupLoc(fd);
   if (thrownErrorType) {
-    prepareRethrowEpilog(*thrownErrorType, cleanupLoc);
+    prepareRethrowEpilog(fd,
+                         AbstractionPattern(*thrownErrorType),
+                         *thrownErrorType,
+                         cleanupLoc);
   }
 
   SILValue result;
@@ -2169,9 +2230,12 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         getParameterTypes(nativeCI.LoweredType.getParams(), hasSelfParam);
 
       for (unsigned nativeParamIndex : indices(params)) {
+        // Adjust the parameter if we inserted an implicit isolated parameter.
+        unsigned nativeFnTyParamIndex = nativeParamIndex + hasImplicitIsolatedParameter;
+
         // Bring the parameter to +1.
         auto paramValue = params[nativeParamIndex];
-        auto thunkParam = nativeFnTy->getParameters()[nativeParamIndex];
+        auto thunkParam = nativeFnTy->getParameters()[nativeFnTyParamIndex];
         // TODO: Could avoid a retain if the bridged parameter is also +0 and
         // doesn't require a bridging conversion.
         ManagedValue param;
@@ -2187,6 +2251,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         case ParameterConvention::Indirect_InoutAliasable:
           param = ManagedValue::forLValue(paramValue);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In:
           param = emitManagedRValueWithCleanup(paramValue);
           break;
@@ -2299,7 +2364,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forObjectRValueWithoutOwnership(fn), subs, args,
-                  calleeTypeInfo, ApplyOptions(), context, llvm::None)
+                  calleeTypeInfo, ApplyOptions(), context, std::nullopt)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

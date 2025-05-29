@@ -1,4 +1,4 @@
-// RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir -Xcc -std=c++17 | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs %s -emit-ir | %FileCheck %s
 
 import StructuredBindingsGetMethod
 

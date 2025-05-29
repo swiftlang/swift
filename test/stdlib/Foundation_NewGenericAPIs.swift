@@ -41,7 +41,7 @@ func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
 
 
 func test_NSKeyedUnarchiver_unarchiveObjectWithData(_ data: NSData) {
-  var r = NSKeyedUnarchiver.unarchiveObject(with: data as Data)
+  var r = NSKeyedUnarchiver.unarchiveObject(with: data as Data) // expected-warning * {{'unarchiveObject(with:)' was deprecated}}
   expectType(Optional<Any>.self, &r)
 }
 

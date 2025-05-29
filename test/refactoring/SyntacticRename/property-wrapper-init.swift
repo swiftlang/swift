@@ -35,13 +35,10 @@ func uses() {
 }
 
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
 // RUN: %empty-directory(%t.ranges)
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="init" -is-function-like -old-name "init(initialValue:)" -new-name "init(somethingElse:)" >> %t.result/property-wrapper-init.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="init" -is-function-like -old-name "init(initialValue:)" >> %t.ranges/property-wrapper-init.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="body" -is-function-like -old-name "init(first:body:)" -new-name "init(second:head:)" >> %t.result/property-wrapper-body.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="body" -is-function-like -old-name "init(first:body:)" >> %t.ranges/property-wrapper-body.swift
-// RUN: diff -u %S/Outputs/property-wrapper-init/init.swift.expected %t.result/property-wrapper-init.swift
-// RUN: diff -u %S/FindRangeOutputs/property-wrapper-init/init.swift.expected %t.ranges/property-wrapper-init.swift
-// RUN: diff -u %S/Outputs/property-wrapper-init/body.swift.expected %t.result/property-wrapper-body.swift
-// RUN: diff -u %S/FindRangeOutputs/property-wrapper-init/body.swift.expected %t.ranges/property-wrapper-body.swift
+// RUN: diff -u %S/Outputs/property-wrapper-init/init.swift.expected %t.ranges/property-wrapper-init.swift
+// RUN: diff -u %S/Outputs/property-wrapper-init/body.swift.expected %t.ranges/property-wrapper-body.swift

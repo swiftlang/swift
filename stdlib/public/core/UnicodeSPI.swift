@@ -25,20 +25,26 @@ extension Unicode {
 }
 
 @available(SwiftStdlib 5.7, *)
+extension Unicode._NFD: Sendable {}
+
+@available(SwiftStdlib 5.7, *)
 extension Unicode._NFD {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
   public struct Iterator {
-    var base: Unicode._InternalNFD<Substring>.Iterator
+    var base: Unicode._InternalNFD<Substring.UnicodeScalarView>.Iterator
   }
 }
+
+@available(SwiftStdlib 5.7, *)
+extension Unicode._NFD.Iterator: Sendable {}
 
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD.Iterator: IteratorProtocol {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
   public mutating func next() -> Unicode.Scalar? {
-    base.next()?.scalar
+    base.next()
   }
 }
 
@@ -47,7 +53,7 @@ extension Unicode._NFD: Sequence {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
   public func makeIterator() -> Iterator {
-    Iterator(base: Unicode._InternalNFD(base: base).makeIterator())
+    Iterator(base: base._internalNFD.makeIterator())
   }
 }
 
@@ -80,13 +86,19 @@ extension Unicode {
 }
 
 @available(SwiftStdlib 5.7, *)
+extension Unicode._NFC: Sendable {}
+
+@available(SwiftStdlib 5.7, *)
 extension Unicode._NFC {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
   public struct Iterator {
-    var base: Unicode._InternalNFC<Substring>.Iterator
+    var base: Unicode._InternalNFC<Substring.UnicodeScalarView>.Iterator
   }
 }
+
+@available(SwiftStdlib 5.7, *)
+extension Unicode._NFC.Iterator: Sendable {}
 
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC.Iterator: IteratorProtocol {
@@ -102,11 +114,7 @@ extension Unicode._NFC: Sequence {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
   public func makeIterator() -> Iterator {
-    Iterator(
-      base: Unicode._InternalNFC<Substring>.Iterator(
-        iterator: Unicode._InternalNFD<Substring>(base: base).makeIterator()
-      )
-    )
+    Iterator(base: base._internalNFC.makeIterator())
   }
 }
 
@@ -145,9 +153,9 @@ extension Unicode.Scalar.Properties {
   @available(SwiftStdlib 5.7, *)
   public var _scriptExtensions: [UInt8] {
     var count: UInt8 = 0
-    let pointer = _swift_stdlib_getScriptExtensions(_scalar.value, &count)
+    let pointer = unsafe _swift_stdlib_getScriptExtensions(_scalar.value, &count)
 
-    guard let pointer = pointer else {
+    guard let pointer = unsafe pointer else {
       return [_script]
     }
 
@@ -155,7 +163,7 @@ extension Unicode.Scalar.Properties {
     result.reserveCapacity(Int(count))
 
     for i in 0 ..< count {
-      let rawValue = pointer[Int(i)]
+      let rawValue = unsafe pointer[Int(i)]
 
       _internalInvariant(rawValue != .max, "Unknown script rawValue")
 
@@ -176,18 +184,18 @@ extension Unicode.Scalar.Properties {
   public var _caseFolded: String {
     var buffer: (UInt32, UInt32, UInt32) = (.max, .max, .max)
 
-    withUnsafeMutableBytes(of: &buffer) {
+    unsafe withUnsafeMutableBytes(of: &buffer) {
       // This is safe because the memory is already UInt32
-      let ptr = $0.baseAddress!.assumingMemoryBound(to: UInt32.self)
-      _swift_stdlib_getCaseMapping(_scalar.value, ptr)
+      let ptr = unsafe $0.baseAddress!.assumingMemoryBound(to: UInt32.self)
+      unsafe _swift_stdlib_getCaseMapping(_scalar.value, ptr)
     }
 
     var result = ""
     // Max mapping is 3 scalars and the max UTF8 bytes of a scalar is 4.
     result.reserveCapacity(12)
 
-    withUnsafeBytes(of: &buffer) {
-      for scalar in $0.bindMemory(to: UInt32.self) {
+    unsafe withUnsafeBytes(of: &buffer) {
+      for unsafe scalar in unsafe $0.bindMemory(to: UInt32.self) {
         guard scalar != .max else {
           break
         }

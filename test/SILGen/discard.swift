@@ -1,13 +1,14 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
-// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
 
 // Swift sources are require to remove struct_extract so this check-not line passes:
 // "CHECK-SIL-NOT: struct_extract"
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 func invokedDeinit() {}
 
-@_moveOnly enum MaybeFile {
+enum MaybeFile: ~Copyable {
   case some(File)
   case none
 
@@ -41,7 +42,7 @@ func invokedDeinit() {}
   // CHECK-SIL:    release_value [[FILE]] : $File
 }
 
-@_moveOnly struct File {
+struct File: ~Copyable {
   let fd: Int
   static var nextFD: Int = 0
 
@@ -71,7 +72,7 @@ func invokedDeinit() {}
   }
 }
 
-@_moveOnly struct PointerTree {
+struct PointerTree: ~Copyable {
   let left: UnsafePointer<UInt>?
   let file: Int = 0
   lazy var popularity: Int = 0
@@ -89,7 +90,7 @@ func invokedDeinit() {}
 // CHECK-LABEL: sil hidden [ossa] @$s4test11PointerTreeV10tryDestroy9doDiscardySb_tKF : $@convention(method) (Bool, @owned PointerTree) -> @error any Error {
 // CHECK:   bb0{{.*}}:
 // CHECK:     [[SELF_BOX:%.*]] = alloc_box ${ var PointerTree }, var, name "self"
-// CHECK:     [[SELF_BOX_LIFETIME:%.*]] = begin_borrow [lexical] [[SELF_BOX]]
+// CHECK:     [[SELF_BOX_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[SELF_BOX]]
 // CHECK:     [[SELF_PTR:%.*]] = project_box [[SELF_BOX_LIFETIME]] : ${ var PointerTree }, 0
 //            .. skip to the conditional test ..
 // CHECK:     [[SHOULD_FORGET:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
@@ -145,7 +146,7 @@ final class Wallet {
   var numCards = 0
 }
 
-@_moveOnly enum Ticket {
+enum Ticket: ~Copyable {
   case empty
   case within(Wallet)
 
@@ -172,7 +173,7 @@ final class Wallet {
   // CHECK:    destroy_value [[DD]] : $Ticket
 
   // CHECK-SIL-LABEL: sil hidden @$s4test6TicketO06changeB08inWalletyAA0E0CSg_tF : $@convention(method) (@guaranteed Optional<Wallet>, @owned Ticket) -> () {
-  // CHECK-SIL:    [[SELF_REF:%.*]] = alloc_stack [lexical] $Ticket, var, name "self", implicit 
+  // CHECK-SIL:    [[SELF_REF:%.*]] = alloc_stack [lexical] [var_decl] $Ticket, var, name "self"
   // CHECK-SIL:    switch_enum {{.*}} : $Optional<Wallet>, case #Optional.some!enumelt: {{.*}}, case #Optional.none!enumelt: [[NO_WALLET_BB:bb[0-9]+]]
   //
   // >> now we begin the destruction sequence, which involves pattern matching on self to destroy its innards

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -disable-availability-checking -c -o /dev/null -O -disable-llvm-optzns
+// RUN: %target-swift-frontend -primary-file %s -target %target-swift-5.1-abi-triple -c -o /dev/null -O -disable-llvm-optzns
 
 // REQUIRES: concurrency
 

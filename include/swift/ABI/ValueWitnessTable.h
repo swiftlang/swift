@@ -29,7 +29,8 @@
 
 namespace swift {
 
-struct TypeLayout;
+template <typename Runtime>
+struct TargetTypeLayout;
 template <class Runtime> struct TargetEnumValueWitnessTable;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -118,9 +119,9 @@ public:
 
   // Handle the data witnesses explicitly so we can use more specific
   // types for the flags enums.
-  typedef size_t size;
-  typedef size_t stride;
-  typedef ValueWitnessFlags flags;
+  typedef typename Runtime::StoredSize size;
+  typedef typename Runtime::StoredSize stride;
+  typedef TargetValueWitnessFlags<typename Runtime::StoredSize> flags;
   typedef uint32_t extraInhabitantCount;
 };
 
@@ -214,8 +215,8 @@ template <typename Runtime> struct TargetValueWitnessTable {
   const TargetEnumValueWitnessTable<Runtime> *_asEVWT() const;
 
   /// Get the type layout record within this value witness table.
-  const TypeLayout *getTypeLayout() const {
-    return reinterpret_cast<const TypeLayout *>(&size);
+  const TargetTypeLayout<Runtime> *getTypeLayout() const {
+    return reinterpret_cast<const TargetTypeLayout<Runtime> *>(&size);
   }
 
   /// Check whether this metadata is complete.
@@ -224,7 +225,7 @@ template <typename Runtime> struct TargetValueWitnessTable {
   /// "Publish" the layout of this type to other threads.  All other stores
   /// to the value witness table (including its extended header) should have
   /// happened before this is called.
-  void publishLayout(const TypeLayout &layout);
+  void publishLayout(const TargetTypeLayout<Runtime> &layout);
 };
 
 /// A value-witness table with enum entry points.
@@ -275,23 +276,27 @@ TargetValueWitnessTable<Runtime>::_asEVWT() const {
 /// necessary to perform dependent layout of generic value types. It excludes
 /// the value witness functions and includes only the size, alignment,
 /// extra inhabitants, and miscellaneous flags about the type.
-struct TypeLayout {
-  ValueWitnessTypes::size size;
-  ValueWitnessTypes::stride stride;
-  ValueWitnessTypes::flags flags;
-  ValueWitnessTypes::extraInhabitantCount extraInhabitantCount;
+template <typename Runtime>
+struct TargetTypeLayout {
+  typename TargetValueWitnessTypes<Runtime>::size size;
+  typename TargetValueWitnessTypes<Runtime>::stride stride;
+  typename TargetValueWitnessTypes<Runtime>::flags flags;
+  typename TargetValueWitnessTypes<Runtime>::extraInhabitantCount
+      extraInhabitantCount;
 
 private:
   void _static_assert_layout();
 public:
-  TypeLayout() = default;
-  constexpr TypeLayout(ValueWitnessTypes::size size,
-                       ValueWitnessTypes::stride stride,
-                       ValueWitnessTypes::flags flags,
-                       ValueWitnessTypes::extraInhabitantCount xiCount)
-    : size(size), stride(stride), flags(flags), extraInhabitantCount(xiCount) {}
+  TargetTypeLayout() = default;
+  constexpr TargetTypeLayout(
+      typename TargetValueWitnessTypes<Runtime>::size size,
+      typename TargetValueWitnessTypes<Runtime>::stride stride,
+      typename TargetValueWitnessTypes<Runtime>::flags flags,
+      typename TargetValueWitnessTypes<Runtime>::extraInhabitantCount xiCount)
+      : size(size), stride(stride), flags(flags),
+        extraInhabitantCount(xiCount) {}
 
-  const TypeLayout *getTypeLayout() const { return this; }
+  const TargetTypeLayout *getTypeLayout() const { return this; }
 
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
@@ -303,14 +308,16 @@ public:
     return extraInhabitantCount != 0;
   }
 };
+using TypeLayout = TargetTypeLayout<InProcess>;
 
-inline void TypeLayout::_static_assert_layout() {
-  #define CHECK_TYPE_LAYOUT_OFFSET(FIELD)                               \
-    static_assert(offsetof(ValueWitnessTable, FIELD)                    \
-                    - offsetof(ValueWitnessTable, size)                 \
-                  == offsetof(TypeLayout, FIELD),                       \
-                  "layout of " #FIELD " in TypeLayout doesn't match "   \
-                  "value witness table")
+template <typename Runtime>
+inline void TargetTypeLayout<Runtime>::_static_assert_layout() {
+#define CHECK_TYPE_LAYOUT_OFFSET(FIELD)                                        \
+  static_assert(offsetof(TargetValueWitnessTable<Runtime>, FIELD) -            \
+                        offsetof(TargetValueWitnessTable<Runtime>, size) ==    \
+                    offsetof(TargetTypeLayout<Runtime>, FIELD),                \
+                "layout of " #FIELD " in TypeLayout doesn't match "            \
+                "value witness table")
   CHECK_TYPE_LAYOUT_OFFSET(size);
   CHECK_TYPE_LAYOUT_OFFSET(flags);
   CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantCount);

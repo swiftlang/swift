@@ -38,6 +38,7 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Immediate/SwiftMaterializationUnit.h"
 #include "swift/SIL/SILModule.h"
@@ -58,7 +59,7 @@ static std::string mangle(const StringRef Unmangled) {
 
 /// Whether a function name is mangled to be a lazy reexport
 static bool isMangled(const StringRef Symbol) {
-  return Symbol.endswith(ManglingSuffix);
+  return Symbol.ends_with(ManglingSuffix);
 }
 
 /// Demangle a lazy reexport
@@ -157,7 +158,7 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))
                   .addFeatures(Features)
-                  .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+                  .setCodeGenOptLevel(llvm::CodeGenOptLevel::Default);
   auto J = llvm::orc::LLJITBuilder()
                .setJITTargetMachineBuilder(std::move(JTMB))
                .create();
@@ -292,11 +293,12 @@ std::unique_ptr<LazySwiftMaterializationUnit>
 LazySwiftMaterializationUnit::Create(SwiftJIT &JIT, CompilerInstance &CI) {
   auto *M = CI.getMainModule();
   TBDGenOptions Opts;
-  Opts.PublicSymbolsOnly = false;
+  Opts.PublicOrPackageSymbolsOnly = false;
   auto TBDDesc = TBDGenDescriptor::forModule(M, std::move(Opts));
   SymbolSourceMapRequest SourceReq{TBDDesc};
-  const auto *Sources =
-      llvm::cantFail(M->getASTContext().evaluator(std::move(SourceReq)));
+  const auto *Sources = evaluateOrFatal(
+      M->getASTContext().evaluator,
+      std::move(SourceReq));
   llvm::orc::SymbolFlagsMap PublicInterface;
   for (const auto &Entry : *Sources) {
     const auto &Source = Entry.getValue();

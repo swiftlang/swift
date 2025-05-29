@@ -12,6 +12,7 @@
 
 #include "swift/Parse/ParseVersion.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace swift;
@@ -53,7 +54,7 @@ static void splitVersionComponents(
   }
 }
 
-llvm::Optional<Version> VersionParser::parseCompilerVersionString(
+std::optional<Version> VersionParser::parseCompilerVersionString(
     StringRef VersionString, SourceLoc Loc, DiagnosticEngine *Diags) {
 
   Version CV;
@@ -93,7 +94,7 @@ llvm::Optional<Version> VersionParser::parseCompilerVersionString(
 
     // The second version component isn't used for comparison.
     if (i == 1) {
-      if (!SplitComponent.equals("*")) {
+      if (SplitComponent != "*") {
         if (Diags) {
           // Majors 600-1300 were used for Swift 1.0-5.5 (based on clang
           // versions), but then we reset the numbering based on Swift versions,
@@ -173,10 +174,10 @@ llvm::Optional<Version> VersionParser::parseCompilerVersionString(
     CV.Components[0] = CV.Components[0] / 1000;
   }
 
-  return isValidVersion ? llvm::Optional<Version>(CV) : llvm::None;
+  return isValidVersion ? std::optional<Version>(CV) : std::nullopt;
 }
 
-llvm::Optional<Version>
+std::optional<Version>
 VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
                                   DiagnosticEngine *Diags) {
   Version TheVersion;
@@ -188,7 +189,7 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
   if (VersionString.empty()) {
     if (Diags)
       Diags->diagnose(Loc, diag::empty_version_string);
-    return llvm::None;
+    return std::nullopt;
   }
 
   splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
@@ -221,5 +222,5 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
     }
   }
 
-  return isValidVersion ? llvm::Optional<Version>(TheVersion) : llvm::None;
+  return isValidVersion ? std::optional<Version>(TheVersion) : std::nullopt;
 }

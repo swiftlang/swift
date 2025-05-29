@@ -119,6 +119,9 @@ static SILValue skipStructAndExtract(SILValue value) {
 }
 
 bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
+  LLVM_DEBUG(llvm::dbgs() << "Looking at: ");
+  LLVM_DEBUG(BCM->dump());
+
   SILFunction *function = BCM->getFunction();
   StackList<EndCOWMutationInst *> endCOWMutationInsts(function);
   InstructionSet endCOWMutationsFound(function);
@@ -187,14 +190,20 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
             // Don't immediately bail on a store instruction. Instead, remember
             // it and check if it interferes with any (potential) load.
             if (storeAddrsFound.insert(store->getDest())) {
+              LLVM_DEBUG(llvm::dbgs() << "Found store escape, record: ");
+              LLVM_DEBUG(inst->dump());
               storeAddrs.push_back(store->getDest());
               numStoresFound += 1;
             }
           } else {
+            LLVM_DEBUG(llvm::dbgs() << "Found non-store escape, bailing out: ");
+            LLVM_DEBUG(inst->dump());
             return false;
           }
         }
         if (inst->mayReadFromMemory()) {
+          LLVM_DEBUG(llvm::dbgs() << "Found a may read inst, record: ");
+          LLVM_DEBUG(inst->dump());
           potentialLoadInsts.push_back(inst);
           numLoadsFound += 1;
         }
@@ -225,8 +234,12 @@ bool COWOptsPass::optimizeBeginCOW(BeginCOWMutationInst *BCM) {
         return false;
       for (SILInstruction *load : potentialLoadInsts) {
         for (SILValue storeAddr : storeAddrs) {
-          if (!AA || AA->mayReadFromMemory(load, storeAddr))
+          if (!AA || AA->mayReadFromMemory(load, storeAddr)) {
+            LLVM_DEBUG(llvm::dbgs() << "Found a store address aliasing with a load:");
+            LLVM_DEBUG(load->dump());
+            LLVM_DEBUG(storeAddr->dump());
             return false;
+          }
         }
       }
     }

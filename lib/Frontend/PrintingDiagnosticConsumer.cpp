@@ -15,429 +15,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/AST/CASTBridging.h"
+#include "swift/AST/ASTBridging.h"
+#include "swift/AST/DiagnosticBridge.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsCommon.h"
+#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Markup/Markup.h"
+#include "swift/Bridging/ASTGen.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/FormatAdapters.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <cmath>
 
 using namespace swift;
-using namespace swift::markup;
-
-extern "C" void *swift_ASTGen_createQueuedDiagnostics();
-extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
-extern "C" void swift_ASTGen_addQueuedSourceFile(
-      void *queuedDiagnostics,
-      ssize_t bufferID,
-      void *sourceFile,
-      const uint8_t *displayNamePtr,
-      intptr_t displayNameLength,
-      ssize_t parentID,
-      ssize_t positionInParent);
-extern "C" void swift_ASTGen_addQueuedDiagnostic(
-    void *queued,
-    const char* text, ptrdiff_t textLength,
-    BridgedDiagnosticSeverity severity,
-    const void *sourceLoc,
-    const void **highlightRanges,
-    ptrdiff_t numHighlightRanges
-);
-extern "C" void
-swift_ASTGen_renderQueuedDiagnostics(void *queued, ssize_t contextSize,
-                                     ssize_t colorize,
-                                     BridgedString *renderedString);
-extern "C" void swift_ASTGen_freeBridgedString(BridgedString);
-
-// FIXME: Hack because we cannot easily get to the already-parsed source
-// file from here. Fix this egregious oversight!
-extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
-                                              size_t bufferLength,
-                                              const char *moduleName,
-                                              const char *filename,
-                                              void *_Nullable ctx);
-extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
-
-namespace {
-  class ColoredStream : public raw_ostream {
-    raw_ostream &Underlying;
-  public:
-    explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~ColoredStream() override { flush(); }
-
-    raw_ostream &changeColor(Colors color, bool bold = false,
-                             bool bg = false) override {
-      Underlying.changeColor(color, bold, bg);
-      return *this;
-    }
-    raw_ostream &resetColor() override {
-      Underlying.resetColor();
-      return *this;
-    }
-    raw_ostream &reverseColor() override {
-      Underlying.reverseColor();
-      return *this;
-    }
-    bool has_colors() const override {
-      return true;
-    }
-
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell() - GetNumBytesInBuffer();
-    }
-
-    size_t preferred_buffer_size() const override {
-      return 0;
-    }
-  };
-
-  /// A stream which drops all color settings.
-  class NoColorStream : public raw_ostream {
-    raw_ostream &Underlying;
-
-  public:
-    explicit NoColorStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~NoColorStream() override { flush(); }
-
-    bool has_colors() const override { return false; }
-
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell() - GetNumBytesInBuffer();
-    }
-
-    size_t preferred_buffer_size() const override { return 0; }
-  };
-
-// MARK: Markdown Printing
-    class TerminalMarkupPrinter : public MarkupASTVisitor<TerminalMarkupPrinter> {
-      llvm::raw_ostream &OS;
-      unsigned Indent;
-      unsigned ShouldBold;
-
-      void indent(unsigned Amount = 2) { Indent += Amount; }
-
-      void dedent(unsigned Amount = 2) {
-        assert(Indent >= Amount && "dedent without matching indent");
-        Indent -= Amount;
-      }
-
-      void bold() {
-        ++ShouldBold;
-        updateFormatting();
-      }
-
-      void unbold() {
-        assert(ShouldBold > 0 && "unbolded without matching bold");
-        --ShouldBold;
-        updateFormatting();
-      }
-
-      void updateFormatting() {
-        OS.resetColor();
-        if (ShouldBold > 0)
-          OS.changeColor(raw_ostream::Colors::SAVEDCOLOR, true);
-      }
-
-      void print(StringRef Str) {
-        for (auto c : Str) {
-          OS << c;
-          if (c == '\n')
-            for (unsigned i = 0; i < Indent; ++i)
-              OS << ' ';
-        }
-      }
-
-    public:
-      TerminalMarkupPrinter(llvm::raw_ostream &OS)
-          : OS(OS), Indent(0), ShouldBold(0) {}
-
-      void printNewline() { print("\n"); }
-
-      void visitDocument(const Document *D) {
-        for (const auto *Child : D->getChildren()) {
-          if (Child->getKind() == markup::ASTNodeKind::Paragraph) {
-            // Add a newline before top-level paragraphs
-            printNewline();
-          }
-          visit(Child);
-        }
-      }
-
-      void visitInlineAttributes(const InlineAttributes *A) {
-        print("^[");
-        for (const auto *Child : A->getChildren())
-          visit(Child);
-        print("](");
-        print(A->getAttributes());
-        print(")");
-      }
-
-      void visitBlockQuote(const BlockQuote *BQ) {
-        indent();
-        printNewline();
-        for (const auto *Child : BQ->getChildren())
-          visit(Child);
-        dedent();
-      }
-
-      void visitList(const List *BL) {
-        indent();
-        printNewline();
-        for (const auto *Child : BL->getChildren())
-          visit(Child);
-        dedent();
-      }
-
-      void visitItem(const Item *I) {
-        print("- ");
-        for (const auto *N : I->getChildren())
-          visit(N);
-      }
-
-      void visitCodeBlock(const CodeBlock *CB) {
-        indent();
-        printNewline();
-        print(CB->getLiteralContent());
-        dedent();
-      }
-
-      void visitCode(const Code *C) {
-        print("'");
-        print(C->getLiteralContent());
-        print("'");
-      }
-
-      void visitHTML(const HTML *H) { print(H->getLiteralContent()); }
-
-      void visitInlineHTML(const InlineHTML *IH) {
-        print(IH->getLiteralContent());
-      }
-
-      void visitSoftBreak(const SoftBreak *SB) { printNewline(); }
-
-      void visitLineBreak(const LineBreak *LB) {
-        printNewline();
-        printNewline();
-      }
-
-      void visitLink(const Link *L) {
-        print("[");
-        for (const auto *Child : L->getChildren())
-          visit(Child);
-        print("](");
-        print(L->getDestination());
-        print(")");
-      }
-
-      void visitImage(const Image *I) { llvm_unreachable("unsupported"); }
-
-      void visitParagraph(const Paragraph *P) {
-        for (const auto *Child : P->getChildren())
-          visit(Child);
-        printNewline();
-      }
-
-      // TODO: add raw_ostream support for italics ANSI codes in LLVM.
-      void visitEmphasis(const Emphasis *E) {
-        for (const auto *Child : E->getChildren())
-          visit(Child);
-      }
-
-      void visitStrong(const Strong *E) {
-        bold();
-        for (const auto *Child : E->getChildren())
-          visit(Child);
-        unbold();
-      }
-
-      void visitHRule(const HRule *HR) {
-        print("--------------");
-        printNewline();
-      }
-
-      void visitHeader(const Header *H) {
-        bold();
-        for (const auto *Child : H->getChildren())
-          visit(Child);
-        unbold();
-        printNewline();
-      }
-
-      void visitText(const Text *T) { print(T->getLiteralContent()); }
-
-      void visitPrivateExtension(const PrivateExtension *PE) {
-        llvm_unreachable("unsupported");
-      }
-
-      void visitParamField(const ParamField *PF) {
-        llvm_unreachable("unsupported");
-      }
-
-      void visitReturnField(const ReturnsField *RF) {
-        llvm_unreachable("unsupported");
-      }
-
-      void visitThrowField(const ThrowsField *TF) {
-        llvm_unreachable("unsupported");
-      }
-
-  #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)                              \
-    void visit##Id(const Id *Field) { llvm_unreachable("unsupported"); }
-  #include "swift/Markup/SimpleFields.def"
-    };
-
-    static void printMarkdown(StringRef Content, raw_ostream &Out,
-                              bool UseColor) {
-      markup::MarkupContext ctx;
-      auto document = markup::parseDocument(ctx, Content);
-      if (UseColor) {
-        ColoredStream stream{Out};
-        TerminalMarkupPrinter printer(stream);
-        printer.visit(document);
-      } else {
-        NoColorStream stream{Out};
-        TerminalMarkupPrinter printer(stream);
-        printer.visit(document);
-      }
-    }
-} // end anonymous namespace
-
-#if SWIFT_BUILD_SWIFT_SYNTAX
-/// Enqueue a diagnostic with ASTGen's diagnostic rendering.
-static void enqueueDiagnostic(
-    void *queuedDiagnostics, const DiagnosticInfo &info, SourceManager &SM
-) {
-  llvm::SmallString<256> text;
-  {
-    llvm::raw_svector_ostream out(text);
-    DiagnosticEngine::formatDiagnosticText(out, info.FormatString,
-                                           info.FormatArgs);
-  }
-
-  BridgedDiagnosticSeverity severity;
-  switch (info.Kind) {
-  case DiagnosticKind::Error:
-    severity = BridgedDiagnosticSeverity::BridgedError;
-    break;
-
-  case DiagnosticKind::Warning:
-    severity = BridgedDiagnosticSeverity::BridgedWarning;
-    break;
-
-  case DiagnosticKind::Remark:
-    severity = BridgedDiagnosticSeverity::BridgedRemark;
-    break;
-
-  case DiagnosticKind::Note:
-    severity = BridgedDiagnosticSeverity::BridgedNote;
-    break;
-  }
-
-  // Map the highlight ranges.
-  SmallVector<const void *, 2> highlightRanges;
-  for (const auto &range : info.Ranges) {
-    if (range.isInvalid())
-      continue;
-
-    highlightRanges.push_back(range.getStart().getOpaquePointerValue());
-    highlightRanges.push_back(range.getEnd().getOpaquePointerValue());
-  }
-
-  // FIXME: Translate Fix-Its.
-
-  swift_ASTGen_addQueuedDiagnostic(
-      queuedDiagnostics, text.data(), text.size(), severity,
-      info.Loc.getOpaquePointerValue(),
-      highlightRanges.data(), highlightRanges.size() / 2);
-}
-
-/// Retrieve the stack of source buffers from the provided location out to
-/// a physical source file, with source buffer IDs for each step along the way
-/// due to (e.g.) macro expansions or generated code.
-///
-/// The resulting vector will always contain valid source locations. If the
-/// initial location is invalid, the result will be empty.
-static SmallVector<unsigned, 1> getSourceBufferStack(
-    SourceManager &sourceMgr, SourceLoc loc) {
-  SmallVector<unsigned, 1> stack;
-  while (true) {
-    if (loc.isInvalid())
-      return stack;
-
-    unsigned bufferID = sourceMgr.findBufferContainingLoc(loc);
-    stack.push_back(bufferID);
-
-    auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
-    if (!generatedSourceInfo)
-      return stack;
-
-    loc = generatedSourceInfo->originalSourceRange.getStart();
-  }
-}
-
-void PrintingDiagnosticConsumer::queueBuffer(
-    SourceManager &sourceMgr, unsigned bufferID) {
-  QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
-  if (knownSourceFile)
-    return;
-
-  auto bufferContents = sourceMgr.getEntireTextForBuffer(bufferID);
-  auto sourceFile = swift_ASTGen_parseSourceFile(
-      bufferContents.data(), bufferContents.size(),
-      "module", "file.swift", /*ctx*/ nullptr);
-
-  // Find the parent and position in parent, if there is one.
-  int parentID = -1;
-  int positionInParent = 0;
-  std::string displayName;
-  auto generatedSourceInfo = sourceMgr.getGeneratedSourceInfo(bufferID);
-  if (generatedSourceInfo) {
-    SourceLoc parentLoc = generatedSourceInfo->originalSourceRange.getEnd();
-    if (parentLoc.isValid()) {
-      parentID = sourceMgr.findBufferContainingLoc(parentLoc);
-      positionInParent = sourceMgr.getLocOffsetInBuffer(parentLoc, parentID);
-
-      // Queue the parent buffer.
-      queueBuffer(sourceMgr, parentID);
-    }
-
-    if (DeclName macroName =
-            getGeneratedSourceInfoMacroName(*generatedSourceInfo)) {
-      SmallString<64> buffer;
-      if (generatedSourceInfo->attachedMacroCustomAttr)
-        displayName = ("macro expansion @" + macroName.getString(buffer)).str();
-      else
-        displayName = ("macro expansion #" + macroName.getString(buffer)).str();
-    }
-  }
-
-  if (displayName.empty()) {
-    displayName = sourceMgr.getDisplayNameForLoc(
-        sourceMgr.getLocForBufferStart(bufferID)).str();
-  }
-
-  swift_ASTGen_addQueuedSourceFile(
-      queuedDiagnostics, bufferID, sourceFile,
-      (const uint8_t*)displayName.data(), displayName.size(),
-      parentID, positionInParent);
-  queuedBuffers[bufferID] = sourceFile;
-}
-#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
@@ -456,38 +47,25 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   case DiagnosticOptions::FormattingStyle::Swift: {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // Use the swift-syntax formatter.
-    auto bufferStack = getSourceBufferStack(SM, Info.Loc);
-    if (!bufferStack.empty()) {
-      // If there are no enqueued diagnostics, or we have hit a non-note
-	// diagnostic, flush any enqueued diagnostics and start fresh.
-      if (!queuedDiagnostics || Info.Kind != DiagnosticKind::Note) {
-        flush(/*includeTrailingBreak*/ true);
-        queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
-      }
+    auto bufferStack = DiagnosticBridge::getSourceBufferStack(SM, Info.Loc);
+    if (Info.Kind != DiagnosticKind::Note || bufferStack.empty())
+      DiagBridge.flush(Stream, /*includeTrailingBreak=*/true,
+                       /*forceColors=*/ForceColors);
 
-      unsigned innermostBufferID = bufferStack.front();
-      queueBuffer(SM, innermostBufferID);
-      enqueueDiagnostic(queuedDiagnostics, Info, SM);
-      break;
+    if (bufferStack.empty()) {
+      DiagBridge.emitDiagnosticWithoutLocation(Info, Stream, ForceColors);
+    } else {
+      DiagBridge.enqueueDiagnostic(SM, Info, bufferStack.front());
     }
-#endif
-
+    return;
+#else
     // Fall through when we don't have the new diagnostics renderer available.
     LLVM_FALLTHROUGH;
+#endif
   }
 
   case DiagnosticOptions::FormattingStyle::LLVM:
     printDiagnostic(SM, Info);
-
-    if (PrintEducationalNotes) {
-      for (auto path : Info.EducationalNotePaths) {
-        if (auto buffer = SM.getFileSystem()->getBufferForFile(path)) {
-          printMarkdown(buffer->get()->getBuffer(), Stream, ForceColors);
-          Stream << "\n";
-        }
-      }
-    }
-
     for (auto ChildInfo : Info.ChildDiagnosticInfo) {
       printDiagnostic(SM, *ChildInfo);
     }
@@ -497,37 +75,20 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 
 void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (queuedDiagnostics) {
-    BridgedString renderedString{nullptr, 0};
-    swift_ASTGen_renderQueuedDiagnostics(queuedDiagnostics, /*contextSize=*/2,
-                                         ForceColors ? 1 : 0, &renderedString);
-    if (renderedString.data) {
-      Stream.write((const char *)renderedString.data, renderedString.length);
-      swift_ASTGen_freeBridgedString(renderedString);
-    }
-    swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
-    queuedDiagnostics = nullptr;
-    for (const auto &buffer : queuedBuffers) {
-      swift_ASTGen_destroySourceFile(buffer.second);
-    }
-    queuedBuffers.clear();
-
-    if (includeTrailingBreak)
-      Stream << "\n";
-  }
+  DiagBridge.flush(Stream, includeTrailingBreak,
+                   /*forceColors=*/ForceColors);
 #endif
-
-  for (auto note : BufferedEducationalNotes) {
-    printMarkdown(note, Stream, ForceColors);
-    Stream << "\n";
-  }
-
-  BufferedEducationalNotes.clear();
 }
 
 bool PrintingDiagnosticConsumer::finishProcessing() {
   // If there's an in-flight snippet, flush it.
   flush(false);
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Print out footnotes for any category that was referenced.
+  DiagBridge.printCategoryFootnotes(Stream, ForceColors);
+#endif
+
   return false;
 }
 
@@ -575,6 +136,9 @@ void PrintingDiagnosticConsumer::printDiagnostic(SourceManager &SM,
     llvm::raw_svector_ostream Out(Text);
     DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
                                            Info.FormatArgs);
+
+    if (!Info.Category.empty())
+      Out << " [#" << Info.Category << "]";
   }
 
   auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts,
@@ -650,4 +214,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
 PrintingDiagnosticConsumer::PrintingDiagnosticConsumer(
     llvm::raw_ostream &stream)
     : Stream(stream) {}
-PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() = default;
+
+PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
+  flush();
+}

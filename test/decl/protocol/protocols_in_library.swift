@@ -3,7 +3,7 @@
 struct X {
   struct Inner : Proto {
   }
-  struct Inner2 : Proto2 { // expected-error {{type 'X.Inner2' does not conform to protocol 'Proto2'}}
+  struct Inner2 : Proto2 { // expected-error {{type 'X.Inner2' does not conform to protocol 'Proto2'}} expected-note {{add stubs for conformance}}
   }
 }
 

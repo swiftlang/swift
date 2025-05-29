@@ -24,6 +24,7 @@
 #define SWIFT_LOWERING_RVALUE_H
 
 #include "ManagedValue.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -234,7 +235,17 @@ public:
   /// The values must not require any cleanups.
   SILValue getUnmanagedSingleValue(SILGenFunction &SGF, SILLocation l) const &;
 
+  SILType getTypeOfSingleValue() const & {
+    assert(isComplete() && values.size() == 1);
+    return values[0].getType();
+  }
+
   ManagedValue getScalarValue() && {
+    if (isInContext()) {
+      makeUsed();
+      return ManagedValue::forInContext();
+    }
+
     assert(!isa<TupleType>(type) && "getScalarValue of a tuple rvalue");
     assert(values.size() == 1);
     auto value = values[0];

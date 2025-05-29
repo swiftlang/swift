@@ -51,7 +51,7 @@ extension Indicator where T == Struct {
   static var activity: Indicator<Struct> { fatalError() }
 }
 
-func receiver<T>(_ inidicator: Indicator<T>) {}
+func receiver<T>(_ indicator: Indicator<T>) {}
 
 func test() {
   receiver(.#^COMPLETE_GENERIC_TYPE^#)
@@ -60,7 +60,7 @@ func test() {
 // COMPLETE_GENERIC_TYPE: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
 // COMPLETE_GENERIC_TYPE: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: activity[#Indicator<Struct>#];
 
-func testRecursive<T>(_ inidicator: Indicator<T>) {
+func testRecursive<T>(_ indicator: Indicator<T>) {
   testRecursive(.#^COMPLETE_RECURSIVE_GENERIC^#)
 // FIXME: We should be suggesting `.activity` here because the call to `testRecursive` happens with new generic parameters
 // COMPLETE_RECURSIVE_GENERIC: Begin completions, 1 item

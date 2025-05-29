@@ -19,7 +19,6 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -30,6 +29,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -39,8 +39,6 @@ namespace swift {
 enum class DiagID : uint32_t;
 
 namespace diag {
-
-using namespace llvm::support;
 
 enum LocalizationProducerState : uint8_t {
   NotInitialized,
@@ -71,20 +69,21 @@ public:
   using hash_value_type = uint32_t;
   using offset_type = uint32_t;
 
-  hash_value_type ComputeHash(key_type_ref key) { return llvm::hash_code(key); }
+  hash_value_type ComputeHash(key_type_ref key) { return key; }
 
   std::pair<offset_type, offset_type> EmitKeyDataLength(llvm::raw_ostream &out,
                                                         key_type_ref key,
                                                         data_type_ref data) {
     offset_type dataLength = static_cast<offset_type>(data.size());
-    endian::write<offset_type>(out, dataLength, little);
+    llvm::support::endian::write<offset_type>(out, dataLength,
+                                              llvm::endianness::little);
     // No need to write the key length; it's constant.
     return {sizeof(key_type), dataLength};
   }
 
   void EmitKey(llvm::raw_ostream &out, key_type_ref key, unsigned len) {
     assert(len == sizeof(key_type));
-    endian::write<key_type>(out, key, little);
+    llvm::support::endian::write<key_type>(out, key, llvm::endianness::little);
   }
 
   void EmitData(llvm::raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -113,19 +112,20 @@ public:
     return lhs == rhs;
   }
 
-  hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_code(key);
-  }
+  hash_value_type ComputeHash(internal_key_type key) { return key; }
 
   static std::pair<offset_type, offset_type>
   ReadKeyDataLength(const unsigned char *&data) {
     offset_type dataLength =
-        endian::readNext<offset_type, little, unaligned>(data);
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
     return {sizeof(uint32_t), dataLength};
   }
 
   internal_key_type ReadKey(const unsigned char *data, offset_type length) {
-    return endian::readNext<internal_key_type, little, unaligned>(data);
+    return llvm::support::endian::readNext<
+        internal_key_type, llvm::endianness::little, llvm::support::unaligned>(
+        data);
   }
 
   data_type ReadData(internal_key_type Key, const unsigned char *data,
@@ -159,20 +159,9 @@ public:
 };
 
 class LocalizationProducer {
-  /// This allocator will retain localized diagnostic strings containing the
-  /// diagnostic's message and identifier as `message [id]` for the duration of
-  /// compiler invocation. This will be used when the frontend flag
-  /// `-debug-diagnostic-names` is used.
-  llvm::BumpPtrAllocator localizationAllocator;
-  llvm::StringSaver localizationSaver;
-  bool printDiagnosticNames;
   LocalizationProducerState state = NotInitialized;
 
 public:
-  LocalizationProducer(bool printDiagnosticNames = false)
-      : localizationSaver(localizationAllocator),
-        printDiagnosticNames(printDiagnosticNames) {}
-
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
@@ -183,8 +172,7 @@ public:
   /// `StringsLocalizationProducer` if the `.strings` file is available. If both
   /// files aren't available returns a `nullptr`.
   static std::unique_ptr<LocalizationProducer>
-  producerFor(llvm::StringRef locale, llvm::StringRef path,
-              bool printDiagnosticNames);
+  producerFor(llvm::StringRef locale, llvm::StringRef path);
 
   virtual ~LocalizationProducer() {}
 
@@ -208,9 +196,8 @@ class StringsLocalizationProducer final : public LocalizationProducer {
   std::vector<std::string> diagnostics;
 
 public:
-  explicit StringsLocalizationProducer(llvm::StringRef filePath,
-                                       bool printDiagnosticNames = false)
-      : LocalizationProducer(printDiagnosticNames), filePath(filePath) {}
+  explicit StringsLocalizationProducer(llvm::StringRef filePath)
+      : LocalizationProducer(), filePath(filePath) {}
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
@@ -236,8 +223,7 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 
 public:
   explicit SerializedLocalizationProducer(
-      std::unique_ptr<llvm::MemoryBuffer> buffer,
-      bool printDiagnosticNames = false);
+      std::unique_ptr<llvm::MemoryBuffer> buffer);
 
 protected:
   bool initializeImpl() override;

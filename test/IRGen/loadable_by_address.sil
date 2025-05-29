@@ -1,0 +1,79 @@
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct X {
+  var x1 : Int
+  var x2 : Int
+  var x3 : Int
+  var x4: Int
+  var x5: Int
+  var x6: Int
+  var x7: Int
+  var x8: Int
+  var x9: Int
+  var x10: Int
+  var x11: Int
+  var x12: Int
+  var x13: Int
+  var x14: Int
+  var x15: Int
+  var x16: Int
+}
+
+sil @yield_nothing_take_x : $@convention(thin) @yield_once_2 (@owned X) -> (@yields @in_guaranteed ()) {
+entry(%x : $X):
+  %void_addr = alloc_stack $()
+  %void = tuple ()
+  store %void to %void_addr : $*()
+  yield %void_addr : $*(), resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %void_addr : $*()
+  return %void : $()
+
+bb2:
+  dealloc_stack %void_addr : $*()
+  unwind
+}
+
+// CHECK-LABEL: sil @begin_apply_x_yielder : {{.*}} {
+// CHECK:         ({{%[^,]+}}, {{%[^,]+}}, [[ALLOCATION:%[^,]+]]) = begin_apply
+// CHECK:         dealloc_stack [[ALLOCATION]]
+// CHECK-LABEL: } // end sil function 'begin_apply_x_yielder'
+sil @begin_apply_x_yielder : $@convention(thin) (@owned X) -> () {
+entry(%x : $X):
+  %fn = function_ref @yield_nothing_take_x : $@convention(thin) @yield_once_2 (@owned X) -> (@yields @in_guaranteed ())
+  (%void, %token, %allocation) = begin_apply %fn(%x) : $@convention(thin) @yield_once_2 (@owned X) -> (@yields @in_guaranteed ())
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil @branch_inst_f : $@convention(thin) (@owned X, UInt8) -> ()
+sil @branch_inst_f2 : $@convention(thin) (@owned X, UInt8) -> ()
+
+sil @trigger : $@convention(thin) (@owned X) -> ()
+
+// This used to crash.
+sil @branch_inst_test : $@convention(thin) (Builtin.Int1, @owned X) -> (@convention(thin) (@owned X, UInt8) -> ()) {
+entry(%1 : $Builtin.Int1, %t: $X):
+  %f = function_ref @trigger : $@convention(thin) (@owned X) -> ()
+  %x = apply %f(%t) : $@convention(thin) (@owned X) -> ()
+  cond_br %1,  bb1, bb2
+
+bb1:
+  %2 = function_ref @branch_inst_f : $@convention(thin) (@owned X, UInt8) -> ()
+  br bb3(%2)
+
+bb2:
+  %3 = function_ref @branch_inst_f2 : $@convention(thin) (@owned X, UInt8) -> ()
+  br bb3(%3)
+
+bb3(%r : $@convention(thin) (@owned X, UInt8) -> ()):
+  return %r : $@convention(thin) (@owned X, UInt8) -> ()
+}

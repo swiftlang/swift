@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt -send-non-sendable -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify
+
+// REQUIRES: swift_feature_RegionBasedIsolation
+
+// PLEASE READ THIS!
+//
+// In this file, we test out how the checker handles dataflow in a CFG. We want
+// to validate that we properly propagate dataflow given instructions occur in
+// specific locations.
+
+sil_stage raw
+
+import Swift
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {}
+
+sil @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @constructKlass : $@convention(thin) () -> @owned NonSendableKlass
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// The problem this validates that we properly propagate dataflow through blocks
+// if the initial block does not have any partition state.
+sil [ossa] @haveIntroducerInMiddleOfCFG : $@convention(thin) @async () -> () {
+bb0:
+  br bb0a
+
+bb0a:
+  %constructKlass = function_ref @constructKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %klass = apply %constructKlass() : $@convention(thin) () -> @owned NonSendableKlass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %transferKlass = function_ref @transferKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferKlass(%klass) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{}}
+  // expected-note @-2 {{}}
+  %useKlass = function_ref @useKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  apply %useKlass(%klass) : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+  // expected-note @-1 {{access can happen concurrently}}
+  destroy_value %klass : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}

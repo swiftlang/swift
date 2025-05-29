@@ -126,16 +126,10 @@
 // redundant rules. This is implemented in HomotopyReduction.cpp and
 // MinimalConformances.cpp.
 //
-// Minimization emits warnings about redundant rules by producing that
-// correspond to user-written requirements by producing RequirementError
-// values.
-//
 // After minimization, the remaining non-redundant rules are converted into
-// the Requirements of a minimal generic signature using the
-// RequirementBuilder.
-//
-// After minimization, the requirement machine undergoes a final state
-// transition into the immutable "frozen" state:
+// the Requirements of a minimal generic signature by the RequirementBuilder.
+// Then, the requirement machine undergoes a final state transition into the
+// immutable "frozen" state:
 //
 //   /-----------------------------\
 //  |  Complete RequirementMachine  |
@@ -204,6 +198,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementLowering.h"
 #include "RuleBuilder.h"
 
@@ -236,19 +231,22 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
     break;
 
   case CompletionResult::MaxRuleCount:
-    llvm::errs() << "Rewrite system exceeded maximum rule count\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded maximum rule count\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxRuleLength:
-    llvm::errs() << "Rewrite system exceeded rule length limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded rule length limit\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxConcreteNesting:
-    llvm::errs() << "Rewrite system exceeded concrete type nesting depth limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type nesting depth limit\n";
+      dump(out);
+    });
   }
 }
 
@@ -279,7 +277,6 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false, protos,
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -329,7 +326,6 @@ RequirementMachine::initWithGenericSignature(GenericSignature sig) {
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -382,7 +378,6 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, component,
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -431,7 +426,6 @@ RequirementMachine::initWithWrittenRequirements(
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
                     /*protos=*/ArrayRef<const ProtocolDecl *>(),
-                    std::move(builder.WrittenRequirements),
                     std::move(builder.ImportedRules),
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
@@ -459,7 +453,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       unsigned ruleCount = System.getRules().size();
 
       // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
-      auto result = System.computeConfluentCompletion(MaxRuleCount, MaxRuleLength);
+      auto result = System.performKnuthBendix(MaxRuleCount, MaxRuleLength);
 
       unsigned rulesAdded = (System.getRules().size() - ruleCount);
 
@@ -502,7 +496,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
-        if (newRule.getNesting() > MaxConcreteNesting) {
+        if (newRule.getNesting() > MaxConcreteNesting + System.getDeepestInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
                                 ruleCount + i);
         }
@@ -519,7 +513,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
     dump(llvm::dbgs());
   }
 
-  assert(!Complete);
+  ASSERT(!Complete);
   Complete = true;
 
   return std::make_pair(CompletionResult::Success, 0);
@@ -560,7 +554,7 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
     for (auto paramTy : Params) {
       out << " " << Type(paramTy);
       if (paramTy->isParameterPack())
-        out << "…";
+        out << " " << paramTy;
     }
     out << " >";
   }

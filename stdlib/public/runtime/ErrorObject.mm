@@ -110,7 +110,7 @@ using namespace swift::hashable_support;
   auto copy = type->allocateBufferIn(&copyBuf);
   error->type->vw_initializeWithCopy(copy, const_cast<OpaqueValue *>(value));
 
-  auto description = getDescription(copy, type);
+  id description = getDescription(copy, type);
   type->deallocateBufferIn(&copyBuf);
   return description;
 }

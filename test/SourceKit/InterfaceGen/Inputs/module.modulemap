@@ -1,0 +1,4 @@
+module UsesCXX20 {
+  header "uses-cxx20.h"
+  export *
+}

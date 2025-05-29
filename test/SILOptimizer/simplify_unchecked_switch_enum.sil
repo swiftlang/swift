@@ -1,0 +1,156 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=switch_enum | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=switch_enum | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+enum E {
+  case A
+  case B(String)
+  case C(Int)
+}
+
+// CHECK-LABEL: sil @test_simple :
+// CHECK:       bb0(%0 : $String):
+// CHECK-NEXT:    br bb1(%0 : $String)
+// CHECK:       bb1(%2 : $String):
+// CHECK-NEXT:    return %2 : $String
+// CHECK-NOT:   bb2
+// CHECK:       } // end sil function 'test_simple'
+sil @test_simple : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%2 : $String):
+  return %2 : $String
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @no_payload_argument :
+// CHECK:       bb0(%0 : $String):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-NOT:   bb2
+// CHECK:       } // end sil function 'no_payload_argument'
+sil @no_payload_argument : $@convention(thin) (@guaranteed String) -> () {
+bb0(%0 : $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1:
+  %2 = tuple ()
+  return %2 : $()
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @owned_ossa :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    br bb1(%0 : $String)
+// CHECK:       bb1(%2 : @owned $String):
+// CHECK-NEXT:    return %2 : $String
+// CHECK-NOT:   bb2
+// CHECK:       } // end sil function 'owned_ossa'
+sil [ossa] @owned_ossa : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%2 : @owned $String):
+  return %2 : $String
+
+bb2(%4 : @owned $E):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_ossa :
+// CHECK:       bb0(%0 : @guaranteed $String):
+// CHECK-NEXT:    br bb1(%0 : $String)
+// CHECK:       bb1(%2 : @guaranteed $String):
+// CHECK-NEXT:    %3 = borrowed %2 : $String from ()
+// CHECK-NEXT:    %4 = copy_value %3
+// CHECK-NEXT:    return %4 : $String
+// CHECK-NOT:   bb2
+// CHECK:       } // end sil function 'guaranteed_ossa'
+sil [ossa] @guaranteed_ossa : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : @guaranteed $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%2 : @guaranteed $String):
+  %3 = copy_value %2 : $String
+  return %3 : $String
+
+bb2(%4 : @guaranteed $E):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @owned_with_additional_uses :
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'owned_with_additional_uses'
+sil [ossa] @owned_with_additional_uses : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = begin_borrow %1 : $E
+  end_borrow %2 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%5 : @owned $String):
+  return %5 : $String
+
+bb2(%7 : @owned $E):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_with_additional_uses :
+// CHECK:         enum
+// CHECK-NEXT:    begin_borrow
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    br bb1(%0 : $String)
+// CHECK:       bb1([[A:%.*]] : @guaranteed $String):
+// CHECK-NEXT:    [[B:%.*]] = borrowed [[A]] : $String from ()
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[B]]
+// CHECK-NEXT:    return [[C]] : $String
+// CHECK-NOT:   bb2
+// CHECK:       } // end sil function 'guaranteed_with_additional_uses'
+sil [ossa] @guaranteed_with_additional_uses : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : @guaranteed $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = begin_borrow %1 : $E
+  end_borrow %2 : $E
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%5 : @guaranteed $String):
+  %6 = copy_value %5 : $String
+  return %6 : $String
+
+bb2(%7 : @guaranteed $E):
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @owned_with_debug_uses :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-O:       br bb1(%0 : $String)
+// CHECK-ONONE:   switch_enum
+// CHECK:       } // end sil function 'owned_with_debug_uses'
+sil [ossa] @owned_with_debug_uses : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  debug_value %1 : $E, let, name "e"
+  switch_enum %1 : $E, case #E.B!enumelt: bb1, default bb2
+
+bb1(%2 : @owned $String):
+  return %2 : $String
+
+bb2(%4 : @owned $E):
+  unreachable
+}
+

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name modify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name modify %s | %FileCheck %s
 
 class Base {
   var stored: Int = 0

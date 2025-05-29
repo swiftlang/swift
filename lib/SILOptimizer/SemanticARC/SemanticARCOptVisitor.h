@@ -49,9 +49,9 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   Context ctx;
 
-  explicit SemanticARCOptVisitor(SILFunction &fn, DeadEndBlocks &deBlocks,
+  explicit SemanticARCOptVisitor(SILFunction &fn, SILPassManager *pm, DeadEndBlocks &deBlocks,
                                  bool onlyMandatoryOpts)
-      : ctx(fn, deBlocks, onlyMandatoryOpts,
+      : ctx(fn, pm, deBlocks, onlyMandatoryOpts,
             InstModCallbacks()
                 .onDelete(
                     [this](SILInstruction *inst) { eraseInstruction(inst); })
@@ -96,7 +96,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   /// worklist.
   void drainVisitedSinceLastMutationIntoWorklist() {
     while (!visitedSinceLastMutation.empty()) {
-      llvm::Optional<SILValue> nextValue =
+      std::optional<SILValue> nextValue =
           visitedSinceLastMutation.pop_back_val();
       if (!nextValue.has_value()) {
         continue;
@@ -143,7 +143,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
 
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
-  bool visitLoadInst(LoadInst *li);
   bool visitMoveValueInst(MoveValueInst *mvi);
   bool
   visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *uoci);
@@ -168,6 +167,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
     }                                                                          \
     return false;                                                              \
   }
+  FORWARDING_INST(BorrowedFrom)
   FORWARDING_INST(Tuple)
   FORWARDING_INST(Object)
   FORWARDING_INST(Struct)
@@ -196,13 +196,13 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(LinearFunction)
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
+  FORWARDING_INST(FunctionExtractIsolation)
 #undef FORWARDING_INST
 
   bool processWorklist();
   bool optimize();
   bool optimizeWithoutFixedPoint();
 
-  bool performLoadCopyToLoadBorrowOptimization(LoadInst *li, SILValue original);
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);

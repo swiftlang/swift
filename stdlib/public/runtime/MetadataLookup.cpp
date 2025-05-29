@@ -29,12 +29,12 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/LibPrespecialized.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
@@ -43,6 +43,7 @@
 #include <functional>
 #include <list>
 #include <new>
+#include <optional>
 #include <vector>
 
 using namespace swift;
@@ -54,6 +55,10 @@ using namespace reflection;
 #include <objc/message.h>
 #include <objc/objc.h>
 #include <dlfcn.h>
+#endif
+
+#if __has_include(<mach-o/dyld_priv.h>)
+#include <mach-o/dyld_priv.h>
 #endif
 
 /// A Demangler suitable for resolving runtime type metadata strings.
@@ -132,11 +137,13 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       if (symInfo->getSymbolName())
         symbolName = symInfo->getSymbolName();
     }
+    uintptr_t ptrLocation = detail::applyRelativeOffset(base, offset);
     swift::fatalError(
         0,
         "Failed to look up symbolic reference at %p - offset %" PRId32
-        " - symbol %s in %s\n",
-        base, offset, symbolName, fileName);
+        " - symbol %s in %s - pointer at %#" PRIxPTR
+        " is likely a reference to a missing weak symbol\n",
+        base, offset, symbolName, fileName, ptrLocation);
   }
 
   // Figure out this symbolic reference's grammatical role.
@@ -157,7 +164,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       break;
         
     default:
-      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+      if (isa<TypeContextDescriptor>(descriptor)) {
         nodeKind = Node::Kind::TypeSymbolicReference;
         isType = true;
         break;
@@ -221,7 +228,7 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
   switch (kind) {
   case SymbolicReferenceKind::Context:
     return _buildDemanglingForContext(
-      (const ContextDescriptor *)resolvedReference, {}, Dem);
+        (const ContextDescriptor *)resolvedReference, {}, Dem);
 
   case SymbolicReferenceKind::AccessorFunctionReference:
 #if SWIFT_PTRAUTH
@@ -322,14 +329,38 @@ namespace {
   };
 } // end anonymous namespace
 
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+struct SharedCacheInfoState {
+  uintptr_t dyldSharedCacheStart;
+  uintptr_t dyldSharedCacheEnd;
+
+  bool inSharedCache(const void *ptr) {
+    auto uintPtr = reinterpret_cast<uintptr_t>(ptr);
+    return dyldSharedCacheStart <= uintPtr && uintPtr < dyldSharedCacheEnd;
+  }
+
+  SharedCacheInfoState() {
+    size_t length;
+    dyldSharedCacheStart = (uintptr_t)_dyld_get_shared_cache_range(&length);
+    dyldSharedCacheEnd =
+        dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
+  }
+};
+
+static Lazy<SharedCacheInfoState> SharedCacheInfo;
+#endif
+
 struct TypeMetadataPrivateState {
   ConcurrentReadableHashMap<NominalTypeDescriptorCacheEntry> NominalCache;
   ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
-  
+
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  ConcurrentReadableArray<TypeMetadataSection> SharedCacheSectionsToScan;
+#endif
+
   TypeMetadataPrivateState() {
     initializeTypeMetadataRecordLookup();
   }
-
 };
 
 static Lazy<TypeMetadataPrivateState> TypeMetadataRecords;
@@ -338,6 +369,12 @@ static void
 _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  if (SharedCacheInfo.get().inSharedCache(begin)) {
+    T.SharedCacheSectionsToScan.push_back(TypeMetadataSection{begin, end});
+    return;
+  }
+#endif
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
 }
 
@@ -346,6 +383,8 @@ void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
     const void *records, uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
+
+  libPrespecializedImageLoaded();
 
   // If we have a section, enqueue the type metadata for lookup.
   auto recordBytes = reinterpret_cast<const char *>(records);
@@ -397,6 +436,38 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
   auto mangledName = extension->getMangledExtendedContext();
+  
+  // A extension of the form `extension Protocol where Self == ConcreteType`
+  // is formally a protocol extension, so the formal generic parameter list
+  // is `<Self>`, but because of the same type constraint, the extended context
+  // looks like a reference to that nominal type. We want to match the
+  // extension's formal generic environment rather than the nominal type's
+  // in this case, so we should skip out on this case.
+  //
+  // We can detect this by looking at whether the generic context of the
+  // extension has a first generic parameter, which would be the Self parameter,
+  // with a same type constraint matching the extended type.
+  for (auto &reqt : extension->getGenericRequirements()) {
+    if (reqt.getKind() != GenericRequirementKind::SameType) {
+      continue;
+    }
+    // 'x' is the mangling of the first generic parameter
+    if (!reqt.getParam().equals("x")) {
+      continue;
+    }
+    // Is the generic parameter same-type-constrained to the same type
+    // we're extending? Then this is a `Self == ExtendedType` constraint.
+    // This is impossible for normal generic nominal type extensions because
+    // that would mean that you had:
+    //   struct Foo<T> {...}
+    //   extension Foo where T == Foo<T> {...}
+    // which would mean that the extended type is the infinite expansion
+    // Foo<Foo<Foo<Foo<...>>>>, which we don't allow.
+    if (reqt.getMangledTypeName().data() == mangledName.data()) {
+      return nullptr;
+    }
+  }
+  
   node = demangler.demangleType(mangledName,
                                 ResolveAsSymbolicReference(demangler));
   if (!node)
@@ -656,7 +727,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
     default:
       if (auto type = llvm::dyn_cast<TypeContextDescriptor>(context)) {
-        llvm::Optional<ParsedTypeIdentity> _identity;
+        std::optional<ParsedTypeIdentity> _identity;
         auto getIdentity = [&]() -> const ParsedTypeIdentity & {
           if (_identity) return *_identity;
           _identity = ParsedTypeIdentity::parse(type);
@@ -738,6 +809,111 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
   return true;
 }
 
+// Helper functions to allow _searchTypeMetadataRecordsInSections to work with
+// both type and protocol records.
+static const ContextDescriptor *
+getContextDescriptor(const TypeMetadataRecord &record) {
+  return record.getContextDescriptor();
+}
+
+static const ContextDescriptor *
+getContextDescriptor(const ProtocolRecord &record) {
+  return record.Protocol.getPointer();
+}
+
+// Perform a linear scan of the given records section, searching for a
+// descriptor that matches the mangling passed in `node`. `sectionsToScan` is a
+// ConcurrentReadableHashMap containing sections of type/protocol records.
+template <typename SectionsContainer>
+static const ContextDescriptor *
+_searchTypeMetadataRecordsInSections(SectionsContainer &sectionsToScan,
+                                     Demangle::NodePointer node) {
+  for (auto &section : sectionsToScan.snapshot()) {
+    for (const auto &record : section) {
+      if (auto context = getContextDescriptor(record)) {
+        if (_contextDescriptorMatchesMangling(context, node)) {
+          return context;
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+// Search for a context descriptor matching the mangling passed in `node`.
+// `state` is `TypeMetadataPrivateState` or `ProtocolMetadataPrivateState` and
+// the search will use the sections in those structures. `traceBegin` is a
+// function returning a trace state which is called around the linear scans of
+// type/protocol records. When available, the search will consult the
+// LibPrespecialized table, and perform validation on the result when validation
+// is enabled.
+template <typename State, typename TraceBegin>
+static const ContextDescriptor *
+_searchForContextDescriptor(State &state, NodePointer node,
+                            TraceBegin traceBegin) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  // Try LibPrespecialized first.
+  auto result = getLibPrespecializedTypeDescriptor(node);
+
+  // Validate the result if requested.
+  if (SWIFT_UNLIKELY(
+          runtime::environment::
+              SWIFT_DEBUG_VALIDATE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP())) {
+    // Only validate a definitive result.
+    if (result.first == LibPrespecializedLookupResult::Found ||
+        result.first == LibPrespecializedLookupResult::DefinitiveNotFound) {
+      // Perform a scan of the shared cache sections and see if the result
+      // matches.
+      auto scanResult = _searchTypeMetadataRecordsInSections(
+          state.SharedCacheSectionsToScan, node);
+
+      // Ignore a result that's outside the shared cache. This can happen for
+      // indirect descriptor records that get fixed up to point to a root.
+      if (SharedCacheInfo.get().inSharedCache(scanResult)) {
+        // We may find a different but equivalent context if they're not unique,
+        // as iteration order may be different between the two. Use
+        // equalContexts to compare distinct but equal non-unique contexts
+        // properly.
+        if (!equalContexts(result.second, scanResult)) {
+          auto tree = getNodeTreeAsString(node);
+          swift::fatalError(
+              0,
+              "Searching for type descriptor, prespecialized descriptor map "
+              "returned %p, but scan returned %p. Node tree:\n%s",
+              result.second, scanResult, tree.c_str());
+        }
+      }
+    }
+  }
+
+  // If we found something, we're done, return it.
+  if (result.first == LibPrespecializedLookupResult::Found) {
+    assert(result.second);
+    return result.second;
+  }
+
+  // If a negative result was not definitive, then we must search the shared
+  // cache sections.
+  if (result.first == LibPrespecializedLookupResult::NonDefinitiveNotFound) {
+    auto traceState = traceBegin(node);
+    auto descriptor = _searchTypeMetadataRecordsInSections(
+        state.SharedCacheSectionsToScan, node);
+    traceState.end(descriptor);
+    if (descriptor)
+      return descriptor;
+  }
+
+  // If we didn't find anything in the shared cache, then search the rest.
+#endif
+
+  auto traceState = traceBegin(node);
+  auto foundDescriptor =
+      _searchTypeMetadataRecordsInSections(state.SectionsToScan, node);
+  traceState.end(foundDescriptor);
+  return foundDescriptor;
+}
+
 // returns the nominal type descriptor for the type named by typeName
 static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
@@ -752,19 +928,8 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
           return nullptr;
 #endif
 
-  auto traceState = runtime::trace::metadata_scan_begin(node);
-
-  for (auto &section : T.SectionsToScan.snapshot()) {
-    for (const auto &record : section) {
-      if (auto context = record.getContextDescriptor()) {
-        if (_contextDescriptorMatchesMangling(context, node)) {
-          return traceState.end(context);
-        }
-      }
-    }
-  }
-
-  return nullptr;
+  return _searchForContextDescriptor(T, node,
+                                     runtime::trace::metadata_scan_begin);
 }
 
 #define DESCRIPTOR_MANGLING_SUFFIX_Structure Mn
@@ -803,18 +968,18 @@ descriptorFromStandardMangling(Demangle::NodePointer symbolicNode) {
   // Fast-path lookup for standard library type references with short manglings.
   if (symbolicNode->getNumChildren() >= 2
       && symbolicNode->getChild(0)->getKind() == Node::Kind::Module
-      && symbolicNode->getChild(0)->getText().equals("Swift")
+      && stringRefEqualsCString(symbolicNode->getChild(0)->getText(), "Swift")
       && symbolicNode->getChild(1)->getKind() == Node::Kind::Identifier) {
     auto name = symbolicNode->getChild(1)->getText();
 
-#define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
-    if (name.equals(#TYPENAME)) { \
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                                \
+    if (stringRefEqualsCString(name, #TYPENAME)) {                             \
       return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
     }
   // FIXME: When the _Concurrency library gets merged into the Standard Library,
   // we will be able to reference those symbols directly as well.
 #define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                    \
-  if (concurrencyDescriptors && name.equals(#TYPENAME)) {                      \
+  if (concurrencyDescriptors && stringRefEqualsCString(name, #TYPENAME)) {     \
     return concurrencyDescriptors->TYPENAME;                                   \
   }
 #if !SWIFT_OBJC_INTEROP
@@ -851,7 +1016,7 @@ _findContextDescriptor(Demangle::NodePointer node,
     return nullptr;
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -888,9 +1053,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   return foundContext;
 }
 
-void swift::_swift_registerConcurrencyStandardTypeDescriptors(
-    const ConcurrencyStandardTypeDescriptors *descriptors) {
+/// Function to check whether we're currently running on the given global
+/// actor.
+bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+        swift::_swift_task_isCurrentGlobalActorHook)(
+    const Metadata *, const WitnessTable *);
+
+void swift::_swift_registerConcurrencyRuntime(
+    const ConcurrencyStandardTypeDescriptors *descriptors,
+    IsCurrentGlobalActor isCurrentGlobalActor) {
   concurrencyDescriptors = descriptors;
+  _swift_task_isCurrentGlobalActorHook = isCurrentGlobalActor;
 }
 
 #pragma mark Protocol descriptor cache
@@ -943,6 +1116,10 @@ namespace {
     ConcurrentReadableHashMap<ProtocolDescriptorCacheEntry> ProtocolCache;
     ConcurrentReadableArray<ProtocolSection> SectionsToScan;
 
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+    ConcurrentReadableArray<ProtocolSection> SharedCacheSectionsToScan;
+#endif
+
     ProtocolMetadataPrivateState() {
       initializeProtocolLookup();
     }
@@ -955,6 +1132,12 @@ static void
 _registerProtocols(ProtocolMetadataPrivateState &C,
                    const ProtocolRecord *begin,
                    const ProtocolRecord *end) {
+#if DYLD_GET_SWIFT_PRESPECIALIZED_DATA_DEFINED
+  if (SharedCacheInfo.get().inSharedCache(begin)) {
+    C.SharedCacheSectionsToScan.push_back(ProtocolSection{begin, end});
+    return;
+  }
+#endif
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
@@ -992,18 +1175,12 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 static const ProtocolDescriptor *
 _searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        NodePointer node) {
-  auto traceState = runtime::trace::protocol_scan_begin(node);
-
-  for (auto &section : C.SectionsToScan.snapshot()) {
-    for (const auto &record : section) {
-      if (auto protocol = record.Protocol.getPointer()) {
-        if (_contextDescriptorMatchesMangling(protocol, node))
-          return traceState.end(protocol);
-      }
-    }
-  }
-
-  return nullptr;
+  auto descriptor =
+      _searchForContextDescriptor(C, node, runtime::trace::protocol_scan_begin);
+  assert(!descriptor ||
+         isa<ProtocolDescriptor>(descriptor) &&
+             "Protocol record search found non-protocol descriptor.");
+  return reinterpret_cast<const ProtocolDescriptor *>(descriptor);
 }
 
 static const ProtocolDescriptor *
@@ -1026,7 +1203,7 @@ _findProtocolDescriptor(NodePointer node,
   }
 
   auto mangling =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem, Mangle::ManglingFlavor::Default);
 
   if (!mangling.isSuccess())
     return nullptr;
@@ -1087,19 +1264,19 @@ public:
 
 #pragma mark Metadata lookup via mangled name
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 swift::_depthIndexToFlatIndex(unsigned depth, unsigned index,
                               llvm::ArrayRef<unsigned> paramCounts) {
   // Out-of-bounds depth.
   if (depth >= paramCounts.size())
-    return llvm::None;
+    return std::nullopt;
 
   // Compute the flat index.
   unsigned flatIndex = index + (depth == 0 ? 0 : paramCounts[depth - 1]);
 
   // Out-of-bounds index.
   if (flatIndex >= paramCounts[depth])
-    return llvm::None;
+    return std::nullopt;
 
   return flatIndex;
 }
@@ -1167,7 +1344,7 @@ namespace {
 /// Use with \c _getTypeByMangledName to decode potentially-generic types.
 class SubstGenericParametersFromWrittenArgs {
   /// The complete set of generic arguments.
-  const llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs;
+  const llvm::SmallVectorImpl<MetadataPackOrValue> &allGenericArgs;
 
   /// The counts of generic parameters at each level.
   const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
@@ -1184,26 +1361,22 @@ public:
   /// \param genericParamCounts The count of generic parameters at each
   /// generic level, typically gathered by _gatherGenericParameterCounts.
   explicit SubstGenericParametersFromWrittenArgs(
-      const llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
+      const llvm::SmallVectorImpl<MetadataPackOrValue> &allGenericArgs,
       const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
       : allGenericArgs(allGenericArgs),
         genericParamCounts(genericParamCounts) {}
 
-  MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
+  MetadataPackOrValue getMetadata(unsigned depth, unsigned index) const;
+  MetadataPackOrValue getMetadataFullOrdinal(unsigned ordinal) const;
   const WitnessTable *getWitnessTable(const Metadata *type,
                                       unsigned index) const;
 };
 
 }  // end anonymous namespace
 
-static void _gatherWrittenGenericArgs(
-    const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
-    Demangler &BorrowFrom);
-
-static llvm::Optional<TypeLookupError>
+static std::optional<TypeLookupError>
 _gatherGenericParameters(const ContextDescriptor *context,
-                         llvm::ArrayRef<MetadataOrPack> genericArgs,
+                         llvm::ArrayRef<MetadataPackOrValue> genericArgs,
                          const Metadata *parent,
                          llvm::SmallVectorImpl<unsigned> &genericParamCounts,
                          llvm::SmallVectorImpl<const void *> &allGenericArgsVec,
@@ -1228,11 +1401,13 @@ _gatherGenericParameters(const ContextDescriptor *context,
       str += " <";
 
       bool first = true;
-      for (MetadataOrPack metadata : genericArgs) {
+      for (MetadataPackOrValue metadata : genericArgs) {
         if (!first)
           str += ", ";
         first = false;
-        str += metadata.nameForMetadata();
+        char *metadataStr;
+        swift_asprintf(&metadataStr, "%p", metadata.Ptr);
+        str += metadataStr;
       }
 
       str += "> ";
@@ -1253,7 +1428,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
   (void)_gatherGenericParameterCounts(context,
                                       genericParamCounts, demangler);
   unsigned numTotalGenericParams =
-    genericParamCounts.empty() ? 0 : genericParamCounts.back();
+    genericParamCounts.empty() ? context->getNumGenericParams()
+                               : genericParamCounts.back();
   
   // Check whether we have the right number of generic arguments.
   if (genericArgs.size() == getLocalGenericParams(context).size()) {
@@ -1276,12 +1452,43 @@ _gatherGenericParameters(const ContextDescriptor *context,
   // requirements and fill in the generic arguments vector.
   if (!genericParamCounts.empty()) {
     // Compute the set of generic arguments "as written".
-    llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
+    llvm::SmallVector<MetadataPackOrValue, 8> allGenericArgs;
 
-    // If we have a parent, gather it's generic arguments "as written".
-    if (parent) {
-      _gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
-                                allGenericArgs, demangler);
+    auto generics = context->getGenericContext();
+    assert(generics);
+
+    // If we have a parent, gather its generic arguments "as written". If our
+    // parent is not generic, there are no generic arguments to add.
+    if (parent && parent->getTypeContextDescriptor() &&
+        parent->getTypeContextDescriptor()->getGenericContext()) {
+      auto parentDescriptor = parent->getTypeContextDescriptor();
+      auto parentGenerics = parentDescriptor->getGenericContext();
+      auto packHeader = parentGenerics->getGenericPackShapeHeader();
+
+      // _gatherWrittenGenericParameters expects to immediately read key generic
+      // arguments, so skip past the shape classes if we have any.
+      auto nonShapeClassGenericArgs = parent->getGenericArgs() + packHeader.NumShapeClasses;
+
+      auto numKeyArgs = 0;
+      for (auto param : parentGenerics->getGenericParams()) {
+        if (param.hasKeyArgument()) {
+          numKeyArgs += 1;
+        }
+      }
+
+      llvm::ArrayRef<const void *> genericArgsRef(
+          reinterpret_cast<const void * const *>(nonShapeClassGenericArgs),
+          numKeyArgs);
+
+      if (!_gatherWrittenGenericParameters(parentDescriptor,
+                                           genericArgsRef,
+                                           allGenericArgs, demangler)) {
+        auto commonString = makeCommonErrorStringGetter();
+        return TypeLookupError([=] {
+          return commonString() + "failed to get parent context's written" +
+                 " generic arguments";
+        });
+      }
     }
     
     // Add the generic arguments we were given.
@@ -1290,8 +1497,6 @@ _gatherGenericParameters(const ContextDescriptor *context,
     
     // Copy the generic arguments needed for metadata from the generic
     // arguments "as written".
-    auto generics = context->getGenericContext();
-    assert(generics);
     {
       // Add a placeholder length for each shape class.
       auto packShapeHeader = generics->getGenericPackShapeHeader();
@@ -1364,6 +1569,13 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
           break;
         }
+        case GenericParamKind::Value: {
+          if (param.hasKeyArgument()) {
+            allGenericArgsVec.push_back(arg.Ptr);
+          }
+
+          break;
+        }
         default:
           auto commonString = makeCommonErrorStringGetter();
           return TypeLookupError([=] {
@@ -1380,13 +1592,18 @@ _gatherGenericParameters(const ContextDescriptor *context,
     SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                         genericParamCounts);
     auto error = _checkGenericRequirements(
+        generics->getGenericParams(),
         generics->getGenericRequirements(), allGenericArgsVec,
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index).Ptr;
         },
+        [&substitutions](unsigned fullOrdinal, unsigned keyOrdinal) {
+          return substitutions.getMetadataFullOrdinal(fullOrdinal).Ptr;
+        },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -1405,19 +1622,19 @@ _gatherGenericParameters(const ContextDescriptor *context,
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace {
 
 /// Find the offset of the protocol requirement for an associated type with
 /// the given name in the given protocol descriptor.
-llvm::Optional<const ProtocolRequirement *>
+std::optional<const ProtocolRequirement *>
 findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr)
-    return llvm::None;
+    return std::nullopt;
 
   // Look through the list of associated type names.
   StringRef associatedTypeNames(associatedTypeNamesPtr);
@@ -1437,7 +1654,7 @@ findAssociatedTypeByName(const ProtocolDescriptor *protocol, StringRef name) {
   }
 
   if (!found)
-    return llvm::None;
+    return std::nullopt;
 
   // We have a match on the Nth associated type; go find the Nth associated
   // type requirement.
@@ -1541,7 +1758,7 @@ private:
   std::vector<std::pair<MetadataPackPointer, size_t>> ActivePackExpansions;
 
 public:
-  using BuiltType = MetadataOrPack;
+  using BuiltType = MetadataPackOrValue;
 
   struct BuiltLayoutConstraint {
     bool operator==(BuiltLayoutConstraint rhs) const { return true; }
@@ -1603,6 +1820,11 @@ public:
     }
   };
 
+  struct BuiltInverseRequirement {
+    BuiltType SubjectType;
+    InvertibleProtocolKind Kind;
+  };
+
   DecodedMetadataBuilder(Demangler &demangler,
                          SubstGenericParameterFn substGenericParameter,
                          SubstDependentWitnessTableFn substWitnessTable)
@@ -1616,6 +1838,9 @@ public:
         .getType();
   }
 
+  Mangle::ManglingFlavor getManglingFlavor() { 
+    return Mangle::ManglingFlavor::Default;
+  }
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   TypeLookupErrorOr<BuiltType>
@@ -1627,7 +1852,7 @@ public:
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
 
-    llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
+    llvm::SmallVector<MetadataPackOrValue, 8> allGenericArgs;
     for (auto argSet : genericArgs)
       allGenericArgs.append(argSet.begin(), argSet.end());
     
@@ -1802,17 +2027,25 @@ public:
 
     // Collect any other generic arguments.
     auto error = _checkGenericRequirements(
-        genSig.getRequirements(), allArgsVec,
+        genSig.getParams(), genSig.getRequirements(), allArgsVec,
         [genArgs](unsigned depth, unsigned index) -> const Metadata * {
           if (depth != 0 || index >= genArgs.size())
-            return nullptr;
+            return (const Metadata*)nullptr;
 
           // FIXME: variadic generics
           return genArgs[index].getMetadata();
         },
+        [genArgs](unsigned fullOrdinal, unsigned keyOrdinal) {
+          if (fullOrdinal >= genArgs.size())
+            return (const Metadata*)nullptr;
+
+          // FIXME: variadic generics
+          return genArgs[fullOrdinal].getMetadata();
+        },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -1824,7 +2057,7 @@ public:
   TypeLookupErrorOr<BuiltType> createBuiltinType(StringRef builtinName,
                                                  StringRef mangledName) const {
 #define BUILTIN_TYPE(Symbol, _) \
-    if (mangledName.equals(#Symbol)) \
+    if (stringRefEqualsCString(mangledName, #Symbol)) \
       return BuiltType(&METADATA_SYM(Symbol).base);
 #if !SWIFT_STDLIB_ENABLE_VECTOR_TYPES
 #define BUILTIN_VECTOR_TYPE(ElementSymbol, ElementName, Width)
@@ -1835,8 +2068,8 @@ public:
 
   TypeLookupErrorOr<BuiltType>
   createMetatypeType(BuiltType instance,
-                     llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
-                         llvm::None) const {
+                     std::optional<Demangle::ImplMetatypeRepresentation> repr =
+                         std::nullopt) const {
     if (!instance.isMetadata())
       return TYPE_LOOKUP_ERROR_FMT("Tried to build a metatype from a pack");
     return BuiltType(swift_getMetatypeMetadata(instance.getMetadata()));
@@ -1844,8 +2077,8 @@ public:
 
   TypeLookupErrorOr<BuiltType> createExistentialMetatypeType(
       BuiltType instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr =
-          llvm::None) const {
+      std::optional<Demangle::ImplMetatypeRepresentation> repr =
+          std::nullopt) const {
     if (!instance.isMetadata()) {
       return TYPE_LOOKUP_ERROR_FMT("Tried to build an existential metatype "
                                    "from a pack");
@@ -1888,8 +2121,10 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType>
-  createConstrainedExistentialType(BuiltType base,
-                                   llvm::ArrayRef<BuiltRequirement> rs) const {
+  createConstrainedExistentialType(
+      BuiltType base,
+      llvm::ArrayRef<BuiltRequirement> rs,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Runtime plumbing.
     return BuiltType();
   }
@@ -1933,8 +2168,9 @@ public:
   createFunctionType(
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
+      ExtendedFunctionTypeFlags extFlags,
       FunctionMetadataDifferentiabilityKind diffKind,
-      BuiltType globalActorType) const {
+      BuiltType globalActorType, BuiltType thrownError) const {
     assert(
         (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
         (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
@@ -1970,26 +2206,20 @@ public:
     }
 
     return BuiltType(
-      flags.hasGlobalActor()
-        ? swift_getFunctionTypeMetadataGlobalActor(flags, diffKind, paramTypes.data(),
+        swift_getExtendedFunctionTypeMetadata(
+            flags, diffKind, paramTypes.data(),
             flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-            result.getMetadata(), globalActorType.getMetadata())
-        : flags.isDifferentiable()
-          ? swift_getFunctionTypeMetadataDifferentiable(
-                flags, diffKind, paramTypes.data(),
-                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-                result.getMetadata())
-          : swift_getFunctionTypeMetadata(
-                flags, paramTypes.data(),
-                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-                result.getMetadata()));
+            result.getMetadata(), globalActorType.getMetadataOrNull(), extFlags,
+            thrownError.getMetadataOrNull()));
   }
 
   TypeLookupErrorOr<BuiltType> createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
+      Demangle::ImplCoroutineKind coroutineKind,
       llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
+      llvm::ArrayRef<Demangle::ImplFunctionYield<BuiltType>> yields,
       llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
-      llvm::Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
+      std::optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
       ImplFunctionTypeFlags flags) {
     // We can't realize the metadata for a SILFunctionType.
     return BuiltType();
@@ -2181,10 +2411,16 @@ public:
     return {};
   }
 
+  BuiltInverseRequirement createInverseRequirement(
+      BuiltType subjectType, InvertibleProtocolKind kind) {
+    return BuiltInverseRequirement{subjectType, kind};
+  }
+
   TypeLookupErrorOr<BuiltType> createSILBoxTypeWithLayout(
       llvm::ArrayRef<BuiltSILBoxField> Fields,
       llvm::ArrayRef<BuiltSubstitution> Substitutions,
-      llvm::ArrayRef<BuiltRequirement> Requirements) const {
+      llvm::ArrayRef<BuiltRequirement> Requirements,
+      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) const {
     // FIXME: Implement.
     return BuiltType();
   }
@@ -2208,6 +2444,12 @@ public:
     return BuiltType();
   }
 
+  TypeLookupErrorOr<BuiltType> createInlineArrayType(BuiltType count,
+                                                     BuiltType element) {
+    // Mangled types for building metadata don't contain sugared types
+    return BuiltType();
+  }
+
   TypeLookupErrorOr<BuiltType> createDictionaryType(BuiltType key,
                                                     BuiltType value) {
     // Mangled types for building metadata don't contain sugared types
@@ -2217,6 +2459,26 @@ public:
   TypeLookupErrorOr<BuiltType> createParenType(BuiltType base) {
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
+  }
+
+  TypeLookupErrorOr<BuiltType> createIntegerType(intptr_t value) {
+    // Note: We explicitly ignore the value check here because when the
+    // integer happens to be '0', we'll compare a MetadataPackOrValue against
+    // 'nullptr' which this is. We know this is still a good value for
+    // integers.
+    return TypeLookupErrorOr<BuiltType>(BuiltType(value),
+                                        /*ignoreValueCheck*/ true);
+  }
+
+  TypeLookupErrorOr<BuiltType> createNegativeIntegerType(intptr_t value) {
+    return BuiltType(value);
+  }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinFixedArrayType(BuiltType size,
+                                                           BuiltType element) {
+    return BuiltType(swift_getFixedArrayTypeMetadata(MetadataState::Abstract,
+                                                     size.getValue(),
+                                                     element.getMetadata()));
   }
 };
 
@@ -2242,7 +2504,7 @@ swift_getTypeByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
     return TypeInfo{MetadataResponse{type, MetadataState::Complete},
                     TypeReferenceOwnership()};
   }
-  
+    
   // TODO: propagate the request down to the builder instead of calling
   // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
@@ -2554,14 +2816,39 @@ swift::getTypePackByMangledName(StringRef typeName,
   return type.getType().getMetadataPack();
 }
 
+TypeLookupErrorOr<intptr_t>
+swift::getTypeValueByMangledName(StringRef typeName,
+                                const void *const *origArgumentVector,
+                                SubstGenericParameterFn substGenericParam,
+                                SubstDependentWitnessTableFn substWitnessTable) {
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+  NodePointer node = demangler.demangleTypeRef(typeName);
+  if (!node)
+    return TypeLookupError("Demangling failed");
+
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
+                                 substWitnessTable);
+  auto type = Demangle::decodeMangledType(builder, node);
+
+  if (type.isError())
+    return *type.getError();
+
+  // Note: We explicitly ignore the value check here because when the
+  // integer happens to be '0', we'll do '!value' which in this case converts
+  // the integer to a boolean, but '0' is a valid value.
+  return TypeLookupErrorOr<intptr_t>(type.getType().getValue(),
+                                     /*ignoreValueCheck*/ true);
+}
+
 // ==== Function metadata functions ----------------------------------------------
 
-static llvm::Optional<llvm::StringRef>
-cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
+static std::optional<llvm::StringRef> cstrToStringRef(const char *typeNameStart,
+                                                      size_t typeNameLength) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   for (char c : typeName) {
     if (c >= '\x01' && c <= '\x1F')
-      return llvm::None;
+      return std::nullopt;
   }
   return typeName;
 }
@@ -2571,7 +2858,7 @@ cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
 static NodePointer extractFunctionTypeFromMethod(Demangler &demangler,
                                                  const char *typeNameStart,
                                                  size_t typeNameLength) {
-  llvm::Optional<llvm::StringRef> typeName =
+  std::optional<llvm::StringRef> typeName =
       cstrToStringRef(typeNameStart, typeNameLength);
   if (!typeName)
     return nullptr;
@@ -2620,25 +2907,6 @@ static NodePointer getParameterList(NodePointer funcType) {
   return parameterContainer;
 }
 
-static const Metadata *decodeType(TypeDecoder<DecodedMetadataBuilder> &decoder,
-                                  NodePointer type) {
-  assert(type->getKind() == Node::Kind::Type);
-
-  auto builtTypeOrError = decoder.decodeMangledType(type);
-
-  if (builtTypeOrError.isError()) {
-    auto err = builtTypeOrError.getError();
-    char *errStr = err->copyErrorString();
-    err->freeErrorString(errStr);
-    return nullptr;
-  }
-
-  if (!builtTypeOrError.getType().isMetadata())
-    return nullptr;
-
-  return builtTypeOrError.getType().getMetadata();
-}
-
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 unsigned swift_func_getParameterCount(const char *typeNameStart,
@@ -2674,8 +2942,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  auto request = MetadataRequest(MetadataState::Complete);
+
+  NodePointer nodePointer = resultType->getFirstChild();
+  auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -2685,9 +2957,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
         return substFn.getWitnessTable(type, index);
       });
 
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+  if (typeInfoOrErr.isError()) {
+    return nullptr;
+  }
 
-  return decodeType(decoder, resultType->getFirstChild());
+  auto typeInfo = typeInfoOrErr.getType();
+  return typeInfo.getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
@@ -2715,8 +2990,21 @@ swift_func_getParameterTypeInfo(
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  // for each parameter (TupleElement), store it into the provided buffer
+  for (unsigned index = 0; index != typesLength; ++index) {
+    auto nodePointer = parameterList->getChild(index);
+
+    if (nodePointer->getKind() == Node::Kind::TupleElement) {
+      assert(nodePointer->getNumChildren() == 1);
+      nodePointer = nodePointer->getFirstChild();
+    }
+    assert(nodePointer->getKind() == Node::Kind::Type);
+
+    auto request = MetadataRequest(MetadataState::Complete);
+
+    auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -2725,24 +3013,13 @@ swift_func_getParameterTypeInfo(
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
       });
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
 
-  // for each parameter (TupleElement), store it into the provided buffer
-  for (unsigned index = 0; index != typesLength; ++index) {
-    auto *parameter = parameterList->getChild(index);
-
-    if (parameter->getKind() == Node::Kind::TupleElement) {
-      assert(parameter->getNumChildren() == 1);
-      parameter = parameter->getFirstChild();
+    if (typeInfoOrErr.isError()) {
+      return -3; // Failed to decode a type.
     }
 
-    assert(parameter->getKind() == Node::Kind::Type);
-
-    auto type = decodeType(decoder, parameter);
-    if (!type)
-      return -3; // Failed to decode a type.
-
-    types[index] = type;
+    auto typeInfo = typeInfoOrErr.getType();
+    types[index] = typeInfo.getMetadata();
   } // end foreach parameter
 
   return typesLength;
@@ -2760,13 +3037,18 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
   auto error = _checkGenericRequirements(
+      genericEnv->getGenericParameters(),
       genericEnv->getGenericRequirements(), witnessTables,
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
       },
+      [&substFn](unsigned fullOrdinal, unsigned keyOrdinal) {
+        return substFn.getMetadataKeyArgOrdinal(keyOrdinal).Ptr;
+      },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
-      });
+      },
+      nullptr);
 
   if (error) {
     return {/*ptr=*/nullptr, -1};
@@ -2878,18 +3160,27 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
 
   DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
 
-  llvm::ArrayRef<MetadataOrPack> genericArgsRef(
-      reinterpret_cast<const MetadataOrPack *>(genericArgs), genericArgsSize);
+  // _instantiateCheckedGenericMetadata expects generic args to NOT begin with
+  // shape classes.
+  llvm::ArrayRef<const void *> genericArgsRef(genericArgs, genericArgsSize);
+  llvm::SmallVector<MetadataPackOrValue, 8> writtenGenericArgs;
+
+  // If we fail to fill in all of the generic parameters, just fail.
+  if (!_gatherWrittenGenericParameters(context, genericArgsRef,
+                                       writtenGenericArgs, demangler)) {
+    return nullptr;
+  }
+
   llvm::SmallVector<unsigned, 8> genericParamCounts;
   llvm::SmallVector<const void *, 8> allGenericArgs;
 
-  auto result = _gatherGenericParameters(context, genericArgsRef,
+  auto result = _gatherGenericParameters(context, writtenGenericArgs,
                                          /* parent */ nullptr,
                                          genericParamCounts, allGenericArgs,
                                          demangler);
 
-  // _gatherGenericParameters returns llvm::None on success.
-  if (result.hasValue()) {
+  // _gatherGenericParameters returns std::nullopt on success.
+  if (result.has_value()) {
     return nullptr;
   }
 
@@ -2935,7 +3226,7 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   // ObjC metadata.
   StringRef typeStr(typeName);
   const Metadata *metadata = nullptr;
-  if (typeStr.startswith("_Tt")) {
+  if (typeStr.starts_with("_Tt")) {
     Demangler demangler;
     auto node = demangler.demangleSymbol(typeName);
     if (!node)
@@ -2974,12 +3265,14 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
   return OldGetClassHook(typeName, outClass);
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor))
 static void installGetClassHook() {
   if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_getClass)) {
     SWIFT_RUNTIME_WEAK_USE(objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook));
   }
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 #endif
 
@@ -3136,26 +3429,26 @@ void SubstGenericParametersFromMetadata::setup() const {
   }
 }
 
-MetadataOrPack
+MetadataPackOrValue
 SubstGenericParametersFromMetadata::getMetadata(
                                         unsigned depth, unsigned index) const {
   // Don't attempt anything if we have no generic parameters.
   if (genericArgs == nullptr)
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   // On first access, compute the descriptor path.
   setup();
 
   // If the depth is too great, there is nothing to do.
   if (depth >= descriptorPath.size())
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   /// Retrieve the descriptor path element at this depth.
   auto &pathElement = descriptorPath[depth];
 
   // Check whether the index is clearly out of bounds.
   if (index >= pathElement.numTotalGenericParams)
-    return MetadataOrPack();
+    return MetadataPackOrValue();
 
   // Compute the flat index.
   unsigned flatIndex = pathElement.numKeyGenericParamsInParent + numShapeClasses;
@@ -3166,7 +3459,7 @@ SubstGenericParametersFromMetadata::getMetadata(
 
     // Make sure that the requested parameter itself has a key argument.
     if (!genericParams[index].hasKeyArgument())
-      return MetadataOrPack();
+      return MetadataPackOrValue();
 
     // Increase the flat index for each parameter with a key argument, up to
     // the given index.
@@ -3178,7 +3471,19 @@ SubstGenericParametersFromMetadata::getMetadata(
     flatIndex += index;
   }
 
-  return MetadataOrPack(genericArgs[flatIndex]);
+  return MetadataPackOrValue(genericArgs[flatIndex]);
+}
+
+MetadataPackOrValue SubstGenericParametersFromMetadata::getMetadataKeyArgOrdinal(
+    unsigned ordinal) const {
+  // Don't attempt anything if we have no generic parameters.
+  if (genericArgs == nullptr)
+    return MetadataPackOrValue();
+
+  // On first access, compute the descriptor path.
+  setup();
+
+  return MetadataPackOrValue(genericArgs[numShapeClasses + ordinal]);
 }
 
 const WitnessTable *
@@ -3195,16 +3500,25 @@ SubstGenericParametersFromMetadata::getWitnessTable(const Metadata *type,
       index + numKeyGenericParameters + numShapeClasses];
 }
 
-MetadataOrPack SubstGenericParametersFromWrittenArgs::getMetadata(
+MetadataPackOrValue SubstGenericParametersFromWrittenArgs::getMetadata(
                                         unsigned depth, unsigned index) const {
   if (auto flatIndex =
           _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
     if (*flatIndex < allGenericArgs.size()) {
-      return MetadataOrPack(allGenericArgs[*flatIndex]);
+      return MetadataPackOrValue(allGenericArgs[*flatIndex]);
     }
   }
 
-  return MetadataOrPack();
+  return MetadataPackOrValue();
+}
+
+MetadataPackOrValue SubstGenericParametersFromWrittenArgs::getMetadataFullOrdinal(
+    unsigned ordinal) const {
+  if (ordinal < allGenericArgs.size()) {
+    return MetadataPackOrValue(allGenericArgs[ordinal]);
+  }
+
+  return MetadataPackOrValue();
 }
 
 const WitnessTable *
@@ -3215,93 +3529,78 @@ SubstGenericParametersFromWrittenArgs::getWitnessTable(const Metadata *type,
 
 /// Demangle the given type name to a generic parameter reference, which
 /// will be returned as (depth, index).
-static llvm::Optional<std::pair<unsigned, unsigned>>
+static std::optional<std::pair<unsigned, unsigned>>
 demangleToGenericParamRef(StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
   if (!node)
-    return llvm::None;
+    return std::nullopt;
 
   // Find the flat index that the right-hand side refers to.
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
   if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return llvm::None;
+    return std::nullopt;
 
   return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
                                        node->getChild(1)->getIndex());
 }
 
-static void _gatherWrittenGenericArgs(
-    const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
-    Demangler &BorrowFrom) {
-  if (!description)
-    return;
-  auto generics = description->getGenericContext();
-  if (!generics)
-    return;
+bool swift::_gatherWrittenGenericParameters(
+    const TypeContextDescriptor *descriptor,
+    llvm::ArrayRef<const void *> keyArgs,
+    llvm::SmallVectorImpl<MetadataPackOrValue> &genericArgs,
+    Demangle::Demangler &Dem) {
+  if (!descriptor) {
+    return false;
+  }
 
+  auto genericContext = descriptor->getGenericContext();
+
+  // If the type itself is not generic, then we're done.
+  if (!genericContext) {
+    return true;
+  }
+
+  unsigned argIndex = 0;
   bool missingWrittenArguments = false;
-  auto genericArgs = description->getGenericArguments(metadata);
-  for (auto param : generics->getGenericParams()) {
-    switch (param.getKind()) {
-    case GenericParamKind::Type:
-      // The type should have a key argument unless it's been same-typed to
-      // another type.
-      if (param.hasKeyArgument()) {
-        auto genericArg = *genericArgs++;
-        allGenericArgs.push_back(MetadataOrPack(genericArg));
-      } else {
-        // Leave a gap for us to fill in by looking at same type info.
-        allGenericArgs.push_back(MetadataOrPack());
-        missingWrittenArguments = true;
-      }
 
-      break;
+  for (auto param : genericContext->getGenericParams()) {
+    // The type should have a key argument unless it's been same-typed to
+    // another type.
+    if (param.hasKeyArgument()) {
+      genericArgs.push_back(MetadataPackOrValue(keyArgs[argIndex]));
 
-    case GenericParamKind::TypePack:
-      // The type should have a key argument unless it's been same-typed to
-      // another type.
-      if (param.hasKeyArgument()) {
-        auto genericArg = reinterpret_cast<const Metadata * const *>(*genericArgs++);
-        MetadataPackPointer pack(genericArg);
-        allGenericArgs.push_back(MetadataOrPack(pack));
-      } else {
-        // Leave a gap for us to fill in by looking at same type info.
-        allGenericArgs.push_back(MetadataOrPack());
-        missingWrittenArguments = true;
-      }
-
-      break;
-
-    default:
-      // We don't know about this kind of parameter. Create placeholders where
-      // needed.
-      if (param.hasKeyArgument()) {
-        allGenericArgs.push_back(MetadataOrPack());
-        ++genericArgs;
-      }
-
-      break;
+      argIndex += 1;
+    } else {
+      // Leave a gap for us to fill in by looking at same-type requirements.
+      genericArgs.push_back(MetadataPackOrValue());
+      missingWrittenArguments = true;
     }
+
+    assert((param.getKind() == GenericParamKind::Type ||
+           param.getKind() == GenericParamKind::TypePack ||
+           param.getKind() == GenericParamKind::Value) &&
+           "Unknown generic parameter kind");
   }
 
   // If there is no follow-up work to do, we're done.
   if (!missingWrittenArguments)
-    return;
+    return true;
 
   // We have generic arguments that would be written, but have been
   // canonicalized away. Use same-type requirements to reconstitute them.
 
   // Retrieve the mapping information needed for depth/index -> flat index.
   llvm::SmallVector<unsigned, 8> genericParamCounts;
-  (void)_gatherGenericParameterCounts(description, genericParamCounts,
-                                      BorrowFrom);
+  (void)_gatherGenericParameterCounts(descriptor, genericParamCounts, Dem);
+
+  SubstGenericParametersFromWrittenArgs substitutions(genericArgs,
+                                                      genericParamCounts);
 
   // Walk through the generic requirements to evaluate same-type
   // constraints that are needed to fill in missing generic arguments.
-  for (const auto &req : generics->getGenericRequirements()) {
+  for (const auto &req : genericContext->getGenericRequirements()) {
     // We only care about same-type constraints.
     if (req.Flags.getKind() != GenericRequirementKind::SameType)
       continue;
@@ -3318,23 +3617,44 @@ static void _gatherWrittenGenericArgs(
     auto lhsFlatIndex =
       _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
                              genericParamCounts);
-    if (!lhsFlatIndex || *lhsFlatIndex >= allGenericArgs.size())
-      continue;
+    if (!lhsFlatIndex || *lhsFlatIndex >= genericArgs.size())
+      return false;
 
-    if (!allGenericArgs[*lhsFlatIndex]) {
+    if (!genericArgs[*lhsFlatIndex]) {
+      MetadataPackOrValue genericArg;
+
+      if (req.Flags.isValueRequirement()) {
+        auto genericArgValue =
+            swift::getTypeValueByMangledName(
+              req.getMangledTypeName(),
+              keyArgs.data(),
+              [&substitutions](unsigned depth, unsigned index) {
+                return substitutions.getMetadata(depth, index).Ptr;
+              },
+              [&substitutions](const Metadata *type, unsigned index) {
+                return substitutions.getWitnessTable(type, index);
+              }).getType();
+
+        genericArg = MetadataPackOrValue(genericArgValue);
+      } else {
+        auto *genericArgMetadata =
+            swift_getTypeByMangledName(MetadataState::Abstract,
+              req.getMangledTypeName(),
+              keyArgs.data(),
+              [&substitutions](unsigned depth, unsigned index) {
+                return substitutions.getMetadata(depth, index).Ptr;
+              },
+              [&substitutions](const Metadata *type, unsigned index) {
+                return substitutions.getWitnessTable(type, index);
+              }).getType().getMetadata();
+        if (!genericArgMetadata)
+          return false;
+
+        genericArg = MetadataPackOrValue(genericArgMetadata);
+      }
+
       // Substitute into the right-hand side.
-      SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
-                                                          genericParamCounts);
-      allGenericArgs[*lhsFlatIndex] =
-          MetadataOrPack(swift_getTypeByMangledName(MetadataState::Abstract,
-            req.getMangledTypeName(),
-            (const void * const *)allGenericArgs.data(),
-            [&substitutions](unsigned depth, unsigned index) {
-              return substitutions.getMetadata(depth, index).Ptr;
-            },
-            [&substitutions](const Metadata *type, unsigned index) {
-              return substitutions.getWitnessTable(type, index);
-            }).getType().getMetadata());
+      genericArgs[*lhsFlatIndex] = genericArg;
       continue;
     }
 
@@ -3342,20 +3662,28 @@ static void _gatherWrittenGenericArgs(
     // the right-hand side is itself a generic parameter, which means
     // we have a same-type constraint A == B where A is already filled in.
     auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
-    if (!rhsParam)
+
+    // If the rhs parameter is not a generic parameter itself with
+    // (depth, index), it could potentially be some associated type. If that's
+    // the case, then we don't need to do anything else for this rhs because it
+    // won't appear in the key arguments list.
+    if (!rhsParam) {
       continue;
+    }
 
     auto rhsFlatIndex =
       _depthIndexToFlatIndex(rhsParam->first, rhsParam->second,
                              genericParamCounts);
-    if (!rhsFlatIndex || *rhsFlatIndex >= allGenericArgs.size())
-      continue;
+    if (!rhsFlatIndex || *rhsFlatIndex >= genericArgs.size())
+      return false;
 
-    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[*lhsFlatIndex])
-      continue;
+    if (genericArgs[*rhsFlatIndex] || !genericArgs[*lhsFlatIndex])
+      return false;
 
-    allGenericArgs[*rhsFlatIndex] = allGenericArgs[*lhsFlatIndex];
+    genericArgs[*rhsFlatIndex] = genericArgs[*lhsFlatIndex];
   }
+
+  return true;
 }
 
 struct InitializeDynamicReplacementLookup {
@@ -3396,7 +3724,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
         reinterpret_cast<void **>(&chainRoot->implementationFunction),
         reinterpret_cast<void *const *>(&previous->implementationFunction),
         replacedFunctionKey->getExtraDiscriminator(),
-        !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+        !replacedFunctionKey->isData(), /*allowNull*/ false);
   }
 
   // First populate the current replacement's chain entry.
@@ -3407,7 +3735,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 
   currentEntry->next = chainRoot->next;
 
@@ -3418,7 +3746,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
       reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isData());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -3443,7 +3771,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 }
 
 /// An automatic dynamic replacement entry.
@@ -3601,4 +3929,4 @@ void swift::swift_disableDynamicReplacementScope(
   DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

@@ -17,10 +17,12 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
@@ -29,56 +31,54 @@ using namespace swift;
 /// FV(PackElementType(Param, M), N) = FV(Param, 0) if M >= N, {} otherwise
 /// FV(Param, N) = {Param}
 static Type transformTypeParameterPacksRec(
-    Type t, llvm::function_ref<llvm::Optional<Type>(SubstitutableType *)> fn,
+    Type t, llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn,
     unsigned expansionLevel) {
   return t.transformWithPosition(
       TypePosition::Invariant,
-      [&](TypeBase *t, TypePosition p) -> llvm::Optional<Type> {
+      [&](TypeBase *t, TypePosition p) -> std::optional<Type> {
+        // If we're already inside N levels of PackExpansionType,  and we're
+        // walking into another PackExpansionType, a type parameter pack
+        // reference now needs level (N+1) to be free.
+        if (auto *expansionType = dyn_cast<PackExpansionType>(t)) {
+          auto countType = expansionType->getCountType();
+          auto patternType = expansionType->getPatternType();
+          auto newPatternType = transformTypeParameterPacksRec(
+              patternType, fn, expansionLevel + 1);
+          if (patternType.getPointer() != newPatternType.getPointer())
+            return Type(PackExpansionType::get(patternType, countType));
 
-    // If we're already inside N levels of PackExpansionType,  and we're
-    // walking into another PackExpansionType, a type parameter pack
-    // reference now needs level (N+1) to be free.
-    if (auto *expansionType = dyn_cast<PackExpansionType>(t)) {
-      auto countType = expansionType->getCountType();
-      auto patternType = expansionType->getPatternType();
-      auto newPatternType = transformTypeParameterPacksRec(
-          patternType, fn, expansionLevel + 1);
-      if (patternType.getPointer() != newPatternType.getPointer())
-        return Type(PackExpansionType::get(patternType, countType));
+          return Type(expansionType);
+        }
 
-      return Type(expansionType);
-    }
+        // A PackElementType with level N reaches past N levels of
+        // nested PackExpansionType. So a type parameter pack reference
+        // therein is free if N is greater than or equal to our current
+        // expansion level.
+        if (auto *eltType = dyn_cast<PackElementType>(t)) {
+          if (eltType->getLevel() >= expansionLevel) {
+            return transformTypeParameterPacksRec(eltType->getPackType(), fn,
+                                                  /*expansionLevel=*/0);
+          }
 
-    // A PackElementType with level N reaches past N levels of
-    // nested PackExpansionType. So a type parameter pack reference
-    // therein is free if N is greater than or equal to our current
-    // expansion level.
-    if (auto *eltType = dyn_cast<PackElementType>(t)) {
-      if (eltType->getLevel() >= expansionLevel) {
-        return transformTypeParameterPacksRec(eltType->getPackType(), fn,
-                                              /*expansionLevel=*/0);
-      }
+          return Type(eltType);
+        }
 
-      return Type(eltType);
-    }
+        // A bare type parameter pack is like a PackElementType with level 0.
+        if (auto *paramType = dyn_cast<SubstitutableType>(t)) {
+          if (expansionLevel == 0 && (isa<PackArchetypeType>(paramType) ||
+                                      paramType->isRootParameterPack())) {
+            return fn(paramType);
+          }
 
-    // A bare type parameter pack is like a PackElementType with level 0.
-    if (auto *paramType = dyn_cast<SubstitutableType>(t)) {
-      if (expansionLevel == 0 &&
-          (isa<PackArchetypeType>(paramType) ||
-           paramType->isRootParameterPack())) {
-        return fn(paramType);
-      }
+          return Type(paramType);
+        }
 
-      return Type(paramType);
-    }
-
-    return llvm::None;
-  });
+        return std::nullopt;
+      });
 }
 
 Type Type::transformTypeParameterPacks(
-    llvm::function_ref<llvm::Optional<Type>(SubstitutableType *)> fn) const {
+    llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn) const {
   return transformTypeParameterPacksRec(*this, fn, /*expansionLevel=*/0);
 }
 
@@ -109,7 +109,7 @@ struct PackReferenceCollector: TypeWalker {
       for (auto type : boundGenericType->getExpandedGenericArgs())
         type.walk(*this);
 
-      return Action::SkipChildren;
+      return Action::SkipNode;
     }
 
     if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer())) {
@@ -120,7 +120,7 @@ struct PackReferenceCollector: TypeWalker {
         for (auto type : typeAliasType->getExpandedGenericArgs())
           type.walk(*this);
 
-        return Action::SkipChildren;
+        return Action::SkipNode;
       }
     }
 
@@ -162,30 +162,22 @@ void TypeBase::getTypeParameterPacks(
       if (paramTy->isParameterPack())
         rootParameterPacks.push_back(paramTy);
     } else if (auto *archetypeTy = t->getAs<PackArchetypeType>()) {
-      rootParameterPacks.push_back(archetypeTy->getRoot());
+      if (archetypeTy->isRoot()) {
+        rootParameterPacks.push_back(archetypeTy);
+      } else {
+        auto *genericEnv = archetypeTy->getGenericEnvironment();
+        auto paramTy = archetypeTy->getInterfaceType()->getRootGenericParam();
+        rootParameterPacks.push_back(
+            genericEnv->mapTypeIntoContext(paramTy));
+      }
     }
 
     return false;
   });
 }
 
-bool GenericTypeParamType::isParameterPack() const {
-  if (auto param = getDecl()) {
-    return param->isParameterPack();
-  }
-
-  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return (fixedNum & GenericTypeParamType::TYPE_SEQUENCE_BIT) ==
-         GenericTypeParamType::TYPE_SEQUENCE_BIT;
-}
-
 bool TypeBase::isParameterPack() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->isRootParameterPack();
+  return getDependentMemberRoot()->isRootParameterPack();
 }
 
 bool TypeBase::isRootParameterPack() {
@@ -207,7 +199,7 @@ static Type increasePackElementLevelImpl(
     Type type, unsigned level, unsigned outerLevel) {
   assert(level > 0);
 
-  return type.transformRec([&](TypeBase *t) -> llvm::Optional<Type> {
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (auto *elementType = dyn_cast<PackElementType>(t)) {
       if (elementType->getLevel() >= outerLevel) {
         elementType = PackElementType::get(elementType->getPackType(),
@@ -231,7 +223,7 @@ static Type increasePackElementLevelImpl(
       return Type(t);
     }
 
-    return llvm::None;
+    return std::nullopt;
   });
 }
 
@@ -315,8 +307,6 @@ static CanPackType getReducedShapeOfPack(const ASTContext &ctx,
     }
 
     // Use () as a placeholder for scalar shape.
-    assert(!elt->template is<PackArchetypeType>() &&
-           "Pack archetype outside of a pack expansion");
     elts.push_back(ctx.TheEmptyTupleType);
   }
 
@@ -390,10 +380,11 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
     remappedIndex -= substCount;
   }
 
-  llvm::errs() << "Invalid substituted argument index: " << substIndex << "\n";
-  subMap.dump(llvm::errs());
-  dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Invalid substituted argument index: " << substIndex << "\n";
+    subMap.dump(out);
+    dump(out);
+  });
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
@@ -453,8 +444,11 @@ PackType::getExpandedGenericArgs(ArrayRef<GenericTypeParamType *> params,
 }
 
 PackType *PackType::getSingletonPackExpansion(Type param) {
-  assert(param->isParameterPack() || param->is<PackArchetypeType>());
-  return get(param->getASTContext(), {PackExpansionType::get(param, param)});
+  SmallVector<Type, 2> rootParameterPacks;
+  param->getTypeParameterPacks(rootParameterPacks);
+  assert(rootParameterPacks.size() >= 1);
+  auto count = rootParameterPacks[0];
+  return get(param->getASTContext(), {PackExpansionType::get(param, count)});
 }
 
 CanPackType CanPackType::getSingletonPackExpansion(CanType param) {
@@ -514,7 +508,7 @@ static CanPackType getApproximateFormalPackType(const ASTContext &ctx,
   // Build an array of formal element types, but be lazy about it:
   // use the original array unless we see an element type that doesn't
   // work as a legal formal type.
-  llvm::Optional<SmallVector<CanType, 4>> formalEltTypes;
+  std::optional<SmallVector<CanType, 4>> formalEltTypes;
   for (auto i : indices(loweredEltTypes)) {
     auto loweredEltType = loweredEltTypes[i];
     bool isLegal = loweredEltType->isLegalFormalType();

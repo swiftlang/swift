@@ -19,13 +19,12 @@
 #ifndef SWIFT_BASIC_VERSION_H
 #define SWIFT_BASIC_VERSION_H
 
-
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
 #include <array>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -63,6 +62,9 @@ public:
 
   /// Create a literal version from a list of components.
   Version(std::initializer_list<unsigned> Values) : Components(Values) {}
+
+  /// Create a version from an llvm::VersionTuple.
+  Version(const llvm::VersionTuple &version);
 
   /// Return a string to be used as an internal preprocessor define.
   ///
@@ -102,7 +104,7 @@ public:
   /// support for. It's also common for valid versions to produce a different
   /// result; for example "-swift-version 3" at one point instructed the
   /// compiler to act as if it is version 3.1.
-  llvm::Optional<Version> getEffectiveLanguageVersion() const;
+  std::optional<Version> getEffectiveLanguageVersion() const;
 
   /// Whether this version is greater than or equal to the given major version
   /// number.
@@ -129,10 +131,17 @@ public:
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 
+  /// Returns a major version to represent the next future language mode. This
+  /// exists to make it easier to find and update clients when a new language
+  /// mode is added.
+  static constexpr unsigned getFutureMajorLanguageVersion() {
+    return 7;
+  }
+
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 3> getValidEffectiveVersions() {
-    return {{"4", "4.2", "5"}};
+  static std::array<StringRef, 4> getValidEffectiveVersions() {
+    return {{"4", "4.2", "5", "6"}};
   };
 };
 
@@ -175,10 +184,19 @@ StringRef getCurrentCompilerTag();
 /// depending on the vendor.
 StringRef getCurrentCompilerSerializationTag();
 
+/// Distribution channel of the running compiler for distributed swiftmodules.
+/// Helps to distinguish swiftmodules between different compilers using the
+/// same serialization tag.
+StringRef getCurrentCompilerChannel();
+
 /// Retrieves the value of the upcoming C++ interoperability compatibility
 /// version that's going to be presented as some new concrete version to the
 /// users.
 unsigned getUpcomingCxxInteropCompatVersion();
+
+/// Retrieves the version of the running compiler. It could be a tag or
+/// a "development" version that only has major/minor.
+std::string getCompilerVersion();
 
 } // end namespace version
 } // end namespace swift

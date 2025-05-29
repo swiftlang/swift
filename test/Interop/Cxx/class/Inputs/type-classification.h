@@ -251,4 +251,49 @@ struct HasMethodThatReturnsIteratorBox {
   IteratorBox getIteratorBox() const;
 };
 
+struct __attribute__((swift_attr("~Copyable"))) StructCopyableMovableAnnotatedNonCopyable {
+  inline StructCopyableMovableAnnotatedNonCopyable() {}
+  StructCopyableMovableAnnotatedNonCopyable(const StructCopyableMovableAnnotatedNonCopyable &) = default;
+  StructCopyableMovableAnnotatedNonCopyable(StructCopyableMovableAnnotatedNonCopyable &&) = default;
+  StructCopyableMovableAnnotatedNonCopyable &
+  operator=(const StructCopyableMovableAnnotatedNonCopyable &) = default;
+    StructCopyableMovableAnnotatedNonCopyable &
+  operator=(StructCopyableMovableAnnotatedNonCopyable &&) = default;
+  ~StructCopyableMovableAnnotatedNonCopyable() = default;
+};
+
+struct HasCopyConstructorWithDefaultArgs {
+  int value;
+  HasCopyConstructorWithDefaultArgs(int value) : value(value) {}
+
+  HasCopyConstructorWithDefaultArgs(
+      const HasCopyConstructorWithDefaultArgs &other, int value = 1)
+      : value(other.value + value) {}
+
+  HasCopyConstructorWithDefaultArgs(HasCopyConstructorWithDefaultArgs &&) =
+      default;
+};
+
+struct HasMoveConstructorWithDefaultArgs {
+  int value;
+  HasMoveConstructorWithDefaultArgs(int value) : value(value) {}
+
+  HasMoveConstructorWithDefaultArgs(HasMoveConstructorWithDefaultArgs &&other,
+                                    int value = 1)
+      : value(other.value + value) {}
+};
+
+struct HasCopyAndMoveConstructorWithDefaultArgs {
+  int value;
+  HasCopyAndMoveConstructorWithDefaultArgs(int value) : value(value) {}
+
+  HasCopyAndMoveConstructorWithDefaultArgs(
+      const HasCopyAndMoveConstructorWithDefaultArgs &other, int value = 1)
+      : value(other.value + value) {}
+
+  HasCopyAndMoveConstructorWithDefaultArgs(
+      HasCopyAndMoveConstructorWithDefaultArgs &&other, int value = 1)
+      : value(other.value + value) {}
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H

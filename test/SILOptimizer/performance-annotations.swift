@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-sil %s -o /dev/null -verify
-// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
+
 // REQUIRES: swift_in_compiler
+// REQUIRES: optimized_stdlib
+// REQUIRES: swift_feature_RawLayout
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -92,22 +94,74 @@ func testMemoryLayout() -> Int {
 }
 
 class MyError : Error {}
+class MyError2 : Error {}
 
 @_noLocks
 func errorExistential(_ b: Bool) throws -> Int {
   if b {
     return 28
   }
-  throw MyError()
+  throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
+}
+
+@_noLocks
+func concreteThrowsExistential(_ b: Bool) throws -> Int {
+  if b {
+    return 28
+  }
+
+  throw ErrorEnum.tryAgain // expected-error{{Using type 'any Error' can cause metadata allocation or locks}}
+}
+
+@_noLocks
+func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
+  if b1 {
+    throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
+  }
+  if b2 {
+    throw MyError2()
+  }
+  return 28
 }
 
 @_noLocks
 func testCatch(_ b: Bool) throws -> Int? {
   do {
     return try errorExistential(true)
-  } catch let e as MyError {
+  } catch let e as MyError { // expected-error{{this code performs reference counting operations which can cause locking}}
     print(e)
     return nil
+  }
+}
+
+enum ErrorEnum: Error {
+  case failed
+  case tryAgain
+}
+
+@_noLocks
+func concreteError(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+func concreteErrorOther(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+@_noLocks
+func testCatchConcrete(_ b: Bool) -> Int {
+  do {
+    return try concreteError(b) + concreteErrorOther(b)
+  } catch {
+    return 17
   }
 }
 
@@ -219,11 +273,6 @@ func closueWhichModifiesLocalVar() -> Int {
   }
   localNonEscapingClosure()
   return x
-}
-
-@_noAllocation
-func createEmptyArray() {
-  _ = [Int]() // expected-error {{ending the lifetime of a value of type}}
 }
 
 struct Buffer {
@@ -412,3 +461,147 @@ func testInfiniteLoop(_ c: Cl) {
   while true {}
 }
 
+@_noAllocation
+func testPrecondition(_ count: Int) {
+  precondition(count == 2, "abc")
+}
+
+@_noRuntime
+func dynamicCastNoRuntime(_ a: AnyObject) -> Cl? {
+  return a as? Cl // expected-error {{dynamic casting can lock or allocate}}
+}
+
+func useExistential<T: P>(_: T) {}
+
+@_noRuntime
+func openExistentialNoRuntime(_ existential: P) {
+  _openExistential(existential, do: useExistential) // expected-error {{generic function calls can cause metadata allocation or locks}}
+}
+
+@_noExistentials
+func dynamicCastNoExistential(_ a: AnyObject) -> Cl? {
+  return a as? Cl
+}
+
+@_noExistentials
+func useOfExistential() -> P {
+  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in '@_noExistential' function}}
+}
+
+@_noExistentials
+func genericNoExistential() -> some P {
+  Str(x: 1)
+}
+
+@_noRuntime
+func genericNoRuntime() -> some P {
+  Str(x: 1)
+}
+
+@_noObjCBridging
+func useOfExistentialNoObjc() -> P {
+  Str(x: 1)
+}
+
+@_noRuntime
+func useOfExistentialNoRuntime() -> P {
+  Str(x: 1) // expected-error {{Using type 'any P' can cause metadata allocation or locks}}
+}
+
+public struct NonCopyable: ~Copyable {
+  var value: Int
+}
+
+@_noAllocation
+public func testNonCopyable(_ foo: consuming NonCopyable) {
+  let _ = foo.value
+}
+
+@_noAllocation
+func matchCEnum(_ variant: c_closed_enum_t) -> Int {
+  switch variant {
+  case .A:
+    return 1
+  case .B:
+    return 2
+  case .C:
+    return 5
+  }
+}
+
+public struct GenericStruct<T> {
+    private var x = 0
+    private var y: T?
+    @inline(never)
+    init() {}
+}
+
+@_noLocks
+func testLargeTuple() {
+    typealias SixInt8s = (Int8, Int8, Int8, Int8, Int8, Int8)
+    _ = GenericStruct<SixInt8s>()
+}
+
+struct Ptr<T> {
+  public var p: UnsafeMutablePointer<T>
+
+  @_noAllocation
+  init(p: UnsafeMutablePointer<T>) {
+    self.p = p
+  }
+}
+
+struct NonCopyableStruct: ~Copyable {
+  func foo() {}
+}
+
+@_noLocks
+func testNonCopyable() {
+  let t = NonCopyableStruct()
+  t.foo()
+}
+
+public struct RawLayoutWrapper: ~Copyable {
+  private let x = RawLayout<Int>()
+
+  @_noLocks func testit() {
+    x.test()
+  }
+}
+
+@_rawLayout(like: T)
+public struct RawLayout<T>: ~Copyable {
+  public func test() {}
+}
+
+func takesClosure(_: () -> ()) {}
+
+@_noLocks
+func testClosureExpression<T>(_ t: T) {
+  takesClosure {
+  // expected-error@-1 {{generic closures or local functions can cause metadata allocation or locks}}
+    _ = T.self
+  }
+}
+
+@_noLocks
+func testLocalFunction<T>(_ t: T) {
+  func localFunc() {
+    _ = T.self
+  }
+
+  takesClosure(localFunc)
+  // expected-error@-1 {{generic closures or local functions can cause metadata allocation or locks}}
+}
+
+func takesGInt(_ x: G<Int>) {}
+
+struct G<T> {}
+
+extension G where T == Int {
+  @_noAllocation func method() {
+    takesClosure {
+      takesGInt(self) // OK
+    }
+  }
+}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -verify %s -parse-stdlib -emit-sil -o /dev/null
+// RUN: %target-swift-frontend -sil-verify-all -verify %s -parse-stdlib -emit-sil -o /dev/null
 
 
 import Swift
@@ -146,8 +146,8 @@ public func conditionalBadConsumingUseLoop2<T>(_ x: T) {
 // Parameters
 
 // This is ok, no uses after.
-public func simpleMoveOfParameter<T>(_ x: T) -> () {
-    let _ = consume x // expected-error {{'consume' applied to value that the compiler does not support}}
+public func simpleMoveOfParameter<T>(_ x: T) -> () { // expected-error {{'x' is borrowed and cannot be consumed}}
+    let _ = consume x // expected-note {{consumed here}}
 }
 
 public func simpleMoveOfOwnedParameter<T>(_ x: __owned T) -> () {
@@ -200,6 +200,26 @@ public func errorLoopMoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // exp
     for _ in 0..<1024 {
         nonConsumingUse(x) // expected-note {{used here}}
     }
+}
+
+func consumeConsuming<T>(_ k: consuming T) {
+  _ = consume k
+}
+
+func consumeBorrowing<T>(_ k: borrowing T) { // expected-error{{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note{{consumed here}}
+}
+
+func consumeOwned<T>(_ k: __owned T) {
+  _ = consume k
+}
+
+func consumeShared<T>(_ k: __shared T) { // expected-error {{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note {{consumed here}}
+}
+
+func consumeBare<T>(_ k: T) { // expected-error {{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note {{consumed here}}
 }
 
 ////////////////////////
@@ -362,6 +382,20 @@ public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x
     } else {
         print("no")
     }
+}
+
+enum rdar125817827<A, B> {
+  case a(A)
+  case b(B)
+}
+
+extension rdar125817827 {
+  func foo() { // expected-error {{'self' is borrowed and cannot be consumed}}
+    switch consume self { // expected-note {{consumed here}}
+    case let .a(a): print(a)
+    case let .b(b): print(b)
+    }
+  }
 }
 
 /////////////////////////

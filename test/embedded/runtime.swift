@@ -1,24 +1,26 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
-// RUN: %target-run-simple-swift(-Osize -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Extern -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Extern -O -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Extern -Osize -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
-@_silgen_name("putchar")
-func putchar(_: UInt8)
+@_extern(c, "putchar")
+@discardableResult
+func putchar(_: CInt) -> CInt
 
 public func print(_ s: StaticString, terminator: StaticString = "\n") {
   var p = s.utf8Start
   while p.pointee != 0 {
-    putchar(p.pointee)
+    putchar(CInt(p.pointee))
     p += 1
   }
   p = terminator.utf8Start
   while p.pointee != 0 {
-    putchar(p.pointee)
+    putchar(CInt(p.pointee))
     p += 1
   }
 }

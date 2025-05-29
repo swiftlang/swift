@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -100,7 +101,7 @@ protected:
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+3+1+1,
+                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+1+3+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -112,6 +113,9 @@ protected:
       
       /// Whether this type is known to be bitwise-takable.
       BitwiseTakable : 1,
+
+      /// Whether this type is known to be bitwise-borrowable.
+      BitwiseBorrowable : 1,
 
       /// Whether this type is known to be copyable.
       Copyable : 1,
@@ -159,7 +163,9 @@ protected:
     Bits.TypeInfo.Kind = unsigned(stik);
     Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
     Bits.TypeInfo.TriviallyDestroyable = pod;
-    Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
+    Bits.TypeInfo.BitwiseTakable = bitwiseTakable >= IsBitwiseTakableOnly;
+    Bits.TypeInfo.BitwiseBorrowable =
+      bitwiseTakable == IsBitwiseTakableAndBorrowable;
     Bits.TypeInfo.Copyable = copyable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
@@ -207,9 +213,12 @@ public:
   /// actually possible to do ABI operations on it from this current SILModule.
   /// See SILModule::isTypeABIAccessible.
   ///
-  /// All fixed-size types are currently ABI-accessible, although this would
+  /// Almost all fixed-size types are currently ABI-accessible, although this would
   /// not be difficult to change (e.g. if we had an archetype size constraint
   /// that didn't say anything about triviality).
+  /// The exception to this is non-copyable types, which need to be able to call
+  /// the metadata to get to the deinit and so their type metadata
+  /// needs to be accessible.
   IsABIAccessible_t isABIAccessible() const {
     return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
   }
@@ -227,11 +236,25 @@ public:
   }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
-  /// is equivalent to a memcpy.
-  IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
-    return IsBitwiseTakable_t(Bits.TypeInfo.BitwiseTakable);
+  /// is equivalent to a memcpy, and possibly bitwise-borrowable, i.e.,
+  /// a borrowed argument can be passed by value rather than by reference.
+  IsBitwiseTakable_t getBitwiseTakable(ResilienceExpansion expansion) const {
+    return IsBitwiseTakable_t(
+      Bits.TypeInfo.BitwiseTakable | (Bits.TypeInfo.BitwiseBorrowable << 1));
   }
   
+  /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
+  /// is equivalent to a memcpy
+  bool isBitwiseTakable(ResilienceExpansion expansion) const {
+    return Bits.TypeInfo.BitwiseTakable;
+  }
+  
+  /// Whether this type is known to be bitwise-borrowable, i.e.,
+  /// a borrowed argument can be passed by value rather than by reference.
+  bool isBitwiseBorrowable(ResilienceExpansion expansion) const {
+    return Bits.TypeInfo.BitwiseBorrowable;
+  }
+
   /// Returns the type of special interface followed by this TypeInfo.
   /// It is important for our design that this depends only on
   /// immediate type structure and not on, say, properties that can
@@ -371,7 +394,8 @@ public:
   /// the old object is actually no longer permitted to be destroyed.
   virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T,
-                                  bool isOutlined) const = 0;
+                                  bool isOutlined,
+                                  bool zeroizeIfSensitive) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
@@ -566,12 +590,25 @@ public:
   virtual void verify(IRGenTypeVerifierFunction &IGF,
                       llvm::Value *typeMetadata,
                       SILType T) const;
+  /// Perform \p invocation with the appropriate metadata collector for use in
+  /// emitting an outlined value function of a value operation that can be
+  /// performed with a value witness.
+  ///
+  /// Returns whether there was an appropriate emitter (and whether \p
+  /// invocation was called).
+  bool withWitnessableMetadataCollector(
+      IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+      DeinitIsNeeded_t needsDeinit,
+      llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const;
 
   void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, IsInitialization_t isInit,
                         IsTake_t isTake) const;
 
   void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+
+  void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
+                           Atomicity atomicity) const;
 };
 
 } // end namespace irgen

@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 @_semantics("arc.immortal")
-final public class BasicBlock : CustomStringConvertible, HasShortDescription, Equatable {
+final public class BasicBlock : CustomStringConvertible, HasShortDescription, Hashable {
   public var next: BasicBlock? { bridged.getNext().block }
   public var previous: BasicBlock? { bridged.getPrevious().block }
 
@@ -53,6 +53,30 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   
   public var hasSinglePredecessor: Bool { singlePredecessor != nil }
 
+  public var singleSuccessor: BasicBlock? {
+    successors.count == 1 ? successors[0] : nil
+  }
+
+  /// All function exiting blocks except for ones with an `unreachable` terminator,
+  /// not immediately preceded by an apply of a no-return function.
+  public var isReachableExitBlock: Bool {
+    switch terminator {
+      case let termInst where termInst.isFunctionExiting:
+        return true
+      case is UnreachableInst:
+        if let instBeforeUnreachable = terminator.previous,
+           let ai = instBeforeUnreachable as? ApplyInst,
+           ai.isCalleeNoReturn && !ai.isCalleeTrapNoReturn
+        {
+          return true
+        }
+
+        return false
+      default:
+        return false
+    }
+  }
+
   /// The index of the basic block in its function.
   /// This has O(n) complexity. Only use it for debugging
   public var index: Int {
@@ -65,6 +89,10 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   public var name: String { "bb\(index)" }
 
   public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
 
   public var bridged: BridgedBasicBlock { BridgedBasicBlock(SwiftObject(self)) }
 }
@@ -93,6 +121,8 @@ public struct InstructionList : CollectionLikeSequence, IteratorProtocol {
   }
 
   public var first: Instruction? { currentInstruction }
+
+  public var last: Instruction? { reversed().first }
 
   public func reversed() -> ReverseInstructionList {
     if let inst = currentInstruction {

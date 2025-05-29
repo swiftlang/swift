@@ -314,12 +314,11 @@ extension KlassWrapper {
         print("123")
     }
 
-    // We do not support moving within a defer right now.
     mutating func deferTestFail1() {
         let _ = (consume self)
         defer {
             self = KlassWrapper(k: Klass())
-            let _ = (consume self) // expected-error {{'consume' applied to value that the compiler does not support}}
+            let _ = (consume self)
         }
         print("123")
     }
@@ -706,6 +705,34 @@ func multipleCapture2(_ k: Klass) -> () {
         k3 = Klass()
     }
     print("foo bar")
+}
+
+func consumeString() {
+  var s = "asdf" // expected-warning{{}}
+  _ = consume s
+}
+
+func consumeArray() {
+  var x:[Int] = [] // expected-warning{{}}
+  _ = consume x
+}
+
+func consumeInitdArray() {
+  let x:[Int] ; x = []
+  _ = consume x
+}
+
+func isNegative(_ c: consuming Int) -> Bool { return c < 0 }
+func consumeInt() {
+    var g = 0 // expected-warning{{variable 'g' was never mutated; consider changing to 'let' constant}}
+              // expected-error@-1 {{'g' used after consume}}
+
+    _ = isNegative(consume g) // expected-note {{consumed here}}
+                              // expected-warning@-1 {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
+
+    _ = isNegative(consume g) // expected-note {{used here}}
+                              // expected-error@-1 {{'consume' applied to value that the compiler does not support. This is a compiler bug. Please file a bug with a small example of the bug}}
+                              // expected-warning@-2 {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 //////////////////////

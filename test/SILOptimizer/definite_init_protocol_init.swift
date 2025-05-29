@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -emit-sil %s -swift-version 5 -verify | %FileCheck %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -Xllvm -sil-print-types -emit-sil %s -swift-version 5 -verify | %FileCheck %s
 
 // Ensure that convenience initializers on concrete types can
 // delegate to factory initializers defined in protocol
@@ -27,7 +27,7 @@ class TrivialClass : TriviallyConstructible {
 
   // CHECK-LABEL: sil hidden @$s023definite_init_protocol_B012TrivialClassC5upperACSi_tcfC
   // CHECK:     bb0(%0 : $Int, [[SELF_META:%.*]] : $@thick TrivialClass.Type):
-  // CHECK-NEXT:  [[SELF_BOX:%.*]] = alloc_stack $TrivialClass
+  // CHECK-NEXT:  [[SELF_BOX:%.*]] = alloc_stack [var_decl] $TrivialClass
   // CHECK-NEXT:  debug_value
   // CHECK-NEXT:  [[METATYPE:%.*]] = unchecked_trivial_bit_cast [[SELF_META]] {{.*}} to $@thick @dynamic_self TrivialClass.Type
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $TrivialClass
@@ -62,7 +62,7 @@ struct TrivialStruct : TriviallyConstructible {
 
 // CHECK-LABEL: sil hidden @$s023definite_init_protocol_B013TrivialStructV5upperACSi_tcfC
 // CHECK:     bb0(%0 : $Int, %1 : $@thin TrivialStruct.Type):
-// CHECK-NEXT: [[SELF:%.*]] = alloc_stack $TrivialStruct
+// CHECK-NEXT: [[SELF:%.*]] = alloc_stack [var_decl] $TrivialStruct
 // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $TrivialStruct
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialStruct.Type
 // CHECK:      [[FN:%.*]] = function_ref @$s023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
@@ -92,7 +92,7 @@ struct AddressOnlyStruct : TriviallyConstructible {
 
 // CHECK-LABEL: sil hidden @$s023definite_init_protocol_B017AddressOnlyStructV5upperACSi_tcfC
 // CHECK:     bb0(%0 : $*AddressOnlyStruct, %1 : $Int, %2 : $@thin AddressOnlyStruct.Type):
-// CHECK-NEXT: [[SELF:%.*]] = alloc_stack $AddressOnlyStruct
+// CHECK-NEXT: [[SELF:%.*]] = alloc_stack [var_decl] $AddressOnlyStruct
 // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $AddressOnlyStruct
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick AddressOnlyStruct.Type
 // CHECK:      [[FN:%.*]] = function_ref @$s023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
@@ -125,7 +125,7 @@ enum TrivialEnum : TriviallyConstructible {
 
 // CHECK-LABEL: sil hidden @$s023definite_init_protocol_B011TrivialEnumO5upperACSi_tcfC
 // CHECK:     bb0(%0 : $Int, %1 : $@thin TrivialEnum.Type):
-// CHECK-NEXT: [[SELF:%.*]] = alloc_stack $TrivialEnum
+// CHECK-NEXT: [[SELF:%.*]] = alloc_stack [var_decl] $TrivialEnum
 // CHECK:      [[SELF_BOX:%.*]] = alloc_stack $TrivialEnum
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialEnum.Type
 // CHECK:      [[FN:%.*]] = function_ref @$s023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC

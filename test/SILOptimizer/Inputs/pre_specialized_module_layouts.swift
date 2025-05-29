@@ -3,27 +3,35 @@ public struct SomeData {
   public init() {}
 }
 
-public class SomeClass {
+public final class SomeClass: Sendable {
   public init() {}
 }
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Double)
 @_specialize(exported: true, where @_noMetadata T : _Class)
-@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@_specialize(exported: true, where @_noMetadata T : _BridgeObject)
+@_specialize(exported: true, where @_noMetadata T : _Trivial(64))
+@_specialize(exported: true, where @_noMetadata T : _TrivialStride(96))
+@_specialize(exported: true, availability: macOS 50, *; where T == SomeData)
 public func publicPrespecialized<T>(_ t: T) {
+}
+
+@_specialize(exported: true, where @_noMetadata T : _Class)
+public func publicPrespecializedWithMarkerProtocol<T: Sendable>(_ t: T) -> T {
+  return t
 }
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where @_noMetadata T : _Class)
-@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@_specialize(exported: true, availability: macOS 50, *; where T == SomeData)
 @inlinable
 @inline(never)
 public func publicPrespecialized2<T>(_ t: T) { }
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where @_noMetadata T : _Class)
-@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@_specialize(exported: true, availability: macOS 50, *; where T == SomeData)
 @inlinable
 @inline(never)
 public func publicPrespecializedThrows<T>(_ t: T) throws -> T { return t }
@@ -131,6 +139,12 @@ public func useInternalThing<T>(_ t: T) {
 }
 
 @_specialize(exported: true, where @_noMetadata T : _Class, @_noMetadata V : _Class)
-public func publicPresepcializedMultipleIndirectResults<T, V>(_ t: T, _ v: V, _ x: Int64)-> (V, Int64, T) {
+@_specialize(exported: true, where @_noMetadata T : _BridgeObject, @_noMetadata V : _BridgeObject)
+public func publicPresepcializedMultipleIndirectResults<T, V>(_ t: T, _ v: V, _ x: Int64) -> (V, Int64, T) {
+    return (v, x, t)
+}
+
+@_specialize(exported: true, where @_noMetadata T : _Class, @_noMetadata V : _Class)
+public func publicPresepcializedMultipleIndirectResultsWithMarkerProtocol<T: Sendable, V>(_ t: T, _ v: V, _ x: Int64) -> (V, Int64, T) {
     return (v, x, t)
 }

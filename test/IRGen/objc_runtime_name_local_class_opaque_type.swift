@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -disable-availability-checking -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend %s -target %target-swift-5.1-abi-triple -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -enable-experimental-move-only -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-experimental-move-only -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -enable-experimental-move-only -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -enable-experimental-move-only -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: asserts
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 public protocol EventLoop: Sendable {}
 
@@ -57,7 +57,6 @@ extension NIODefaultSerialEventLoopExecutor: SerialExecutor {
   @inlinable
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(complexEquality: self)
-
   }
 
   @inlinable

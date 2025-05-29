@@ -17,8 +17,10 @@
 #define SWIFT_CLANGIMPORTER_CLANGMODULE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
+#include "clang/Basic/ASTSourceDescriptor.h"
 #include "clang/Basic/Module.h"
 
 namespace clang {
@@ -36,7 +38,7 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
-  mutable llvm::Optional<ArrayRef<ImportedModule>> importedModulesForLookup;
+  mutable std::optional<ArrayRef<ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ASTSourceDescriptor ASTSourceDescriptor;
 
@@ -88,7 +90,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
-  virtual bool shouldCollectDisplayDecls() const override;
+  void lookupAvailabilityDomains(
+      Identifier identifier,
+      SmallVectorImpl<AvailabilityDomain> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
@@ -106,7 +110,11 @@ public:
 
   Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const override {
-    llvm_unreachable("no private decls in Clang modules");
+    llvm_unreachable("Clang modules do not need discriminators");
+  }
+
+  virtual version::Version getLanguageVersionBuiltWith() const override {
+    return version::Version();
   }
 
   virtual StringRef getFilename() const override;
@@ -121,7 +129,7 @@ public:
 
   /// Returns the ASTSourceDescriptor of the associated Clang module if one
   /// exists.
-  llvm::Optional<clang::ASTSourceDescriptor> getASTSourceDescriptor() const;
+  std::optional<clang::ASTSourceDescriptor> getASTSourceDescriptor() const;
 
   virtual StringRef getModuleDefiningPath() const override;
 

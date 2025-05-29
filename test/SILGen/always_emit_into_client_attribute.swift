@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift -package-name Package | %FileCheck %s
 
 // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute0A22EmitIntoClientFunctionyyF : $@convention(thin) () -> ()
 @_alwaysEmitIntoClient public func alwaysEmitIntoClientFunction() {
@@ -9,6 +9,17 @@
 
 // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute26implicitlyUsableFromInlineyyF : $@convention(thin) () -> ()
 @_alwaysEmitIntoClient func implicitlyUsableFromInline() {
+  alwaysEmitIntoClientOtherFunction()
+}
+
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute35packageAlwaysEmitIntoClientFunctionyyF : $@convention(thin) () -> ()
+@_alwaysEmitIntoClient package func packageAlwaysEmitIntoClientFunction() {
+  alwaysEmitIntoClientOtherFunction()
+}
+
+// FIXME: @_alwaysEmitIntoClient should not be allowed on private decls
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute35privateAlwaysEmitIntoClientFunction33_5D0713A780245A446371C699E6F23C4FLLyyF : $@convention(thin) () -> ()
+@_alwaysEmitIntoClient private func privateAlwaysEmitIntoClientFunction() {
   alwaysEmitIntoClientOtherFunction()
 }
 
@@ -46,4 +57,22 @@ public final class C {
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$s33always_emit_into_client_attribute1CCfD : $@convention(method) (@owned C) -> ()
   @_alwaysEmitIntoClient
   deinit {}
+}
+
+
+// We drop AEIC if the containing context does not have effective public
+// visibility.
+internal struct InternalContext {
+// CHECK-LABEL: sil hidden [ossa] @$s33always_emit_into_client_attribute15InternalContextV1vSivgZ
+  @_alwaysEmitIntoClient
+  internal static var v : Int { 1 }
+}
+
+// We drop AEIC if the containing context does not have effective public
+// visibility.
+package struct PackageContext {
+// CHECK-LABEL: sil package [ossa] @$s33always_emit_into_client_attribute14PackageContextV1vSivgZ
+
+  @_alwaysEmitIntoClient
+  package static var v : Int { 1 }
 }

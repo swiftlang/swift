@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
@@ -89,11 +90,12 @@ void DominanceInfo::verify() const {
 
   // And compare.
   if (errorOccurredOnComparison(OtherDT)) {
-    llvm::errs() << "DominatorTree is not up to date!\nComputed:\n";
-    print(llvm::errs());
-    llvm::errs() << "\nActual:\n";
-    OtherDT.print(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "DominatorTree is not up to date!\nComputed:\n";
+      print(out);
+      out << "\nActual:\n";
+      OtherDT.print(out);
+    });
   }
 }
 
@@ -146,11 +148,12 @@ void PostDominanceInfo::verify() const {
 
   // And compare.
   if (errorOccurredOnComparison(OtherDT)) {
-    llvm::errs() << "PostDominatorTree is not up to date!\nComputed:\n";
-    print(llvm::errs());
-    llvm::errs() << "\nActual:\n";
-    OtherDT.print(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "PostDominatorTree is not up to date!\nComputed:\n";
+      print(out);
+      out << "\nActual:\n";
+      OtherDT.print(out);
+    });
   }
 }
 

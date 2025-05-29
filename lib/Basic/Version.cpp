@@ -14,10 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/CharInfo.h"
-#include "llvm/ADT/None.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -100,6 +100,23 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
+Version::Version(const llvm::VersionTuple &version) {
+  if (version.empty())
+    return;
+
+  Components.emplace_back(version.getMajor());
+
+  if (auto minor = version.getMinor()) {
+    Components.emplace_back(*minor);
+    if (auto subminor = version.getSubminor()) {
+      Components.emplace_back(*subminor);
+      if (auto build = version.getBuild()) {
+        Components.emplace_back(*build);
+      }
+    }
+  }
+}
+
 Version::operator llvm::VersionTuple() const
 {
   switch (Components.size()) {
@@ -125,10 +142,10 @@ Version::operator llvm::VersionTuple() const
   }
 }
 
-llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
+std::optional<Version> Version::getEffectiveLanguageVersion() const {
   switch (size()) {
   case 0:
-    return llvm::None;
+    return std::nullopt;
   case 1:
     break;
   case 2:
@@ -136,12 +153,12 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     // component is 4.2.
     if (Components[0] == 4 && Components[1] == 2)
       break;
-    return llvm::None;
+    return std::nullopt;
   default:
     // We do not want to permit users requesting more precise effective language
     // versions since accepting such an argument promises more than we're able
     // to deliver.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // FIXME: When we switch to Swift 5 by default, the "4" case should return
@@ -159,22 +176,27 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     assert(size() == 2 && Components[0] == 4 && Components[1] == 2);
     return Version{4, 2};
   case 5:
-    static_assert(SWIFT_VERSION_MAJOR == 5,
+    return Version{5, 10};
+  case 6:
+    static_assert(SWIFT_VERSION_MAJOR == 6,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
-  case 6:
-    // Allow version '6' in asserts compilers *only* so that we can start
-    // testing changes slated for Swift 6. Note that it's still not listed in
+
+  // FIXME: When Swift 7 becomes real, remove 'REQUIRES: swift7' from tests
+  //        using '-swift-version 7'.
+
+  case Version::getFutureMajorLanguageVersion():
+    // Allow the future language mode version in asserts compilers *only* so
+    // that we can start testing changes planned for after the current latest
+    // language mode. Note that it'll not be listed in
     // `Version::getValidEffectiveVersions()`.
-    // FIXME: When Swift 6 becomes real, remove 'REQUIRES: asserts' from tests
-    //        using '-swift-version 6'.
 #ifdef NDEBUG
     LLVM_FALLTHROUGH;
 #else
-    return Version{6};
+    return Version{Version::getFutureMajorLanguageVersion()};
 #endif
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -306,8 +328,30 @@ StringRef getCurrentCompilerSerializationTag() {
 #endif
 }
 
+StringRef getCurrentCompilerChannel() {
+  static const char* forceDebugChannel =
+    ::getenv("SWIFT_FORCE_SWIFTMODULE_CHANNEL");
+  if (forceDebugChannel)
+    return forceDebugChannel;
+
+  // Leave it to downstream compilers to define the different channels.
+  return StringRef();
+}
+
 unsigned getUpcomingCxxInteropCompatVersion() {
   return SWIFT_VERSION_MAJOR + 1;
+}
+
+std::string getCompilerVersion() {
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+
+ // TODO: This should print SWIFT_COMPILER_VERSION when
+ // available, but to do that we need to switch from
+ // llvm::VersionTuple to swift::Version.
+ OS << SWIFT_VERSION_STRING;
+
+  return OS.str();
 }
 
 } // end namespace version

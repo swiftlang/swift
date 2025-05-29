@@ -130,15 +130,12 @@ private:
   ///    DD and EEE are uninitialized
   ///
   /// See also: SILBitfield::bitfieldID, SILFunction::currentBitfieldID.
-  int64_t lastInitializedBitfieldID = 0;
+  uint64_t lastInitializedBitfieldID = 0;
 
   // Used by `BasicBlockBitfield`.
   unsigned getCustomBits() const { return customBits; }
   // Used by `BasicBlockBitfield`.
   void setCustomBits(unsigned value) { customBits = value; }
-
-  // Used by `BasicBlockBitfield`.
-  enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
 
   friend struct llvm::ilist_traits<SILBasicBlock>;
 
@@ -155,7 +152,10 @@ public:
 
   ~SILBasicBlock();
 
-  bool isMarkedAsDeleted() const { return lastInitializedBitfieldID < 0; }
+  enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max();
 
   /// Gets the ID (= index in the function's block list) of the block.
   ///
@@ -165,7 +165,7 @@ public:
   int getDebugID() const;
 
   void setDebugName(llvm::StringRef name);
-  llvm::Optional<llvm::StringRef> getDebugName() const;
+  std::optional<llvm::StringRef> getDebugName() const;
 
   SILFunction *getParent() { return Parent; }
   SILFunction *getFunction() { return getParent(); }
@@ -175,6 +175,9 @@ public:
 
   /// This method unlinks 'self' from the containing SILFunction and deletes it.
   void eraseFromParent();
+
+  /// Replaces usages of this block with 'undef's and then deletes it.
+  void removeDeadBlock();
 
   /// Remove all instructions of a SILGlobalVariable's static initializer block.
   void clearStaticInitializerBlock(SILModule &module);
@@ -230,6 +233,52 @@ public:
   reverse_iterator rend() { return InstList.rend(); }
   const_reverse_iterator rbegin() const { return InstList.rbegin(); }
   const_reverse_iterator rend() const { return InstList.rend(); }
+
+  llvm::iterator_range<iterator> getRangeStartingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {inst->getIterator(), end()};
+  }
+
+  llvm::iterator_range<iterator> getRangeEndingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {begin(), inst->getIterator()};
+  }
+
+  llvm::iterator_range<reverse_iterator>
+  getReverseRangeStartingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {inst->getReverseIterator(), rend()};
+  }
+
+  llvm::iterator_range<reverse_iterator>
+  getReverseRangeEndingAtInst(SILInstruction *inst) {
+    assert(inst->getParent() == this);
+    return {rbegin(), inst->getReverseIterator()};
+  }
+
+  llvm::iterator_range<const_iterator>
+  getRangeStartingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {inst->getIterator(), end()};
+  }
+
+  llvm::iterator_range<const_iterator>
+  getRangeEndingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {begin(), inst->getIterator()};
+  }
+
+  llvm::iterator_range<const_reverse_iterator>
+  getReverseRangeStartingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {inst->getReverseIterator(), rend()};
+  }
+
+  llvm::iterator_range<const_reverse_iterator>
+  getReverseRangeEndingAtInst(SILInstruction *inst) const {
+    assert(inst->getParent() == this);
+    return {rbegin(), inst->getReverseIterator()};
+  }
 
   /// Allows deleting instructions while iterating over all instructions of the
   /// block.
@@ -329,18 +378,18 @@ public:
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr,
+                                              ValueDecl *D = nullptr,
                                               bool disableEntryBlockVerification = false);
 
   SILFunctionArgument *insertFunctionArgument(unsigned AtArgPos, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,
-                                              const ValueDecl *D = nullptr);
+                                              ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th Function arg with a new Function arg with SILType \p
   /// Ty and ValueDecl \p D.
   SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
                                                ValueOwnershipKind Kind,
-                                               const ValueDecl *D = nullptr);
+                                               ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
   /// ValueDecl \p D.
@@ -350,21 +399,21 @@ public:
   /// replacePhiArgumentAndRAUW.
   SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
                                      ValueOwnershipKind kind,
-                                     const ValueDecl *decl = nullptr,
+                                     ValueDecl *decl = nullptr,
                                      bool isReborrow = false,
                                      bool isEscaping = false);
 
   /// Replace phi argument \p i and RAUW all uses.
   SILPhiArgument *replacePhiArgumentAndReplaceAllUses(
       unsigned i, SILType type, ValueOwnershipKind kind,
-      const ValueDecl *decl = nullptr, bool isReborrow = false,
+      ValueDecl *decl = nullptr, bool isReborrow = false,
       bool isEscaping = false);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter, reborrow flag and
   /// escaping flag.
   SILPhiArgument *createPhiArgument(SILType Ty, ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr,
+                                    ValueDecl *D = nullptr,
                                     bool isReborrow = false,
                                     bool isEscaping = false);
 
@@ -372,7 +421,7 @@ public:
   /// AtArgPos.
   SILPhiArgument *insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                     ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr,
+                                    ValueDecl *D = nullptr,
                                     bool isReborrow = false,
                                     bool isEscaping = false);
 
@@ -508,6 +557,9 @@ public:
   /// Pretty-print the SILBasicBlock.
   void dump() const;
 
+  /// Pretty-print the SILBasicBlock with Debug Info.
+  void dump(bool DebugInfo) const;
+
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
@@ -516,7 +568,6 @@ public:
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 
-#ifndef NDEBUG
   /// Print the ID of the block, bbN.
   void dumpID(bool newline = true) const;
 
@@ -525,7 +576,6 @@ public:
 
   /// Print the ID of the block with \p Ctx, bbN.
   void printID(SILPrintContext &Ctx, bool newline = true) const;
-#endif
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {

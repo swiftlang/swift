@@ -3,8 +3,8 @@ func test1() {
     let x = 1
     print(x)
   } else {
-    let xRenamed = 2
-    print(xRenamed)
+    let <base>x</base> = 2
+    print(<base>x</base>)
   }
 }
 

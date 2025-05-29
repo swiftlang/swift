@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
 
 // Linux doesn't have the same symbol name for _ArrayBuffer, which is part of
 // the ObjC runtime interop.  Use `_ContiguousArrayBuffer instead.
@@ -82,8 +82,8 @@ bb0(%0 : $TrivialDestructor):
   return %18 : $()
 }
 
-// Test the sanity check in dead object elimination which checks that all stores
-// to the array are within the array's liferange.
+// Test the soundness check in dead object elimination which checks that all stores
+// to the array are within the array's liverange.
 
 // CHECK-LABEL: sil @malformed_deadarray
 // CHECK: apply

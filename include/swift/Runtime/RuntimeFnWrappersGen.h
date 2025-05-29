@@ -22,7 +22,7 @@
 
 namespace swift {
 
-class AvailabilityContext;
+class AvailabilityRange;
 class ASTContext;
 
 namespace irgen {
@@ -39,7 +39,8 @@ enum class RuntimeAvailability {
 /// given name, return types, argument types, attributes and
 /// a calling convention.
 llvm::Constant *getRuntimeFn(llvm::Module &Module, llvm::Constant *&cache,
-                             char const *name, llvm::CallingConv::ID cc,
+                             const char *ModuleName, char const *FunctionName,
+                             llvm::CallingConv::ID cc,
                              RuntimeAvailability availability,
                              llvm::ArrayRef<llvm::Type *> retTypes,
                              llvm::ArrayRef<llvm::Type *> argTypes,

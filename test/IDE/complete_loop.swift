@@ -7,6 +7,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_5 | %FileCheck %s -check-prefix=LOOP_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_6 | %FileCheck %s -check-prefix=LOOP_6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_7 | %FileCheck %s -check-prefix=LOOP_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_8 | %FileCheck %s -check-prefix=LOOP_8
 
 class Gen {
 	func IntGen() -> Int { return 0 }
@@ -80,3 +81,9 @@ do {
 }
 // LOOP_6: Begin completions, 1 items
 // LOOP_6-CHECK-NEXT: Keyword[in]/None:                   in; name=in
+
+// Pack Iteration
+do {
+  for t in #^LOOP_8^# {}
+}
+// LOOP_8-DAG: Keyword[repeat]/None:                   repeat; name=repeat

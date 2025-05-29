@@ -18,7 +18,7 @@ var z : Int       // expected-error {{invalid redeclaration}}
 // CHECK-NEXT: Number FIXITs = 0
 
 #sourceLocation(file: "fake-file.swuft", line: 4)
-var z : Int // Note: no expected-* here because it's "not in this file".
+var z : Int // expected-error {{invalid redeclaration of 'z'}}
 // CHECK-NEXT: {{^}}fake-file.swuft:4:5: error: invalid redeclaration of 'z' [] []
 // CHECK-NEXT: Number FIXITs = 0
 // CHECK-NEXT: +-{{.*[/\\]}}serialized-diagnostics.swift:{{[0-9]+}}:5: note: 'z' previously declared here [] []

@@ -1,4 +1,0 @@
-protocol A {
-}
-protocol B {
-}

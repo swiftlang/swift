@@ -2,11 +2,11 @@
 // RUN: split-file %s %t
 
 // Check that the diagnostics are produced regardless of what primary file we're using.
-// RUN: %target-swift-frontend -typecheck -primary-file %t/1.swift %t/2.swift %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify
-// RUN: %target-swift-frontend -typecheck %t/1.swift -primary-file %t/2.swift %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify
-// RUN: %target-swift-frontend -typecheck %t/1.swift %t/2.swift -primary-file %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify
-// RUN: %target-swift-frontend -typecheck -primary-file %t/1.swift -primary-file %t/2.swift -primary-file %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify
-// RUN: %target-swift-frontend -typecheck %t/1.swift %t/2.swift %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify
+// RUN: %target-swift-frontend -typecheck -primary-file %t/1.swift %t/2.swift %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -typecheck %t/1.swift -primary-file %t/2.swift %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -typecheck %t/1.swift %t/2.swift -primary-file %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -typecheck -primary-file %t/1.swift -primary-file %t/2.swift -primary-file %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -typecheck %t/1.swift %t/2.swift %t/3.swift -I %S/Inputs/inconsistent-implementation-only/ -verify -swift-version 5 -enable-library-evolution
 
 //--- 1.swift
 

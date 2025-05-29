@@ -211,14 +211,14 @@ public extension FE_PublicClass {
 
 // CHECK-LABEL: internal func GA_localTypes()
 func GA_localTypes() {
-  // CHECK-SRC: private struct Local {
+  // CHECK-SRC: struct Local {
   struct Local {
     // CHECK-SRC: internal let x
     let x = 0
   }
   _ = Local()
 
-  // CHECK-SRC: private enum LocalEnum {
+  // CHECK-SRC: enum LocalEnum {
   enum LocalEnum {
     // CHECK-SRC: {{^}} case A
     case A, B

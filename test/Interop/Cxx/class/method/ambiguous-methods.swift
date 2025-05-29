@@ -14,7 +14,7 @@ var CxxAmbiguousMethodTestSuite = TestSuite("CxxAmbiguousMethods")
 CxxAmbiguousMethodTestSuite.test("[Const First] numberOfMutableMethodsCalled: () -> Int") {
   var instance = HasAmbiguousMethods()
 
-  // Sanity check. Make sure we start at 0
+  // Soundness check. Make sure we start at 0
   // and that calling numberOfMutableMethodsCalled doesn't change
   // the count
   expectEqual(0, instance.numberOfMutableMethodsCalled())
@@ -38,7 +38,7 @@ CxxAmbiguousMethodTestSuite.test("Basic Increment: (Int) -> Int") {
   var instance = HasAmbiguousMethods()
   var a: Int32 = 0
 
-  // Sanity check. Make sure we start at 0
+  // Soundness check. Make sure we start at 0
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
   // Non mutable version should NOT change count
@@ -55,7 +55,7 @@ CxxAmbiguousMethodTestSuite.test("Out Param Increment: (Int, Int, inout Int) -> 
   var instance = HasAmbiguousMethods()
   var out: Int32 = 0
 
-  // Sanity check. Make sure we start at 0
+  // Soundness check. Make sure we start at 0
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
   // Non mutable version should NOT change count
@@ -72,7 +72,7 @@ CxxAmbiguousMethodTestSuite.test("Inout Param Increment: (inout Int, Int) -> Voi
   var instance = HasAmbiguousMethods()
   var inoutVal: Int32 = 0
 
-  // Sanity check. Make sure we start at 0
+  // Soundness check. Make sure we start at 0
   expectEqual(0, instance.numberOfMutableMethodsCalled())
 
   // Non mutable version should NOT change count

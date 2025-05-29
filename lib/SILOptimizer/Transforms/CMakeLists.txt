@@ -6,7 +6,6 @@ target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementWMO.cpp
   AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
-  ArrayElementValuePropagation.cpp
   COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
@@ -14,12 +13,10 @@ target_sources(swiftSILOptimizer PRIVATE
   CopyPropagation.cpp
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
-  DestroyHoisting.cpp
   Devirtualizer.cpp
   DifferentiabilityWitnessDevirtualizer.cpp
   EagerSpecializer.cpp
   GenericSpecializer.cpp
-  MoveOnlyDeinitDevirtualization.cpp
   Outliner.cpp
   AssemblyVisionRemarkGenerator.cpp
   PartialApplySimplification.cpp
@@ -36,6 +33,5 @@ target_sources(swiftSILOptimizer PRIVATE
   Sink.cpp
   SpeculativeDevirtualizer.cpp
   StringOptimization.cpp
-  TempLValueOpt.cpp
-  TempRValueElimination.cpp
-  VTableSpecializer.cpp)
+  TempLValueOpt.cpp)
+

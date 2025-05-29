@@ -8,7 +8,7 @@ struct User_D: Decodable {
   let firstName: String
   let lastName: String?
 
-  enum CodingKeys: CodingKey {
+  private enum CodingKeys: CodingKey {
     case firstName
     case lastName
   }

@@ -15,9 +15,9 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace swift {
 
@@ -44,16 +44,25 @@ private:
 
   ASTContext &Ctx;
   DependencyTracker *DepTracker;
+  const bool disableSandbox;
 
   /// Map a module name to an plugin entry that provides the module.
-  llvm::Optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
+  std::optional<llvm::DenseMap<swift::Identifier, PluginEntry>> PluginMap;
 
   /// Get or lazily create and populate 'PluginMap'.
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
+  /// Resolved plugin path remappings.
+  std::vector<std::string> PathRemap;
+
 public:
-  PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker)
-      : Ctx(Ctx), DepTracker(DepTracker) {}
+  PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker,
+               std::optional<std::vector<std::string>> Remap = std::nullopt,
+               bool disableSandbox = false)
+      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {
+    if (Remap)
+      PathRemap = std::move(*Remap);
+  }
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();
@@ -76,15 +85,18 @@ public:
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  llvm::Expected<LoadedLibraryPlugin *> loadLibraryPlugin(llvm::StringRef path);
+  llvm::Expected<CompilerPlugin *> getInProcessPlugins();
 
   /// Launch the specified executable plugin path resolving the path with the
   /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  llvm::Expected<LoadedExecutablePlugin *>
-  loadExecutablePlugin(llvm::StringRef path);
+  llvm::Expected<CompilerPlugin *> loadExecutablePlugin(llvm::StringRef path);
+
+  /// Add the specified plugin associated with the module name to the dependency
+  /// tracker if needed.
+  void recordDependency(const PluginEntry &plugin, Identifier moduleName);
 };
 
 } // namespace swift

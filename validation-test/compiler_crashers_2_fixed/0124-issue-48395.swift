@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -emit-ir %s
 
 // https://github.com/apple/swift/issues/48395
 
-struct DefaultAssociatedType {
+public struct DefaultAssociatedType {
 }
 
 protocol Protocol {
@@ -10,9 +10,9 @@ protocol Protocol {
     init(object: AssociatedType)
 }
 
-final class Conformance: Protocol {
+public final class Conformance: Protocol {
     private let object: AssociatedType
-    init(object: AssociatedType) { // expected-error {{reference to invalid associated type 'AssociatedType' of type 'Conformance'}}
+    public init(object: AssociatedType) {
         self.object = object
     }
 }

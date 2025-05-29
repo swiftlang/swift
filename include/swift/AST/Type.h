@@ -31,9 +31,9 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -87,33 +87,22 @@ struct QueryTypeSubstitutionMap {
   Type operator()(SubstitutableType *type) const;
 };
 
-/// A function object suitable for use as a \c TypeSubstitutionFn that
-/// queries an underlying \c TypeSubstitutionMap, or returns the original type
-/// if no match was found.
-struct QueryTypeSubstitutionMapOrIdentity {
-  const TypeSubstitutionMap &substitutions;
-  
-  Type operator()(SubstitutableType *type) const;
-};
-
 /// Function used to resolve conformances.
-using GenericFunction = auto(CanType dependentType,
-                             Type conformingReplacementType,
-                             ProtocolDecl *conformedProtocol)
+using GenericFunction = auto(InFlightSubstitution &IFS,
+                             Type dependentType,
+                             ProtocolDecl *proto)
                             -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
 /// conformance through a module.
 class LookUpConformanceInModule {
-  ModuleDecl *M;
 public:
-  explicit LookUpConformanceInModule(ModuleDecl *M)
-    : M(M) {}
+  explicit LookUpConformanceInModule() {}
 
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -121,42 +110,29 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
-};
-
-/// Functor class suitable for use as a \c LookupConformanceFn that fetches
-/// conformances from a generic signature.
-class LookUpConformanceInSignature {
-  const GenericSignatureImpl *Sig;
-public:
-  LookUpConformanceInSignature(const GenericSignatureImpl *Sig)
-    : Sig(Sig) {
-      assert(Sig && "Cannot lookup conformance in null signature!");
-    }
-
-    ProtocolConformanceRef operator()(CanType dependentType,
-                                      Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// Allow substitutions to recurse into SILFunctionTypes.
-  /// Normally, SILType::subst() should be used for lowered
-  /// types, however in special cases where the substitution
-  /// is just changing between contextual and interface type
-  /// representations, using Type::subst() is allowed.
-  AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
-  DesugarMemberTypes = 0x02,
-  /// Substitute types involving opaque type archetypes.
+  DesugarMemberTypes = 0x01,
+  /// Allow primary archetypes to themselves be the subject of substitution.
+  /// Otherwise, we map them out of context first.
+  SubstitutePrimaryArchetypes = 0x02,
+  /// Allow opaque archetypes to themselves be the subject of substitution,
+  /// used when erasing them to their underlying types. Otherwise, we
+  /// recursively substitute their substitutions, instead, preserving the
+  /// opaque archetype.
   SubstituteOpaqueArchetypes = 0x04,
+  /// Allow local archetypes to themselves be the subject of substitution.
+  SubstituteLocalArchetypes = 0x08,
   /// Don't increase pack expansion level for free pack references.
   /// Do not introduce new usages of this flag.
   /// FIXME: Remove this.
-  PreservePackExpansionLevel = 0x08,
+  PreservePackExpansionLevel = 0x10,
 };
 
 /// Options for performing substitutions into a type.
@@ -172,7 +148,7 @@ struct SubstOptions : public OptionSet<SubstFlags> {
   /// conformance with the state \c CheckingTypeWitnesses.
   GetTentativeTypeWitness getTentativeTypeWitness;
 
-  SubstOptions(llvm::NoneType) : OptionSet(llvm::None) {}
+  SubstOptions(std::nullopt_t) : OptionSet(std::nullopt) {}
 
   SubstOptions(SubstFlags flags) : OptionSet(flags) { }
 
@@ -214,7 +190,13 @@ enum class ForeignRepresentableKind : uint8_t {
 /// therefore, the result type is in covariant position relative to the function
 /// type.
 struct TypePosition final {
-  enum : uint8_t { Covariant, Contravariant, Invariant, Shape };
+  enum : uint8_t {
+    Covariant = 1 << 0,
+    Contravariant = 1 << 1,
+    Invariant = 1 << 2,
+    Shape = 1 << 3,
+    Last_Position = Shape,
+  };
 
 private:
   decltype(Covariant) kind;
@@ -236,6 +218,10 @@ public:
   }
 
   operator decltype(kind)() const { return kind; }
+};
+enum : unsigned {
+  NumTypePositions =
+      countBitsUsed(static_cast<unsigned>(TypePosition::Last_Position))
 };
 
 /// Type - This is a simple value object that contains a pointer to a type
@@ -279,16 +265,6 @@ public:
   /// Transform the given type by recursively applying the user-provided
   /// function to each node.
   ///
-  /// \param fn A function object with the signature \c Type(Type) , which
-  /// accepts a type and returns either a transformed type or a null type
-  /// (which will propagate out the null type).
-  ///
-  /// \returns the result of transforming the type.
-  Type transform(llvm::function_ref<Type(Type)> fn) const;
-
-  /// Transform the given type by recursively applying the user-provided
-  /// function to each node.
-  ///
   /// \param fn A function object which accepts a type pointer and returns a
   /// transformed type, a null type (which will propagate out the null type),
   /// or None (to indicate that the transform operation should recursively
@@ -297,7 +273,7 @@ public:
   ///
   /// \returns the result of transforming the type.
   Type
-  transformRec(llvm::function_ref<llvm::Optional<Type>(TypeBase *)> fn) const;
+  transformRec(llvm::function_ref<std::optional<Type>(TypeBase *)> fn) const;
 
   /// Transform the given type by recursively applying the user-provided
   /// function to each node.
@@ -314,7 +290,7 @@ public:
   /// \returns the result of transforming the type.
   Type transformWithPosition(
       TypePosition pos,
-      llvm::function_ref<llvm::Optional<Type>(TypeBase *, TypePosition)> fn)
+      llvm::function_ref<std::optional<Type>(TypeBase *, TypePosition)> fn)
       const;
 
   /// Transform free pack element references, that is, those not captured by a
@@ -322,8 +298,7 @@ public:
   ///
   /// This is the 'map' counterpart to TypeBase::getTypeParameterPacks().
   Type transformTypeParameterPacks(
-      llvm::function_ref<llvm::Optional<Type>(SubstitutableType *)> fn)
-      const;
+      llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn) const;
 
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {
@@ -343,7 +318,7 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(SubstitutionMap substitutions,
-             SubstOptions options = llvm::None) const;
+             SubstOptions options = std::nullopt) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -357,7 +332,7 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(TypeSubstitutionFn substitutions, LookupConformanceFn conformances,
-             SubstOptions options = llvm::None) const;
+             SubstOptions options = std::nullopt) const;
 
   /// Apply an in-flight substitution to this type.
   ///
@@ -365,7 +340,9 @@ public:
   /// subsystem.
   Type subst(InFlightSubstitution &subs) const;
 
-  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  /// Whether this type is from a system module and should be considered
+  /// implicitly private.
+  bool isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
@@ -410,7 +387,7 @@ public:
   /// that can express the join, or Any if the only join would be a
   /// more-general existential type, or None if we cannot yet compute a
   /// correct join but one better than Any may exist.
-  static llvm::Optional<Type> join(Type first, Type second);
+  static std::optional<Type> join(Type first, Type second);
 
   friend llvm::hash_code hash_value(Type T) {
     return llvm::hash_value(T.getPointer());
@@ -520,6 +497,9 @@ public:
   bool isAnyExistentialType() const {
     return isAnyExistentialTypeImpl(*this);
   }
+
+  /// Is this type the error existential, 'any Error'?
+  bool isErrorExistentialType() const;
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();

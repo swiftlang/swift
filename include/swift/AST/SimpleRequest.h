@@ -36,21 +36,32 @@ class Evaluator;
 enum class RequestFlags {
   /// The result for a particular request should never be cached.
   Uncached = 1 << 0,
+
   /// The result for a particular request should be cached within the
   /// evaluator itself.
   Cached = 1 << 1,
+
   /// The result of a particular request will be cached via some separate
   /// mechanism, such as a mutable data structure.
   SeparatelyCached = 1 << 2,
+
+  /// The result is separately cached, but the request can also make use
+  /// of the request evaluator's cache for out-of-line storage. This
+  /// is used to optimize caching of requests where the usual case is
+  /// that the value is empty. In this case, the separate mechanism
+  /// can represent the empty state more efficiently than adding a new
+  /// entry to the request evaluator's cache.
+  SplitCached = 1 << 3,
+
   /// This request introduces the source component of a source-sink
   /// incremental dependency pair and defines a new dependency scope.
   ///
   /// This bit is optional.  High-level requests
-  /// (e.g. \c TypeCheckSourceFileRequest) will require it.
+  /// (e.g. \c TypeCheckPrimaryFileRequest) will require it.
   ///
   /// For further discussion on incremental dependencies
   /// see DependencyAnalysis.md.
-  DependencySource = 1 << 3,
+  DependencySource = 1 << 4,
   /// This request introduces the sink component of a source-sink
   /// incremental dependency pair and is a consumer of the current
   /// dependency scope.
@@ -60,7 +71,7 @@ enum class RequestFlags {
   ///
   /// For further discussion on incremental dependencies
   /// see DependencyAnalysis.md.
-  DependencySink = 1 << 4,
+  DependencySink = 1 << 5,
 };
 
 static constexpr inline RequestFlags operator|(RequestFlags lhs, RequestFlags rhs) {
@@ -100,6 +111,11 @@ template<typename T,
          typename = typename std::enable_if<
              canExtractNearestSourceLoc<T>()>::type>
 SourceLoc maybeExtractNearestSourceLoc(const T& value) {
+  if constexpr (std::is_pointer_v<T>) {
+    if (value == nullptr) {
+      return SourceLoc();
+    }
+  }
   return extractNearestSourceLoc(value);
 }
 
@@ -160,6 +176,10 @@ constexpr bool isEverCached(RequestFlags kind) {
 
 constexpr bool hasExternalCache(RequestFlags kind) {
   return cacheContains(kind, RequestFlags::SeparatelyCached);
+}
+
+constexpr bool hasSplitCache(RequestFlags kind) {
+  return cacheContains(kind, RequestFlags::SplitCached);
 }
 
 constexpr bool isDependencySource(RequestFlags kind) {
@@ -274,6 +294,7 @@ protected:
 public:
   constexpr static bool isEverCached = detail::isEverCached(Caching);
   constexpr static bool hasExternalCache = detail::hasExternalCache(Caching);
+  constexpr static bool hasSplitCache = detail::hasSplitCache(Caching);
 
 public:
   constexpr static bool isDependencySource = detail::isDependencySource(Caching);

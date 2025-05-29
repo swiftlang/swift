@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://113915243 - flaky test on watchos
+// UNSUPPORTED: OS=watchos
+
 // REQUIRES: concurrency_runtime
 
 import Dispatch

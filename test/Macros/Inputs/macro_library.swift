@@ -42,3 +42,30 @@ public macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition
 
 @attached(peer, names: named(value))
 public macro declareVarValuePeer() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@propertyWrapper
+public struct declareVarValuePeerShadowed {
+  public var wrappedValue: Int
+  public init(wrappedValue: Int) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@attached(peer, names: named(value))
+public macro declareVarValuePeerShadowed() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@attached(peer, names: overloaded)
+public macro AddAsync() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
+
+@attached(peer, names: overloaded)
+public macro AddAsyncFinal() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
+
+public enum Something {
+case something
+}
+
+@attached(peer, names: overloaded)
+public macro AcceptedDotted(_: Something) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
+
+@attached(peer, names: overloaded)
+public macro ExpandTypeError() = #externalMacro(module: "MacroDefinition", type: "ExpandTypeErrorMacro")

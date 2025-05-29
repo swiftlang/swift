@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -407,8 +407,7 @@ sil @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.I
 // CHECK-LABEL: sil @testOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 {
 // CHECK: bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
 // CHECK:   [[FN:%.*]] = function_ref @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   [[TTF:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   %{{.*}} = apply [[TTF]](%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   %{{.*}} = apply [[FN]](%0, %1) : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
 // CHECK:   %{{.*}} = tuple ()
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'testOptimizeApplyOfConvertFunction'

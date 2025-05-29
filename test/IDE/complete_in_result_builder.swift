@@ -134,7 +134,7 @@ func testCompleteFunctionArgumentLabels() {
   @TupleBuilder<String> var x1 {
     StringFactory.makeString(#^FUNCTION_ARGUMENT_LABEL^#)
     // FUNCTION_ARGUMENT_LABEL: Begin completions, 1 item
-    // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#x: String#}[')'][#String#];
+    // FUNCTION_ARGUMENT_LABEL: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: String#}[')'][#String#];
   }
 }
 
@@ -372,11 +372,41 @@ func testOverloadedCallArgs() {
     @ViewBuilder var body: Int {
       overloaded(#^OVERLOADED_CALL_ARG^#, second: 1)
       // OVERLOADED_CALL_ARG: Begin completions
-      // OVERLOADED_CALL_ARG-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#single: Int#}[')'][#Int#];
-      // OVERLOADED_CALL_ARG-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#(first): Int#}, {#second: Int#}[')'][#Int#];
+      // OVERLOADED_CALL_ARG-DAG: Pattern/Local/Flair[ArgLabels]: {#single: Int#}[#Int#]; name=single:
       // OVERLOADED_CALL_ARG-DAG: Literal[Integer]/None/TypeRelation[Convertible]: 0[#Int#];
       // OVERLOADED_CALL_ARG: End completions
     }
   }
 
+}
+
+// https://github.com/swiftlang/swift/issues/77283
+func testInForLoop(_ x: [Int]) {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ components: T...) -> T {
+      components.first!
+    }
+    static func buildArray<T>(_ components: [T]) -> T {
+      components.first!
+    }
+  }
+  struct S {
+    init() {}
+    func baz() -> Int { 0 }
+  }
+  struct R {
+    init<T>(@Builder _ x: () -> T) {}
+  }
+  _ = R {
+    for _ in x {
+      S().#^IN_FOR_LOOP^#
+      // IN_FOR_LOOP: Decl[InstanceMethod]/CurrNominal:   baz()[#Int#]; name=baz()
+    }
+  }
+  _ = R {
+    for _ in S().#^IN_FOR_LOOP_SEQ^# {
+      // IN_FOR_LOOP_SEQ: Decl[InstanceMethod]/CurrNominal:   baz()[#Int#]; name=baz()
+    }
+  }
 }

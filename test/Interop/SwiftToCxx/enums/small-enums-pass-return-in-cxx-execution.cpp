@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/small-enums-pass-return-in-cxx.swift -typecheck -module-name Enums -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %S/small-enums-pass-return-in-cxx.swift -module-name Enums -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/enums.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-enums-execution.o
 // RUN: %target-interop-build-swift %S/small-enums-pass-return-in-cxx.swift -o %t/swift-enums-execution -Xlinker %t/swift-enums-execution.o -module-name Enums -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -13,8 +13,6 @@
 #include <cassert>
 #include <cstddef>
 #include "enums.h"
-
-#define MAX(a, b) ((a) >= (b) ? (a) : (b))
 
 int main() {
     using namespace Enums;

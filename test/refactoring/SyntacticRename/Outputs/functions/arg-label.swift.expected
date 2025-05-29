@@ -6,7 +6,7 @@ func /*no-args:def*/aFunc() -> Int {
 
 func /*param-label:def*/aFunc(a: Int) {}
 
-func /*arg-label:def*/anotherFunc(c a:Int) {}
+func /*arg-label:def*/<base>aFunc</base>(<arglabel index=0>b</arglabel><param index=0> a</param>:Int) {}
 
 func /*no-label:def*/aFunc(_ b:Int) -> Int {
     return /*no-args:call*/aFunc()
@@ -40,7 +40,7 @@ class AStruct {
 let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/+ AStruct()
 /*no-args:call*/aFunc()
 /*param-label:call*/aFunc(a: 2)
-/*arg-label:call*/anotherFunc(c: /*no-args:call*/aFunc() * /*no-args:call*/aFunc())
+/*arg-label:call*/<base>aFunc</base>(<callarg index=0>b</callarg><callcolon index=0>: /*no-args:call*/</callcolon>aFunc() * /*no-args:call*/aFunc())
 let _ = /*no-label:call*/aFunc(3)
 /*whitespace-labels:call*/aFunc( a  :  2 ,2,  c:  4 )
 

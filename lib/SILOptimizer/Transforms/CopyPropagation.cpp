@@ -49,6 +49,7 @@
 
 #define DEBUG_TYPE "copy-propagation"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -61,6 +62,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/SetVector.h"
 
 using namespace swift;
@@ -425,7 +427,7 @@ namespace {
 
 class CopyPropagation : public SILFunctionTransform {
   /// If true, debug_value instructions should be pruned.
-  bool pruneDebug;
+  PruneDebugInsts_t pruneDebug;
   /// If true, all values will be canonicalized.
   bool canonicalizeAll;
   /// If true, then borrow scopes will be canonicalized, allowing copies of
@@ -433,42 +435,33 @@ class CopyPropagation : public SILFunctionTransform {
   bool canonicalizeBorrows;
 
 public:
-  CopyPropagation(bool pruneDebug, bool canonicalizeAll,
+  CopyPropagation(PruneDebugInsts_t pruneDebug, bool canonicalizeAll,
                   bool canonicalizeBorrows)
       : pruneDebug(pruneDebug), canonicalizeAll(canonicalizeAll),
         canonicalizeBorrows(canonicalizeBorrows) {}
 
   /// The entry point to this function transformation.
   void run() override;
+
+  void propagateCopies(CanonicalDefWorklist &defWorklist, bool &changed,
+                       NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                       InstructionDeleter &deleter);
+
+  void verifyOwnership();
 };
 
 } // end anonymous namespace
 
-/// Top-level pass driver.
-void CopyPropagation::run() {
+void CopyPropagation::propagateCopies(
+    CanonicalDefWorklist &defWorklist, bool &changed,
+    NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+    InstructionDeleter &deleter) {
   auto *f = getFunction();
   auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
-  auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+  auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
   auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
   auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
   DominanceInfo *domTree = dominanceAnalysis->get(f);
-
-  // Label for unit testing with debug output.
-  LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
-
-  // This algorithm fundamentally assumes ownership.
-  if (!f->hasOwnership())
-    return;
-
-  CanonicalDefWorklist defWorklist(canonicalizeBorrows);
-  auto callbacks =
-      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
-        defWorklist.erase(instToDelete);
-        instToDelete->eraseFromParent();
-      });
-
-  InstructionDeleter deleter(std::move(callbacks));
-  bool changed = false;
 
   StackList<BeginBorrowInst *> beginBorrowsToShrink(f);
   StackList<MoveValueInst *> moveValues(f);
@@ -493,8 +486,9 @@ void CopyPropagation::run() {
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(
-      pruneDebug, /*maximizeLifetime=*/!getFunction()->shouldOptimize(),
-      getFunction(), accessBlockAnalysis, domTree, calleeAnalysis, deleter);
+      pruneDebug, MaximizeLifetime_t(!getFunction()->shouldOptimize()),
+      getFunction(), accessBlockAnalysis, deadEndBlocksAnalysis, domTree,
+      calleeAnalysis, deleter);
   // NOTE: We assume that the function is in reverse post order so visiting the
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.
@@ -502,11 +496,14 @@ void CopyPropagation::run() {
     bool firstRun = true;
     // Run the sequence of utilities:
     // - ShrinkBorrowScope
-    // - CanonicalizeOSSALifetime
-    // - LexicalDestroyFolder
+    // - CanonicalizeOSSALifetime(borrowee)
+    // - LexicalDestroyFolding
+    // - CanonicalizeOSSALifetime(folded)
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+      if (!continueWithNextSubpassRun(bbi))
+        return;
       auto shrunk = shrinkBorrowScope(*bbi, deleter, calleeAnalysis,
                                       modifiedCopyValueInsts);
       for (auto *cvi : modifiedCopyValueInsts)
@@ -521,27 +518,36 @@ void CopyPropagation::run() {
       if (borrowee->getOwnershipKind() != OwnershipKind::Owned)
         break;
 
+      if (!continueWithNextSubpassRun(borrowee))
+        return;
       auto canonicalized = canonicalizer.canonicalizeValueLifetime(borrowee);
       if (!canonicalized && !firstRun)
         break;
 
+      if (!continueWithNextSubpassRun(bbi))
+        return;
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
-      auto hoisted =
-          hoistDestroysOfOwnedLexicalValue(folded, *f, deleter, calleeAnalysis);
+      auto hoisted = canonicalizer.canonicalizeValueLifetime(folded);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
+      if (!continueWithNextSubpassRun(folded))
+        return;
       eliminateRedundantMove(folded, deleter, defWorklist);
       firstRun = false;
     }
   }
   for (auto *mvi : moveValues) {
+    if (!continueWithNextSubpassRun(mvi))
+      return;
     eliminateRedundantMove(mvi, deleter, defWorklist);
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
-      hoistDestroysOfOwnedLexicalValue(argument, *f, deleter, calleeAnalysis);
+      if (!continueWithNextSubpassRun(argument))
+        return;
+      canonicalizer.canonicalizeValueLifetime(argument);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -578,8 +584,12 @@ void CopyPropagation::run() {
       // they may be chained, and CanonicalizeBorrowScopes pushes them
       // top-down.
       for (auto result : ownedForward->getResults()) {
+        if (!continueWithNextSubpassRun(result))
+          return;
         canonicalizer.canonicalizeValueLifetime(result);
       }
+      if (!continueWithNextSubpassRun(ownedForward))
+        return;
       if (sinkOwnedForward(ownedForward, postOrderAnalysis, domTree)) {
         changed = true;
         // Sinking 'ownedForward' may create an opportunity to sink its
@@ -601,6 +611,8 @@ void CopyPropagation::run() {
     BorrowedValue borrow(defWorklist.borrowedValues.pop_back_val());
     assert(canonicalizeBorrows || !borrow.isLocalScope());
 
+    if (!continueWithNextSubpassRun(borrow.value))
+      return;
     borrowCanonicalizer.canonicalizeBorrowScope(borrow);
     for (CopyValueInst *copy : borrowCanonicalizer.getUpdatedCopies()) {
       defWorklist.updateForCopy(copy);
@@ -617,6 +629,8 @@ void CopyPropagation::run() {
   // Canonicalize all owned defs.
   while (!defWorklist.ownedValues.empty()) {
     SILValue def = defWorklist.ownedValues.pop_back_val();
+    if (!continueWithNextSubpassRun(def))
+      return;
     auto canonicalized = canonicalizer.canonicalizeValueLifetime(def);
     if (!canonicalized)
       continue;
@@ -624,30 +638,64 @@ void CopyPropagation::run() {
     if (auto *inst = def->getDefiningInstruction())
       deleter.trackIfDead(inst);
   }
+}
+
+/// Top-level pass driver.
+void CopyPropagation::run() {
+  auto *f = getFunction();
+  // This algorithm fundamentally assumes ownership.
+  if (!f->hasOwnership())
+    return;
+
+  // Label for unit testing with debug output.
+  LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
+
+  auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+
+  CanonicalDefWorklist defWorklist(canonicalizeBorrows);
+
+  auto callbacks =
+      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
+        defWorklist.erase(instToDelete);
+        instToDelete->eraseFromParent();
+      });
+  InstructionDeleter deleter(std::move(callbacks));
+
+  bool changed = false;
+  propagateCopies(defWorklist, changed, accessBlockAnalysis, deleter);
+
   // Recursively cleanup dead defs after removing uses.
   deleter.cleanupDeadInstructions();
 
   // Invalidate analyses.
   if (changed || deleter.hadCallbackInvocation()) {
+    updateAllGuaranteedPhis(getPassManager(), getFunction());
     // Preserves NonLocalAccessBlockAnalysis.
     accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     accessBlockAnalysis->unlockInvalidation();
     if (f->getModule().getOptions().VerifySILOwnership) {
-      auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-      f->verifyOwnership(deBlocksAnalysis->get(f));
+      verifyOwnership();
     }
   }
+}
+
+void CopyPropagation::verifyOwnership() {
+  auto *f = getFunction();
+  auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
+  f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
+                         ? nullptr
+                         : deBlocksAnalysis->get(f));
 }
 
 // MandatoryCopyPropagation is not currently enabled in the -Onone pipeline
 // because it may negatively affect the debugging experience.
 SILTransform *swift::createMandatoryCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
+  return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ false);
 }
 
 SILTransform *swift::createCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
+  return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ EnableRewriteBorrows);
 }

@@ -35,8 +35,8 @@ struct Err1 : Error { }
 func test4(arg: () throws -> Void) {
   do {
     try arg()
-  } catch let xRenamed as Err1 {
-    print(xRenamed)
+  } catch let <base>x</base> as Err1 {
+    print(<base>x</base>)
   } catch let x {
     print(x)
   }

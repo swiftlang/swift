@@ -110,13 +110,13 @@ protocol P8: P0 {
   // CHECK: associated_type_decl
   // CHECK-SAME: "A"
   // CHECK-NOT: override
-  // CHECK-SAME: )
+  // CHECK-SAME: {{$}}
   @_nonoverride
   associatedtype A
 
   // CHECK: func_decl{{.*}}foo(){{.*}}Self : P8
   // CHECK-NOT: override=
-  // CHECK-SAME: )
+  // CHECK-SAME: {{$}}
   @_nonoverride
   func foo()
 

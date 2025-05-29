@@ -17,10 +17,13 @@
 #include "GenArchetype.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
@@ -47,6 +50,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "LocalTypeData.h"
 #include "MetadataRequest.h"
 #include "Outlining.h"
 #include "ProtocolInfo.h"
@@ -74,16 +78,35 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
       return emitOpaqueTypeMetadataRef(IGF, opaque, request);
   }
 
+#ifndef NDEBUG
+  if (archetype->isRoot()) {
+    llvm::errs() << "Metadata for archetype not bound in function.\n"
+                 << "  The metadata could be missing entirely because it needs "
+                    "to be passed to the function.\n"
+                 << "  Or the metadata is present and not bound in which case "
+                    "setScopedLocalTypeMetadata or similar must be called.\n";
+    llvm::errs() << "Archetype without metadata: " << archetype << "\n";
+    archetype->dump(llvm::errs());
+    llvm::errs() << "Function:\n";
+    IGF.CurFn->print(llvm::errs());
+    if (auto localTypeData = IGF.getLocalTypeData()) {
+      llvm::errs() << "LocalTypeData:\n";
+      localTypeData->dump();
+    } else {
+      llvm::errs() << "No LocalTypeDataCache for this function!\n";
+    }
+  }
+#endif
   // If there's no local or opaque metadata, it must be a nested type.
-  assert(archetype->getParent() && "Not a nested archetype");
+  auto *member = archetype->getInterfaceType()->castTo<DependentMemberType>();
 
-  CanArchetypeType parent(archetype->getParent());
-  AssociatedType association(
-      archetype->getInterfaceType()->castTo<DependentMemberType>()
-        ->getAssocType());
+  auto parent = cast<ArchetypeType>(
+    archetype->getGenericEnvironment()->mapTypeIntoContext(
+      member->getBase())->getCanonicalType());
+  auto *assocType = member->getAssocType();
 
   MetadataResponse response =
-    emitAssociatedTypeMetadataRef(IGF, parent, association, request);
+    emitAssociatedTypeMetadataRef(IGF, parent, assocType, request);
 
   setTypeMetadataName(IGF.IGM, response.getMetadata(), archetype);
 
@@ -114,7 +137,7 @@ public:
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     // We'll need formal type metadata for this archetype.
-    collector.collectTypeMetadataForLayout(T);
+    collector.collectTypeMetadata(T);
   }
 
   TypeLayoutEntry
@@ -171,7 +194,6 @@ public:
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
   }
 };
-
 } // end anonymous namespace
 
 /// Emit a single protocol witness table reference.
@@ -254,11 +276,40 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
       rootWTable = emitOpaqueTypeWitnessTableRef(IGF, opaqueRoot,
                                                  rootProtocol);
     }
+#ifndef NDEBUG
+    if (!rootWTable) {
+      llvm::errs()
+          << "Root witness table not bound in function.\n"
+          << "  The witness table could be missing entirely because it needs "
+             "to be passed to the function.\n"
+          << "  Or the witness table is present and not bound in which case "
+             "setScopedLocalTypeData or similar must be called.\n";
+      llvm::errs() << "Root archetype for conformance: " << rootArchetype
+                   << "\n";
+      rootArchetype->dump(llvm::errs());
+      llvm::errs() << "Root protocol without wtable: " << rootProtocol << "\n";
+      rootProtocol->dump(llvm::errs());
+      llvm::errs() << "Archetype for conformance: " << archetype << "\n";
+      archetype->dump(llvm::errs());
+      llvm::errs() << "Protocol for conformance: " << protocol << "\n";
+      protocol->dump(llvm::errs());
+      llvm::errs() << "Function:\n";
+      IGF.CurFn->print(llvm::errs());
+      if (auto localTypeData = IGF.getLocalTypeData()) {
+        llvm::errs() << "LocalTypeData:\n";
+        localTypeData->dump();
+      } else {
+        llvm::errs() << "No LocalTypeDataCache for this function!\n";
+      }
+    }
+#endif
     assert(rootWTable && "root witness table not bound in local context!");
   }
 
+  auto conformance = ProtocolConformanceRef::forAbstract(
+      rootArchetype, rootProtocol);
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
-                                       ProtocolConformanceRef(rootProtocol),
+                                       conformance,
                                        MetadataResponse::forComplete(rootWTable),
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();
@@ -270,11 +321,11 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 MetadataResponse
 irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      CanArchetypeType origin,
-                                     AssociatedType association,
+                                     AssociatedTypeDecl *assocType,
                                      DynamicMetadataRequest request) {
   // Find the conformance of the origin to the associated type's protocol.
   llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
-                                               association.getSourceProtocol());
+                                               assocType->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata =
@@ -282,7 +333,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
       .getMetadata();
 
   return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable,
-                                       association, request);
+                                       assocType, request);
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
@@ -354,13 +405,24 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.
   IsABIAccessible_t abiAccessible = IsABIAccessible;
-  if (auto opaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
+  if (isa<OpaqueTypeArchetypeType>(archetype)) {
     auto &currentSILModule = IGM.getSILModule();
     abiAccessible =
         currentSILModule.isTypeMetadataAccessible(archetype->getCanonicalType())
             ? IsABIAccessible
             : IsNotABIAccessible;
   }
+
+  // TODO: Should this conformance imply isAddressOnlyTrivial is true?
+  auto *bitwiseCopyableProtocol =
+      IGM.getSwiftModule()->getASTContext().getProtocol(
+          KnownProtocolKind::BitwiseCopyable);
+  // The protocol won't be present in swiftinterfaces from older SDKs.
+  if (bitwiseCopyableProtocol && checkConformance(
+                                     archetype, bitwiseCopyableProtocol)) {
+    return BitwiseCopyableTypeInfo::create(storageType, abiAccessible);
+  }
+
   return OpaqueArchetypeTypeInfo::create(storageType, abiAccessible);
 }
 
@@ -393,12 +455,16 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     SmallVector<llvm::Value *, 4> args;
     SmallVector<llvm::Type *, 4> types;
 
+    // We need to pass onHeapPacks=true because the runtime demangler
+    // expects to differentiate on-heap packs from non-pack types by
+    // checking the least significant bit of the metadata pointer.
     enumerateGenericSignatureRequirements(
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto arg = emitGenericRequirementFromSubstitutions(
               IGF, reqt, MetadataState::Abstract,
-              archetype->getSubstitutions());
+              archetype->getSubstitutions(),
+              /*onHeapPacks=*/true);
           args.push_back(arg);
           types.push_back(args.back()->getType());
         });
@@ -461,8 +527,8 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeMetadata2FunctionPointer() :
@@ -504,8 +570,8 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeConformance2FunctionPointer() :

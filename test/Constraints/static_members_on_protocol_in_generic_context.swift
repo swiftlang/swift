@@ -349,3 +349,17 @@ func test_leading_dot_syntax_with_typelias() {
   test(.box) // expected-error {{type 'Box<T>.Type' cannot conform to 'Container'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
+
+// User-defined marker protocols do gain the inference for members, since they
+// support extensions.
+@_marker protocol SomeMarkerProto {}
+extension Int: SomeMarkerProto {}
+
+extension SomeMarkerProto where Self == Int {
+  static func answer() -> Int { 42 }
+}
+
+do {
+  func testSomeMarkerProto<T: SomeMarkerProto>(_: T) {}
+  testSomeMarkerProto(.answer())
+}

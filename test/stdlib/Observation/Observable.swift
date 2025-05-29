@@ -1,13 +1,14 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir)
 
 // Run this test via the swift-plugin-server
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -external-plugin-path -Xfrontend %swift-plugin-dir#%swift-plugin-server)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -external-plugin-path -Xfrontend %swift-plugin-dir#%swift-plugin-server)
 
 // REQUIRES: observation
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_Macros
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
@@ -185,6 +186,39 @@ class RecursiveInner {
 }
 
 @Observable
+class GenericClass<T> {
+  var value = 3
+}
+
+struct StructParent {
+  @Observable
+  class NestedGenericClass<T> {
+    var value = 3
+  }
+}
+
+struct GenericStructParent<T> {
+  @Observable
+  class NestedClass {
+    var value = 3
+  }
+}
+
+class ClassParent {
+  @Observable
+  class NestedGenericClass<T> {
+    var value = 3
+  }
+}
+
+class GenericClassParent<T> {
+  @Observable
+  class NestedClass {
+    var value = 3
+  }
+}
+
+@Observable
 class RecursiveOuter {
   var inner = RecursiveInner()
   var value = "prefix"
@@ -214,6 +248,59 @@ class RecursiveOuter {
 #endif
 class GuardedAvailability {
 }
+
+@Observable class TestASTScopeLCA {
+  // Make sure ASTScope unqualified lookup can find local variables
+  // inside initial values with closures when accessor macros are
+  // involved.
+  var state : Bool = {
+    let value = true
+    return value
+  }()
+}
+
+@Observable class Parent {
+  class Nested {}
+}
+
+extension Parent.Nested {}
+
+struct CowContainer {
+  final class Contents { }
+  
+  var contents = Contents()
+  
+  mutating func mutate() {
+    if !isKnownUniquelyReferenced(&contents) {
+      contents = Contents()
+    }
+  }
+  
+  var id: ObjectIdentifier {
+    ObjectIdentifier(contents)
+  }
+}
+
+
+@Observable
+final class CowTest {
+  var container = CowContainer()
+}
+
+@Observable
+final class DeinitTriggeredObserver {
+  var property: Int = 3
+  let deinitTrigger: () -> Void
+
+  init(_ deinitTrigger: @escaping () -> Void) {
+    self.deinitTrigger = deinitTrigger
+  }
+
+  deinit {
+    deinitTrigger()
+  }
+}
+
 
 @main
 struct Validator {
@@ -429,6 +516,30 @@ struct Validator {
       obj.inner.value = "test"
       expectEqual(obj.innerEventCount, 2)
       expectEqual(obj.outerEventCount, 2)
+    }
+    
+    suite.test("validate copy on write semantics") {
+      let subject = CowTest()
+      let startId = subject.container.id
+      expectEqual(subject.container.id, startId)
+      subject.container.mutate()
+      expectEqual(subject.container.id, startId)
+    }
+
+    suite.test("weak container observation") {
+      let changed = CapturedState(state: false)
+      let deinitialized = CapturedState(state: false)
+      var test = DeinitTriggeredObserver {
+        deinitialized.state = true
+      }
+      withObservationTracking { [weak test] in
+        _blackHole(test?.property)
+      } onChange: {
+        changed.state = true
+      }
+      test = DeinitTriggeredObserver { }
+      expectEqual(deinitialized.state, true)
+      expectEqual(changed.state, true)
     }
 
     runAllTests()

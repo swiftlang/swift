@@ -14,11 +14,11 @@ class Klass {}
 let asdf: any Hashable & Klass
 
 // a concrete move-only type
-@_moveOnly struct MO {
+struct MO: ~Copyable {
   var x: Int?
 }
 
-@_moveOnly struct GenericMO<T> {
+struct GenericMO<T>: ~Copyable {
   var t: T
 }
 
@@ -50,30 +50,30 @@ struct CerebralValley<T> {
 func basic_vararg(_ va: MO...) {} // expected-error {{noncopyable type 'MO' cannot be used within a variadic type yet}}
 
 func illegalTypes<T>(_ t: T) {
-  let _: Array<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
-  let _: Maybe<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
-  let _: Dictionary<MO, String> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
-  let _: [MO] // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
-  let _: [String : MO] // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
-  let _: [MO : MO] // expected-error 2{{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
-  let _: [MO : T] // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
+  let _: Array<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: Maybe<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: Dictionary<MO, String> // expected-error {{type 'MO' does not conform to protocol 'Hashable'}}
+  let _: [MO] // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: [String : MO] // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: [MO : MO] // expected-error {{type 'MO' does not conform to protocol 'Hashable'}}
+  let _: [MO : T] // expected-error {{type 'MO' does not conform to protocol 'Hashable'}}
 
-  _ = t as! ValBox<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'ValBox<T>' yet}}
+  _ = t as! ValBox<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
-  let _: Optional<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Optional<Wrapped>' yet}}
-  let _: MO? // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Optional<Wrapped>' yet}}
-  let _: MO?? // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Optional<Wrapped>' yet}}
-  let _: MO! // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Optional<Wrapped>' yet}}
-  let _: MO?! // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Optional<Wrapped>' yet}}
+  let _: Optional<MO>
+  let _: MO?
+  let _: MO??
+  let _: MO!
+  let _: MO?!
 
   let _: Klass & MO // expected-error {{non-protocol, non-class type 'MO' cannot be used within a protocol-constrained type}}
   let _: any MO // expected-error {{'any' has no effect on concrete type 'MO'}}
   let _: any GenericMO<T> // expected-error {{'any' has no effect on concrete type 'GenericMO<T>'}}
 
-  let _: CerebralValley<MO>.TechBro // expected-error {{noncopyable type 'MO' cannot be used with generic type 'CerebralValley<T>' yet}}
-  let _: CerebralValley<Int>.GenericBro<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'CerebralValley<T>.GenericBro<U>' yet}}
+  let _: CerebralValley<MO>.TechBro // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: CerebralValley<Int>.GenericBro<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
-  let _: GenericMO<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'GenericMO<T>' yet}}
+  let _: GenericMO<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 }
 
 func illegalInExpr() {

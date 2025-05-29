@@ -28,3 +28,10 @@ int printf(const char * restrict format, ...);
 
 @end
 
+void implFunc(int param) {
+  printf("implFunc");
+}
+
+void implFuncCName(int param) {
+  printf("implFuncCName");
+}

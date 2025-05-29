@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/ArgumentCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
@@ -50,7 +51,8 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
     const AnyFunctionType::Param *TypeParam = &ParamsToPass[Idx];
     bool Required = !Res.DeclParamIsOptional[Idx];
 
-    if (Res.FirstTrailingClosureIndex && Idx > *Res.FirstTrailingClosureIndex &&
+    if (Res.FirstTrailingClosureIndex &&
+        Res.ArgIdx > *Res.FirstTrailingClosureIndex &&
         !TypeParam->getPlainType()
              ->lookThroughAllOptionalTypes()
              ->is<AnyFunctionType>()) {
@@ -89,41 +91,16 @@ bool ArgumentTypeCheckCompletionCallback::addPossibleParams(
   return ShowGlobalCompletions;
 }
 
-/// Applies heuristic to determine whether the result type of \p E is
-/// unconstrained, that is if the constraint system is satisfiable for any
-/// result type of \p E.
-static bool isExpressionResultTypeUnconstrained(const Solution &S, Expr *E) {
-  ConstraintSystem &CS = S.getConstraintSystem();
-  if (auto ParentExpr = CS.getParentExpr(E)) {
-    if (auto Assign = dyn_cast<AssignExpr>(ParentExpr)) {
-      if (isa<DiscardAssignmentExpr>(Assign->getDest())) {
-        // _ = <expr> is unconstrained
-        return true;
-      }
-    } else if (isa<RebindSelfInConstructorExpr>(ParentExpr)) {
-      // super.init() is unconstrained (it always produces the correct result
-      // by definition)
+/// Returns whether `E` has a parent expression with arguments.
+static bool hasParentCallLikeExpr(Expr *E, ConstraintSystem &CS) {
+  E = CS.getParentExpr(E);
+  while (E) {
+    if (E->getArgs() || isa<ParenExpr>(E) || isa<TupleExpr>(E) || isa<CollectionExpr>(E)) {
       return true;
     }
+    E = CS.getParentExpr(E);
   }
-  auto target = S.getTargetFor(E);
-  if (!target)
-    return false;
-
-  assert(target->kind == SyntacticElementTarget::Kind::expression);
-  switch (target->getExprContextualTypePurpose()) {
-  case CTP_Unused:
-    // If we aren't using the contextual type, its unconstrained by definition.
-    return true;
-  case CTP_Initialization: {
-    // let x = <expr> is unconstrained
-    auto contextualType = target->getExprContextualType();
-    return !contextualType || contextualType->is<UnresolvedType>();
-  }
-  default:
-    // Assume that it's constrained by default.
-    return false;
-  }
+  return false;
 }
 
 void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
@@ -160,10 +137,21 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   auto ArgIdx = ArgInfo->completionIdx;
 
   Type ExpectedCallType;
-  if (!isExpressionResultTypeUnconstrained(S, ParentCall)) {
-    ExpectedCallType = getTypeForCompletion(S, ParentCall);
+  if (auto ArgLoc = S.getConstraintSystem().getArgumentLocator(ParentCall)) {
+    if (auto FuncArgApplyInfo = S.getFunctionArgApplyInfo(ArgLoc)) {
+      Type ParamType = FuncArgApplyInfo->getParamType();
+      ExpectedCallType = S.simplifyTypeForCodeCompletion(ParamType);
+    }
   }
-
+  if (!ExpectedCallType) {
+    if (auto ContextualType = S.getContextualType(ParentCall)) {
+      ExpectedCallType = ContextualType;
+    }
+  }
+  if (ExpectedCallType && ExpectedCallType->hasUnresolvedType()) {
+    ExpectedCallType = Type();
+  }
+  
   auto *CallLocator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
 
@@ -182,7 +170,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   // Find the parameter the completion was bound to (if any), as well as which
   // parameters are already bound (so we don't suggest them even when the args
   // are out of order).
-  llvm::Optional<unsigned> ParamIdx;
+  std::optional<unsigned> ParamIdx;
   std::set<unsigned> ClaimedParams;
   bool IsNoninitialVariadic = false;
 
@@ -216,7 +204,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   }
 
   bool HasLabel = false;
-  llvm::Optional<unsigned> FirstTrailingClosureIndex = llvm::None;
+  std::optional<unsigned> FirstTrailingClosureIndex = std::nullopt;
   if (auto PE = CS.getParentExpr(CompletionExpr)) {
     if (auto Args = PE->getArgs()) {
       HasLabel = !Args->getLabel(ArgIdx).empty();
@@ -278,10 +266,27 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     }
   }
 
+  bool IncludeSignature = false;
+  if (ParentCall->getArgs()->getUnlabeledUnaryExpr() == CompletionExpr) {
+    // If the code completion expression is the only expression in the call
+    // and the code completion token doesn’t have a label, we have a case like
+    // `Point(|)`. Suggest the entire function signature.
+    IncludeSignature = true;
+  } else if (!ParentCall->getArgs()->empty() &&
+             ParentCall->getArgs()->getExpr(0) == CompletionExpr &&
+             !ParentCall->getArgs()->get(0).hasLabel()) {
+    if (hasParentCallLikeExpr(ParentCall, CS)) {
+      // We are completing in cases like `bar(arg: foo(|, option: 1)`
+      // In these cases, we don’t know if `option` belongs to the call to `foo`
+      // or `bar`. Be defensive and also suggest the signature.
+      IncludeSignature = true;
+    }
+  }
+
   Results.push_back(
-      {ExpectedTy, ExpectedCallType, isa<SubscriptExpr>(ParentCall),
+      {ExpectedTy,  ExpectedCallType, isa<SubscriptExpr>(ParentCall),
        Info.getValue(), FuncTy, ArgIdx, ParamIdx, std::move(ClaimedParams),
-       IsNoninitialVariadic, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
+       IsNoninitialVariadic, IncludeSignature, Info.BaseTy, HasLabel, FirstTrailingClosureIndex,
        IsAsync, DeclParamIsOptional, SolutionSpecificVarTypes});
 }
 
@@ -316,7 +321,7 @@ void ArgumentTypeCheckCompletionCallback::computeShadowedDecls(
 }
 
 void ArgumentTypeCheckCompletionCallback::collectResults(
-    bool IncludeSignature, bool IsLabeledTrailingClosure, SourceLoc Loc,
+    bool IsLabeledTrailingClosure, SourceLoc Loc,
     DeclContext *DC, ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
@@ -333,13 +338,13 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
   }
 
   SmallVector<Type, 8> ExpectedTypes;
+  SmallVector<PossibleParamInfo, 8> Params;
 
-  if (IncludeSignature && !Results.empty()) {
-    Lookup.setHaveLParen(true);
-    Lookup.setExpectedTypes(ExpectedCallTypes,
-                            /*isImplicitSingleExpressionReturn=*/false);
+  for (auto &Result : Results) {
+    if (Result.IncludeSignature) {
+      Lookup.setHaveLParen(true);
+      Lookup.setExpectedTypes(ExpectedCallTypes, /*isImpliedResult=*/false);
 
-    for (auto &Result : Results) {
       auto SemanticContext = SemanticContextKind::None;
       NominalTypeDecl *BaseNominal = nullptr;
       if (Result.BaseType) {
@@ -369,12 +374,15 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
       }
       if (Result.FuncTy) {
         if (auto FuncTy = Result.FuncTy) {
+          // Only show call pattern completions if the function isn't
+          // overridden.
           if (ShadowedDecls.count(Result.FuncD) == 0) {
-            // Don't show call pattern completions if the function is
-            // overridden.
             if (Result.IsSubscript) {
-              assert(SemanticContext != SemanticContextKind::None);
+              // The subscript decl may not be preset for e.g the implicit
+              // `keyPath:` subscript. Such a subscript is allowed on any
+              // non-nominal type, so the semantic context may be none.
               auto *SD = dyn_cast_or_null<SubscriptDecl>(Result.FuncD);
+              assert(!SD || SemanticContext != SemanticContextKind::None);
               Lookup.addSubscriptCallPattern(FuncTy, SD, SemanticContext);
             } else {
               auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Result.FuncD);
@@ -383,19 +391,16 @@ void ArgumentTypeCheckCompletionCallback::collectResults(
           }
         }
       }
-    }
-    Lookup.setHaveLParen(false);
-
-    shouldPerformGlobalCompletion |=
-        !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
-  } else if (!Results.empty()) {
-    SmallVector<PossibleParamInfo, 8> Params;
-    for (auto &Ret : Results) {
+      Lookup.setHaveLParen(false);
+      // We didn't find any function signatures. Perform global completion as a fallback.
       shouldPerformGlobalCompletion |=
-          addPossibleParams(Ret, Params, ExpectedTypes);
+          !Lookup.FoundFunctionCalls || Lookup.FoundFunctionsWithoutFirstKeyword;
+    } else {
+      shouldPerformGlobalCompletion |=
+          addPossibleParams(Result, Params, ExpectedTypes);
     }
-    Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
   }
+  Lookup.addCallArgumentCompletionResults(Params, IsLabeledTrailingClosure);
 
   if (shouldPerformGlobalCompletion) {
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;

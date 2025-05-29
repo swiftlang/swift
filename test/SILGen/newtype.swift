@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
-// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -Xllvm -sil-print-types -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
+// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -Xllvm -sil-print-types -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 
@@ -20,7 +20,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : @owned $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
-// CHECK-RAW: [[SELF_BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+// CHECK-RAW: [[SELF_BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[SELF_BOX_LIFETIME]]
 // CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-RAW: [[COPIED_STR:%.*]] = copy_value [[BORROWED_STR]]

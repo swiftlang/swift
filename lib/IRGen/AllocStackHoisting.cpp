@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -117,7 +117,7 @@ public:
   /// change.
   bool hasMovedElt() const {
     return llvm::any_of(Elts, [](AllocStackInst *asi) {
-      return asi->getUsesMoveableValueDebugInfo();
+      return asi->usesMoveableValueDebugInfo();
     });
   }
 };
@@ -157,9 +157,8 @@ void moveAllocStackToBeginningOfBlock(
   // of the debug_value to the original position.
   if (haveMovedElt) {
     if (auto varInfo = AS->getVarInfo()) {
-      SILBuilderWithScope Builder(AS);
       // SILBuilderWithScope skips over meta instructions when picking a scope.
-      Builder.setCurrentDebugScope(AS->getDebugScope());
+      SILBuilder Builder(AS, AS->getDebugScope());
       auto *DVI = Builder.createDebugValue(AS->getLoc(), AS, *varInfo);
       DVI->setUsesMoveableValueDebugInfo();
       DebugValueToBreakBlocksAt.push_back(DVI);
@@ -198,14 +197,14 @@ void Partition::assignStackLocation(
     if (AssignedLoc == AllocStack) continue;
     eraseDeallocStacks(AllocStack);
     AllocStack->replaceAllUsesWith(AssignedLoc);
-    if (hasAtLeastOneMovedElt) {
-      if (auto VarInfo = AllocStack->getVarInfo()) {
-        SILBuilderWithScope Builder(AllocStack);
-        auto *DVI = Builder.createDebugValue(AllocStack->getLoc(), AssignedLoc,
-                                             *VarInfo);
+    if (auto VarInfo = AllocStack->getVarInfo()) {
+      SILBuilder Builder(AllocStack, AllocStack->getDebugScope());
+      auto *DVI = Builder.createDebugValueAddr(AllocStack->getLoc(),
+                                               AssignedLoc, *VarInfo);
+      if (hasAtLeastOneMovedElt) {
         DVI->setUsesMoveableValueDebugInfo();
-        DebugValueToBreakBlocksAt.push_back(DVI);
       }
+      DebugValueToBreakBlocksAt.push_back(DVI);
     }
     AllocStack->eraseFromParent();
   }
@@ -412,7 +411,7 @@ class HoistAllocStack {
   /// instructions in the function.
   InstructionIndices stackInstructionIndices;
 
-  llvm::Optional<SILAnalysis::InvalidationKind> InvalidationKind = llvm::None;
+  std::optional<SILAnalysis::InvalidationKind> InvalidationKind = std::nullopt;
 
   DominanceInfo *DomInfoToUpdate = nullptr;
 
@@ -423,7 +422,7 @@ public:
   /// Try to hoist generic alloc_stack instructions to the entry block.  Returns
   /// none if the function was not changed. Otherwise, returns the analysis
   /// invalidation kind to use if the function was changed.
-  llvm::Optional<SILAnalysis::InvalidationKind> run();
+  std::optional<SILAnalysis::InvalidationKind> run();
 
   void setDominanceToUpdate(DominanceInfo *DI) { DomInfoToUpdate = DI; }
 
@@ -442,7 +441,9 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
     return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
-    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetVariantOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast;
   }
   if (isa<HasSymbolInst>(I)) {
     return true;
@@ -520,7 +521,7 @@ void HoistAllocStack::hoist() {
 
 /// Try to hoist generic alloc_stack instructions to the entry block.
 /// Returns true if the function was changed.
-llvm::Optional<SILAnalysis::InvalidationKind> HoistAllocStack::run() {
+std::optional<SILAnalysis::InvalidationKind> HoistAllocStack::run() {
   collectHoistableInstructions();
 
   // Nothing to hoist?

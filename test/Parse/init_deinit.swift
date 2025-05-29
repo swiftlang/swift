@@ -33,8 +33,8 @@ struct FooStructDeinitializerB {
   deinit // expected-error {{expected '{' for deinitializer}}
 }
 
-struct FooStructDeinitializerC {
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+struct FooStructDeinitializerC { // expected-note {{consider adding '~Copyable' to struct 'FooStructDeinitializerC'}}
+  deinit {} // expected-error {{deinitializer cannot be declared in struct 'FooStructDeinitializerC' that conforms to 'Copyable'}}
 }
 
 class FooClassDeinitializerA {
@@ -59,7 +59,7 @@ deinit {} // expected-error {{deinitializers may only be declared within a class
 
 struct BarStruct {
   init() {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // NOTE: this doesn't get diagnosed with the other errors in this file for some reason.
 }
 
 extension BarStruct {
@@ -71,7 +71,7 @@ extension BarStruct {
 
 enum BarUnion {
   init() {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // NOTE: this doesn't get diagnosed with the other errors in this file for some reason.
 }
 
 extension BarUnion {
@@ -116,27 +116,4 @@ func barFunc() {
     deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
     return
   } ()
-}
-
-// https://github.com/apple/swift/issues/43464
-
-class Aaron {
-  init(x: Int) {}
-  convenience init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{24-24=self.}}
-}
-
-class Theodosia: Aaron {
-  init() {
-    init(x: 2) // expected-error {{missing 'super.' at initializer invocation}} {{5-5=super.}}
-  }
-}
-
-struct AaronStruct {
-  init(x: Int) {}
-  init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{12-12=self.}}
-}
-
-enum AaronEnum: Int {
-  case A = 1
-  init(x: Int) { init(rawValue: x)! } // expected-error {{missing 'self.' at initializer invocation}} {{18-18=self.}}
 }

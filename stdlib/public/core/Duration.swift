@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -35,15 +35,13 @@
 @frozen
 public struct Duration: Sendable {
   /// The low 64 bits of a 128-bit signed integer value counting attoseconds.
-  @usableFromInline
-  internal var _low: UInt64
+  public var _low: UInt64
 
   /// The high 64 bits of a 128-bit signed integer value counting attoseconds.
-  @usableFromInline
-  internal var _high: Int64
+  public var _high: Int64
 
   @inlinable
-  internal init(_high: Int64, low: UInt64) {
+  public init(_high: Int64, low: UInt64) {
     self._low = low
     self._high = _high
   }
@@ -101,6 +99,36 @@ extension Duration {
   }
 }
 
+@available(SwiftStdlib 6.0, *)
+extension Duration {
+  /// The number of attoseconds represented by this `Duration`.
+  ///
+  /// This property provides direct access to the underlying number of attoseconds 
+  /// that the current `Duration` represents.
+  ///
+  ///     let d = Duration.seconds(1)
+  ///     print(d.attoseconds) // 1_000_000_000_000_000_000
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  public var attoseconds: Int128 {
+    Int128(_low: _low, _high: _high)
+  }
+  
+  /// Construct a `Duration` from the given number of attoseconds.
+  ///
+  /// This directly constructs a `Duration` from the given number of attoseconds.
+  ///
+  ///     let d = Duration(attoseconds: 1_000_000_000_000_000_000)
+  ///     print(d) // 1.0 seconds
+  ///
+  /// - Parameter attoseconds: The total duration expressed in attoseconds.
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  public init(attoseconds: Int128) {
+    self.init(_high: attoseconds._high, low: attoseconds._low)
+  }
+}
+
 @available(SwiftStdlib 5.7, *)
 extension Duration {
   /// Construct a `Duration` given a number of seconds represented as a 
@@ -110,9 +138,13 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of seconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(seconds).multiplied(by: 1_000_000_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: seconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: seconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
   
   /// Construct a `Duration` given a duration and scale, taking care so that
@@ -150,11 +182,15 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of milliseconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(milliseconds).multiplied(by: 1_000_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: milliseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: milliseconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
   /// Construct a `Duration` given a number of seconds milliseconds as a 
@@ -175,11 +211,15 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of microseconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(microseconds).multiplied(by: 1_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: microseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: microseconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
   /// Construct a `Duration` given a number of seconds microseconds as a 
@@ -200,11 +240,26 @@ extension Duration {
   ///
   /// - Returns: A `Duration` representing a given number of nanoseconds.
   @available(SwiftStdlib 5.7, *)
+  @inlinable
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(nanoseconds).multiplied(by: 1_000_000_000))
+    guard let high = Int64(exactly: nanoseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: nanoseconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
+    let highScaled = high * 1_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
+  }
+  
+  /// Construct a `Duration` given a number of seconds nanoseconds as a
+  /// `Double` by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .nanoseconds(382.9)
+  ///
+  /// - Returns: A `Duration` representing a given number of nanoseconds.
+  @available(SwiftStdlib 6.2, *)
+  public static func nanoseconds(_ nanoseconds: Double) -> Duration {
+    Duration(nanoseconds, scale: 1_000_000_000)
   }
 }
 

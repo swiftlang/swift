@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Performs mandatory optimizations for performance-annotated functions, and global
@@ -35,8 +36,7 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   if moduleContext.options.enableEmbeddedSwift {
     worklist.addAllNonGenericFunctions(of: moduleContext)
   } else {
-    worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
-    worklist.addAllAnnotatedGlobalInitOnceFunctions(of: moduleContext)
+    worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
@@ -50,8 +50,21 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         return
       }
 
-      optimize(function: f, context, &worklist)
+      // It's not required to set the perf_constraint flag on all functions in embedded mode.
+      // Embedded mode already implies that flag.
+      if !moduleContext.options.enableEmbeddedSwift {
+        f.set(isPerformanceConstraint: true, context)
+      }
+
+      optimize(function: f, context, moduleContext, &worklist)
     }
+
+    // Generic specialization takes care of removing metatype arguments of generic functions.
+    // But sometimes non-generic functions have metatype arguments which must be removed.
+    // We need handle this case with a function signature optimization.
+    removeMetatypeArgumentsInCallees(of: f, moduleContext)
+
+    worklist.addCallees(of: f)
   }
 }
 
@@ -60,13 +73,24 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
+
+  // ObjectOutliner replaces calls to findStringSwitchCase with _findStringSwitchCaseWithCache, but this happens as a late SIL optimization,
+  // which is a problem for Embedded Swift, because _findStringSwitchCaseWithCache will then reference non-specialized code. Solve this by
+  // eagerly linking and specializing _findStringSwitchCaseWithCache whenever findStringSwitchCase is found in the module.
+  if context.options.enableEmbeddedSwift {
+    if function.hasSemanticsAttribute("findStringSwitchCase"),
+        let f = context.lookupStdlibFunction(name: "_findStringSwitchCaseWithCache"),
+        context.loadFunction(function: f, loadCalleesRecursively: true) {
+      worklist.pushIfNotVisited(f)
+    }
+  }
   
   var changed = true
   while changed {
     changed = runSimplification(on: function, context, preserveDebugInfo: true) { instruction, simplifyCtxt in
-      if let i = instruction as? OnoneSimplifyable {
+      if let i = instruction as? OnoneSimplifiable {
         i.simplify(simplifyCtxt)
         if instruction.isDeleted {
           return
@@ -79,15 +103,88 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, &worklist)
+          specializeVTable(forClassType: alloc.type, errorLocation: alloc.location, moduleContext) {
+            worklist.pushIfNotVisited($0)
+          }
         }
       case let metatype as MetatypeInst:
         if context.options.enableEmbeddedSwift {
-          specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, &worklist)
+          let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
+          if instanceType.isClass {
+            specializeVTable(forClassType: instanceType, errorLocation: metatype.location, moduleContext) {
+              worklist.pushIfNotVisited($0)
+            }
+          }
         }
       case let classMethod as ClassMethodInst:
         if context.options.enableEmbeddedSwift {
           _ = context.specializeClassMethodInst(classMethod)
+        }
+      case let witnessMethod as WitnessMethodInst:
+        if context.options.enableEmbeddedSwift {
+          _ = context.specializeWitnessMethodInst(witnessMethod)
+        }
+
+      case let initExRef as InitExistentialRefInst:
+        if context.options.enableEmbeddedSwift {
+          for c in initExRef.conformances where c.isConcrete {
+            specializeWitnessTable(for: c, moduleContext) {
+              worklist.addWitnessMethods(of: $0)
+            }
+          }
+        }
+
+      case let bi as BuiltinInst:
+        switch bi.id {
+        case .BuildOrdinaryTaskExecutorRef,
+             .BuildOrdinarySerialExecutorRef,
+             .BuildComplexEqualitySerialExecutorRef:
+          specializeWitnessTable(for: bi.substitutionMap.conformances[0], moduleContext) {
+            worklist.addWitnessMethods(of: $0)
+          }
+
+        default:
+          break
+        }
+
+
+      // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
+      case let destroyValue as DestroyValueInst:
+        if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyValue.location)
+          }
+        }
+      case let destroyAddr as DestroyAddrInst:
+        if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(.deinit_not_visible, at: destroyAddr.location)
+          }
+        }
+
+      case let iem as InitExistentialMetatypeInst:
+        if iem.uses.ignoreDebugUses.isEmpty {
+          context.erase(instructionIncludingDebugUses: iem)
+        }
+
+      case let fri as FunctionRefInst:
+        // Mandatory de-virtualization and mandatory inlining might leave referenced functions in "serialized"
+        // functions with wrong linkage. Fix this by making the referenced function public.
+        // It's not great, because it can prevent dead code elimination. But it's only a rare case.
+        if function.serializedKind != .notSerialized,
+           !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
+        {
+          fri.referencedFunction.set(linkage: .public, moduleContext)
+        }
+        
+      case let copy as CopyAddrInst:
+        if function.isGlobalInitOnceFunction, copy.source.type.isLoadable(in: function) {
+          // In global init functions we have to make sure that redundant load elimination can remove all
+          // loads (from temporary stack locations) so that globals can be statically initialized.
+          // For this it's necessary to load copy_addr instructions to loads and stores.
+          copy.replaceWithLoadAndStore(simplifyCtxt)
         }
 
       default:
@@ -100,25 +197,21 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
     removeUnusedMetatypeInstructions(in: function, context)
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
-    changed = context.optimizeMemoryAccesses(in: function) || changed
-    _ = context.eliminateDeadAllocations(in: function)
-  }
+    if eliminateRedundantLoads(in: function,
+                               variant: function.isGlobalInitOnceFunction ? .mandatoryInGlobalInit : .mandatory,
+                               context)
+    {
+      changed = true
+    }
 
-  worklist.add(calleesOf: function)
-}
-
-private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
-  guard let vtable = context.specializeVTable(for: type, in: function) else {
-    return
-  }
-
-  for entry in vtable.entries {
-    worklist.pushIfNotVisited(entry.function)
+    changed = context.eliminateDeadAllocations(in: function) || changed
   }
 }
 
 private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
                                    _ context: FunctionPassContext, _ simplifyCtxt: SimplifyContext) {
+  // De-virtualization and inlining in/into a "serialized" function might create function references to functions
+  // with wrong linkage. We need to fix this later (see handling of FunctionRefInst in `optimize`).
   if simplifyCtxt.tryDevirtualize(apply: apply, isMandatory: true) != nil {
     return
   }
@@ -132,14 +225,20 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
     return
   }
 
-  if apply.canInline &&
-     shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions)
-  {
+  if shouldInline(apply: apply, callee: callee, alreadyInlinedFunctions: &alreadyInlinedFunctions) {
     if apply.inliningCanInvalidateStackNesting  {
       simplifyCtxt.notifyInvalidatedStackNesting()
     }
 
     simplifyCtxt.inlineFunction(apply: apply, mandatoryInline: true)
+  }
+}
+
+private func removeMetatypeArgumentsInCallees(of function: Function, _ context: ModulePassContext) {
+  for inst in function.instructions {
+    if let apply = inst as? FullApplySite {
+      specializeByRemovingMetatypeArguments(apply: apply, context)
+    }
   }
 }
 
@@ -153,18 +252,41 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
 }
 
 private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlinedFunctions: inout Set<PathFunctionTuple>) -> Bool {
-  if callee.isTransparent {
-    return true
+  if let beginApply = apply as? BeginApplyInst,
+     !beginApply.canInline
+  {
+    return false
   }
 
-  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
-    // Cannot inline a non-ossa function into an ossa function
+  guard callee.canBeInlinedIntoCaller(withSerializedKind: apply.parentFunction.serializedKind) ||
+        // Even if the serialization kind doesn't match, we need to make sure to inline witness method thunks
+        // in embedded swift.
+        callee.thunkKind == .thunk ||
+        // Force inlining transparent co-routines. This might be necessary if `-enable-testing` is turned on.
+        (apply is BeginApplyInst && callee.isTransparent)
+  else {
     return false
+  }
+
+  // Cannot inline a non-ossa function into an ossa function
+  if apply.parentFunction.hasOwnership && !callee.hasOwnership {
+    return false
+  }
+
+  if callee.isTransparent {
+    precondition(callee.hasOwnership, "transparent functions should have ownership at this stage of the pipeline")
+    return true
   }
 
   if apply is BeginApplyInst {
     // Avoid co-routines because they might allocate (their context).
     return true
+  }
+
+  if callee.mayBindDynamicSelf {
+    // We don't support inlining a function that binds dynamic self into a global-init function
+    // because the global-init function cannot provide the self metadata.
+    return false
   }
 
   if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
@@ -265,7 +387,14 @@ private extension Value {
     var singleUseValue: any Value = self
     var path = SmallProjectionPath()
     while true {
-      guard let use = singleUseValue.uses.singleRelevantUse else {
+      // The initializer value of a global can contain access instructions if it references another
+      // global variable by address, e.g.
+      //   var p = Point(x: 10, y: 20)
+      //   let o = UnsafePointer(&p)
+      // Therefore ignore the `end_access` use of a `begin_access`.
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUsers(ofType: EndAccessInst.self)
+
+      guard let use = relevantUses.singleUse else {
         return nil
       }
       
@@ -305,6 +434,9 @@ private extension Value {
 private extension Function {
   /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
   func getInitializedGlobal() -> GlobalVariable? {
+    if !isDefinition {
+      return nil
+    }
     for inst in self.entryBlock.instructions {
       switch inst {
       case let agi as AllocGlobalInst:
@@ -331,30 +463,40 @@ fileprivate struct FunctionWorklist {
     }
     return nil
   }
-
-  mutating func addAllPerformanceAnnotatedFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.performanceConstraints != .none {
-      pushIfNotVisited(f)
+  
+  mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions {
+      // Performance annotated functions
+      if f.performanceConstraints != .none {
+        pushIfNotVisited(f)
+      }
+      
+      // Annotated global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
+      
+      // @const global init-once functions
+      if f.isGlobalInitOnceFunction {
+        if let global = f.getInitializedGlobal(),
+           global.mustBeInitializedStatically {
+          pushIfNotVisited(f)
+        }
+      }
     }
   }
 
   mutating func addAllNonGenericFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where !f.isGenericFunction {
+    for f in moduleContext.functions where !f.isGeneric {
       pushIfNotVisited(f)
     }
     return
   }
 
-  mutating func addAllAnnotatedGlobalInitOnceFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.isGlobalInitOnceFunction {
-      if let global = f.getInitializedGlobal(),
-         global.mustBeInitializedStatically {
-        pushIfNotVisited(f)
-      }
-    }
-  }
-
-  mutating func add(calleesOf function: Function) {
+  mutating func addCallees(of function: Function) {
     for inst in function.instructions {
       switch inst {
       case let apply as ApplySite:
@@ -377,33 +519,22 @@ fileprivate struct FunctionWorklist {
     }
   }
 
+  mutating func addWitnessMethods(of witnessTable: WitnessTable) {
+    for entry in witnessTable.entries {
+      if case .method(_, let witness) = entry,
+         let method = witness,
+         // A new witness table can still contain a generic function if the method couldn't be specialized for
+         // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+         !method.isGeneric
+      {
+        pushIfNotVisited(method)
+      }
+    }
+  }
+
   mutating func pushIfNotVisited(_ element: Function) {
     if pushedFunctions.insert(element).inserted {
       functions.append(element)
     }
-  }
-}
-
-private extension UseList {
-  var singleRelevantUse: Operand? {
-    var singleUse: Operand?
-    for use in self {
-      switch use.instruction {
-      case is DebugValueInst,
-           // The initializer value of a global can contain access instructions if it references another
-           // global variable by address, e.g.
-           //   var p = Point(x: 10, y: 20)
-           //   let o = UnsafePointer(&p)
-           // Therefore ignore the `end_access` use of a `begin_access`.
-           is EndAccessInst:
-        continue
-      default:
-        if singleUse != nil {
-          return nil
-        }
-        singleUse = use
-      }
-    }
-    return singleUse
   }
 }

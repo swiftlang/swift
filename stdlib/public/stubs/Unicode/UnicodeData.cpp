@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/shims/UnicodeData.h"
-#include <limits>
+#include <stdint.h>
 
 // Every 4 byte chunks of data that we need to hash (in this case only ever
 // scalars and levels who are all uint32), we need to calculate K. At the end
@@ -73,7 +73,7 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
       // within each bit array every 512 bits. Say our level (bit array)
       // contains 16 uint64 integers to represent all of the required bits.
       // There would be a total of 1024 bits, so our rankings for this level
-      // would contain two values for precomputed counted bits for both halfs
+      // would contain two values for precomputed counted bits for both halves
       // of this bit array (1024 / 512 = 2).
       auto rank = ranks[i][idx / 512];
 
@@ -162,7 +162,7 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
   // If our chunk index is larger than the quick look indices, then it means
   // our scalar appears in chunks who are all 0 and trailing.
   if ((__swift_uint64_t) idx > quickLookSize - 1) {
-    return std::numeric_limits<__swift_intptr_t>::max();
+    return INTPTR_MAX;
   }
 
   // Our scalar actually exists in a quick look bit array that was implemented.
@@ -172,7 +172,7 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
   // (chunkSize) of the scalars being represented have no property and ours is
   // one of them.
   if ((quickLook & ((__swift_uint64_t) 1 << chunkBit)) == 0) {
-    return std::numeric_limits<__swift_intptr_t>::max();
+    return INTPTR_MAX;
   }
 
   // Ok, our scalar failed the quick look check. Go lookup our scalar in the
@@ -189,7 +189,7 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
   auto chunkRank = ranks[idx];
 
   // If our specific bit within the chunk isn't the first bit, then count the
-  // number of bits turned on preceeding our chunk bit.
+  // number of bits turned on preceding our chunk bit.
   if (chunkBit != 0) {
     chunkRank += __builtin_popcountll(quickLook << (64 - chunkBit));
   }
@@ -223,7 +223,7 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
   // If our scalar specifically is not turned on within our chunk's bit array,
   // then we know for sure that our scalar does not inhibit this property.
   if ((chunkWord & ((__swift_uint64_t) 1 << scalarSpecificBit)) == 0) {
-    return std::numeric_limits<__swift_intptr_t>::max();
+    return INTPTR_MAX;
   }
 
   // Otherwise, this scalar does have whatever property this scalar array is

@@ -445,6 +445,7 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @safe
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -453,7 +454,7 @@ public protocol Sequence<Element> {
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
-  // @_implements(Sequence, Iterator)
+  @_implements(Sequence, Iterator)
   public typealias _Default_Iterator = Self
 }
 
@@ -487,12 +488,15 @@ public struct DropFirstSequence<Base: Sequence> {
   }
 }
 
+extension DropFirstSequence: Sendable where Base: Sendable {}
+
 extension DropFirstSequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = Base.Iterator
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
     var dropped = 0
@@ -530,6 +534,8 @@ public struct PrefixSequence<Base: Sequence> {
   }
 }
 
+extension PrefixSequence: Sendable where Base: Sendable {}
+
 extension PrefixSequence {
   @frozen
   public struct Iterator {
@@ -545,6 +551,8 @@ extension PrefixSequence {
     }
   }  
 }
+
+extension PrefixSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
 extension PrefixSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -603,6 +611,9 @@ public struct DropWhileSequence<Base: Sequence> {
   }
 }
 
+extension DropWhileSequence: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
+
 extension DropWhileSequence {
   @frozen
   public struct Iterator {
@@ -618,6 +629,9 @@ extension DropWhileSequence {
     }
   }
 }
+
+extension DropWhileSequence.Iterator: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
 
 extension DropWhileSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -670,9 +684,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
@@ -688,6 +703,18 @@ extension Sequence {
       result.append(try transform(element))
     }
     return Array(result)
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
+  func __rethrows_map<T>(
+    _ transform: (Element) throws -> T
+  ) throws -> [T] {
+    try map(transform)
   }
 
   /// Returns an array containing, in order, the elements of the sequence
@@ -988,7 +1015,10 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = (i + 1) % maxLength
+        i += 1
+        if i >= maxLength {
+          i = 0
+        }
       }
     }
 
@@ -1067,7 +1097,10 @@ extension Sequence {
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i = (i + 1) % k
+        i += 1
+        if i >= k {
+          i = 0
+        }
       }
     }
     return Array(result)
@@ -1192,7 +1225,7 @@ extension Sequence {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _copySequenceContents(initializing: buffer)
+    return unsafe _copySequenceContents(initializing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -1205,13 +1238,14 @@ extension Sequence {
       guard let x = it.next() else {
         return (it, idx)
       }
-      ptr.initialize(to: x)
-      ptr += 1
+      unsafe ptr.initialize(to: x)
+      unsafe ptr += 1
     }
     return (it, buffer.endIndex)
   }
     
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1241,6 +1275,9 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 }
 
 extension IteratorSequence: IteratorProtocol, Sequence {
+
+  public typealias Element = Base.Element
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///

@@ -10,10 +10,10 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
-@preconcurrency import Dispatch
+import Dispatch
 @_spi(ConcurrencyExecutors) import _Concurrency
 
-class BaseExecutor: SerialExecutor {
+class BaseExecutor: SerialExecutor, @unchecked Sendable /* only for testing purposes */ {
   let name: String
   let queue: DispatchQueue
 

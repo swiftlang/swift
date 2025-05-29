@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/Inputs/enums.swift -module-name Enums -emit-module -emit-module-path %t/Enums.swiftmodule -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
 
-// RUN: %target-swift-frontend %s -typecheck -module-name UsesEnums -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-enums.h -clang-header-expose-module Enums=enums.h
+// RUN: %target-swift-frontend %s -module-name UsesEnums -I %t -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/uses-enums.h -clang-header-expose-module Enums=enums.h
 
 // RUN: %FileCheck %s < %t/uses-enums.h
 
@@ -22,7 +22,7 @@ public func inoutLargeEnum(_ s: inout LargeEnum) {
 }
 
 // CHECK: SWIFT_INLINE_THUNK void inoutLargeEnum(Enums::LargeEnum& s) noexcept SWIFT_SYMBOL("s:9UsesEnums14inoutLargeEnumyy0B00dE0OzF") {
-// CHECK-NEXT: return _impl::$s9UsesEnums14inoutLargeEnumyy0B00dE0OzF(Enums::_impl::_impl_LargeEnum::getOpaquePointer(s));
+// CHECK-NEXT: _impl::$s9UsesEnums14inoutLargeEnumyy0B00dE0OzF(Enums::_impl::_impl_LargeEnum::getOpaquePointer(s));
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK Enums::LargeEnum UsesEnumsLargeEnum::passThroughStructSeveralI64(const Enums::LargeEnum& y) const {

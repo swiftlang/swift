@@ -25,6 +25,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <optional>
+#include <tuple>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -45,6 +46,11 @@ public:
   MetadataAllocator() = delete;
 
   void Reset() {}
+
+  /// Get the location of the allocator's initial statically allocated pool.
+  /// The return values are start and size. If there is no statically allocated
+  /// pool, the return values are NULL, 0.
+  static std::tuple<const void *, size_t> InitialPoolLocation();
 
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment);
@@ -67,6 +73,9 @@ public:
 class MetadataAllocator {
 public:
   MetadataAllocator(uint16_t tag) {}
+  static std::tuple<const void *, size_t> InitialPoolLocation() {
+    return {nullptr, 0};
+  }
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
@@ -606,12 +615,28 @@ public:
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
+    // Fast path the case where they're bytewise identical. That's nearly always
+    // the case if the hashes are the same, and we can skip the slower deep
+    // comparison.
+    auto *adata = begin();
+    auto *bdata = rhs.begin();
+
+    auto asize = (uintptr_t)end() - (uintptr_t)adata;
+    auto bsize = (uintptr_t)rhs.end() - (uintptr_t)bdata;
+
+    // If sizes don't match, they can never be equal.
+    if (asize != bsize)
+      return false;
+
+    // If sizes match, see if the bytes match. If they do, then the contents
+    // must necessarily match. Otherwise do a deep comparison.
+    if (memcmp(adata, bdata, asize) == 0)
+      return true;
+
     // Compare the layouts.
     if (Layout != rhs.Layout) return false;
 
     // Compare the content.
-    auto *adata = begin();
-    auto *bdata = rhs.begin();
     const uintptr_t *packCounts = reinterpret_cast<const uintptr_t *>(adata);
 
     unsigned argIdx = 0;
@@ -1211,7 +1236,8 @@ public:
                              MetadataRequest request, Args &&...args) {
     // Note that we ignore the extra arguments; those are just for the
     // constructor and allocation.
-    return doInitialization(worker, request);
+    auto result = doInitialization(worker, request);
+    return result;
   }
 
 private:
@@ -1585,8 +1611,6 @@ public:
   bool matchesKey(const MetadataCacheKey &key) const {
     return key == getKey();
   }
-
-  friend struct StaticAssertGenericMetadataCacheEntryValueOffset;
 };
 
 template <class EntryType, uint16_t Tag>

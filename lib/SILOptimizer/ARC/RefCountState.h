@@ -64,7 +64,7 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction *> *I,
                            RCIdentityFunctionInfo *RCFI) {
     assert(I->size() == 1);
 
@@ -188,7 +188,7 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction *> *I,
                            RCIdentityFunctionInfo *RCFI);
 
   /// Update this reference count's state given the instruction \p I.
@@ -327,7 +327,7 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction> *I,
+  bool initWithMutatorInst(ImmutablePointerSet<SILInstruction *> *I,
                            RCIdentityFunctionInfo *RCFI);
 
   /// Initialize the state given the consumed argument Arg.
@@ -335,7 +335,7 @@ public:
 
   /// Initialize this RefCountState with an instruction which introduces a new
   /// ref count at +1.
-  void initWithEntranceInst(ImmutablePointerSet<SILInstruction> *I,
+  void initWithEntranceInst(ImmutablePointerSet<SILInstruction *> *I,
                             SILValue RCIdentity);
 
   /// Uninitialize the current state.

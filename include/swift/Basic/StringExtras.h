@@ -20,7 +20,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -28,6 +27,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -351,12 +351,12 @@ struct OmissionTypeName {
 
   /// Construct a type name.
   OmissionTypeName(StringRef name = StringRef(),
-                   OmissionTypeOptions options = llvm::None,
+                   OmissionTypeOptions options = std::nullopt,
                    StringRef collectionElement = StringRef())
       : Name(name), CollectionElement(collectionElement), Options(options) {}
 
   /// Construct a type name.
-  OmissionTypeName(const char *name, OmissionTypeOptions options = llvm::None,
+  OmissionTypeName(const char *name, OmissionTypeOptions options = std::nullopt,
                    StringRef collectionElement = StringRef())
       : Name(name), CollectionElement(collectionElement), Options(options) {}
 
@@ -466,12 +466,12 @@ bool omitNeedlessWords(StringRef &baseName, MutableArrayRef<StringRef> argNames,
                        ArrayRef<OmissionTypeName> paramTypes, bool returnsSelf,
                        bool isProperty,
                        const InheritedNameSet *allPropertyNames,
-                       llvm::Optional<unsigned> completionHandlerIndex,
-                       llvm::Optional<StringRef> completionHandlerName,
+                       std::optional<unsigned> completionHandlerIndex,
+                       std::optional<StringRef> completionHandlerName,
                        StringScratchSpace &scratch);
 
 /// If the name has a completion-handler suffix, strip off that suffix.
-llvm::Optional<StringRef> stripWithCompletionHandlerSuffix(StringRef name);
+std::optional<StringRef> stripWithCompletionHandlerSuffix(StringRef name);
 
 /// Represents a string that can be efficiently retrieved either as a StringRef
 /// or as a null-terminated C string.

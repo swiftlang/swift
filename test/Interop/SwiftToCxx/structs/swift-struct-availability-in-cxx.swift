@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Struct -clang-header-expose-decls=all-public -emit-clang-header-path %t/struct.h
+// RUN: %target-swift-frontend %s -module-name Struct -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/struct.h
 // RUN: %FileCheck %s < %t/struct.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/struct.h)

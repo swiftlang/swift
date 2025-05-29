@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend-typecheck -verify -target %target-swift-5.1-abi-triple %s
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -target %target-swift-5.1-abi-triple %s
 
 import _Differentiation
 
@@ -218,11 +218,11 @@ protocol ProtocolRequirements: Differentiable {
   @differentiable(reverse, wrt: x)
   init(x: Float, y: Int)
 
-  // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Float) -> Float';}}
+  // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Float) -> Float'}}
   @differentiable(reverse)
   func amb(x: Float, y: Float) -> Float
 
-  // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Int) -> Float';}}
+  // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Int) -> Float'}}
   @differentiable(reverse, wrt: x)
   func amb(x: Float, y: Int) -> Float
 
@@ -281,6 +281,7 @@ struct InternalDiffAttrConformance: ProtocolRequirements {
 
 // Test missing `@differentiable` attribute for public protocol witnesses. Errors expected.
 
+// expected-note @+2 {{add stubs for conformance}}
 // expected-error @+1 {{does not conform to protocol 'ProtocolRequirements'}}
 public struct PublicDiffAttrConformance: ProtocolRequirements {
   public typealias TangentVector = DummyTangentVector
@@ -289,7 +290,6 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   var x: Float
   var y: Float
 
-  // FIXME(TF-284): Fix unexpected diagnostic.
   // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   public init(x: Float, y: Float) {
@@ -297,7 +297,6 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
     self.y = y
   }
 
-  // FIXME(TF-284): Fix unexpected diagnostic.
   // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   public init(x: Float, y: Int) {
@@ -391,6 +390,7 @@ struct TF_521<T: FloatingPoint> {
     self.imaginary = imaginary
   }
 }
+// expected-note @+2 {{add stubs for conformance}}
 // expected-error @+1 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
 extension TF_521: Differentiable where T: Differentiable {
   // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' (aka 'TF_521<T>') does not conform to 'AdditiveArithmetic'}}
@@ -557,10 +557,11 @@ public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
 
 public protocol HasRequirement {
   @differentiable(reverse)
-  // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'; add a stub for conformance}}
+  // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'}}
   func requirement<T: Differentiable>(_ x: T, _ y: T) -> T
 }
 
+// expected-note @+2 {{add stubs for conformance}}
 // expected-error @+1 {{type 'AttemptsToSatisfyRequirement' does not conform to protocol 'HasRequirement'}}
 public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because

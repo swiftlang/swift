@@ -26,7 +26,8 @@ func objCUser(_ obj: ObjCClass) {}
 #endif
 
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
-// CHECK: Importing ASTSection... ok!
+// CHECK: Importing ASTSection...
+// CHECK: Import successful!
 
 // LINETABLE-CHECK-NOT: ASTSection
 

@@ -29,6 +29,8 @@
 
 namespace swift {
 
+class DiagnosticHelper;
+
 /// Create a swift caching output backend that stores the output from
 /// compiler into a CAS.
 llvm::IntrusiveRefCntPtr<cas::SwiftCASOutputBackend>
@@ -36,15 +38,30 @@ createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action);
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action);
 
 /// Replay the output of the compilation from cache.
 /// Return true if outputs are replayed, false otherwise.
-bool replayCachedCompilerOutputs(
-    llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
-    llvm::cas::ObjectRef BaseKey, DiagnosticEngine &Diag,
-    const FrontendInputsAndOutputs &InputsAndOutputs,
-    CachingDiagnosticsProcessor &CDP, bool CacheRemarks);
+bool replayCachedCompilerOutputs(llvm::cas::ObjectStore &CAS,
+                                 llvm::cas::ActionCache &Cache,
+                                 llvm::cas::ObjectRef BaseKey,
+                                 DiagnosticEngine &Diag,
+                                 const FrontendOptions &Opts,
+                                 CachingDiagnosticsProcessor &CDP,
+                                 bool CacheRemarks, bool UseCASBackend);
+
+/// Replay the output of the compilation from cache for one input file.
+/// Return true if outputs are replayed, false otherwise.
+bool replayCachedCompilerOutputsForInput(llvm::cas::ObjectStore &CAS,
+                                         llvm::cas::ObjectRef OutputRef,
+                                         const InputFile &Input,
+                                         unsigned InputIndex,
+                                         DiagnosticEngine &Diag,
+                                         DiagnosticHelper &DiagHelper,
+                                         llvm::vfs::OutputBackend &OutBackend,
+                                         const FrontendOptions &Opts,
+                                         CachingDiagnosticsProcessor &CDP,
+                                         bool CacheRemarks, bool UseCASBackend);
 
 /// Load the cached compile result from cache.
 std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(
@@ -53,8 +70,9 @@ std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(
     llvm::StringRef Filename = "");
 
 llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
-createCASFileSystem(llvm::cas::ObjectStore &CAS, ArrayRef<std::string> FSRoots,
-                    ArrayRef<std::string> IncludeTreeRoots);
+createCASFileSystem(llvm::cas::ObjectStore &CAS,
+                    const std::string &IncludeTreeRoot,
+                    const std::string &IncludeTreeFileList);
 
 std::vector<std::string> remapPathsFromCommandLine(
     ArrayRef<std::string> Args,
@@ -63,19 +81,19 @@ std::vector<std::string> remapPathsFromCommandLine(
 namespace cas {
 class CachedResultLoader {
 public:
-  CachedResultLoader(llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
-                     llvm::cas::ObjectRef CacheKey)
-      : CAS(CAS), Cache(Cache), CacheKey(CacheKey) {}
+  CachedResultLoader(llvm::cas::ObjectStore &CAS,
+                     llvm::cas::ObjectRef OutputRef)
+      : CAS(CAS), OutputRef(OutputRef) {}
 
   using CallbackTy =
       llvm::function_ref<llvm::Error(file_types::ID, llvm::cas::ObjectRef)>;
-  // Replay the cached result, return false if a cache miss happened.
-  llvm::Expected<bool> replay(CallbackTy Callback);
+
+  /// Replay the cached result.
+  llvm::Error replay(CallbackTy Callback);
 
 private:
   llvm::cas::ObjectStore &CAS;
-  llvm::cas::ActionCache &Cache;
-  llvm::cas::ObjectRef CacheKey;
+  llvm::cas::ObjectRef OutputRef;
 };
 } // end namespace cas
 } // end namespace swift

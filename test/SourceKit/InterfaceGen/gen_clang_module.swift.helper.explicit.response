@@ -1,53 +1,53 @@
-
 public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
+
 
 [
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1,
+    key.offset: 0,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 8,
+    key.offset: 7,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 13,
+    key.offset: 12,
     key.length: 31
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 45,
+    key.offset: 44,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 47,
+    key.offset: 46,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 50,
+    key.offset: 49,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 60,
+    key.offset: 59,
     key.length: 5
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 50,
+    key.offset: 49,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 60,
+    key.offset: 59,
     key.length: 5,
     key.is_system: 1
   }
@@ -57,14 +57,14 @@ public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fooHelperExplicitFrameworkFunc1(_:)",
-    key.offset: 8,
+    key.offset: 7,
     key.length: 57,
     key.typename: "Int32",
-    key.nameoffset: 13,
+    key.nameoffset: 12,
     key.namelength: 43,
     key.attributes: [
       {
-        key.offset: 1,
+        key.offset: 0,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -73,7 +73,7 @@ public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "a",
-        key.offset: 45,
+        key.offset: 44,
         key.length: 10,
         key.typename: "Int32"
       }

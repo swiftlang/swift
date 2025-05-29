@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
@@ -149,7 +149,7 @@ bb0(%0 : $@thick Vista.Type):
 sil hidden [ossa] @$s3bug9PresenterCfd : $@convention(method) (@guaranteed Presenter) -> @owned Builtin.NativeObject {
 // %0 "self"                                      // users: %6, %2, %1
 bb0(%0 : @guaranteed $Presenter):
-  debug_value %0 : $Presenter, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Presenter, let, name "self", argno 1 // id: %1
   %2 = ref_element_addr %0 : $Presenter, #Presenter.view // user: %3
   %3 = begin_access [deinit] [static] %2 : $*Optional<Vista> // users: %5, %4
   destroy_addr %3 : $*Optional<Vista>             // id: %4
@@ -163,7 +163,7 @@ bb0(%0 : @guaranteed $Presenter):
 sil hidden [ossa] @$s3bug9PresenterCfD : $@convention(method) (@owned Presenter) -> () {
 // %0 "self"                                      // users: %6, %3, %1
 bb0(%0 : @owned $Presenter):
-  debug_value %0 : $Presenter, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Presenter, let, name "self", argno 1 // id: %1
   // function_ref Presenter.deinit
   %2 = function_ref @$s3bug9PresenterCfd : $@convention(method) (@guaranteed Presenter) -> @owned Builtin.NativeObject // user: %4
   %3 = begin_borrow %0 : $Presenter               // users: %5, %4
@@ -191,7 +191,7 @@ bb0(%0 : $@thick Presenter.Type):
 sil hidden [ossa] @$s3bug9PresenterCACycfc : $@convention(method) (@owned Presenter) -> @owned Presenter {
 // %0 "self"                                      // users: %2, %1
 bb0(%0 : @owned $Presenter):
-  debug_value %0 : $Presenter, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Presenter, let, name "self", argno 1 // id: %1
   %2 = mark_uninitialized [rootself] %0 : $Presenter // users: %10, %9, %3
   %3 = begin_borrow %2 : $Presenter               // users: %8, %4
   %4 = ref_element_addr %3 : $Presenter, #Presenter.view // user: %7
@@ -210,7 +210,7 @@ sil hidden [ossa] @$s3bug5VistaC12doSmthOnMainyyF : $@convention(method) (@guara
 // %0 "self"                                      // user: %2
 bb0(%0 : @guaranteed $Vista):
   %1 = global_addr @$s3bug1xSivp : $*Int          // user: %7
-  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %2
+  debug_value %0 : $Vista, let, name "self", argno 1 // id: %2
   %3 = integer_literal $Builtin.IntLiteral, 1     // user: %6
   %4 = metatype $@thin Int.Type                   // user: %6
   // function_ref Int.init(_builtinIntegerLiteral:)
@@ -230,7 +230,7 @@ sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@conven
 sil hidden [ossa] @$s3bug5VistaCfd : $@convention(method) (@guaranteed Vista) -> @owned Builtin.NativeObject {
 // %0 "self"                                      // users: %2, %1
 bb0(%0 : @guaranteed $Vista):
-  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Vista, let, name "self", argno 1 // id: %1
   %2 = unchecked_ref_cast %0 : $Vista to $Builtin.NativeObject // user: %3
   %3 = unchecked_ownership_conversion %2 : $Builtin.NativeObject, @guaranteed to @owned // user: %4
   return %3 : $Builtin.NativeObject               // id: %4
@@ -240,7 +240,7 @@ bb0(%0 : @guaranteed $Vista):
 sil hidden [ossa] @$s3bug5VistaCfD : $@convention(method) (@owned Vista) -> () {
 // %0 "self"                                      // users: %6, %3, %1
 bb0(%0 : @owned $Vista):
-  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Vista, let, name "self", argno 1 // id: %1
   // function_ref Vista.deinit
   %2 = function_ref @$s3bug5VistaCfd : $@convention(method) (@guaranteed Vista) -> @owned Builtin.NativeObject // user: %4
   %3 = begin_borrow %0 : $Vista                   // users: %5, %4
@@ -257,7 +257,7 @@ bb0(%0 : @owned $Vista):
 sil hidden [ossa] @$s3bug5VistaCACycfc : $@convention(method) (@owned Vista) -> @owned Vista {
 // %0 "self"                                      // users: %2, %1
 bb0(%0 : @owned $Vista):
-  debug_value %0 : $Vista, let, name "self", argno 1, implicit // id: %1
+  debug_value %0 : $Vista, let, name "self", argno 1 // id: %1
   %2 = mark_uninitialized [rootself] %0 : $Vista  // users: %4, %3
   %3 = copy_value %2 : $Vista                     // user: %5
   destroy_value %2 : $Vista                       // id: %4

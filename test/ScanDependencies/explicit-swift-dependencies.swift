@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
 
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
@@ -47,9 +47,9 @@ import F
 // CHECK-NEXT:            "-fno-implicit-modules",
 // CHECK-NEXT:            "-Xcc",
 // CHECK-NEXT:            "-fno-implicit-module-maps",
-// CHECK-NEXT:            "-o",
-// CHECK-NEXT:            "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-{{.*}}.swiftmodule"
-// CHECK-DAG:             "-fmodule-file=F={{.*}}{{/|\\}}F-{{.*}}.pcm",
-// CHECK-DAG:             "-fmodule-file=SwiftShims={{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm",
+// CHECK-DAG:             "-fmodule-file=F={{.*}}{{/|\\}}F-{{.*}}.pcm"
+// CHECK-DAG:             "-fmodule-file=SwiftShims={{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm"
+// CHECK-NEXT:            "-o",
+// CHECK-NEXT:            "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule"

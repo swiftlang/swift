@@ -27,19 +27,15 @@ class UnresolvedMemberTypeCheckCompletionCallback
     : public TypeCheckCompletionCallback {
   struct Result {
     Type ExpectedTy;
-    bool IsImplicitSingleExpressionReturn;
+    bool IsImpliedResult;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
 
-    /// Checks whether this result has the same \c BaseTy and \c BaseDecl as
-    /// \p Other and if the two can thus be merged to be one value lookup in
-    /// \c deliverResults.
-    bool canBeMergedWith(const Result &Other, DeclContext &DC) const;
-
-    /// Merge this result with \p Other. Assumes that they can be merged.
-    void merge(const Result &Other, DeclContext &DC);
+    /// Attempts to merge this result with \p Other, returning \c true if
+    /// successful, else \c false.
+    bool tryMerge(const Result &Other, DeclContext *DC);
   };
 
   CodeCompletionExpr *CompletionExpr;

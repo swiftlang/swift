@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
 
 // https://github.com/apple/swift/issues/47626
 

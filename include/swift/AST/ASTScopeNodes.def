@@ -1,0 +1,98 @@
+//===--- ASTScopeNodes.def - Node kinds for the ASTScope tree ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines all of the kinds of ASTScope nodes.
+//
+// The primary macro to define before including this file is SCOPE_NODE(Name),
+// which provides the name of the scope node (without the "Scope" suffix).
+// There are several more specific macros that can be defined to get more
+// specific information about certain kinds of nodes:
+//
+//   DECL_SCOPE_NODE(Name) - A scope node associated with a declaration.
+//   STMT_SCOPE_NODE(Name) - A scope node associated with a statement.
+//   EXPR_SCOPE_NODE(Name) - A scope node associated with an expression.
+//   DECL_ATTRIBUTE_SCOPE_NODE(Name) - A scope node associated with a
+//       declaration attribute.
+//
+// For each of these that is not defined on inclusion of this file, a
+// definition in terms of SCOPE_NODE will be provided, allowing clients to
+// define only SCOPE_NODE to deal with all scope nodes.
+//===----------------------------------------------------------------------===//
+
+#ifndef SCOPE_NODE
+#  error "define SCOPE_NODE(Name) when enumerating ASTScope nodes
+#  define SCOPE_NODE(Name)
+#endif
+
+#ifndef DECL_SCOPE_NODE
+#  define DECL_SCOPE_NODE(Name) SCOPE_NODE(Name)
+#endif
+
+#ifndef STMT_SCOPE_NODE
+#  define STMT_SCOPE_NODE(Name) SCOPE_NODE(Name)
+#endif
+
+#ifndef EXPR_SCOPE_NODE
+#  define EXPR_SCOPE_NODE(Name) SCOPE_NODE(Name)
+#endif
+
+#ifndef DECL_ATTRIBUTE_SCOPE_NODE
+#  define DECL_ATTRIBUTE_SCOPE_NODE(Name) SCOPE_NODE(Name)
+#endif
+
+SCOPE_NODE(ASTSourceFile)
+DECL_SCOPE_NODE(NominalType)
+DECL_SCOPE_NODE(Extension)
+DECL_SCOPE_NODE(TypeAlias)
+DECL_SCOPE_NODE(OpaqueType)
+SCOPE_NODE(GenericParam)
+DECL_SCOPE_NODE(AbstractFunctionDecl)
+SCOPE_NODE(ParameterList)
+DECL_SCOPE_NODE(FunctionBody)
+DECL_SCOPE_NODE(DefaultArgumentInitializer)
+DECL_ATTRIBUTE_SCOPE_NODE(CustomAttribute)
+DECL_SCOPE_NODE(PatternEntryDecl)
+DECL_SCOPE_NODE(PatternEntryInitializer)
+SCOPE_NODE(ConditionalClausePatternUse)
+SCOPE_NODE(ConditionalClauseInitializer)
+EXPR_SCOPE_NODE(CaptureList)
+EXPR_SCOPE_NODE(ClosureParameters)
+DECL_SCOPE_NODE(TopLevelCode)
+DECL_ATTRIBUTE_SCOPE_NODE(SpecializeAttribute)
+DECL_ATTRIBUTE_SCOPE_NODE(DifferentiableAttribute)
+DECL_SCOPE_NODE(SubscriptDecl)
+DECL_SCOPE_NODE(EnumElement)
+DECL_SCOPE_NODE(MacroDecl)
+SCOPE_NODE(MacroDefinition)
+DECL_SCOPE_NODE(MacroExpansionDecl)
+STMT_SCOPE_NODE(IfStmt)
+STMT_SCOPE_NODE(WhileStmt)
+STMT_SCOPE_NODE(GuardStmt)
+SCOPE_NODE(GuardStmtBody)
+STMT_SCOPE_NODE(RepeatWhile)
+STMT_SCOPE_NODE(DoStmt)
+STMT_SCOPE_NODE(DoCatchStmt)
+STMT_SCOPE_NODE(SwitchStmt)
+STMT_SCOPE_NODE(ForEachStmt)
+SCOPE_NODE(ForEachPattern)
+STMT_SCOPE_NODE(CaseStmt)
+SCOPE_NODE(CaseLabelItem)
+SCOPE_NODE(CaseStmtBody)
+STMT_SCOPE_NODE(BraceStmt)
+EXPR_SCOPE_NODE(Try)
+DECL_ATTRIBUTE_SCOPE_NODE(ABIAttribute)
+
+#undef DECL_ATTRIBUTE_SCOPE_NODE
+#undef EXPR_SCOPE_NODE
+#undef STMT_SCOPE_NODE
+#undef DECL_SCOPE_NODE
+#undef SCOPE_NODE

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift -c -primary-file %s -Xllvm -sil-print-after=loadable-address -sil-verify-all -o %t/big_types_generic.o 2>&1 | %FileCheck %s
+// RUN: %swift -c -disable-large-loadable-types-reg2mem -primary-file %s -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -sil-verify-all -o %t/big_types_generic.o 2>&1 | %FileCheck %s
 
 struct Big<T> {
   var a0 : T

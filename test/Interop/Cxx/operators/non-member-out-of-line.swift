@@ -20,4 +20,11 @@ OperatorsTestSuite.test("plus") {
   expectEqual(65, result.value)
 }
 
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
+  expectTrue(lhs != rhs)
+}
+
 runAllTests()

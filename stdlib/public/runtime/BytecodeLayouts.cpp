@@ -38,6 +38,8 @@
 #include <ptrauth.h>
 #endif
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+
 using namespace swift;
 
 static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
@@ -97,6 +99,152 @@ static uint64_t readTagBytes(const uint8_t *addr, uint8_t byteCount) {
   }
 }
 
+// This check is used to determine whether or not ObjC references can
+// be tagged pointers. If they can't, they have the same spare bits
+// as swift references, and we have to mask them out before passing the
+// reference to ref counting operations.
+static constexpr bool platformSupportsTaggedPointers() {
+  // Platforms that don't reserve bits for ObjC, don't support tagged
+  // pointers.
+  return _swift_abi_ObjCReservedBitsMask != 0;
+}
+
+#if defined(__APPLE__) && defined(__arm64__)
+
+#define CONTINUE_WITH_COPY(METADATA, READER, ADDR_OFFSET, DEST, SRC)           \
+  do {                                                                         \
+    TAG = READER.readBytes<uint64_t>();                                        \
+    OFFSET = (TAG & ~(0xFFULL << 56));                                         \
+    if (OFFSET) {                                                              \
+      memcpy(DEST + ADDR_OFFSET, SRC + ADDR_OFFSET, OFFSET);                   \
+    }                                                                          \
+    ADDR_OFFSET += OFFSET;                                                     \
+    TAG >>= 56;                                                                \
+    goto *dispatchTable[TAG];                                                  \
+  } while (false)
+
+#define CONTINUE_NO_COPY(METADATA, READER, ADDR_OFFSET, ADDR)                  \
+  do {                                                                         \
+    TAG = READER.readBytes<uint64_t>();                                        \
+    OFFSET = (TAG & ~(0xFFULL << 56));                                         \
+    ADDR_OFFSET += OFFSET;                                                     \
+    TAG >>= 56;                                                                \
+    goto *dispatchTable[TAG];                                                  \
+  } while (false)
+
+#define handleRefCounts(FN_TABLE, CONTINUE, METADATA, READER, ADDR_OFFSET,     \
+                        ...)                                                   \
+  do {                                                                         \
+    while (true) {                                                             \
+      uint64_t TAG = 0;                                                        \
+      uintptr_t OFFSET = 0;                                                    \
+                                                                               \
+      _Pragma("clang diagnostic push") _Pragma(                                \
+          "clang diagnostic ignored \"-Wgnu-label-as-value\"")                 \
+          const void *dispatchTable[] = {                                      \
+              &&done,       &&Error,   &&NativeStrong,   &&NativeUnowned,      \
+              &&NativeWeak, &&Unknown, &&UnknownUnowned, &&UnknownWeak,        \
+              &&Bridge,     &&Block,   &&ObjC,           &&NativeSwiftObjC,    \
+              &&Metatype,   &&Generic, &&Existential,    &&Resilient,          \
+              &&Default,    &&Default, &&Default,        &&Default,            \
+              &&Default,    &&Default, &&Default,                              \
+      };                                                                       \
+                                                                               \
+      [[clang::nomerge]] {                                                     \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+                                                                               \
+      [[clang::nomerge]] {                                                     \
+      Error:                                                                   \
+                                                                               \
+        FN_TABLE[1](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      NativeStrong:                                                            \
+        FN_TABLE[2](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      NativeUnowned:                                                           \
+        FN_TABLE[3](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      NativeWeak:                                                              \
+        FN_TABLE[4](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Unknown:                                                                 \
+        FN_TABLE[5](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      UnknownUnowned:                                                          \
+        FN_TABLE[6](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      UnknownWeak:                                                             \
+        FN_TABLE[7](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Bridge:                                                                  \
+        FN_TABLE[8](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Block:                                                                   \
+        FN_TABLE[9](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);               \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      ObjC:                                                                    \
+        FN_TABLE[10](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);              \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      NativeSwiftObjC:                                                         \
+        FN_TABLE[11](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);              \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Metatype:                                                                \
+        FN_TABLE[12](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);              \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Generic:                                                                 \
+        swift_unreachable("");                                                 \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Existential:                                                             \
+        FN_TABLE[14](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);              \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Resilient:                                                               \
+        FN_TABLE[15](METADATA, READER, ADDR_OFFSET, __VA_ARGS__);              \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      [[clang::nomerge]] {                                                     \
+      Default:                                                                 \
+        uintptr_t _ADDR_OFFSET = ADDR_OFFSET;                                  \
+        LayoutStringReader1 _READER = READER;                                  \
+        FN_TABLE[TAG](METADATA, _READER, _ADDR_OFFSET, __VA_ARGS__);           \
+        READER = _READER;                                                      \
+        ADDR_OFFSET = _ADDR_OFFSET;                                            \
+        CONTINUE(METADATA, READER, ADDR_OFFSET, __VA_ARGS__);                  \
+      }                                                                        \
+      _Pragma("clang diagnostic pop")                                          \
+    }                                                                          \
+  done:                                                                        \
+    break;                                                                     \
+  } while (false)
+#endif
+
 static void handleRefCountsDestroy(const Metadata *metadata,
                           LayoutStringReader1 &reader,
                           uintptr_t &addrOffset,
@@ -113,9 +261,10 @@ static void handleEnd(const Metadata *metadata,
 
 static void errorDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
-  SwiftError *error = *(SwiftError**)(addr + addrOffset);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(SwiftError*);
-  swift_errorRelease(error);
+  swift_errorRelease((SwiftError *)object);
 }
 
 static void nativeStrongDestroy(const Metadata *metadata,
@@ -144,9 +293,12 @@ static void weakDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
 static void unknownDestroy(const Metadata *metadata,
                            LayoutStringReader1 &reader, uintptr_t &addrOffset,
                            uint8_t *addr) {
-  void *object = *(void**)(addr + addrOffset);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(void*);
-  swift_unknownObjectRelease(object);
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+  swift_unknownObjectRelease((void *)object);
 }
 
 static void unknownUnownedDestroy(const Metadata *metadata,
@@ -261,7 +413,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>();
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -275,13 +427,17 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
 
       if (tagBytes) {
         xiType = nullptr;
+      } else if (!xiType) {
+        // If there are no inhabitants and the extra tag bits are not set,
+        // we have a payload.
+        return;
       }
     }
 
     if (SWIFT_LIKELY(xiType)) {
       auto tag = xiType->vw_getEnumTagSinglePayload(
           (const OpaqueValue *)(addr + addrOffset + xiTagBytesOffset),
-          numEmptyCases);
+          xiType->vw_getNumExtraInhabitants());
       if (SWIFT_LIKELY(tag == 0)) {
         return;
       }
@@ -481,7 +637,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>(); // numEmptyCases
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -495,13 +651,17 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
 
       if (tagBytes) {
         xiType = nullptr;
+      } else if (!xiType) {
+        // If there are no inhabitants and the extra tag bits are not set,
+        // we have a payload.
+        return;
       }
     }
 
     if (SWIFT_LIKELY(xiType)) {
       auto tag = xiType->vw_getEnumTagSinglePayload(
           (const OpaqueValue *)(src + addrOffset + xiTagBytesOffset),
-          numEmptyCases);
+          xiType->vw_getNumExtraInhabitants());
       if (SWIFT_LIKELY(tag == 0)) {
         return;
       }
@@ -621,26 +781,47 @@ multiPayloadEnumGeneric(const Metadata *metadata, LayoutStringReader1 &reader,
   }
 }
 
-#if SWIFT_OBJC_INTEROP
 static void blockDestroy(const Metadata *metadata, LayoutStringReader1 &reader,
                          uintptr_t &addrOffset, uint8_t *addr) {
-  void* object = (void *)(addr + addrOffset);
+#if SWIFT_OBJC_INTEROP
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset += sizeof(void*);
-  _Block_release(object);
+  _Block_release((void *)object);
+#else
+  swift_unreachable("Blocks are not available on this platform");
+#endif
 }
 
 static void objcStrongDestroy(const Metadata *metadata,
                               LayoutStringReader1 &reader,
                               uintptr_t &addrOffset, uint8_t *addr) {
+#if SWIFT_OBJC_INTEROP
   uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(objc_object*);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
 
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+
+  objc_release((objc_object *)object);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
+}
+
+static void nativeSwiftObjcStrongDestroy(const Metadata *metadata,
+                                         LayoutStringReader1 &reader,
+                                         uintptr_t &addrOffset, uint8_t *addr) {
+#if SWIFT_OBJC_INTEROP
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
+  addrOffset += sizeof(objc_object *);
   object &= ~_swift_abi_SwiftSpareBitsMask;
   objc_release((objc_object *)object);
-}
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
 #endif
+}
 
 static void metatypeDestroy(const Metadata *metadata,
                             LayoutStringReader1 &reader, uintptr_t &addrOffset,
@@ -676,7 +857,7 @@ static void resilientDestroy(const Metadata *metadata,
 typedef void (*DestrFn)(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *addr);
 
-const DestrFn destroyTable[] = {
+constexpr DestrFn destroyTable[] = {
     &handleEnd,
     &errorDestroy,
     &nativeStrongDestroy,
@@ -686,14 +867,9 @@ const DestrFn destroyTable[] = {
     &unknownUnownedDestroy,
     &unknownWeakDestroy,
     &bridgeDestroy,
-#if SWIFT_OBJC_INTEROP
     &blockDestroy,
     &objcStrongDestroy,
-#else
-    nullptr,
-    nullptr,
-#endif
-    nullptr, // Custom
+    &nativeSwiftObjcStrongDestroy,
     &metatypeDestroy,
     nullptr, // Generic
     &existentialDestroy,
@@ -723,20 +899,35 @@ static void handleRefCountsDestroy(const Metadata *metadata,
   }
 }
 
-extern "C" void
-swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
+static void swift_cvw_destroyImpl(swift::OpaqueValue *address,
+                                  const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
-  handleRefCountsDestroy(metadata, reader, addrOffset, (uint8_t *)address);
+  uint8_t *addr = (uint8_t *)address;
+
+#if defined(__APPLE__) && defined(__arm64__)
+  handleRefCounts(destroyTable, CONTINUE_NO_COPY, metadata, reader, addrOffset,
+                  addr);
+#else
+  handleRefCountsDestroy(metadata, reader, addrOffset, addr);
+#endif
 }
 
-void swift::swift_generic_arrayDestroy(swift::OpaqueValue *address, size_t count, size_t stride, const Metadata *metadata) {
+void swift::swift_cvw_arrayDestroy(swift::OpaqueValue *address, size_t count,
+                                   size_t stride, const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
+  uint8_t *addr = (uint8_t *)address;
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-    handleRefCountsDestroy(metadata, reader, addrOffset, (uint8_t *)address);
+
+#if defined(__APPLE__) && defined(__arm64__)
+    handleRefCounts(destroyTable, CONTINUE_NO_COPY, metadata, reader,
+                    addrOffset, addr);
+#else
+    handleRefCountsDestroy(metadata, reader, addrOffset, addr);
+#endif
   }
 }
 
@@ -749,10 +940,11 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
 static void errorRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                         uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  SwiftError *object = *(SwiftError **)(src + _addrOffset);
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + addrOffset, &object, sizeof(SwiftError*));
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(SwiftError *);
-  swift_errorRetain(object);
+  swift_errorRetain((SwiftError *)object);
 }
 
 static void nativeStrongRetain(const Metadata *metadata,
@@ -789,10 +981,13 @@ static void weakCopyInit(const Metadata *metadata, LayoutStringReader1 &reader,
 static void unknownRetain(const Metadata *metadata, LayoutStringReader1 &reader,
                           uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  void *object = *(void **)(src + _addrOffset);
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void *);
-  swift_unknownObjectRetain(object);
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+  swift_unknownObjectRetain((void *)object);
 }
 
 static void unknownUnownedCopyInit(const Metadata *metadata,
@@ -826,28 +1021,54 @@ static void bridgeRetain(const Metadata *metadata, LayoutStringReader1 &reader,
   swift_bridgeObjectRetain(object);
 }
 
-#if SWIFT_OBJC_INTEROP
 static void blockCopy(const Metadata *metadata, LayoutStringReader1 &reader,
                       uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
-  auto *copy = _Block_copy(*(void**)(src + _addrOffset));
-  memcpy(dest + _addrOffset, &copy, sizeof(void*));
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &object, sizeof(void *));
   addrOffset = _addrOffset + sizeof(void*);
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  _Block_copy((void *)object);
+#else
+  swift_unreachable("Blocks are not available on this platform");
+#endif
 }
 
 static void objcStrongRetain(const Metadata *metadata,
                              LayoutStringReader1 &reader, uintptr_t &addrOffset,
                              uint8_t *dest, uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
   addrOffset = _addrOffset + sizeof(objc_object *);
-  if (object & _swift_abi_ObjCReservedBitsMask)
-    return;
+
+  if (!platformSupportsTaggedPointers()) {
+    object &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+
+  objc_retain((objc_object *)object);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
+}
+
+static void nativeSwiftObjcStrongRetain(const Metadata *metadata,
+                                        LayoutStringReader1 &reader,
+                                        uintptr_t &addrOffset, uint8_t *dest,
+                                        uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
+  uintptr_t _addrOffset = addrOffset;
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
+  addrOffset = _addrOffset + sizeof(objc_object *);
   object &= ~_swift_abi_SwiftSpareBitsMask;
   objc_retain((objc_object *)object);
-}
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
 #endif
+}
 
 static void metatypeInitWithCopy(const Metadata *metadata,
                                  LayoutStringReader1 &reader,
@@ -891,7 +1112,7 @@ typedef void (*InitFn)(const Metadata *metadata,
                                  uint8_t *dest,
                                  uint8_t *src);
 
-static const InitFn initWithCopyTable[] = {
+constexpr InitFn initWithCopyTable[] = {
     &handleEnd,
     &errorRetain,
     &nativeStrongRetain,
@@ -901,14 +1122,9 @@ static const InitFn initWithCopyTable[] = {
     &unknownUnownedCopyInit,
     &unknownWeakCopyInit,
     &bridgeRetain,
-#if SWIFT_OBJC_INTEROP
     &blockCopy,
     &objcStrongRetain,
-#else
-    nullptr,
-    nullptr,
-#endif
-    nullptr, // Custom
+    &nativeSwiftObjcStrongRetain,
     &metatypeInitWithCopy,
     nullptr, // Generic
     &existentialInitWithCopy,
@@ -931,7 +1147,7 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
-    if (SWIFT_UNLIKELY(offset)) {
+    if (offset) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
@@ -944,29 +1160,43 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
   }
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+static swift::OpaqueValue *
+swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
-  handleRefCountsInitWithCopy(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#if defined(__APPLE__) && defined(__arm64__)
+  handleRefCounts(initWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
+                  addrOffset, dest, src);
+#else
+  handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
+#endif
 
   assert(addrOffset == metadata->vw_size());
 
-  return dest;
+  return _dest;
 }
 
-void swift::swift_generic_arrayInitWithCopy(swift::OpaqueValue *dest,
-                                     swift::OpaqueValue *src,
-                                     size_t count,
-                                     size_t stride,
-                                     const Metadata *metadata) {
+void swift::swift_cvw_arrayInitWithCopy(swift::OpaqueValue *_dest,
+                                        swift::OpaqueValue *_src, size_t count,
+                                        size_t stride,
+                                        const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-    handleRefCountsInitWithCopy(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
+#if defined(__APPLE__) && defined(__arm64__)
+    handleRefCounts(initWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
+                    addrOffset, dest, src);
+#else
+    handleRefCountsInitWithCopy(metadata, reader, addrOffset, dest, src);
+#endif
   }
 }
 
@@ -1032,19 +1262,27 @@ static void resilientInitWithTake(const Metadata *metadata,
   type->vw_initializeWithTake(destObject, srcObject);
 }
 
-static const InitFn initWithTakeTable[] = {
+static void copyingInitWithTake(const Metadata *metadata,
+                                LayoutStringReader1 &reader,
+                                uintptr_t &addrOffset, uint8_t *dest,
+                                uint8_t *src) {
+  memcpy(dest + addrOffset, src + addrOffset, sizeof(uintptr_t));
+  addrOffset += sizeof(uintptr_t);
+}
+
+constexpr InitFn initWithTakeTable[] = {
     &handleEnd,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
     &unknownWeakInitWithTake,
-    &bridgeRetain,
-    nullptr,
-    nullptr,
-    nullptr, // Custom
+    &copyingInitWithTake,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
+    &copyingInitWithTake,
     &metatypeInitWithTake,
     nullptr, // Generic
     &existentialInitWithTake,
@@ -1067,58 +1305,62 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
-    if (SWIFT_UNLIKELY(offset)) {
+    if (offset) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
-    _addrOffset += offset;
+    addrOffset += offset;
     tag >>= 56;
     if (SWIFT_UNLIKELY(tag == 0)) {
-      addrOffset = _addrOffset;
       return;
     }
 
-    if (auto handler = initWithTakeTable[tag]) {
-      addrOffset = _addrOffset;
-      handler(metadata, reader, addrOffset, dest, src);
-    } else {
-      memcpy(dest + _addrOffset, src + _addrOffset, sizeof(uintptr_t));
-      addrOffset = _addrOffset + sizeof(uintptr_t);
-    }
+    initWithTakeTable[tag](metadata, reader, addrOffset, dest, src);
   }
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+static swift::OpaqueValue *
+swift_cvw_initWithTakeImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
   if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     size_t size = metadata->vw_size();
-    memcpy(dest, src, size);
-    return dest;
+    memcpy(_dest, _src, size);
+    return _dest;
   }
+
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
 
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
 
-  handleRefCountsInitWithTake(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
+#if defined(__APPLE__) && defined(__arm64__)
+  handleRefCounts(initWithTakeTable, CONTINUE_WITH_COPY, metadata, reader,
+                  addrOffset, dest, src);
+#else
+  handleRefCountsInitWithTake(metadata, reader, addrOffset, dest, src);
+#endif
 
   assert(addrOffset == metadata->vw_size());
 
-  return dest;
+  return _dest;
 }
 
 static void errorAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
+                                LayoutStringReader1 &reader,
+                                uintptr_t &addrOffset, uint8_t *dest,
+                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  SwiftError *destObject = *(SwiftError **)(dest + _addrOffset);
-  SwiftError *srcObject = *(SwiftError **)(src + _addrOffset);
-  memcpy(dest + addrOffset, &srcObject, sizeof(SwiftError*));
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+
+  memcpy(dest + _addrOffset, &srcObject, sizeof(SwiftError *));
   addrOffset = _addrOffset + sizeof(SwiftError *);
-  swift_errorRelease(destObject);
-  swift_errorRetain(srcObject);
+
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  swift_errorRelease((SwiftError *)destObject);
+  swift_errorRetain((SwiftError *)srcObject);
 }
 
 static void nativeStrongAssignWithCopy(const Metadata *metadata,
@@ -1153,30 +1395,45 @@ static void unownedAssignWithCopy(const Metadata *metadata,
   swift_unownedRetain((HeapObject *)srcObject);
 }
 
-static void weakAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
+static void unknownAssignWithCopy(const Metadata *metadata,
+                                  LayoutStringReader1 &reader,
+                                  uintptr_t &addrOffset, uint8_t *dest,
+                                  uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  auto *destObject = (WeakReference *)(dest + _addrOffset);
-  auto *srcObject = (WeakReference *)(src + _addrOffset);
-  addrOffset = _addrOffset + sizeof(WeakReference);
-  swift_weakCopyAssign(destObject, srcObject);
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &srcObject, sizeof(void *));
+  addrOffset = _addrOffset + sizeof(void *);
+  if (!platformSupportsTaggedPointers()) {
+    destObject &= ~_swift_abi_SwiftSpareBitsMask;
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  }
+  swift_unknownObjectRelease((void *)destObject);
+  swift_unknownObjectRetain((void *)srcObject);
 }
 
-static void unknownAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
+static void bridgeAssignWithCopy(const Metadata *metadata,
+                                 LayoutStringReader1 &reader,
+                                 uintptr_t &addrOffset, uint8_t *dest,
+                                 uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
   void *destObject = *(void **)(dest + _addrOffset);
   void *srcObject = *(void **)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(void*));
   addrOffset = _addrOffset + sizeof(void *);
-  swift_unknownObjectRelease(destObject);
-  swift_unknownObjectRetain(srcObject);
+  swift_bridgeObjectRelease(destObject);
+  swift_bridgeObjectRetain(srcObject);
+}
+
+static void weakAssignWithCopy(const Metadata *metadata,
+                               LayoutStringReader1 &reader,
+                               uintptr_t &addrOffset, uint8_t *dest,
+                               uint8_t *src) {
+  uintptr_t _addrOffset = addrOffset;
+  auto *destObject = (WeakReference *)(dest + _addrOffset);
+  auto *srcObject = (WeakReference *)(src + _addrOffset);
+  addrOffset = _addrOffset + sizeof(WeakReference);
+  swift_weakCopyAssign(destObject, srcObject);
 }
 
 static void unknownUnownedAssignWithCopy(const Metadata *metadata,
@@ -1203,31 +1460,24 @@ static void unknownWeakAssignWithCopy(const Metadata *metadata,
   swift_unknownObjectWeakCopyAssign(destObject, srcObject);
 }
 
-static void bridgeAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
-  uintptr_t _addrOffset = addrOffset;
-  void *destObject = *(void **)(dest + _addrOffset);
-  void *srcObject = *(void **)(src + _addrOffset);
-  memcpy(dest + _addrOffset, &srcObject, sizeof(void*));
-  addrOffset = _addrOffset + sizeof(void*);
-  swift_bridgeObjectRelease(destObject);
-  swift_bridgeObjectRetain(srcObject);
-}
-
-#if SWIFT_OBJC_INTEROP
 static void blockAssignWithCopy(const Metadata *metadata,
                              LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
-  _Block_release(*(void **)(dest + _addrOffset));
-  auto *copy = _Block_copy(*(void **)(src + _addrOffset));
-  memcpy(dest + _addrOffset, &copy, sizeof(void*));
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &srcObject, sizeof(void *));
   addrOffset = _addrOffset + sizeof(void*);
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  _Block_release((void *)destObject);
+  _Block_copy((void *)srcObject);
+#else
+  swift_unreachable("Blocks are not available on this platform");
+#endif
 }
 
 static void objcStrongAssignWithCopy(const Metadata *metadata,
@@ -1235,35 +1485,44 @@ static void objcStrongAssignWithCopy(const Metadata *metadata,
                              uintptr_t &addrOffset,
                              uint8_t *dest,
                              uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
   uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
   uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object*));
   addrOffset = _addrOffset + sizeof(objc_object*);
 
-  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
+  if (!platformSupportsTaggedPointers()) {
     destObject &= ~_swift_abi_SwiftSpareBitsMask;
-    objc_release((objc_object *)destObject);
-  }
-
-  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
     srcObject &= ~_swift_abi_SwiftSpareBitsMask;
-    objc_retain((objc_object *)srcObject);
   }
-}
-#endif
 
-static void metatypeAssignWithCopy(const Metadata *metadata,
-                               LayoutStringReader1 &reader,
-                               uintptr_t &addrOffset,
-                               uint8_t *dest,
-                               uint8_t *src) {
+  objc_release((objc_object *)destObject);
+  objc_retain((objc_object *)srcObject);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
+}
+
+static void nativeSwiftObjcStrongAssignWithCopy(const Metadata *metadata,
+                                                LayoutStringReader1 &reader,
+                                                uintptr_t &addrOffset,
+                                                uint8_t *dest, uint8_t *src) {
+#if SWIFT_OBJC_INTEROP
   uintptr_t _addrOffset = addrOffset;
-  auto *type = reader.readBytes<const Metadata *>();
-  auto *destObject = (OpaqueValue *)(dest + _addrOffset);
-  auto *srcObject = (OpaqueValue *)(src + _addrOffset);
-  addrOffset = _addrOffset + type->vw_size();
-  type->vw_assignWithCopy(destObject, srcObject);
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object *));
+  addrOffset = _addrOffset + sizeof(objc_object *);
+
+  destObject &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_release((objc_object *)destObject);
+
+  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_retain((objc_object *)srcObject);
+#else
+  swift_unreachable("ObjC interop is not available on this platform");
+#endif
 }
 
 static void existentialAssignWithCopy(const Metadata *metadata,
@@ -1272,17 +1531,47 @@ static void existentialAssignWithCopy(const Metadata *metadata,
                                uint8_t *dest,
                                uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  auto *type = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
+  auto *srcType = getExistentialTypeMetadata((OpaqueValue*)(src + _addrOffset));
+  auto *destType = getExistentialTypeMetadata((OpaqueValue*)(dest + _addrOffset));
   auto *destObject = (OpaqueValue *)(dest + _addrOffset);
   auto *srcObject = (OpaqueValue *)(src + _addrOffset);
   addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
-  if (type->getValueWitnesses()->isValueInline()) {
-    type->vw_assignWithCopy(destObject, srcObject);
+
+  if (srcType == destType) {
+    if (srcType->getValueWitnesses()->isValueInline()) {
+      srcType->vw_assignWithCopy(destObject, srcObject);
+    } else {
+      swift_release(*(HeapObject**)destObject);
+      memcpy(destObject, srcObject, sizeof(uintptr_t));
+      swift_retain(*(HeapObject**)srcObject);
+    }
+    return;
+  }
+
+  if (destType->getValueWitnesses()->isValueInline()) {
+      destType->vw_destroy(destObject);
   } else {
     swift_release(*(HeapObject**)destObject);
+  }
+
+  if (srcType->getValueWitnesses()->isValueInline()) {
+    srcType->vw_initializeWithCopy(destObject, srcObject);
+  } else {
     memcpy(destObject, srcObject, sizeof(uintptr_t));
     swift_retain(*(HeapObject**)srcObject);
   }
+}
+
+static void metatypeAssignWithCopy(const Metadata *metadata,
+                                   LayoutStringReader1 &reader,
+                                   uintptr_t &addrOffset, uint8_t *dest,
+                                   uint8_t *src) {
+  uintptr_t _addrOffset = addrOffset;
+  auto *type = reader.readBytes<const Metadata *>();
+  auto *destObject = (OpaqueValue *)(dest + _addrOffset);
+  auto *srcObject = (OpaqueValue *)(src + _addrOffset);
+  addrOffset = _addrOffset + type->vw_size();
+  type->vw_assignWithCopy(destObject, srcObject);
 }
 
 static void resilientAssignWithCopy(const Metadata *metadata,
@@ -1317,7 +1606,12 @@ static void handleSingleRefCountInitWithCopy(const Metadata *metadata,
                                         uint8_t *dest,
                                         uint8_t *src) {
   auto tag = reader.readBytes<uint64_t>();
-  addrOffset += (tag & ~(0xFFULL << 56));
+  auto _addrOffset = addrOffset;
+  auto offset = (tag & ~(0xFFULL << 56));
+  if (SWIFT_UNLIKELY(offset)) {
+    memcpy(dest + _addrOffset, src + _addrOffset, offset);
+  }
+  addrOffset = _addrOffset + offset;
   tag >>= 56;
   if (SWIFT_UNLIKELY(tag == 0)) {
     return;
@@ -1326,10 +1620,10 @@ static void handleSingleRefCountInitWithCopy(const Metadata *metadata,
 }
 
 static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
-                               LayoutStringReader1 &reader,
-                               uintptr_t &addrOffset,
-                               uint8_t *dest,
-                               uint8_t *src) {
+                                                  LayoutStringReader1 &reader,
+                                                  uintptr_t &_addrOffset,
+                                                  uint8_t *dest, uint8_t *src) {
+  uintptr_t addrOffset = _addrOffset;
   reader.modify([&](LayoutStringReader1 &reader) {
     uint64_t srcTagBytes = 0;
     uint64_t destTagBytes = 0;
@@ -1364,7 +1658,8 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
           zeroTagValue;
     }
 
-    if (srcTagBytes >= xiTagValues && destTagBytes >= xiTagValues) {
+    if (SWIFT_LIKELY(srcTagBytes >= xiTagValues &&
+                     destTagBytes >= xiTagValues)) {
       return;
     } else if (srcTagBytes >= xiTagValues) {
       const uint8_t *end = (reader.layoutStr + refCountBytes);
@@ -1385,6 +1680,8 @@ static void singlePayloadEnumSimpleAssignWithCopy(const Metadata *metadata,
     memcpy(dest + addrOffset, src + addrOffset, skip);
     addrOffset += skip;
   });
+
+  _addrOffset = addrOffset;
 }
 
 static void singlePayloadEnumFNAssignWithCopy(const Metadata *metadata,
@@ -1472,7 +1769,7 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     auto tagBytesAndOffset = reader.readBytes<uint64_t>();
     auto payloadSize = reader.readBytes<size_t>();
     auto *xiType = reader.readBytes<const Metadata *>();
-    auto numEmptyCases = reader.readBytes<unsigned>();
+    (void)reader.readBytes<unsigned>(); // numEmptyCases
     auto refCountBytes = reader.readBytes<size_t>();
     auto skip = reader.readBytes<size_t>();
 
@@ -1490,13 +1787,13 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
       if (!srcTag) {
         srcTag = xiType->vw_getEnumTagSinglePayload(
             (const OpaqueValue *)(src + addrOffset + xiTagBytesOffset),
-            numEmptyCases);
+            xiType->vw_getNumExtraInhabitants());
       }
 
       if (!destTag) {
         destTag = xiType->vw_getEnumTagSinglePayload(
             (const OpaqueValue *)(dest + addrOffset + xiTagBytesOffset),
-            numEmptyCases);
+            xiType->vw_getNumExtraInhabitants());
       }
     }
 
@@ -1524,68 +1821,13 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
 }
 
 static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
-  size_t numPayloads;
-  size_t refCountBytes;
-  size_t enumSize;
-  LayoutStringReader1 nestedReader;
-  uintptr_t nestedAddrOffset;
-  unsigned srcTag;
-  unsigned destTag;
+                                             LayoutStringReader1 &reader,
+                                             uintptr_t &addrOffset,
+                                             uint8_t *dest, uint8_t *src);
 
-  reader.modify([&](LayoutStringReader1 &reader) {
-    GetEnumTagFn getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
-    reader.readBytes(numPayloads, refCountBytes, enumSize);
-    nestedReader = reader;
-    nestedAddrOffset = addrOffset;
-
-    srcTag = getEnumTag(src + addrOffset);
-    destTag = getEnumTag(dest + addrOffset);
-    reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
-  });
-
-  if (SWIFT_LIKELY(srcTag < numPayloads && destTag < numPayloads)) {
-    addrOffset += enumSize;
-    size_t srcRefCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
-    size_t destRefCountOffset = nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
-    LayoutStringReader1 nestedReaderDest = nestedReader;
-    nestedReader.skip((numPayloads * sizeof(size_t)) + srcRefCountOffset);
-    nestedReaderDest.skip((numPayloads * sizeof(size_t)) + destRefCountOffset);
-    auto nestedAddrOffsetDest = nestedAddrOffset;
-    handleRefCountsDestroy(metadata, nestedReaderDest, nestedAddrOffsetDest, dest);
-    handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
-    auto trailingBytes = addrOffset - nestedAddrOffset;
-    if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
-    return;
-  } else if (srcTag < numPayloads) {
-    addrOffset += enumSize;
-    size_t refCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
-    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
-    auto trailingBytes = addrOffset - nestedAddrOffset;
-    if (trailingBytes)
-      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
-    return;
-  } else if (destTag < numPayloads) {
-    size_t refCountOffset =
-        nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
-    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
-    handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
-  }
-
-  memcpy(dest + addrOffset, src + addrOffset, enumSize);
-  addrOffset += enumSize;
-}
-
-static void multiPayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
+static void multiPayloadEnumFNResolvedAssignWithCopy(
+    const Metadata *metadata, LayoutStringReader1 &reader,
+    uintptr_t &addrOffset, uint8_t *dest, uint8_t *src) {
   size_t numPayloads;
   size_t refCountBytes;
   size_t enumSize;
@@ -1640,10 +1882,9 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
 }
 
 static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
-                             LayoutStringReader1 &reader,
-                             uintptr_t &addrOffset,
-                             uint8_t *dest,
-                             uint8_t *src) {
+                                                  LayoutStringReader1 &reader,
+                                                  uintptr_t &addrOffset,
+                                                  uint8_t *dest, uint8_t *src) {
   size_t tagBytes;
   size_t numPayloads;
   size_t refCountBytes;
@@ -1699,42 +1940,40 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
   addrOffset += enumSize;
 }
 
-static const InitFn assignWithCopyTable[] = {
-  &handleEnd,
-  &errorAssignWithCopy,
-  &nativeStrongAssignWithCopy,
-  &unownedAssignWithCopy,
-  &weakAssignWithCopy,
-  &unknownAssignWithCopy,
-  &unknownUnownedAssignWithCopy,
-  &unknownWeakAssignWithCopy,
-  &bridgeAssignWithCopy,
-#if SWIFT_OBJC_INTEROP
-  &blockAssignWithCopy,
-  &objcStrongAssignWithCopy,
-#else
-  nullptr,
-  nullptr,
-#endif
-  nullptr, // Custom
-  &metatypeAssignWithCopy,
-  nullptr, // Generic
-  &existentialAssignWithCopy,
-  &resilientAssignWithCopy,
-  &singlePayloadEnumSimpleAssignWithCopy,
-  &singlePayloadEnumFNAssignWithCopy,
-  &singlePayloadEnumFNResolvedAssignWithCopy,
-  &singlePayloadEnumGenericAssignWithCopy,
-  &multiPayloadEnumFNAssignWithCopy,
-  &multiPayloadEnumFNResolvedAssignWithCopy,
-  &multiPayloadEnumGenericAssignWithCopy,
+typedef void (*AssignCPFn)(const Metadata *metadata, uint8_t *dest,
+                           uint8_t *src);
+
+constexpr InitFn assignWithCopyTable[] = {
+    &handleEnd,
+    &errorAssignWithCopy,
+    &nativeStrongAssignWithCopy,
+    &unownedAssignWithCopy,
+    &weakAssignWithCopy,
+    &unknownAssignWithCopy,
+    &unknownUnownedAssignWithCopy,
+    &unknownWeakAssignWithCopy,
+    &bridgeAssignWithCopy,
+    &blockAssignWithCopy,
+    &objcStrongAssignWithCopy,
+    &nativeSwiftObjcStrongAssignWithCopy,
+    &metatypeAssignWithCopy,
+    nullptr, // Generic
+    &existentialAssignWithCopy,
+    &resilientAssignWithCopy,
+    &singlePayloadEnumSimpleAssignWithCopy,
+    &singlePayloadEnumFNAssignWithCopy,
+    &singlePayloadEnumFNResolvedAssignWithCopy,
+    &singlePayloadEnumGenericAssignWithCopy,
+    &multiPayloadEnumFNAssignWithCopy,
+    &multiPayloadEnumFNResolvedAssignWithCopy,
+    &multiPayloadEnumGenericAssignWithCopy,
 };
 
+#if !(defined(__APPLE__) && defined(__arm64__))
 static void handleRefCountsAssignWithCopy(const Metadata *metadata,
-                          LayoutStringReader1 &reader,
-                          uintptr_t &addrOffset,
-                          uint8_t *dest,
-                          uint8_t *src) {
+                                          LayoutStringReader1 &reader,
+                                          uintptr_t &addrOffset, uint8_t *dest,
+                                          uint8_t *src) {
   while (true) {
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
@@ -1751,47 +1990,142 @@ static void handleRefCountsAssignWithCopy(const Metadata *metadata,
     assignWithCopyTable[tag](metadata, reader, addrOffset, dest, src);
   }
 }
+#endif // !(defined(__APPLE__) && defined(__arm64__))
 
-extern "C" swift::OpaqueValue *
-swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
+                                             LayoutStringReader1 &reader,
+                                             uintptr_t &addrOffset,
+                                             uint8_t *dest, uint8_t *src) {
+  size_t numPayloads;
+  size_t refCountBytes;
+  size_t enumSize;
+  LayoutStringReader1 nestedReader;
+  uintptr_t nestedAddrOffset;
+  unsigned srcTag;
+  unsigned destTag;
+
+  reader.modify([&](LayoutStringReader1 &reader) {
+    GetEnumTagFn getEnumTag = readRelativeFunctionPointer<GetEnumTagFn>(reader);
+    reader.readBytes(numPayloads, refCountBytes, enumSize);
+    nestedReader = reader;
+    nestedAddrOffset = addrOffset;
+
+    srcTag = getEnumTag(src + addrOffset);
+    destTag = getEnumTag(dest + addrOffset);
+    reader.skip(refCountBytes + (numPayloads * sizeof(size_t)));
+  });
+
+  if (SWIFT_LIKELY(srcTag < numPayloads && destTag < numPayloads)) {
+    addrOffset += enumSize;
+    size_t srcRefCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
+    size_t destRefCountOffset = nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
+
+    if (srcTag == destTag) {
+      nestedReader.skip((numPayloads * sizeof(size_t)) + srcRefCountOffset);
+#if defined(__APPLE__) && defined(__arm64__)
+      auto nestedAddrOffsetDest = nestedAddrOffset;
+      LayoutStringReader1 nestedReaderDest = nestedReader;
+
+      handleRefCounts(assignWithCopyTable, CONTINUE_WITH_COPY, metadata,
+                      nestedReaderDest, nestedAddrOffsetDest, dest, src);
+      nestedAddrOffset = nestedAddrOffsetDest;
+#else
+      handleRefCountsAssignWithCopy(metadata, nestedReader, nestedAddrOffset,
+                                    dest, src);
+#endif
+    } else {
+      LayoutStringReader1 nestedReaderDest = nestedReader;
+      nestedReader.skip((numPayloads * sizeof(size_t)) + srcRefCountOffset);
+      nestedReaderDest.skip((numPayloads * sizeof(size_t)) +
+                            destRefCountOffset);
+      auto nestedAddrOffsetDest = nestedAddrOffset;
+      handleRefCountsDestroy(metadata, nestedReaderDest, nestedAddrOffsetDest,
+                             dest);
+      handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset,
+                                  dest, src);
+    }
+    auto trailingBytes = addrOffset - nestedAddrOffset;
+    if (trailingBytes) {
+      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+    }
+    return;
+  } else if (srcTag < numPayloads) {
+    addrOffset += enumSize;
+    size_t refCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+    handleRefCountsInitWithCopy(metadata, nestedReader, nestedAddrOffset, dest, src);
+    auto trailingBytes = addrOffset - nestedAddrOffset;
+    if (trailingBytes) {
+      memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
+    }
+    return;
+  } else if (destTag < numPayloads) {
+    size_t refCountOffset =
+        nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
+    handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
+  }
+
+  memcpy(dest + addrOffset, src + addrOffset, enumSize);
+  addrOffset += enumSize;
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithCopyImpl(swift::OpaqueValue *_dest,
+                             swift::OpaqueValue *_src,
                              const Metadata *metadata) {
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
-  handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t *)dest,
-                                (uint8_t *)src);
+
+#if defined(__APPLE__) && defined(__arm64__)
+  handleRefCounts(assignWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
+                  addrOffset, dest, src);
+#else
+  handleRefCountsAssignWithCopy(metadata, reader, addrOffset, dest, src);
+#endif
 
   assert(addrOffset == metadata->vw_size());
 
-  return dest;
+  return _dest;
 }
 
-void swift::swift_generic_arrayAssignWithCopy(swift::OpaqueValue *dest,
-                                              swift::OpaqueValue *src,
-                                              size_t count, size_t stride,
-                                              const Metadata *metadata) {
+void swift::swift_cvw_arrayAssignWithCopy(swift::OpaqueValue *_dest,
+                                          swift::OpaqueValue *_src,
+                                          size_t count, size_t stride,
+                                          const Metadata *metadata) {
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
   const uint8_t *layoutStr = metadata->getLayoutString();
   for (size_t i = 0; i < count; i++) {
     LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
     uintptr_t addrOffset = i * stride;
-    handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t *)dest,
-                                  (uint8_t *)src);
+
+#if defined(__APPLE__) && defined(__arm64__)
+    handleRefCounts(assignWithCopyTable, CONTINUE_WITH_COPY, metadata, reader,
+                    addrOffset, dest, src);
+#else
+    handleRefCountsAssignWithCopy(metadata, reader, addrOffset, dest, src);
+#endif
   }
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+static swift::OpaqueValue *
+swift_cvw_assignWithTakeImpl(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                              const Metadata *metadata) {
-  swift_generic_destroy(dest, metadata);
-  return swift_generic_initWithTake(dest, src, metadata);
+  swift_cvw_destroy(dest, metadata);
+  return swift_cvw_initWithTake(dest, src, metadata);
 }
 
-extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
-                                                   const Metadata *metadata) {
+extern "C" unsigned
+swift_cvw_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                   const Metadata *metadata) {
   return 0;
 }
 
-extern "C" void swift_singletonEnum_destructiveInjectEnumTag(
+extern "C" void swift_cvw_singletonEnum_destructiveInjectEnumTag(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   return;
 }
@@ -1824,8 +2158,8 @@ static inline T handleSinglePayloadEnumSimpleTag(
                    xiTagBytesOffset, payloadSize, numExtraTagBytes);
 }
 
-extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
-                                                const Metadata *metadata) {
+static unsigned swift_cvw_enumSimple_getEnumTagImpl(swift::OpaqueValue *address,
+                                                    const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -1867,7 +2201,7 @@ extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
       reader, addr, extraTagBytesHandler, xihandler);
 }
 
-extern "C" void swift_enumSimple_destructiveInjectEnumTag(
+static void swift_cvw_enumSimple_destructiveInjectEnumTagImpl(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
@@ -1925,9 +2259,8 @@ extern "C" void swift_enumSimple_destructiveInjectEnumTag(
                                          xihandler);
 }
 
-extern "C"
-unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
-                                 const Metadata *metadata) {
+static unsigned swift_cvw_enumFn_getEnumTagImpl(swift::OpaqueValue *address,
+                                                const Metadata *metadata) {
   auto addr = reinterpret_cast<const uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -1936,9 +2269,9 @@ unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
   return getEnumTag(addr);
 }
 
-extern "C" unsigned
-swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
-                                         const Metadata *metadata) {
+static unsigned
+swift_cvw_multiPayloadEnumGeneric_getEnumTagImpl(swift::OpaqueValue *address,
+                                                 const Metadata *metadata) {
   auto addr = reinterpret_cast<const uint8_t *>(address);
   LayoutStringReader1 reader{metadata->getLayoutString() +
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -1965,7 +2298,7 @@ swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   }
 }
 
-extern "C" void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(
+static void swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTagImpl(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
@@ -2028,9 +2361,9 @@ static inline T handleSinglePayloadEnumGenericTag(
                    numExtraTagBytes);
 }
 
-extern "C" unsigned
-swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
-                                          const Metadata *metadata) {
+static unsigned
+swift_cvw_singlePayloadEnumGeneric_getEnumTagImpl(swift::OpaqueValue *address,
+                                                  const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -2059,7 +2392,8 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
                           uint8_t numExtraTagBytes) -> unsigned {
     if (xiType) {
       return xiType->vw_getEnumTagSinglePayload(
-          (const OpaqueValue *)(addr + xiTagBytesOffset), numEmptyCases);
+          (const OpaqueValue *)(addr + xiTagBytesOffset),
+          xiType->vw_getNumExtraInhabitants());
     }
 
     return 0;
@@ -2069,7 +2403,7 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
       reader, addr, extraTagBytesHandler, xihandler);
 }
 
-extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
+static void swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTagImpl(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
@@ -2127,13 +2461,13 @@ extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
                                           xihandler);
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
+static swift::OpaqueValue *
+swift_cvw_initializeBufferWithCopyOfBufferImpl(swift::ValueBuffer *dest,
                                                swift::ValueBuffer *src,
                                                const Metadata *metadata) {
   if (metadata->getValueWitnesses()->isValueInline()) {
-    return swift_generic_initWithCopy((swift::OpaqueValue *)dest,
-                                      (swift::OpaqueValue *)src, metadata);
+    return swift_cvw_initWithCopy((swift::OpaqueValue *)dest,
+                                  (swift::OpaqueValue *)src, metadata);
   } else {
     memcpy(dest, src, sizeof(swift::HeapObject *));
     swift_retain(*(swift::HeapObject **)src);
@@ -2141,10 +2475,10 @@ swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
   }
 }
 
-void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
-                                             size_t layoutStrOffset,
-                                             const uint8_t *fieldLayoutStr,
-                                             const Metadata *fieldType) {
+void swift::swift_cvw_resolve_resilientAccessors(uint8_t *layoutStr,
+                                                 size_t layoutStrOffset,
+                                                 const uint8_t *fieldLayoutStr,
+                                                 const Metadata *fieldType) {
   LayoutStringWriter writer{layoutStr, layoutStrOffset};
   LayoutStringReader reader{fieldLayoutStr, 0};
   while (true) {
@@ -2223,9 +2557,9 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
         size_t caseOffset = reader.readBytes<size_t>();
         const uint8_t *caseLayoutString = fieldCasesBeginOffset +
                                           caseOffset;
-        swift_resolve_resilientAccessors(layoutStr,
-                                         casesBeginOffset + caseOffset,
-                                         caseLayoutString, fieldType);
+        swift_cvw_resolve_resilientAccessors(layoutStr,
+                                             casesBeginOffset + caseOffset,
+                                             caseLayoutString, fieldType);
       }
       reader.skip(refCountBytes);
       break;
@@ -2255,8 +2589,217 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
   }
 }
 
-extern "C"
-void swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
-                                           Metadata* type) {
+static void swift_cvw_destroyMultiPayloadEnumFNImpl(swift::OpaqueValue *address,
+                                                    const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *addr = (uint8_t *)address;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsDestroy>(metadata, reader, addrOffset,
+                                             addr);
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithCopyMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                               swift::OpaqueValue *_src,
+                                               const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFNAssignWithCopy(metadata, reader, addrOffset, dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata) {
+  swift_cvw_destroyMultiPayloadEnumFN(dest, metadata);
+  return swift_cvw_initWithTake(dest, src, metadata);
+}
+
+static swift::OpaqueValue *
+swift_cvw_initWithCopyMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                             swift::OpaqueValue *_src,
+                                             const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsInitWithCopy>(metadata, reader, addrOffset,
+                                                  dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_initWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                             swift::OpaqueValue *_src,
+                                             const Metadata *metadata) {
+  if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
+    size_t size = metadata->vw_size();
+    memcpy(_dest, _src, size);
+    return _dest;
+  }
+
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsInitWithTake>(metadata, reader, addrOffset,
+                                                  dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFNImpl(
+    swift::ValueBuffer *dest, swift::ValueBuffer *src,
+    const Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isValueInline()) {
+    return swift_cvw_initWithCopyMultiPayloadEnumFN(
+        (swift::OpaqueValue *)dest, (swift::OpaqueValue *)src, metadata);
+  } else {
+    memcpy(dest, src, sizeof(swift::HeapObject *));
+    swift_retain(*(swift::HeapObject **)src);
+    return (swift::OpaqueValue *)&(*(swift::HeapObject **)dest)[1];
+  }
+}
+
+extern "C" void swift_cvw_instantiateLayoutString(const uint8_t *layoutStr,
+                                                  Metadata *type) {
   type->setLayoutString(layoutStr);
 }
+
+// Forwarders for compatibility reasons
+
+extern "C" void swift_generic_destroy(swift::OpaqueValue *address,
+                                      const Metadata *metadata) {
+  swift_cvw_destroy(address, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                             const Metadata *metadata) {
+  return swift_cvw_assignWithCopy(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                             const Metadata *metadata) {
+  return swift_cvw_assignWithTake(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                           const Metadata *metadata) {
+  return swift_cvw_initWithCopy(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                           const Metadata *metadata) {
+  return swift_cvw_initWithTake(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
+                                               swift::ValueBuffer *src,
+                                               const Metadata *metadata) {
+  return swift_cvw_initializeBufferWithCopyOfBuffer(dest, src, metadata);
+}
+
+extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+                                                const Metadata *metadata) {
+  return swift_cvw_enumSimple_getEnumTag(address, metadata);
+}
+
+extern "C" void swift_enumSimple_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  swift_cvw_enumSimple_destructiveInjectEnumTag(address, tag, metadata);
+}
+
+extern "C" unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
+                                            const Metadata *metadata) {
+  return swift_cvw_enumFn_getEnumTag(address, metadata);
+}
+
+extern "C" unsigned
+swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                         const Metadata *metadata) {
+  return swift_cvw_multiPayloadEnumGeneric_getEnumTag(address, metadata);
+}
+
+extern "C" void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTag(address, tag,
+                                                             metadata);
+}
+
+extern "C" unsigned
+swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                          const Metadata *metadata) {
+  return swift_cvw_singlePayloadEnumGeneric_getEnumTagImpl(address, metadata);
+}
+
+extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTag(address, tag,
+                                                              metadata);
+}
+
+extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                                   const Metadata *metadata) {
+  return 0;
+}
+
+extern "C" void swift_singletonEnum_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  return;
+}
+
+extern "C" void swift_generic_instantiateLayoutString(const uint8_t *layoutStr,
+                                                  Metadata *type) {
+  swift_cvw_instantiateLayoutString(layoutStr, type);
+}
+
+#define OVERRIDE_CVW COMPATIBILITY_OVERRIDE
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

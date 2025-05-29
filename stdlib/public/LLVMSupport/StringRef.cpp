@@ -39,12 +39,12 @@ int StringRef::compare_insensitive(StringRef RHS) const {
   return Length < RHS.Length ? -1 : 1;
 }
 
-bool StringRef::startswith_insensitive(StringRef Prefix) const {
+bool StringRef::starts_with_insensitive(StringRef Prefix) const {
   return Length >= Prefix.Length &&
       ascii_strncasecmp(Data, Prefix.Data, Prefix.Length) == 0;
 }
 
-bool StringRef::endswith_insensitive(StringRef Suffix) const {
+bool StringRef::ends_with_insensitive(StringRef Suffix) const {
   return Length >= Suffix.Length &&
       ascii_strncasecmp(end() - Suffix.Length, Suffix.Data, Suffix.Length) == 0;
 }
@@ -160,7 +160,7 @@ size_t StringRef::find(StringRef Str, size_t From) const {
 size_t StringRef::find_insensitive(StringRef Str, size_t From) const {
   StringRef This = substr(From);
   while (This.size() >= Str.size()) {
-    if (This.startswith_insensitive(Str))
+    if (This.starts_with_insensitive(Str))
       return From;
     This = This.drop_front();
     ++From;
@@ -368,17 +368,17 @@ static unsigned GetAutoSenseRadix(StringRef &Str) {
   if (Str.empty())
     return 10;
 
-  if (Str.startswith("0x") || Str.startswith("0X")) {
+  if (Str.starts_with("0x") || Str.starts_with("0X")) {
     Str = Str.substr(2);
     return 16;
   }
 
-  if (Str.startswith("0b") || Str.startswith("0B")) {
+  if (Str.starts_with("0b") || Str.starts_with("0B")) {
     Str = Str.substr(2);
     return 2;
   }
 
-  if (Str.startswith("0o")) {
+  if (Str.starts_with("0o")) {
     Str = Str.substr(2);
     return 8;
   }

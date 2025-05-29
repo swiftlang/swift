@@ -249,7 +249,7 @@ extension String: BidirectionalCollection {
     }
     return i
   }
-
+  
   /// Returns the distance between two indices.
   ///
   /// - Parameters:
@@ -269,23 +269,25 @@ extension String: BidirectionalCollection {
     let start = _guts.validateInclusiveCharacterIndex_5_7(start)
     let end = _guts.validateInclusiveCharacterIndex_5_7(end)
 
-    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-
     // Per SE-0180, `start` and `end` are allowed to fall in between Character
     // boundaries, in which case this function must still terminate without
     // trapping and return a result that makes sense.
-
-    var i = start
+    var i = start._encodedOffset
     var count = 0
-    if i < end {
-      while i < end { // Note `<` instead of `==`
-        count += 1
-        i = _uncheckedIndex(after: i)
+    if start < end {
+      while i < end._encodedOffset { // Note `<` instead of `==`
+        count &+= 1
+        /*
+         For the purposes of this loop, this should be equivalent to
+         _uncheckedIndex(after: i). We don't need to spend time setting up
+         actual Indexes when we only care about counting strides.
+         */
+        i &+= _guts._opaqueCharacterStride(startingAt: i)
       }
-    } else if i > end {
-      while i > end { // Note `<` instead of `==`
-        count -= 1
-        i = _uncheckedIndex(before: i)
+    } else if start > end {
+      while i > end._encodedOffset { // Note `<` instead of `==`
+        count &-= 1
+        i &-= _guts._opaqueCharacterStride(endingAt: i)
       }
     }
     return count

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse-as-library -g -emit-sil -o - | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend %s -parse-as-library -g -Xllvm -sil-print-types -emit-sil -o - | %FileCheck %s --check-prefix=CHECK-SIL
 
 public enum Err: Error, Equatable {
   case err

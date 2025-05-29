@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/tuple_conformance_other.swift -emit-module-path %t/lib.swiftmodule -module-name lib
-// RUN: %target-swift-frontend -emit-sil %s -I %t | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -I %t | %FileCheck %s
 import lib
 
 public func doStuff() {

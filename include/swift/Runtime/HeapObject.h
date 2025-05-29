@@ -386,6 +386,57 @@ public:
   HeapObject *operator *() const { return object; }
 };
 
+/// RAII object that wraps a Swift object and optionally performs a single
+/// retain on that object. Multiple requests to retain the object only perform a
+/// single retain, and if that retain has been done then it's automatically
+/// released when leaving the scope. This helps implement a defensive retain
+/// pattern where you may need to retain an object in some circumstances. This
+/// helper makes it easy to retain the object only once even when loops are
+/// involved, and do a release to balance the retain on all paths out of the
+/// scope.
+class SwiftDefensiveRetainRAII {
+  HeapObject *object;
+  bool didRetain;
+
+public:
+  // Noncopyable.
+  SwiftDefensiveRetainRAII(const SwiftDefensiveRetainRAII &) = delete;
+  SwiftDefensiveRetainRAII &operator=(const SwiftDefensiveRetainRAII &) = delete;
+
+  /// Create a new helper with the given object. The object is not retained
+  /// initially.
+  SwiftDefensiveRetainRAII(HeapObject *object)
+      : object(object), didRetain(false) {}
+
+  ~SwiftDefensiveRetainRAII() {
+    if (didRetain)
+      swift_release(object);
+  }
+
+  /// Perform a defensive retain of the object. If a defensive retain has
+  /// already been performed, this is a no-op.
+  void defensiveRetain() {
+    if (!didRetain) {
+      swift_retain(object);
+      didRetain = true;
+    }
+  }
+
+  /// Take the retain from the helper. This is an optimization for code paths
+  /// that want to retain the object long-term, and avoids doing a redundant
+  /// retain/release pair. If a defensive retain has not been done, then this
+  /// will retain the object, so the caller always gets a +1 on the object.
+  void takeRetain() {
+    if (!didRetain)
+      swift_retain(object);
+    didRetain = false;
+  }
+
+  /// Returns true if the object was defensively retained (and takeRetain not
+  /// called). Intended for use in asserts.
+  bool isRetained() { return didRetain; }
+};
+
 /*****************************************************************************/
 /**************************** UNOWNED REFERENCES *****************************/
 /*****************************************************************************/

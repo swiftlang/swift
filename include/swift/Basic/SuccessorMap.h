@@ -25,9 +25,9 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
 
@@ -159,7 +159,7 @@ public:
   void validate() const {
 #ifndef NDEBUG
     if (Root)
-      validateNode(Root, llvm::None, llvm::None);
+      validateNode(Root, std::nullopt, std::nullopt);
 #endif
   }
 
@@ -369,8 +369,8 @@ private:
   /// Validate that the node is well-formed and that all of its keys
   /// (and those of its children) fall (non-inclusively) between
   /// lowerBound and upperBound-1.
-  static void validateNode(Node *node, llvm::Optional<K> lowerBound,
-                           llvm::Optional<K> upperBound) {
+  static void validateNode(Node *node, std::optional<K> lowerBound,
+                           std::optional<K> upperBound) {
     // The node cannot have an empty key range.
     assert(Traits::precedes(node->Begin, node->End));
 

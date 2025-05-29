@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-type-layout %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-type-layout %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize --check-prefix=CHECK-%target-cpu
 
 import Builtin
 
@@ -40,21 +40,21 @@ entry(%e : $Either<(), ()>):
   fix_lifetime %e : $Either<(), ()>
 
   // CHECK-NEXT: alloca
-  // CHECK-NEXT: trunc i8 {{.*}} to i1
   // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $Either<(), ()>
 
   %l = enum $Either<(), ()>, #Either.Left!enumelt, undef : $()
-  // CHECK-NEXT: store i1 false
+  // CHECK-NEXT: store i8 0
   store %l to %s : $*Either<(), ()>
   %r = enum $Either<(), ()>, #Either.Right!enumelt, undef : $()
-  // CHECK-NEXT: store i1 true
+  // CHECK-NEXT: store i8 1
+  // CHECK-NEXT: [[COND:%.*]] = icmp ne i8 {{%.*}}, 1
   store %r to %s : $*Either<(), ()>
 
   %a = unchecked_enum_data %l : $Either<(), ()>, #Either.Left!enumelt
   %b = unchecked_enum_data %r : $Either<(), ()>, #Either.Right!enumelt
 
-  // CHECK-NEXT: br i1 {{%.*}}, label %[[RIGHT_PRE:[0-9]+]], label %[[LEFT_PRE:[0-9]+]]
+  // CHECK-NEXT: br i1 [[COND]], label %[[LEFT_PRE:[0-9]+]], label %[[RIGHT_PRE:[0-9]+]]
   // CHECK:      [[LEFT_PRE]]:
   // CHECK:        br label [[LEFT:%[0-9]+]]
   // CHECK:      [[RIGHT_PRE]]:
@@ -331,8 +331,8 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[NOOP:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 1
-  // CHECK:        [[DESTROY:%[0-9]+]] = load ptr, ptr [[DESTROYADDR]]
+  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 1
+  // CHECK:        [[DESTROY:%[^,]+]] = load ptr, ptr [[DESTROYADDR]]
   // CHECK:        call void [[DESTROY]](ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      [[NOOP]]:
@@ -343,8 +343,8 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 4
-  // CHECK:        [[INITWITHTAKE:%[0-9]+]] = load ptr, ptr [[INITWITHTAKEADDR]]
+  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 4
+  // CHECK:        [[INITWITHTAKE:%[^,]+]] = load ptr, ptr [[INITWITHTAKEADDR]]
   // CHECK:        {{%[0-9]+}} = call ptr [[INITWITHTAKE]](ptr noalias {{%[0-9]+}}, ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      [[TRIVIAL]]:
@@ -370,8 +370,8 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 1
-  // CHECK:        [[DESTROY:%[0-9]+]] = load ptr, ptr [[DESTROYADDR]]
+  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 1
+  // CHECK:        [[DESTROY:%[^,]+]] = load ptr, ptr [[DESTROYADDR]]
   // CHECK:        call void [[DESTROY]](ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[NOOP]]
   // CHECK:      [[RIGHT]]:
@@ -384,8 +384,8 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 4
-  // CHECK:        [[INITWITHTAKE:%[0-9]+]] = load ptr, ptr [[INITWITHTAKEADDR]]
+  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 4
+  // CHECK:        [[INITWITHTAKE:%[^,]+]] = load ptr, ptr [[INITWITHTAKEADDR]]
   // CHECK:        {{%[0-9]+}} = call ptr [[INITWITHTAKE]](ptr noalias {{%[0-9]+}}, ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      [[TRIVIAL]]:
@@ -401,8 +401,8 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[INITWITHCOPYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 2
-  // CHECK:        [[INITWITHCOPY:%[0-9]+]] = load ptr, ptr [[INITWITHCOPYADDR]]
+  // CHECK:        [[INITWITHCOPYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 2
+  // CHECK:        [[INITWITHCOPY:%[^,]+]] = load ptr, ptr [[INITWITHCOPYADDR]]
   // CHECK:        {{%[0-9]+}} = call ptr [[INITWITHCOPY]](ptr noalias {{%[0-9]+}}, ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
   // CHECK:      [[RIGHT]]:
@@ -432,6 +432,9 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK-NEXT: br i1 [[T_OK]],
 // CHECK: [[T1:%.*]] = getelementptr inbounds ptr, ptr [[T_CHECKED]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load ptr, ptr [[T1]]
+// CHECK-arm64e-NEXT: ptrtoint ptr [[T1]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
+// CHECK-arm64e: [[VALUE_WITNESSES:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESSES]], i32 8
 // CHECK-NEXT: store ptr [[LAYOUT]], {{.*}} [[BUF0]]
 
@@ -443,6 +446,9 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK-NEXT: br i1 [[U_OK]],
 // CHECK: [[T1:%.*]] = getelementptr inbounds ptr, ptr [[U_CHECKED]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load ptr, ptr [[T1]]
+// CHECK-arm64e-NEXT: ptrtoint ptr [[T1]] to i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
+// CHECK-arm64e: [[VALUE_WITNESSES:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESSES]], i32 8
 // CHECK-NEXT: store ptr [[LAYOUT]], {{.*}} [[BUF1]]
 

@@ -69,7 +69,7 @@ private:
   /// The global variable's serialized attribute.
   /// Serialized means that the variable can be "inlined" into another module.
   /// Currently this flag is set for all global variables in the stdlib.
-  unsigned Serialized : 1;
+  unsigned Serialized : 2;
   
   /// Whether this is a 'let' property, which can only be initialized
   /// once (either in its declaration, or once later), making it immutable.
@@ -97,8 +97,8 @@ private:
   SILBasicBlock StaticInitializerBlock;
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
-                    IsSerialized_t IsSerialized, StringRef mangledName,
-                    SILType loweredType, llvm::Optional<SILLocation> loc,
+                    SerializedKind_t serializedKind, StringRef mangledName,
+                    SILType loweredType, std::optional<SILLocation> loc,
                     VarDecl *decl);
 
 public:
@@ -106,11 +106,11 @@ public:
     registeredMetatype = metatype;
   }
 
-  static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
-                                   IsSerialized_t IsSerialized,
-                                   StringRef MangledName, SILType LoweredType,
-                                   llvm::Optional<SILLocation> Loc = llvm::None,
-                                   VarDecl *Decl = nullptr);
+  static SILGlobalVariable *
+  create(SILModule &Module, SILLinkage Linkage, SerializedKind_t serializedKind,
+         StringRef MangledName, SILType LoweredType,
+         std::optional<SILLocation> Loc = std::nullopt,
+         VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();
 
@@ -147,10 +147,21 @@ public:
   /// might be referenced from outside the current compilation unit.
   bool isPossiblyUsedExternally() const;
 
+  /// Returns true if this global variable should be preserved so it can
+  /// potentially be inspected by the debugger.
+  bool shouldBePreservedForDebugger() const;
+
+  /// Check if this global variable is [serialized]. This does not check
+  /// if it's [serialized_for_package].
+  bool isSerialized() const;
+
+  /// Check if this global variable is [serialized] or [serialized_for_package].
+  bool isAnySerialized() const;
+
   /// Get this global variable's serialized attribute.
-  IsSerialized_t isSerialized() const;
-  void setSerialized(IsSerialized_t isSerialized);
-  
+  SerializedKind_t getSerializedKind() const;
+  void setSerializedKind(SerializedKind_t isSerialized);
+
   /// Is this an immutable 'let' property?
   bool isLet() const { return IsLet; }
   void setLet(bool isLet) { IsLet = isLet; }

@@ -96,11 +96,17 @@ void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) cons
   if (SILPrintOnError)
     func->print(out);
   if (SILPrintModuleOnError)
-    func->getModule().print(out);
+    func->getModule().print(out, func->getModule().getSwiftModule());
 }
 
 void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " SIL node ";
   if (Node)
     out << *Node;
+}
+
+void PrettyStackTraceSILDeclRef::print(llvm::raw_ostream &out) const {
+  out << "While " << action << " SIL decl '";
+  declRef.print(out);
+  out << "'\n";
 }

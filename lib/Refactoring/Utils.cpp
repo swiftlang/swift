@@ -26,7 +26,7 @@ swift::refactoring::correctNameInternal(ASTContext &Ctx, StringRef Name,
   llvm::StringSet<> UsedSuffixes;
   for (auto VD : AllVisibles) {
     StringRef S = VD->getBaseName().userFacingName();
-    if (!S.startswith(Name))
+    if (!S.starts_with(Name))
       continue;
     StringRef Suffix = S.substr(Name.size());
     if (Suffix.empty())
@@ -47,14 +47,15 @@ swift::refactoring::correctNameInternal(ASTContext &Ctx, StringRef Name,
   return Ctx.getIdentifier((llvm::Twine(Name) + SuffixToUse).str()).str();
 }
 
-llvm::StringRef swift::refactoring::correctNewDeclName(DeclContext *DC,
+llvm::StringRef swift::refactoring::correctNewDeclName(SourceLoc Loc,
+                                                       DeclContext *DC,
                                                        StringRef Name) {
 
   // Collect all visible decls in the decl context.
   llvm::SmallVector<ValueDecl *, 16> AllVisibles;
   VectorDeclConsumer Consumer(AllVisibles);
   ASTContext &Ctx = DC->getASTContext();
-  lookupVisibleDecls(Consumer, DC, true);
+  lookupVisibleDecls(Consumer, Loc, DC, /*IncludeTopLevel*/ true);
   return correctNameInternal(Ctx, Name, AllVisibles);
 }
 

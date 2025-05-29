@@ -32,7 +32,7 @@ func useFoo<T>(x x: T) {
 //CHECK-LABEL: sil @$s21spec_archetype_method21interesting_code_hereyyF
 //CHECK: function_ref @$s21spec_archetype_method12generic_call{{[_0-9a-zA-Z]*}}FAA3ABCC_Tg5
 //CHECK-NEXT: apply
-//CHECK:  function_ref @$s21spec_archetype_method6useFoo{{[_0-9a-zA-Z]*}}FAA3ABCC_Tg5 : $@convention(thin) (@guaranteed ABC) -> ()
+//CHECK:  function_ref @$s21spec_archetype_method6useFoo{{[_0-9a-zA-Z]*}}FAA3ABCC_Ttg5 : $@convention(thin) () -> ()
 //CHECK-NEXT: apply
 //CHECK: return
 public

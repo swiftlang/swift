@@ -1,5 +1,7 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-ir %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements %s
+
+// REQUIRES: swift_feature_ThenStatements
 
 func foo() -> Int {
   switch Bool.random() {
@@ -165,6 +167,52 @@ func testFallthrough() throws -> Int {
 // CHECK:       dealloc_stack [[RESULT]] : $*Int
 // CHECK:       return [[VAL]] : $Int
 
+func testFallthrough2() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    fallthrough
+  case false:
+    1
+  }
+  return x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr16testFallthrough2SiyF : $@convention(thin) () -> Int {
+// CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
+// CHECK:       switch_value {{%[0-9]+}} : $Builtin.Int1, case {{%[0-9]+}}: [[TRUEBB:bb[0-9]+]], case {{%[0-9]+}}: [[FALSEBB:bb[0-9]+]]
+//
+// CHECK:       [[TRUEBB]]:
+// CHECK-NEXT:  br [[ENDBB:bb[0-9]+]]
+//
+// CHECK:       [[FALSEBB]]:
+// CHECK-NEXT:  br [[ENDBB]]
+//
+// CHECK:       [[ENDBB]]:
+// CHECK:       [[ONELIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 1
+// CHECK:       [[ONE:%[0-9]+]] = apply {{%[0-9]+}}([[ONELIT]], {{%[0-9]+}})
+// CHECK:       store [[ONE]] to [trivial] [[RESULT]] : $*Int
+// CHECK:       [[VAL:%[0-9]+]] = load [trivial] [[RESULT]] : $*Int
+// CHECK:       [[VAL_RESULT:%[0-9]+]] = move_value [var_decl] [[VAL]] : $Int
+// CHECK:       dealloc_stack [[RESULT]] : $*Int
+// CHECK:       return [[VAL_RESULT:[%0-9]+]] : $Int
+
+func testFallthrough3() throws -> Int {
+  switch Bool.random() {
+  case true:
+    switch Bool.random() {
+    case true:
+      if .random() {
+        fallthrough
+      }
+      throw Err()
+    case false:
+      1
+    }
+  case false:
+    0
+  }
+}
+
 func testClosure() throws -> Int {
   let fn = {
     switch Bool.random() {
@@ -252,6 +300,12 @@ struct TestPropertyInit {
     default:
       2
   }
+}
+
+// https://github.com/swiftlang/swift/issues/75294
+func testAsyncLet(_ x: Int?) async {
+  async let _ = switch x { case let i?: i default: 0 }
+  // CHECK-LABEL: sil private [ossa] @$s11switch_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
 }
 
 func testNested(_ e: E) throws -> Int {
@@ -773,5 +827,96 @@ func testConditionalCast<T>(_ x: Any, _ y: Int) -> T? {
   switch y {
   default:
     x as? T
+  }
+}
+
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+}
+
+// rdar://119158202 - Make sure we correctly contextualize local bindings.
+func testLazyLocal(_ x: Int?) {
+  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1aL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+  lazy var a = switch x { case let x?: x case nil: 0 }
+  _ = a
+
+  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1bL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+  lazy var b = switch Bool.random() {
+  case true:
+    let x = ""
+    then x
+  case false:
+    ""
+  }
+  _ = b
+
+  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+  lazy var c = switch Bool.random() {
+  case true:
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg1xL3_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+    lazy var x = ""
+    then x
+  case false:
+    ""
+  }
+  _ = c
+
+  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1dL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+  lazy var d = switch Bool.random() {
+  case true:
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1dL_Sivg1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+    lazy var y = switch x { case let x?: x case nil: 0 }
+    then y
+  case false:
+    0
+  }
+  _ = d
+
+  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1eL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+  lazy var e = switch Bool.random() {
+  case true:
+    @Wrapper
+    var x = 0
+    then x
+  case false:
+    0
+  }
+  _ = e
+
+  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1fL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+  lazy var f = switch 0 {
+  case 1:
+    1
+  default:
+    0
+  }
+  _ = f
+}
+
+struct LazyProp {
+  var a: Int?
+
+  // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1bSivg : $@convention(method) (@inout LazyProp) -> Int
+  lazy var b = switch a { case let a?: a case nil: 0 }
+
+  // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1cSivg : $@convention(method) (@inout LazyProp) -> Int
+  lazy var c = switch Bool.random() {
+  case true:
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1cSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+    lazy var x = 0
+    then x
+  case false:
+    0
+  }
+
+  // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1dSivg : $@convention(method) (@inout LazyProp) -> Int
+  lazy var d = switch Bool.random() {
+  case true:
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1dSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, @inout_aliasable LazyProp) -> Int
+    lazy var x = switch a { case let a?: a case nil: 0 }
+    then x
+  case false:
+    0
   }
 }

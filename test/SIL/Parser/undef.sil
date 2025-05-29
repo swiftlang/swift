@@ -287,17 +287,6 @@ bb2:
   return undef : $()
 }
 
-sil @switch_value_test : $() -> () {
-bb0:
-  // CHECK: switch_value undef : $Builtin.Int1, case undef: bb1
-  switch_value undef : $Builtin.Int1, case undef: bb1
-bb1:
-  // CHECK: switch_value undef : $() -> (), case undef: bb2
-  switch_value undef : $() -> (), case undef: bb2
-bb2:
-  return undef : $()
-}
-
 sil @switch_enum_test : $() -> () {
 bb0:
   // CHECK: switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb2

@@ -221,4 +221,18 @@ keyPathMultiModule.test("identity across multiple modules") {
   }
 }
 
+@inline(never) @_optimize(none)
+func testGenericExternalPropertyKeyPath<A, B, C>(
+    a: A, b: B, c: C
+) -> KeyPath<GenericExternalKeyPathTest<C>, String> {
+    return \GenericExternalKeyPathTest<C>.property
+}
+
+keyPathMultiModule.test("external generic property keypath accessed from different generic context") {
+    let kp = testGenericExternalPropertyKeyPath(a: 1, b: 1.0, c: "one")
+
+    expectEqual(GenericExternalKeyPathTest<String>()[keyPath: kp],
+                "\(String.self)")
+}
+
 runAllTests()

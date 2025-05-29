@@ -19,7 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 
@@ -37,7 +37,6 @@ class Decl;
 class EnumDecl;
 class Fingerprint;
 class FuncDecl;
-enum class ResultBuilderBodyPreCheck : uint8_t;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;

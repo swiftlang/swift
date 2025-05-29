@@ -74,6 +74,11 @@ class ModuleFile
   /// The module that this module is an overlay of, if any.
   ModuleDecl *UnderlyingModule = nullptr;
 
+  /// Once this module file has been associated with the AST node representing
+  /// it, resolve the potentially-SDK-relative module-defining `.swiftinterface`
+  /// path to an absolute path.
+  std::optional<std::string> ResolvedModuleDefiningFilename;
+
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
 
@@ -91,7 +96,7 @@ public:
   public:
     const ModuleFileSharedCore::Dependency &Core;
 
-    llvm::Optional<ImportedModule> Import = llvm::None;
+    std::optional<ImportedModule> Import = std::nullopt;
     SmallVector<Identifier, 4> spiGroups;
 
     Dependency(const ModuleFileSharedCore::Dependency &coreDependency)
@@ -121,6 +126,9 @@ public:
 private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
+
+  /// External macro modules.
+  SmallVector<ExternalMacroPlugin, 4> MacroModuleNames;
 
 public:
   template <typename T>
@@ -253,6 +261,9 @@ private:
 
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
+
+  /// Abstract conformances referenced by this module.
+  MutableArrayRef<Serialized<AbstractConformance *>> AbstractConformances;
 
   /// Pack conformances referenced by this module.
   MutableArrayRef<Serialized<PackConformance *>> PackConformances;
@@ -493,13 +504,13 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
-  ParameterList *readParameterList();
+  llvm::Expected<ParameterList *> readParameterList();
   
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+  llvm::Expected<GenericParamList *> maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
@@ -528,6 +539,9 @@ private:
   void readPrimaryAssociatedTypes(
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes,
       llvm::BitstreamCursor &Cursor);
+
+  /// Read a list of the protocol declarations inherited by another protocol.
+  bool readInheritedProtocols(SmallVectorImpl<ProtocolDecl *> &inherited);
 
   /// Populates the protocol's default witness table.
   ///
@@ -579,6 +593,10 @@ public:
     return Core->ModuleExportAsName;
   }
 
+  StringRef getPublicModuleName() const {
+    return Core->PublicModuleName;
+  }
+
   /// The ABI name of the module.
   StringRef getModuleABIName() const {
     return Core->ModuleABIName;
@@ -586,6 +604,10 @@ public:
 
   llvm::VersionTuple getUserModuleVersion() const {
     return Core->UserModuleVersion;
+  }
+
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return Core->SwiftInterfaceCompilerVersion;
   }
 
   ArrayRef<StringRef> getAllowableClientNames() const {
@@ -634,6 +656,11 @@ public:
     return Core->Bits.HasCxxInteroperability;
   }
 
+  /// The kind of the C++ stdlib that this module was built with.
+  CXXStdlibKind getCXXStdlibKind() const {
+    return static_cast<CXXStdlibKind>(Core->Bits.CXXStdlibKind);
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -641,6 +668,15 @@ public:
 
   bool isBuiltFromInterface() const {
     return Core->Bits.IsBuiltFromInterface;
+  }
+
+  bool allowNonResilientAccess() const {
+    return Core->Bits.AllowNonResilientAccess;
+  }
+
+  /// Whether this module was built with -experimental-package-cmo.
+  bool serializePackageEnabled() const {
+    return Core->Bits.SerializePackageEnabled;
   }
 
   /// Whether this module is compiled with implicit dynamic.
@@ -658,6 +694,10 @@ public:
   /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
   bool allowCompilerErrors() const;
 
+  /// Allow recovering from errors that could be unsafe when compiling
+  /// the binary. Useful for the debugger and IDE support tools.
+  bool enableExtendedDeserializationRecovery() const;
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
@@ -670,6 +710,9 @@ public:
 
   /// \c true if this module was built with complete checking for concurrency.
   bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
+
+  /// \c true if this module was built with strict memory safety.
+  bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -730,7 +773,8 @@ public:
   ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
-  void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
+  void lookupValue(DeclName name, OptionSet<ModuleLookupFlags> flags,
+                   SmallVectorImpl<ValueDecl*> &results);
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);
@@ -757,6 +801,8 @@ public:
   /// Adds any imported modules to the given vector.
   void getImportedModules(SmallVectorImpl<ImportedModule> &results,
                           ModuleDecl::ImportFilter filter);
+
+  void getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros);
 
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
 
@@ -849,6 +895,8 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false);
 
   StringRef getModuleFilename() const {
+    if (ResolvedModuleDefiningFilename)
+      return ResolvedModuleDefiningFilename.value();
     if (!Core->ModuleInterfacePath.empty())
       return Core->ModuleInterfacePath;
     return getModuleLoadedFilename();
@@ -892,7 +940,7 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
-  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                             uint64_t contextData) override;
   virtual AbstractFunctionDecl *
   loadReferencedFunctionDecl(const DerivativeAttr *DA,
@@ -919,20 +967,20 @@ public:
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
-  llvm::Optional<StringRef> getGroupNameById(unsigned Id) const;
-  llvm::Optional<StringRef> getSourceFileNameById(unsigned Id) const;
-  llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
-  llvm::Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
-  llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
+  std::optional<StringRef> getGroupNameById(unsigned Id) const;
+  std::optional<StringRef> getSourceFileNameById(unsigned Id) const;
+  std::optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  std::optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
+  std::optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
-  llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  std::optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   bool hasLoadedSwiftDoc() const;
-  llvm::Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
-  llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
-  llvm::Optional<ExternalSourceLocs::RawLocs>
+  std::optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
+  std::optional<StringRef> getGroupNameByUSR(StringRef USR) const;
+  std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateDecl(const Decl *D);
-  llvm::Optional<Fingerprint>
+  std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
@@ -1044,16 +1092,26 @@ public:
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Reads a foreign error convention from \c DeclTypeCursor, if present.
-  llvm::Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+  std::optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
 
   /// Reads a foreign async convention from \c DeclTypeCursor, if present.
-  llvm::Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
+  std::optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
+
+  bool maybeReadLifetimeDependenceRecord(SmallVectorImpl<uint64_t> &scratch);
+
+  // Reads lifetime dependence info from type if present.
+  std::optional<LifetimeDependenceInfo>
+  maybeReadLifetimeDependence(unsigned numParams);
+
+  // Reads lifetime dependence specifier from decl if present
+  bool maybeReadLifetimeEntry(SmallVectorImpl<LifetimeEntry> &specifierList,
+                              unsigned numDeclParams, bool hasSelf);
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
-  llvm::Optional<StringRef> maybeReadInlinableBodyText();
+  std::optional<StringRef> maybeReadInlinableBodyText();
 
   /// Reads pattern initializer text from \c DeclTypeCursor, if present.
-  llvm::Optional<StringRef> maybeReadPatternInitializerText();
+  std::optional<StringRef> maybeReadPatternInitializerText();
 };
 
 template <typename T, typename RawData>
@@ -1064,8 +1122,7 @@ void ModuleFile::allocateBuffer(MutableArrayRef<T> &buffer,
     return;
 
   void *rawBuffer = Allocator.Allocate(sizeof(T) * rawData.size(), alignof(T));
-  buffer = llvm::makeMutableArrayRef(static_cast<T *>(rawBuffer),
-                                     rawData.size());
+  buffer = llvm::MutableArrayRef(static_cast<T *>(rawBuffer), rawData.size());
   std::uninitialized_copy(rawData.begin(), rawData.end(), buffer.begin());
 }
 

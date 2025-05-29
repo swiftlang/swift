@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -emit-module -enable-library-evolution -emit-module-path=%t/A.swiftmodule -module-name=A %S/Inputs/mangle-opaque-return-types-A.swift
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir  %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -enable-library-evolution -emit-module-path=%t/A.swiftmodule -module-name=A %S/Inputs/mangle-opaque-return-types-A.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -emit-ir  %s
 import A
 
 public struct C<T, Content: Proto> {

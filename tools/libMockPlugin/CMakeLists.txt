@@ -16,4 +16,4 @@ add_llvm_symbol_exports(libMockPlugin ${LLVM_EXPORTED_SYMBOL_FILE})
 
 add_dependencies(tools libMockPlugin)
 # Adds -dead_strip option
-add_link_opts(libStaticMirror)
+add_link_opts(libMockPlugin)

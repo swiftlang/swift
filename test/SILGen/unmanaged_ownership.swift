@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-stdlib -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -module-name Swift %s | %FileCheck %s
 
 @_marker protocol Copyable {}
 

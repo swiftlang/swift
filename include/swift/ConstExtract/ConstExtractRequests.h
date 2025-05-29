@@ -16,15 +16,16 @@
 #ifndef SWIFT_CONST_EXTRACT_REQUESTS_H
 #define SWIFT_CONST_EXTRACT_REQUESTS_H
 
-#include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ConstTypeInfo.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -35,9 +36,12 @@ class EnumDecl;
 
 /// Retrieve information about compile-time-known values
 class ConstantValueInfoRequest
-  : public SimpleRequest<ConstantValueInfoRequest,
-                         ConstValueTypeInfo(NominalTypeDecl *),
-                         RequestFlags::Cached> {
+    : public SimpleRequest<
+          ConstantValueInfoRequest,
+          ConstValueTypeInfo(
+              NominalTypeDecl *,
+              llvm::PointerUnion<const SourceFile *, ModuleDecl *>),
+          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -46,7 +50,9 @@ private:
 
   // Evaluation.
   ConstValueTypeInfo
-  evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
+  evaluate(Evaluator &eval, NominalTypeDecl *nominal,
+           llvm::PointerUnion<const SourceFile *, ModuleDecl *> extractionScope)
+      const;
 
 public:
   // Caching

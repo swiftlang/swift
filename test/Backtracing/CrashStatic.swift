@@ -51,7 +51,7 @@ struct CrashStatic {
 // CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in CrashStatic at {{.*}}/CrashStatic.swift:15:3
 // CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static CrashStatic.main() + {{[0-9]+}} in CrashStatic at {{.*}}/CrashStatic.swift:39:5
 // CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static CrashStatic.$main() + {{[0-9]+}} in CrashStatic at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 7 [ra] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashStatic at {{.*}}/CrashStatic.swift
+// CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashStatic at {{.*}}/CrashStatic.swift
 
 // CHECK: Registers:
 

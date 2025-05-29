@@ -35,6 +35,7 @@ UID_KEYS = [
     KEY('GenericParams', 'key.generic_params'),
     KEY('GenericRequirements', 'key.generic_requirements'),
     KEY('DocFullAsXML', 'key.doc.full_as_xml'),
+    KEY('DocComment', 'key.doc_comment'),
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
@@ -44,12 +45,10 @@ UID_KEYS = [
     KEY('FilePath', 'key.filepath'),
     KEY('ModuleInterfaceName', 'key.module_interface_name'),
     KEY('Hash', 'key.hash'),
-    KEY('CompilerArgs', 'key.compilerargs'),
     KEY('Severity', 'key.severity'),
     KEY('Offset', 'key.offset'),
     KEY('Length', 'key.length'),
     KEY('SourceFile', 'key.sourcefile'),
-    KEY('SourceText', 'key.sourcetext'),
     KEY('PrimaryFile', 'key.primary_file'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('EnableStructure', 'key.enablesubstructure'),
@@ -68,6 +67,8 @@ UID_KEYS = [
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
     KEY('NumBytesToErase', 'key.num_bytes_to_erase'),
     KEY('NotRecommended', 'key.not_recommended'),
+    KEY('Declarations', 'key.declarations'),
+    KEY('EnableDeclarations', 'key.enabledeclarations'),
     KEY('Annotations', 'key.annotations'),
     KEY('SemanticTokens', 'key.semantic_tokens'),
     KEY('DiagnosticStage', 'key.diagnostic_stage'),
@@ -117,6 +118,7 @@ UID_KEYS = [
     KEY('Introduced', 'key.introduced'),
     KEY('Deprecated', 'key.deprecated'),
     KEY('Obsoleted', 'key.obsoleted'),
+    KEY('CancelBuilds', 'key.cancel_builds'),
     KEY('RemoveCache', 'key.removecache'),
     KEY('TypeUsr', 'key.typeusr'),
     KEY('ContainerTypeUsr', 'key.containertypeusr'),
@@ -146,6 +148,7 @@ UID_KEYS = [
     KEY('Simplified', 'key.simplified'),
     KEY('RangeContent', 'key.rangecontent'),
     KEY('CancelOnSubsequentRequest', 'key.cancel_on_subsequent_request'),
+    KEY('IncludeNonEditableBaseNames', 'key.include_non_editable_base_names'),
     KEY('RenameLocations', 'key.renamelocations'),
     KEY('Locations', 'key.locations'),
     KEY('NameType', 'key.nametype'),
@@ -215,6 +218,21 @@ UID_KEYS = [
     KEY('ExpandedMacroReplacements', 'key.expanded_macro_replacements'),
     KEY('IndexStorePath', 'key.index_store_path'),
     KEY('IndexUnitOutputPath', 'key.index_unit_output_path'),
+    KEY('IncludeLocals', 'key.include_locals'),
+    KEY('IgnoreClangModules', 'key.ignore_clang_modules'),
+    KEY('IncludeSystemModules', 'key.include_system_modules'),
+    KEY('IgnoreStdlib', 'key.ignore_stdlib'),
+    KEY('DisableImplicitModules', 'key.disable_implicit_modules'),
+
+    KEY('CompilerArgs', 'key.compilerargs'),
+    KEY('SourceText', 'key.sourcetext'),
+
+    # IMPORTANT: Add any new keys before CompilerArgs and SourceText.
+    # Always keep CompilerArgs and SourceText as the last keys so that printing
+    # a request dictionary has those as the last entries. That way, when the
+    # request gets truncated by os_log in sourcekit-lsp, we see most of the
+    # request. Most likely the sourcetext and the compiler args wouldn't have
+    # made it into the log message completely anyway.
 ]
 
 
@@ -264,7 +282,6 @@ UID_REQUESTS = [
     REQUEST('NameTranslation', 'source.request.name.translation'),
     REQUEST('MarkupToXML', 'source.request.convert.markup.xml'),
     REQUEST('Statistics', 'source.request.statistics'),
-    REQUEST('SyntacticRename', 'source.request.syntacticrename'),
     REQUEST('FindRenameRanges', 'source.request.find-syntactic-rename-ranges'),
     REQUEST('FindLocalRenameRanges',
             'source.request.find-local-rename-ranges'),
@@ -510,4 +527,6 @@ UID_KINDS = [
     KIND('MacroRolePeer', 'source.lang.swift.macro_role.peer'),
     KIND('MacroRoleConformance', 'source.lang.swift.macro_role.conformance'),
     KIND('MacroRoleExtension', 'source.lang.swift.macro_role.extension'),
+    KIND('MacroRolePreamble', 'source.lang.swift.macro_role.preamble'),
+    KIND('MacroRoleBody', 'source.lang.swift.macro_role.body'),
 ]

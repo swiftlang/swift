@@ -28,8 +28,10 @@ public struct LazyDropWhileSequence<Base: Sequence> {
     self._base = _base
     self._predicate = predicate
   }
-
 }
+
+@available(*, unavailable)
+extension LazyDropWhileSequence: Sendable {}
 
 extension LazyDropWhileSequence {
   /// An iterator over the elements traversed by a base iterator that follow the
@@ -56,6 +58,9 @@ extension LazyDropWhileSequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension LazyDropWhileSequence.Iterator: Sendable {}
 
 extension LazyDropWhileSequence.Iterator: IteratorProtocol {
   @inlinable // lazy-performance

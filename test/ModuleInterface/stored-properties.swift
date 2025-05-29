@@ -14,6 +14,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution -emit-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
 
+// REQUIRES: swift_feature_StructLetDestructuring
+
 // COMMON: public struct HasStoredProperties {
 public struct HasStoredProperties {
   // COMMON: public var computedGetter: Swift.Int {
@@ -38,7 +40,8 @@ public struct HasStoredProperties {
 
   // CHECK: @_hasStorage public var storedWithObservers: Swift.Bool {
   // RESILIENT:   {{^}}  public var storedWithObservers: Swift.Bool {
-  // COMMON-NEXT: {{^}}    get
+  // CHECK-NEXT:  {{^}}    @_transparent get
+  // RESILIENT-NEXT: {{^}} get
   // COMMON-NEXT: {{^}}    set
   // COMMON-NEXT: {{^}}  }
   public var storedWithObservers: Bool {

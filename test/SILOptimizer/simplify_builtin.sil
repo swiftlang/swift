@@ -1,7 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
-// RUN: %target-sil-opt -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
-// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS
-// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS1
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS2
 
 // REQUIRES: swift_in_compiler
 
@@ -25,6 +25,11 @@ class C1<T> {
 
 class C2<T> : C1<T> {
 }
+
+class A {
+}
+
+sil_global [let] @gg : $Int
 
 // CHECK-LABEL: sil @constantFoldAdd
 // CHECK:         [[A:%.*]] = integer_literal $Builtin.Int64, 12
@@ -253,11 +258,11 @@ bb0:
   return %4 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @different_function_metatype
+// CHECK-LABEL: sil @different_function_metatype1
 // CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    return [[R]]
-// CHECK:       } // end sil function 'different_function_metatype'
-sil @different_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+// CHECK:       } // end sil function 'different_function_metatype1'
+sil @different_function_metatype1 : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = metatype $@thick ((Int) -> Bool).Type
   %1 = metatype $@thick ((Float) -> Bool).Type
@@ -265,6 +270,76 @@ bb0:
   %3 = init_existential_metatype %1 : $@thick ((Float) -> Bool).Type, $@thick Any.Type
   %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
   return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @different_function_metatype2
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'different_function_metatype2'
+sil @different_function_metatype2 : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int, Int) -> ()).Type
+  %1 = metatype $@thick (((Int, Int)) -> ()).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int, Int) -> ()).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (((Int, Int)) -> ()).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_function_metatype1 :
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_function_metatype1'
+sil @unknown_function_metatype1 : $@convention(thin) <T> () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((T) -> Bool).Type
+  %1 = metatype $@thick ((Int) -> Bool).Type
+  %2 = init_existential_metatype %0, $@thick Any.Type
+  %3 = init_existential_metatype %1, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2, %3) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_function_metatype2 :
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_function_metatype2'
+sil @unknown_function_metatype2 : $@convention(thin) <T> () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((T) -> Bool).Type
+  %2 = init_existential_metatype %0, $@thick Any.Type
+  %3 = init_existential_metatype %1, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2, %3) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_dynamic_self
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_dynamic_self'
+sil @same_metatype_dynamic_self : $@convention(method) (@guaranteed A) -> Builtin.Int1 {
+bb0(%0 : $A):
+  %2 = metatype $@thick @dynamic_self A.Type
+  %3 = init_existential_metatype %2 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %5 = metatype $@thick @dynamic_self A.Type
+  %6 = init_existential_metatype %5 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %13 = builtin "is_same_metatype"(%3 : $@thick any Any.Type, %6 : $@thick any Any.Type) : $Builtin.Int1
+  return %13 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_dynamic_self
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_dynamic_self'
+sil @unknown_same_metatype_dynamic_self : $@convention(method) (@guaranteed A) -> Builtin.Int1 {
+bb0(%0 : $A):
+  %2 = metatype $@thick @dynamic_self A.Type
+  %3 = init_existential_metatype %2 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %5 = metatype $@thick A.Type
+  %6 = init_existential_metatype %5 : $@thick A.Type, $@thick any Any.Type
+  %13 = builtin "is_same_metatype"(%3 : $@thick any Any.Type, %6 : $@thick any Any.Type) : $Builtin.Int1
+  return %13 : $Builtin.Int1
 }
 
 sil_global hidden [let] @g : $Int32
@@ -296,34 +371,33 @@ sil [global_init_once_fn] @unknown_init : $@convention(c) () -> ()
 // CHECK-LABEL: sil @remove_builtin_once :
 // CHECK-NOT:     builtin
 // CHECK:       } // end sil function 'remove_builtin_once'
-sil @remove_builtin_once : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @remove_builtin_once : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @side_effect_free_init : $@convention(c) () -> ()
-  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
-  %3 = tuple ()
-  return %3 : $()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  %3 = global_addr @gg : $*Int depends_on %2
+  %4 = address_to_pointer %3 : $*Int to $Builtin.RawPointer
+  return %4 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: sil @dont_remove_builtin_once_side_effect :
 // CHECK:         builtin
 // CHECK:       } // end sil function 'dont_remove_builtin_once_side_effect'
-sil @dont_remove_builtin_once_side_effect : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @dont_remove_builtin_once_side_effect : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @init_with_side_effect : $@convention(c) () -> ()
-  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
-  %3 = tuple ()
-  return %3 : $()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  return %0 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: sil @dont_remove_builtin_once_unknown :
 // CHECK:         builtin
 // CHECK:       } // end sil function 'dont_remove_builtin_once_unknown'
-sil @dont_remove_builtin_once_unknown : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @dont_remove_builtin_once_unknown : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @unknown_init : $@convention(c) () -> ()
-  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $()
-  %3 = tuple ()
-  return %3 : $()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  return %0 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: sil @generic_canBeClass
@@ -371,8 +445,9 @@ bb0:
 
 // CHECK-LABEL: sil @remove_assert_configuration
 // CHECK-NOT:     builtin "assert_configuration"
-// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 1
-// CHECK-NOASSERTS: [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-NOASSERTS1: [[L:%.*]] = integer_literal $Builtin.Int8, 1
+// CHECK-NOASSERTS2: [[L:%.*]] = integer_literal $Builtin.Int8, 2
 // CHECK:         [[R:%.*]] = struct $Int8 ([[L]] : $Builtin.Int8)
 // CHECK:         return [[R]]
 // CHECK:       } // end sil function 'remove_assert_configuration'
@@ -381,6 +456,74 @@ bb0:
   %3 = builtin "assert_configuration"() : $Builtin.Int8
   %4 = struct $Int8 (%3 : $Builtin.Int8)
   return %4 : $Int8
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check :
+// CHECK:         %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'string_null_pointer_check'
+sil @string_null_pointer_check : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_ne :
+// CHECK:         %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'string_null_pointer_check_ne'
+sil @string_null_pointer_check_ne : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_no_integer_literal :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_no_integer_literal'
+sil @string_null_pointer_check_no_integer_literal : $@convention(thin) (Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64):
+  %1 = string_literal utf8 "hello"
+  %2 = builtin "ptrtoint_Word"(%1 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
+  %4 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_not_zero :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_not_zero'
+sil @string_null_pointer_check_not_zero : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 123
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_no_string_literal :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_no_string_literal'
+sil @string_null_pointer_check_no_string_literal : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int1 {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
 }
 
 // CHECK-LABEL: sil @convert_thick_to_thin1
@@ -490,3 +633,64 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %3 = builtin "destroyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
   return %0 : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: sil @remove_trivial_destroy_array
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_array'
+sil @remove_trivial_destroy_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type
+  %3 = builtin "destroyArray"<Int>(%2 : $@thin Int.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @remove_trivial_destroy_metatype_array :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_metatype_array'
+sil @remove_trivial_destroy_metatype_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type.Type
+  %3 = builtin "destroyArray"<Int.Type>(%2 : $@thin Int.Type.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @sizeof_concrete_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, 4
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_concrete_type'
+sil @sizeof_concrete_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Int32>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_generic_type :
+// CHECK:         %1 = builtin
+// CHECK:         return %1
+// CHECK:       } // end sil function 'sizeof_generic_type'
+sil @sizeof_generic_type : $@convention(thin) <T> (@thick T.Type) -> Builtin.Word {
+bb0(%0 : $@thick T.Type):
+  %1 = builtin "sizeof"<T>() : $Builtin.Word
+  return %1
+}
+
+// CHECK-LABEL: sil @sizeof_metatype :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(4|8)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_metatype'
+sil @sizeof_metatype : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Bool.Type>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_function_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(8|16)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_function_type'
+sil @sizeof_function_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<()->()>() : $Builtin.Word
+  return %0
+}
+

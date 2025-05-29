@@ -16,5 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(ConstExtract, ConstantValueInfoRequest,
-              ConstValueTypeInfo(NominalTypeDecl *), Cached,
-              NoLocationInfo)
+              ConstValueTypeInfo(
+                  NominalTypeDecl *,
+                  llvm::PointerUnion<const SourceFile *, ModuleDecl *>),
+              Cached, NoLocationInfo)

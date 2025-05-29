@@ -7,7 +7,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK: sil non_abi [serialized] [ossa] @$s11back_deploy8someFuncyyFTwB
-// CHECK: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy8someFuncyyFTwb
+// CHECK: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy8someFuncyyFTwb
 // CHECK: sil [available 10.52] [ossa] @$s11back_deploy8someFuncyyF
 @backDeployed(before: macOS 10.52)
 public func someFunc() {}

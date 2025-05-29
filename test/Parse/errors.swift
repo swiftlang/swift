@@ -50,6 +50,13 @@ func one() {
   }
 
   do {
+#if compiler(>=10)
+    throw opaque_error()
+#endif
+  } catch {    // don't warn, #if code should be scanned.
+  }
+
+  do {
 #if false
     throw opaque_error()
 #endif

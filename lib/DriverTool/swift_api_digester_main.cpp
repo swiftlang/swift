@@ -29,6 +29,7 @@
 #include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "swift/APIDigester/ModuleDiagsConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -136,8 +137,8 @@ class BestMatchMatcher : public NodeMatcher {
     return MatchedRight.count(R) == 0 && CanMatch(L, R);
   }
 
-  llvm::Optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector &Candidates) {
-    llvm::Optional<NodePtr> Best;
+  std::optional<NodePtr> findBestMatch(NodePtr Pin, NodeVector &Candidates) {
+    std::optional<NodePtr> Best;
     for (auto Can : Candidates) {
       if (!internalCanMatch(Pin, Can))
         continue;
@@ -192,11 +193,11 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       if (A->getKind() == SDKNodeKind::DeclVar) {
         if (A->getName().compare_insensitive(R->getName()) == 0) {
           R->annotate(NodeAnnotation::GetterToProperty);
-        } else if (R->getName().startswith("get") &&
+        } else if (R->getName().starts_with("get") &&
                    R->getName().substr(3).compare_insensitive(A->getName()) ==
                        0) {
           R->annotate(NodeAnnotation::GetterToProperty);
-        } else if (R->getName().startswith("set") &&
+        } else if (R->getName().starts_with("set") &&
                    R->getName().substr(3).compare_insensitive(A->getName()) ==
                        0) {
           R->annotate(NodeAnnotation::SetterToProperty);
@@ -213,18 +214,18 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
 
   static bool isAnonymousEnum(SDKNodeDecl *N) {
     return N->getKind() == SDKNodeKind::DeclVar &&
-      N->getUsr().startswith("c:@Ea@");
+      N->getUsr().starts_with("c:@Ea@");
   }
 
   static bool isNominalEnum(SDKNodeDecl *N) {
     return N->getKind() == SDKNodeKind::DeclType &&
-    N->getUsr().startswith("c:@E@");
+    N->getUsr().starts_with("c:@E@");
   }
 
-  static llvm::Optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
+  static std::optional<StringRef> getLastPartOfUsr(SDKNodeDecl *N) {
     auto LastPartIndex = N->getUsr().find_last_of('@');
     if (LastPartIndex == StringRef::npos)
-      return llvm::None;
+      return std::nullopt;
     return N->getUsr().substr(LastPartIndex + 1);
   }
 
@@ -289,12 +290,12 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     auto RR = R.lower();
     if (isNameTooSimple(LL) || isNameTooSimple(RR))
       return false;
-    if (((StringRef)LL).startswith(RR) || ((StringRef)RR).startswith(LL))
+    if (((StringRef)LL).starts_with(RR) || ((StringRef)RR).starts_with(LL))
       return true;
-    if (((StringRef)LL).startswith((llvm::Twine("ns") + RR).str()) ||
-        ((StringRef)RR).startswith((llvm::Twine("ns") + LL).str()))
+    if (((StringRef)LL).starts_with((llvm::Twine("ns") + RR).str()) ||
+        ((StringRef)RR).starts_with((llvm::Twine("ns") + LL).str()))
       return true;
-    if (((StringRef)LL).endswith(RR) || ((StringRef)RR).endswith(LL))
+    if (((StringRef)LL).ends_with(RR) || ((StringRef)RR).ends_with(LL))
       return true;
     return false;
   }
@@ -419,9 +420,9 @@ class SameNameNodeMatcher : public NodeMatcher {
   }
 
   // Given two SDK nodes, figure out the reason for why they have the same name.
-  llvm::Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
+  std::optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
     if (L->getKind() != R->getKind())
-      return llvm::None;
+      return std::nullopt;
     auto NameEqual = L->getPrintedName() == R->getPrintedName();
     auto UsrEqual = isUSRSame(L, R);
     if (NameEqual && UsrEqual)
@@ -431,7 +432,7 @@ class SameNameNodeMatcher : public NodeMatcher {
     else if (UsrEqual)
       return NameMatchKind::USR;
     else
-      return llvm::None;
+      return std::nullopt;
   }
 
   struct NameMatchCandidate {
@@ -563,7 +564,7 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
     // Don't complain about removing @_alwaysEmitIntoClient if we are checking ABI.
     // We shouldn't include these decls in the ABI baseline file. This line is
     // added so the checker is backward compatible.
-    if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
+    if (D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient))
       return;
   }
   auto &Ctx = D->getSDKContext();
@@ -668,11 +669,11 @@ public:
     // Decls with @_alwaysEmitIntoClient aren't required to have an
     // @available attribute.
     if (!Ctx.getOpts().SkipOSCheck &&
-        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
+        DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::Available,
                                                     D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient) &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_Marker)) {
+        !D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient) &&
+        !D->hasDeclAttribute(DeclAttrKind::Marker)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
     }
   }
@@ -1799,7 +1800,7 @@ public:
   }
 };
 
-static llvm::Optional<uint8_t> findSelfIndex(SDKNode *Node) {
+static std::optional<uint8_t> findSelfIndex(SDKNode *Node) {
   if (auto func = dyn_cast<SDKNodeDeclAbstractFunc>(Node)) {
     return func->getSelfIndexOptional();
   } else if (auto vd = dyn_cast<SDKNodeDeclVar>(Node)) {
@@ -1810,7 +1811,7 @@ static llvm::Optional<uint8_t> findSelfIndex(SDKNode *Node) {
       }
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Find cases where a diff is due to a change to being a type member
@@ -1834,7 +1835,7 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
             : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
         right->getPrintedName(),
         findSelfIndex(right),
-        llvm::None,
+        std::nullopt,
         leftParent->getKind() == SDKNodeKind::Root
             ? StringRef()
             : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
@@ -1877,7 +1878,7 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
     Line = Line.trim();
     if (Line.empty())
       continue;
-    if (Line.startswith("// ")) // comment.
+    if (Line.starts_with("// ")) // comment.
       continue;
     Lines.insert(Line);
   }
@@ -1913,6 +1914,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool DisableFailOnError,
                                 bool CompilerStyleDiags,
+                                bool ExplicitErrOnABIBreakage,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
@@ -1935,11 +1937,16 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
                             BreakageAllowlistPath);
   }
+  auto shouldDowngrade = false;
+  // If explicitly specified, avoid downgrading ABI breakage errors to warnings.
+  if (ExplicitErrOnABIBreakage) {
+    shouldDowngrade = false;
+  }
   auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
       createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
                          SerializedDiagPath),
       std::move(allowedBreakages),
-      /*DowngradeToWarning*/false);
+      /*DowngradeToWarning*/shouldDowngrade);
   SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -1961,6 +1968,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool DisableFailOnError,
                                 bool CompilerStyleDiags,
+                                bool ExplicitErrOnABIBreakage,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
@@ -1979,7 +1987,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   RightCollector.deSerialize(RightPath);
   return diagnoseModuleChange(
       Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
-      std::move(ProtocolReqAllowlist), DisableFailOnError, CompilerStyleDiags, SerializedDiagPath,
+      std::move(ProtocolReqAllowlist), DisableFailOnError,
+      ExplicitErrOnABIBreakage, CompilerStyleDiags, SerializedDiagPath,
       BreakageAllowlistPath, DebugMapping);
 }
 
@@ -2177,6 +2186,8 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "linux.json";
   else if (Triple.isOSWindows())
     return "windows.json";
+  else if (Triple.isXROS())
+    return "xros.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);
@@ -2237,6 +2248,7 @@ private:
   std::string OutputFile;
   std::string OutputDir;
   bool CompilerStyleDiags;
+  bool ExplicitErrOnABIBreakage;
   std::string SerializedDiagPath;
   std::string BaselineFilePath;
   std::string BaselineDirPath;
@@ -2336,6 +2348,7 @@ public:
     OutputFile = ParsedArgs.getLastArgValue(OPT_o).str();
     OutputDir = ParsedArgs.getLastArgValue(OPT_output_dir).str();
     CompilerStyleDiags = ParsedArgs.hasArg(OPT_compiler_style_diags);
+    ExplicitErrOnABIBreakage = ParsedArgs.hasArg(OPT_error_on_abi_breakage);
     SerializedDiagPath =
         ParsedArgs.getLastArgValue(OPT_serialize_diagnostics_path).str();
     BaselineFilePath = ParsedArgs.getLastArgValue(OPT_baseline_path).str();
@@ -2462,7 +2475,7 @@ public:
     if (!ResourceDir.empty()) {
       InitInvoke.setRuntimeResourcePath(ResourceDir);
     }
-    std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+    std::vector<SearchPathOptions::SearchPath> FramePaths;
     for (const auto &path : CCSystemFrameworkPaths) {
       FramePaths.push_back({path, /*isSystem=*/true});
     }
@@ -2470,12 +2483,20 @@ public:
       for (const auto &path : BaselineFrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(BaselineModuleInputPaths);
+      std::vector<SearchPathOptions::SearchPath> ImportPaths;
+      for (const auto &path : BaselineModuleInputPaths) {
+        ImportPaths.push_back({path, /*isSystem=*/false});
+      }
+      InitInvoke.setImportSearchPaths(ImportPaths);
     } else {
       for (const auto &path : FrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(ModuleInputPaths);
+      std::vector<SearchPathOptions::SearchPath> ImportPaths;
+      for (const auto &path : ModuleInputPaths) {
+        ImportPaths.push_back({path, /*isSystem=*/false});
+      }
+      InitInvoke.setImportSearchPaths(ImportPaths);
     }
     InitInvoke.setFrameworkSearchPaths(FramePaths);
     if (!ModuleList.empty()) {
@@ -2575,21 +2596,24 @@ public:
         return diagnoseModuleChange(
             SDKJsonPaths[0], SDKJsonPaths[1], OutputFile, CheckerOpts,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath,
+            BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BaselineJson: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath, BreakageAllowlistPath,
+            DebugMapping);
       }
       case ComparisonInputMode::BothLoad: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath, BreakageAllowlistPath,
+            DebugMapping);
       }
       }
     }

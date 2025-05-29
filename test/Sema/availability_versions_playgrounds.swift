@@ -20,22 +20,22 @@ func someFunction() {
     // This branch is dead with our minimum deployment target, so don't emit
     // deprecation and unavailability diagnostics in it.
     deprecatedOn10_8() // no-warning
-    availableOn10_50() // no-warning
+    availableOn50() // no-warning
   }
 
-  if #available(OSX 10.50, *) { // expected-note {{enclosing scope here}}
+  if #available(OSX 50, *) { // expected-note {{enclosing scope here}}
     // Still warn if the check is useless because an enclosing #available rules
     // it out.
-    if #available(OSX 10.50, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+    if #available(OSX 50, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
     }
   }
 }
 
-@available(OSX 10.50, *)
-func availableOn10_50() { // expected-note {{enclosing scope here}}
+@available(OSX 50, *)
+func availableOn50() { // expected-note {{enclosing scope here}}
   // Still warn if the check is useless because an enclosing @available rules
   // it out.
-  if #available(OSX 10.50, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+  if #available(OSX 50, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
   }
 }
 

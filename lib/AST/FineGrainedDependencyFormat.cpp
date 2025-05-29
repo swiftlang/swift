@@ -13,6 +13,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,7 +42,7 @@ class Deserializer {
   bool enterTopLevelBlock();
   bool readMetadata();
 
-  llvm::Optional<std::string> getIdentifier(unsigned n);
+  std::optional<std::string> getIdentifier(unsigned n);
 
 public:
   Deserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
@@ -140,16 +141,16 @@ bool Deserializer::readMetadata() {
   return false;
 }
 
-static llvm::Optional<NodeKind> getNodeKind(unsigned nodeKind) {
+static std::optional<NodeKind> getNodeKind(unsigned nodeKind) {
   if (nodeKind < unsigned(NodeKind::kindCount))
     return NodeKind(nodeKind);
-  return llvm::None;
+  return std::nullopt;
 }
 
-static llvm::Optional<DeclAspect> getDeclAspect(unsigned declAspect) {
+static std::optional<DeclAspect> getDeclAspect(unsigned declAspect) {
   if (declAspect < unsigned(DeclAspect::aspectCount))
     return DeclAspect(declAspect);
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
@@ -285,13 +286,13 @@ bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
   return readFineGrainedDependencyGraph(*buffer.get(), g);
 }
 
-llvm::Optional<std::string> Deserializer::getIdentifier(unsigned n) {
+std::optional<std::string> Deserializer::getIdentifier(unsigned n) {
   if (n == 0)
     return std::string();
 
   --n;
   if (n >= Identifiers.size())
-    return llvm::None;
+    return std::nullopt;
 
   return Identifiers[n];
 }

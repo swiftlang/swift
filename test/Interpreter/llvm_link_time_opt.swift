@@ -1,12 +1,14 @@
 // UNSUPPORTED: OS=windows-msvc
 // static library is not well supported yet on Windows
 
-// XFAIL: OS=linux-android, OS=linux-androideabi
+// UNSUPPORTED: OS=xros
 
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+
+// UNSUPPORTED: linker_overridden
 
 // RUN: %empty-directory(%t)
 // RUN: %use_just_built_liblto %target-swiftc_driver -emit-library -static -lto=llvm-full %lto_flags -emit-module %S/Inputs/lto/module1.swift -working-directory %t

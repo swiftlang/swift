@@ -146,12 +146,12 @@ public:
 
 class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
-  llvm::Optional<int> Signal;
+  std::optional<int> Signal;
 
 public:
   SignalledMessage(StringRef Name, std::string Output, int64_t Pid,
                    sys::TaskProcessInformation ProcInfo, StringRef ErrorMsg,
-                   llvm::Optional<int> Signal)
+                   std::optional<int> Signal)
       : TaskOutputMessage("signalled", Name, Output, Pid, ProcInfo),
         ErrorMsg(ErrorMsg), Signal(Signal) {}
 
@@ -217,7 +217,7 @@ void parseable_output::emitFinishedMessage(
 
 void parseable_output::emitSignalledMessage(
     raw_ostream &os, StringRef Name, StringRef ErrorMsg, StringRef Output,
-    llvm::Optional<int> Signal, int64_t Pid, TaskProcessInformation ProcInfo) {
+    std::optional<int> Signal, int64_t Pid, TaskProcessInformation ProcInfo) {
   SignalledMessage msg(Name, Output.str(), Pid, ProcInfo, ErrorMsg, Signal);
   emitMessage(os, msg);
 }

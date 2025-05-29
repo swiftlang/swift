@@ -1,4 +1,4 @@
-//===--- Demangler.h - String to Node-Tree Demangling -----------*- C++ -*-===//
+//===--- RemanglerBase.h - String to Node-Tree Demangling -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,6 +19,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <unordered_map>
 
 using namespace swift::Demangle;
@@ -37,15 +38,20 @@ SWIFT_BEGIN_INLINE_NAMESPACE
 
 // An entry in the remangler's substitution map.
 class SubstitutionEntry {
-  Node *TheNode = nullptr;
+  llvm::PointerIntPair<Node *, 1, bool> NodeAndTreatAsIdentifier;
   size_t StoredHash = 0;
-  bool treatAsIdentifier = false;
+
+  Node *getNode() const { return NodeAndTreatAsIdentifier.getPointer(); }
+
+  bool getTreatAsIdentifier() const {
+    return NodeAndTreatAsIdentifier.getInt();
+  }
 
 public:
-  void setNode(Node *node, bool treatAsIdentifier) {
-    this->treatAsIdentifier = treatAsIdentifier;
-    TheNode = node;
-    deepHash(node);
+  void setNode(Node *node, bool treatAsIdentifier, size_t hash) {
+    NodeAndTreatAsIdentifier.setPointer(node);
+    NodeAndTreatAsIdentifier.setInt(treatAsIdentifier);
+    StoredHash = hash;
   }
 
   struct Hasher {
@@ -54,26 +60,28 @@ public:
     }
   };
 
+  bool isEmpty() const { return !getNode(); }
+
+  bool matches(Node *node, bool treatAsIdentifier) const {
+    return node == getNode() && treatAsIdentifier == getTreatAsIdentifier();
+  }
+
+  size_t hash() const { return StoredHash; }
+
 private:
   friend bool operator==(const SubstitutionEntry &lhs,
                          const SubstitutionEntry &rhs) {
     if (lhs.StoredHash != rhs.StoredHash)
       return false;
-    if (lhs.treatAsIdentifier != rhs.treatAsIdentifier)
+    if (lhs.getTreatAsIdentifier() != rhs.getTreatAsIdentifier())
       return false;
-    if (lhs.treatAsIdentifier) {
-      return identifierEquals(lhs.TheNode, rhs.TheNode);
+    if (lhs.getTreatAsIdentifier()) {
+      return identifierEquals(lhs.getNode(), rhs.getNode());
     }
-    return lhs.deepEquals(lhs.TheNode, rhs.TheNode);
+    return lhs.deepEquals(lhs.getNode(), rhs.getNode());
   }
 
   static bool identifierEquals(Node *lhs, Node *rhs);
-
-  void combineHash(size_t newValue) {
-    StoredHash = 33 * StoredHash + newValue;
-  }
-
-  void deepHash(Node *node);
 
   bool deepEquals(Node *lhs, Node *rhs) const;
 };
@@ -131,6 +139,13 @@ protected:
   // Used to allocate temporary nodes and the output string (in Buffer).
   NodeFactory &Factory;
 
+  // Recursively calculating the node hashes can be expensive if the node tree
+  // is deep, so we keep a hash table mapping (Node *, treatAsIdentifier) pairs
+  // to hashes.
+  static const size_t HashHashCapacity = 512; // Must be a power of 2
+  static const size_t HashHashMaxProbes = 8;
+  SubstitutionEntry HashHash[HashHashCapacity] = {};
+
   // An efficient hash-map implementation in the spirit of llvm's SmallPtrSet:
   // The first 16 substitutions are stored in an inline-allocated array to avoid
   // malloc calls in the common case.
@@ -148,7 +163,16 @@ protected:
   RemanglerBuffer Buffer;
 
 protected:
-  RemanglerBase(NodeFactory &Factory) : Factory(Factory), Buffer(Factory) { }
+  RemanglerBase(NodeFactory &Factory)
+    : Factory(Factory), Buffer(Factory) { }
+
+  /// Compute the hash for a node.
+  size_t hashForNode(Node *node, bool treatAsIdentifier = false);
+
+  /// Construct a SubstitutionEntry for a given node.
+  /// This will look in the HashHash to see if we already know the hash,
+  /// to avoid having to walk the entire subtree.
+  SubstitutionEntry entryForNode(Node *node, bool treatAsIdentifier = false);
 
   /// Find a substitution and return its index.
   /// Returns -1 if no substitution is found.

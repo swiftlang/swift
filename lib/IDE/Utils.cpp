@@ -12,6 +12,7 @@
 
 #include "swift/IDE/Utils.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -95,10 +96,10 @@ static const char *skipStringInCode(const char *p, const char *End) {
 
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
-                           SourceFileKind SFKind) {
+                           SourceFileKind SFKind, const LangOptions &LangOpts) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, SFKind, BufferID);
+  ParserUnit Parse(SM, SFKind, BufferID, LangOpts, "input");
   Parse.parse();
   SourceCompleteResult SCR;
   SCR.IsComplete = !Parse.getParser().isInputIncomplete();
@@ -176,10 +177,11 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
   return SCR;
 }
 
-SourceCompleteResult
-ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
+SourceCompleteResult ide::isSourceInputComplete(StringRef Text,
+                                                SourceFileKind SFKind,
+                                                const LangOptions &LangOpts) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
-                                    SFKind);
+                                    SFKind, LangOpts);
 }
 
 template <typename FnTy>
@@ -651,10 +653,15 @@ adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
     return scratch;
 
   case GeneratedSourceInfo::ExpressionMacroExpansion:
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+  case GeneratedSourceInfo::DeclarationMacroExpansion:
+  case GeneratedSourceInfo::CodeItemMacroExpansion:
   case GeneratedSourceInfo::AccessorMacroExpansion:
+  case GeneratedSourceInfo::PreambleMacroExpansion:
+  case GeneratedSourceInfo::BodyMacroExpansion:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return expandedCode;
   }
 }
@@ -703,9 +710,8 @@ void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
       containingSF->getParentModule()->getSourceFileContainingLocation(
           originalSourceRange.getStart());
   StringRef originalPath;
-  if (originalFile->getBufferID().has_value() &&
-      containingSF->getBufferID() != originalFile->getBufferID()) {
-    originalPath = SM.getIdentifierForBuffer(*originalFile->getBufferID());
+  if (containingSF->getBufferID() != originalFile->getBufferID()) {
+    originalPath = SM.getIdentifierForBuffer(originalFile->getBufferID());
   }
 
   StringRef bufferName;
@@ -805,6 +811,7 @@ public:
                     getBuffer());
     RewriteBuf.Initialize(Input);
     removeCommentLines(RewriteBuf, Input, "RUN");
+    removeCommentLines(RewriteBuf, Input, "REQUIRES");
     removeCommentLines(RewriteBuf, Input, "CHECK");
   }
 
@@ -1081,7 +1088,7 @@ void swift::ide::getReceiverType(Expr *Base,
     ReceiverTy = SelfT->getSelfType();
 
   // TODO: Handle generics and composed protocols
-  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>()) {
+  if (auto OpenedTy = ReceiverTy->getAs<ExistentialArchetypeType>()) {
     assert(OpenedTy->isRoot());
     ReceiverTy = OpenedTy->getExistentialType();
   }
@@ -1090,3 +1097,36 @@ void swift::ide::getReceiverType(Expr *Base,
     Types.push_back(TyD);
   }
 }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+extern "C" {
+/// Low-level entry point to run the NameMatcher written in swift-syntax.
+///
+/// - Parameters:
+///   - sourceFilePtr: A pointer to an `ExportedSourceFile`, used to access the
+///     syntax tree
+///   - locations: Pointer to a buffer of `BridgedSourceLoc` that should be
+///     resolved by the name matcher.
+///   - locationsCount: Number of elements in `locations`.
+/// - Returns: The opaque value of a `BridgedResolvedLocVector`.
+void *swift_SwiftIDEUtilsBridging_runNameMatcher(const void *sourceFilePtr,
+                                                 BridgedSourceLoc *locations,
+                                                 size_t locationsCount);
+}
+
+std::vector<ResolvedLoc>
+swift::ide::runNameMatcher(const SourceFile &sourceFile,
+                           ArrayRef<SourceLoc> locations) {
+  std::vector<BridgedSourceLoc> bridgedUnresolvedLocs;
+  bridgedUnresolvedLocs.reserve(locations.size());
+  for (SourceLoc loc : locations) {
+    bridgedUnresolvedLocs.push_back(BridgedSourceLoc(loc));
+  }
+
+  BridgedResolvedLocVector bridgedResolvedLocs =
+      swift_SwiftIDEUtilsBridging_runNameMatcher(
+          sourceFile.getExportedSourceFile(), bridgedUnresolvedLocs.data(),
+          bridgedUnresolvedLocs.size());
+  return bridgedResolvedLocs.takeUnbridged();
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX

@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=destroy_value | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil @cl : $@convention(thin) () -> Int
+
+// CHECK-LABEL: sil [ossa] @remove_copy :
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy'
+sil [ossa] @remove_copy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @cl : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
+  destroy_value %1 : $@callee_guaranteed () -> Int
+  %4 = tuple ()
+  return %4 : $()
+}
+
+
+
+

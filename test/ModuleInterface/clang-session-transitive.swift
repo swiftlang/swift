@@ -4,7 +4,7 @@
 
 // RUN: %target-build-swift -module-name TestModule -module-link-name TestModule %S/Inputs/TestModule.swift -enable-library-evolution -emit-module-interface -o %t/TestModule.swiftmodule -swift-version 5 -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import
 
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I%t -validate-clang-modules-once -clang-build-session-file %t/Build.session -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
+// RUN: %target-swift-frontend -scan-dependencies -no-scanner-module-validation %s -o %t/deps.json -I%t -validate-clang-modules-once -clang-build-session-file %t/Build.session -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
 // RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck %s < %t/deps.json
 
@@ -15,6 +15,9 @@ import TestModule
  // CHECK-DAG:          "swift": "TestModule"
  // CHECK-DAG:          "swift": "Swift"
  // CHECK-DAG:          "swift": "SwiftOnoneSupport"
+
+// Additional occurence in source-imported dependencies field
+ // CHECK:      "swift": "TestModule"
 
  // CHECK:      "swift": "TestModule"
  // CHECK-NEXT:    },
@@ -30,10 +33,10 @@ import TestModule
  // CHECK-NEXT:          "swift": "SwiftOnoneSupport"
  // CHECK-NEXT:        }
  // CHECK-NEXT:      ],
- // CHECK-NEXT:      "details": {
+ // CHECK-NEXT:      "linkLibraries": [
+ // CHECK:           "details": {
  // CHECK-NEXT:        "swift": {
  // CHECK-NEXT:          "moduleInterfacePath": 
- // CHECK-NEXT:          "contextHash":
  // CHECK-NEXT:          "compiledModuleCandidates": [
  // CHECK-NEXT:            TestModule.swiftmodule
  // CHECK-NEXT:          ],

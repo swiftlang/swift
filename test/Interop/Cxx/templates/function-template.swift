@@ -28,6 +28,17 @@ FunctionTemplateTestSuite.test("lvalueReference<T> where T == Int") {
   expectEqual(value, 42)
 }
 
+FunctionTemplateTestSuite.test("lvalueReferenceZero<T> where T == Bool") {
+  var value = true
+  lvalueReferenceZero(&value)
+  expectEqual(value, false)
+}
+
+FunctionTemplateTestSuite.test("constLvalueReferenceToBool<T> where T == Bool") {
+  expectTrue(constLvalueReferenceToBool(true))
+  expectFalse(constLvalueReferenceToBool(false))
+}
+
 // TODO: Generics, Any, and Protocols should be tested here but need to be
 // better supported in ClangTypeConverter first.
 

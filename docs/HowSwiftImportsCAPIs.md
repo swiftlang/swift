@@ -958,7 +958,7 @@ Swift enums.
 
 The concept of open enums was added in Swift 5 ([SE-0192 Handling Future
 Enum
-Cases](https://github.com/apple/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md)),
+Cases](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0192-non-exhaustive-enums.md)),
 but that proposal did not change the importing strategy of non-annotated C
 enums, in part because of source compatibility concerns. It might be still
 possible to change C enums to be imported as open Swift enums, but as the time

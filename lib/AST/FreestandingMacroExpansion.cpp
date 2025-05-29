@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/MacroDiscriminatorContext.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -43,7 +46,24 @@ SourceRange FreestandingMacroExpansion::getSourceRange() const {
   FORWARD_VARIANT(getSourceRange);
 }
 unsigned FreestandingMacroExpansion::getDiscriminator() const {
-  FORWARD_VARIANT(getDiscriminator);
+  auto info = getExpansionInfo();
+  if (info->Discriminator != MacroExpansionInfo::InvalidDiscriminator)
+    return info->Discriminator;
+
+  auto mutableThis = const_cast<FreestandingMacroExpansion *>(this);
+  auto dc = getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto discriminatorContext =
+      MacroDiscriminatorContext::getParentOf(mutableThis);
+  info->Discriminator = ctx.getNextMacroDiscriminator(
+      discriminatorContext, getMacroName().getBaseName());
+
+  assert(info->Discriminator != MacroExpansionInfo::InvalidDiscriminator);
+  return info->Discriminator;
+}
+
+unsigned FreestandingMacroExpansion::getRawDiscriminator() const {
+  return getExpansionInfo()->Discriminator;
 }
 
 ASTNode FreestandingMacroExpansion::getASTNode() {

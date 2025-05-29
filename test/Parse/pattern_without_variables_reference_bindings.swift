@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature ReferenceBindings
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ReferenceBindings
 
 let _ = 1 // expected-error{{global variable declaration does not bind any variables}}
 

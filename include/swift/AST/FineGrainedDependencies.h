@@ -21,8 +21,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -30,6 +28,7 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -106,11 +105,11 @@ template <typename KeyT, typename ValueT> class Memoizer {
 public:
   Memoizer() = default;
 
-  llvm::Optional<ValueT> findExisting(KeyT key) {
+  std::optional<ValueT> findExisting(KeyT key) {
     auto iter = memos.find(key);
     if (iter != memos.end())
       return iter->second;
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// \p createFn must create a \ref ValueT that corresponds to the \ref KeyT
@@ -138,10 +137,6 @@ public:
 template <typename Key1, typename Key2, typename Value> class TwoStageMap {
 public:
   // Define this here so it can be changed easily.
-  // TODO: Use llvm structure such as DenseMap. However, DenseMap does not
-  // preserve pointers to elements, so be careful!
-  // TODO: Consider using an ordered structure to guarantee determinism
-  // when compilation order changes.
   template <typename Key, typename MapValue>
   using Map = std::unordered_map<Key, MapValue>;
 
@@ -151,13 +146,13 @@ private:
   Map<Key1, InnerMap> map;
 
 public:
-  llvm::Optional<Value> find(const Key1 &k1, const Key2 &k2) const {
+  std::optional<Value> find(const Key1 &k1, const Key2 &k2) const {
     auto iter = map.find(k1);
     if (iter == map.end())
-      return llvm::None;
+      return std::nullopt;
     auto iter2 = iter->second.find(k2);
-    return iter2 == iter->second.end() ? llvm::None
-                                       : llvm::Optional<Value>(iter2->second);
+    return iter2 == iter->second.end() ? std::nullopt
+                                       : std::optional<Value>(iter2->second);
   }
 
   NullablePtr<const InnerMap> find(const Key1 &k1) const {
@@ -188,32 +183,6 @@ public:
 
   /// Returns the submap at \p k1. May create one if not present.
   Map<Key2, Value> &operator[](const Key1 &k1) { return map[k1]; }
-
-  /// Invoke \p fn on each Key2 and Value matching (k, *)
-  void forEachValueMatching(
-      const Key1 &k1,
-      function_ref<void(const Key2 &, const Value &)> fn) const {
-    const auto &iter = map.find(k1);
-    if (iter == map.end())
-      return;
-    for (auto &p : iter->second)
-      fn(p.first, p.second);
-  }
-
-  /// Invoke \p fn for each entry
-  void forEachEntry(
-      function_ref<void(const Key1 &, const Key2 &, const Value &)> fn) const {
-    for (const auto &p : map)
-      for (const auto &p2 : p.second)
-        fn(p.first, p2.first, p2.second);
-  }
-
-  /// Invoke fn for each Key1 and submap
-  void
-  forEachKey1(function_ref<void(const Key1 &, const InnerMap &)> fn) const {
-    for (const auto &p : map)
-      fn(p.first, p.second);
-  }
 
   /// Check integrity and call \p verifyFn for each element, so that element can
   /// be verified.
@@ -256,12 +225,12 @@ public:
   bool insert(const Key2 &k2, const Key1 &k1, Value &v) {
     return insert(k1, k2, v);
   }
-  llvm::Optional<Value> find(const Key1 &k1, const Key2 &k2) const {
+  std::optional<Value> find(const Key1 &k1, const Key2 &k2) const {
     auto v = map1.find(k1, k2);
     assert(assertConsistent(v, map2.find(k2, k1)));
     return v;
   }
-  llvm::Optional<Value> find(const Key2 &k2, Key1 &k1) const {
+  std::optional<Value> find(const Key2 &k2, Key1 &k1) const {
     return find(k1, k2);
   }
 
@@ -291,36 +260,6 @@ public:
   /// Return the erased value.
   Value findAndErase(const Key2 &k2, const Key1 &k1) {
     return findAndErase(k1, k2);
-  }
-
-  /// Invoke \p fn on each Key2 and Value matching (\p k1, *)
-  void forEachValueMatching(
-      const Key1 &k1,
-      function_ref<void(const Key2 &, const Value &)> fn) const {
-    map1.forEachValueMatching(k1, fn);
-  }
-
-  /// Invoke \p fn on each Key1 and Value matching (*, \p k2)
-  void forEachValueMatching(
-      const Key2 &k2,
-      function_ref<void(const Key1 &, const Value &)> fn) const {
-    map2.forEachValueMatching(k2, fn);
-  }
-
-  /// Invoke \p fn for each entry
-  void forEachEntry(
-      function_ref<void(const Key1 &, const Key2 &, const Value &)> fn) const {
-    map1.forEachEntry(fn);
-  }
-
-  /// Invoke fn for each Key1 and submap
-  void forEachKey1(function_ref<void(const Key1 &, const Key2Map &)> fn) const {
-    map1.forEachKey1(fn);
-  }
-
-  /// Invoke fn for each Key2 and submap
-  void forEachKey2(function_ref<void(const Key1 &, const Key1Map &)> fn) const {
-    map2.forEachKey1(fn);
   }
 
   /// Verify the integrity of each map and the cross-map consistency.
@@ -603,7 +542,7 @@ struct std::hash<typename swift::fine_grained_dependencies::NodeKind> {
 namespace swift {
 namespace fine_grained_dependencies {
 using ContextNameFingerprint =
-    std::tuple<std::string, std::string, llvm::Optional<std::string>>;
+    std::tuple<std::string, std::string, std::optional<std::string>>;
 }
 } // namespace swift
 
@@ -649,7 +588,7 @@ class DepGraphNode {
   /// frontend creates an interface node,
   //  it adds a dependency to it from the implementation source file node (which
   //  has the interfaceHash as its fingerprint).
-  llvm::Optional<Fingerprint> fingerprint;
+  std::optional<Fingerprint> fingerprint;
 
   friend ::llvm::yaml::MappingTraits<DepGraphNode>;
 
@@ -657,7 +596,7 @@ public:
   /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
   DepGraphNode() : key(), fingerprint() {}
 
-  DepGraphNode(DependencyKey key, llvm::Optional<Fingerprint> fingerprint)
+  DepGraphNode(DependencyKey key, std::optional<Fingerprint> fingerprint)
       : key(key), fingerprint(fingerprint) {}
   DepGraphNode(const DepGraphNode &other) = default;
 
@@ -673,7 +612,7 @@ public:
     this->key = key;
   }
 
-  const llvm::Optional<Fingerprint> getFingerprint() const {
+  const std::optional<Fingerprint> getFingerprint() const {
     return fingerprint;
   }
   /// When driver reads a SourceFileDepGraphNode, it may be a node that was
@@ -684,7 +623,7 @@ public:
   /// (someday) have a fingerprint. In order to preserve the
   /// ModuleDepGraphNode's identity but bring its fingerprint up to date, it
   /// needs to set the fingerprint *after* the node has been created.
-  void setFingerprint(llvm::Optional<Fingerprint> fp) { fingerprint = fp; }
+  void setFingerprint(std::optional<Fingerprint> fp) { fingerprint = fp; }
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &os) const;
@@ -732,7 +671,7 @@ public:
 
   /// Used by the frontend to build nodes.
   SourceFileDepGraphNode(DependencyKey key,
-                         llvm::Optional<Fingerprint> fingerprint,
+                         std::optional<Fingerprint> fingerprint,
                          bool isProvides)
       : DepGraphNode(key, fingerprint), isProvides(isProvides) {
     assert(key.verify());
@@ -867,14 +806,14 @@ public:
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
   findExistingNodePairOrCreateAndAddIfNew(
       const DependencyKey &interfaceKey,
-      llvm::Optional<Fingerprint> fingerprint);
+      std::optional<Fingerprint> fingerprint);
 
   NullablePtr<SourceFileDepGraphNode>
   findExistingNode(const DependencyKey &key);
 
   SourceFileDepGraphNode *
   findExistingNodeOrCreateIfNew(const DependencyKey &key,
-                                const llvm::Optional<Fingerprint> fingerprint,
+                                const std::optional<Fingerprint> fingerprint,
                                 bool isProvides);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
@@ -887,14 +826,13 @@ public:
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
   /// successful. If \p allowSwiftModule is true, try to load the information
   /// from a swiftmodule file if appropriate.
-  llvm::Optional<SourceFileDepGraph> static loadFromPath(
+  std::optional<SourceFileDepGraph> static loadFromPath(
       StringRef, bool allowSwiftModule = false);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
-  llvm::Optional<SourceFileDepGraph> static loadFromBuffer(
-      llvm::MemoryBuffer &);
-  llvm::Optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
+  std::optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &);
+  std::optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
       llvm::MemoryBuffer &);
 
   void verifySame(const SourceFileDepGraph &other) const;
@@ -991,7 +929,7 @@ private:
         includeExternals || n->getKey().getKind() != NodeKind::externalDepend;
     bool apiPredicate =
         includeAPINotes ||
-        !StringRef(n->getKey().humanReadableName()).endswith(".apinotes");
+        !StringRef(n->getKey().humanReadableName()).ends_with(".apinotes");
     return externalPredicate && apiPredicate;
   }
   bool includeGraphArc(const NodeT *def, const NodeT *use) const {

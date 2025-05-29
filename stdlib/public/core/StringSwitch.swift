@@ -23,7 +23,7 @@ func _findStringSwitchCase(
   string: String) -> Int {
 
   for (idx, s) in cases.enumerated() {
-    if String(_builtinStringLiteral: s.utf8Start._rawValue,
+    if unsafe String(_builtinStringLiteral: s.utf8Start._rawValue,
               utf8CodeUnitCount: s._utf8CodeUnitCount,
               isASCII: s.isASCII._value) == string {
       return idx
@@ -41,6 +41,7 @@ struct _OpaqueStringSwitchCache {
 
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
+@unsafe
 internal struct _StringSwitchContext {
   internal let cases: [StaticString]
   internal let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
@@ -49,8 +50,8 @@ internal struct _StringSwitchContext {
     cases: [StaticString],
     cachePtr: UnsafeMutablePointer<_StringSwitchCache>
   ){
-    self.cases = cases
-    self.cachePtr = cachePtr
+    unsafe self.cases = cases
+    unsafe self.cachePtr = unsafe cachePtr
   }
 }
 
@@ -73,15 +74,15 @@ func _findStringSwitchCaseWithCache(
 #else
   let ptr = UnsafeMutableRawPointer(Builtin.addressof(&cache))
 #endif
-  let oncePtr = ptr
-  let cacheRawPtr = oncePtr + MemoryLayout<Builtin.Word>.stride
-  let cachePtr = cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
-  var context = _StringSwitchContext(cases: cases, cachePtr: cachePtr)
-  withUnsafeMutablePointer(to: &context) { (context) -> () in
+  let oncePtr = unsafe ptr
+  let cacheRawPtr = unsafe oncePtr + MemoryLayout<Builtin.Word>.stride
+  let cachePtr = unsafe cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
+  var context = unsafe _StringSwitchContext(cases: cases, cachePtr: cachePtr)
+  unsafe withUnsafeMutablePointer(to: &context) { (context) -> () in
     Builtin.onceWithContext(oncePtr._rawValue, _createStringTableCache,
                             context._rawValue)
   }
-  let cache = cachePtr.pointee;
+  let cache = unsafe cachePtr.pointee;
   if let idx = cache[string] {
     return idx
   }
@@ -90,18 +91,18 @@ func _findStringSwitchCaseWithCache(
 
 /// Builds the string switch case.
 internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
-  let context = UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
+  let context = unsafe UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
   var cache = _StringSwitchCache()
-  cache.reserveCapacity(context.cases.count)
+  unsafe cache.reserveCapacity(context.cases.count)
   _internalInvariant(
     MemoryLayout<_StringSwitchCache>.size <= MemoryLayout<Builtin.Word>.size)
 
-  for (idx, s) in context.cases.enumerated() {
-    let key = String(_builtinStringLiteral: s.utf8Start._rawValue,
+  for (idx, s) in unsafe context.cases.enumerated() {
+    let key = unsafe String(_builtinStringLiteral: s.utf8Start._rawValue,
                      utf8CodeUnitCount: s._utf8CodeUnitCount,
                      isASCII: s.isASCII._value)
     cache[key] = idx
   }
-  context.cachePtr.initialize(to: cache)
+  unsafe context.cachePtr.initialize(to: cache)
 }
 

@@ -27,6 +27,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 
@@ -66,7 +67,7 @@ public:
 } // end anonymous namespace
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(type->getASTContext());
   return Mangler.mangleTypeAsContextUSR(type);
 }
 
@@ -83,7 +84,7 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
                                 IRGenModule &IGM,
                                 std::vector<YAMLTypeInfoNode> &Result) {
   // We only care about public and @usableFromInline declarations.
-  if (NTD->getEffectiveAccess() < AccessLevel::Public)
+  if (NTD->getEffectiveAccess() < AccessLevel::Package)
     return;
 
   // We don't care about protocols or classes.
@@ -115,8 +116,8 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
   Result.push_back(createYAMLTypeInfoNode(NTD, IGM, fixedTI));
 }
 
-static llvm::Optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
-                                                           IRGenModule &IGM) {
+static std::optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
+                                                          IRGenModule &IGM) {
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
 
@@ -137,7 +138,7 @@ static llvm::Optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
   }
 
   if (Nodes.empty())
-    return llvm::None;
+    return std::nullopt;
 
   std::sort(Nodes.begin(), Nodes.end());
 

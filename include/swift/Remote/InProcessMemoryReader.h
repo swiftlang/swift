@@ -88,6 +88,8 @@ class InProcessMemoryReader final : public MemoryReader {
       }
       return true;
     }
+    case DLQ_GetObjCInteropIsEnabled:
+      break;
     }
     return false;
   }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -debug-generic-signatures -typecheck %s 2>&1 | %FileCheck %s
 
 // https://github.com/apple/swift/issues/56862
@@ -29,5 +29,4 @@ protocol P {
   associatedtype A : P where A == B.C
   associatedtype B : P where B == A.C
   associatedtype C : P where C == A.B
-  // expected-warning@-1 {{redundant conformance constraint 'Self.C' : 'P'}}
 }

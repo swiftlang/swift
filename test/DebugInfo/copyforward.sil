@@ -1,0 +1,84 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -copy-forwarding %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "backward.swift":66:24 parent @backward : $@convention(method) <τ_0_0> (@inout CollectionOfOne<τ_0_0>.Iterator) -> @out Optional<τ_0_0> }
+sil_scope 2 { loc "backward.swift":67:9 parent 1 }
+
+// CHECK-LABEL: sil {{.+}} @backward
+sil [serialized] [ossa] @backward : $@convention(method) <Element> (@inout CollectionOfOne<Element>.Iterator) -> @out Optional<Element> {
+[%0: write v**]
+[%1: read s0.v**, write s0.v**, copy s0.v**, destroy s0.v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $*Optional<Element>, %1 : $*CollectionOfOne<Element>.Iterator):
+  debug_value %1 : $*CollectionOfOne<Element>.Iterator, var, name "self", argno 1, expr op_deref, loc "backward.swift":66:24, scope 1
+  %3 = alloc_stack [lexical] [var_decl] $Optional<Element>, let, name "result", loc "backward.swift":67:9, scope 2
+  %4 = struct_element_addr %1 : $*CollectionOfOne<Element>.Iterator, #CollectionOfOne.Iterator._elements, loc "backward.swift":67:18, scope 1
+
+  // CHECK: debug_value %{{[0-9]+}} : $*Optional<Element>, let, (name "result", loc "backward.swift":67:9), expr op_deref, loc "backward.swift":67:18, scope 2
+
+  copy_addr %4 to [init] %3 : $*Optional<Element>, loc "backward.swift":67:18, scope 1
+  %6 = alloc_stack $Optional<Element>, loc "backward.swift":68:17, scope 2
+  inject_enum_addr %6 : $*Optional<Element>, #Optional.none!enumelt, loc "backward.swift":68:17, scope 2
+  %8 = struct_element_addr %1 : $*CollectionOfOne<Element>.Iterator, #CollectionOfOne.Iterator._elements, loc "backward.swift":68:15, scope 2
+  copy_addr [take] %6 to %8 : $*Optional<Element>, loc "backward.swift":68:15, scope 2
+  dealloc_stack %6 : $*Optional<Element>, loc "backward.swift":68:17, scope 2
+  copy_addr [take] %3 to [init] %0 : $*Optional<Element>, loc "backward.swift":69:12, scope 2
+  dealloc_stack %3 : $*Optional<Element>, loc "backward.swift":70:3, scope 2
+  %13 = tuple (), loc "backward.swift":70:3, scope 2
+  return %13 : $(), loc "backward.swift":69:5, scope 2
+} // end sil function 'backward'
+
+sil_scope 10 { loc "tempcopy.swift":714:27 parent @tempcopy : $@convention(method) <τ_0_0 where τ_0_0 : Strideable, τ_0_0.Stride : SignedInteger> (@in PartialRangeFrom<τ_0_0>) -> @out PartialRangeFrom<τ_0_0>.Iterator }
+sil_scope 12 { loc "tempcopy.swift":715:12 parent 10 }
+
+// CHECK-LABEL: sil {{.+}} @tempcopy
+sil [serialized] [ossa] @tempcopy : $@convention(method) <Bound where Bound : Strideable, Bound.Stride : SignedInteger> (@in PartialRangeFrom<Bound>) -> @out PartialRangeFrom<Bound>.Iterator {
+[%0: write v**]
+[%1: read v**, write v**, copy s0.v**, destroy v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $*PartialRangeFrom<Bound>.Iterator, %1 : $*PartialRangeFrom<Bound>):
+  debug_value %1 : $*PartialRangeFrom<Bound>, let, name "self", argno 1, expr op_deref, loc "tempcopy.swift":714:27, scope 10 // id: %2
+  %3 = struct_element_addr %1 : $*PartialRangeFrom<Bound>, #PartialRangeFrom.lowerBound, loc "tempcopy.swift":715:31, scope 10 // user: %5
+  %4 = alloc_stack $Bound, loc "tempcopy.swift":715:31, scope 10 // users: %8, %6, %10, %5
+  copy_addr [take] %3 to [init] %4 : $*Bound, loc "tempcopy.swift":715:31, scope 10 // id: %5
+  // CHECK: debug_value %{{[0-9]+}} : $*Bound, let, (name "_current", loc "tempcopy.swift":696:17
+  // CHECK-SAME:   expr op_deref, loc "tempcopy.swift":715:31
+  debug_value %4 : $*Bound, let, name "_current", expr op_deref, loc "tempcopy.swift":696:17, scope 12 // id: %6
+  %7 = struct_element_addr %0 : $*PartialRangeFrom<Bound>.Iterator, #PartialRangeFrom.Iterator._current, loc "tempcopy.swift":696:50, scope 12 // user: %8
+  copy_addr [take] %4 to [init] %7 : $*Bound, loc "tempcopy.swift":696:50, scope 12 // id: %8
+  %9 = tuple (), loc * "tempcopy.swift":696:61, scope 12
+  dealloc_stack %4 : $*Bound, loc "tempcopy.swift":715:41, scope 10 // id: %10
+  %11 = tuple (), loc "tempcopy.swift":716:3, scope 10 // user: %12
+  return %11 : $(), loc "tempcopy.swift":715:5, scope 10 // id: %12
+} // end sil function 'tempcopy'
+
+sil @f_in : $@convention(thin) <T> (@in T) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @forward_takeinit :
+sil hidden [ossa] @forward_takeinit : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  // CHECK: debug_value %0 : $*T, let, (name "hello",{{.+}} expr op_deref
+  %l1 = alloc_stack $T, let, name "hello"
+  copy_addr [take] %0 to [init] %l1 : $*T
+  %f1 = function_ref @f_in : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %c1 = apply %f1<T>(%l1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %l1 : $*T
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @forward :
+sil [serialized] [ossa] @forward : $@convention(thin) <T> (@in T, Builtin.RawPointer) -> () {
+bb0(%0 : $*T, %1 : $Builtin.RawPointer):
+  // CHECK: debug_value %0 : $*T, var, (name "value",{{.+}} expr op_deref
+  %2 = alloc_stack [lexical] [var_decl] $T, var, name "value"
+  copy_addr [take] %0 to [init] %2 : $*T
+  %5 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*T
+  copy_addr [take] %2 to [init] %5 : $*T
+  dealloc_stack %2 : $*T
+  %8 = tuple ()
+  return %8 : $()
+} // end sil function 'forward'

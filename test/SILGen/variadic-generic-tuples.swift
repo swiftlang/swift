@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 func takeAny(_ arg: Any) {}
 
@@ -77,7 +77,7 @@ public struct Container<each T> {
 // CHECK-LABEL: sil {{.*}}@$s4main9ContainerV7storageAA6StoredVyxGxQp_tvs
 // CHECK-SAME:    $@convention(method) <each T> (@pack_owned Pack{repeat Stored<each T>}, @inout Container<repeat each T>) -> () 
 //   Materialize the pack into a local tuple.
-// CHECK:         [[ARG_COPY:%.*]] = alloc_stack $(repeat Stored<each T>), let,
+// CHECK:         [[ARG_COPY:%.*]] = alloc_stack [var_decl] $(repeat Stored<each T>), let,
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}
@@ -120,7 +120,7 @@ struct Wrapper<Value> {
 func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T>) {
   // CHECK: [[RETURN_VAL:%.*]] : $*Pack{repeat Wrapper<each T>}
 
-  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] $(repeat each T)
+  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T)
   let values = (repeat each value)
 
   // Create a temporary for the 'values' in 'each values'
@@ -167,7 +167,7 @@ func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main20projectTupleElementsyyAA7WrapperVyxGxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat Wrapper<each T>}) -> () {
 func projectTupleElements<each T>(_ value: repeat Wrapper<each T>) {
-  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] $(repeat each T)
+  // CHECK: [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T)
 
   // CHECK-NEXT: [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
   // CHECK-NEXT: [[ONE:%.*]] = integer_literal $Builtin.Word, 1
@@ -240,7 +240,8 @@ struct TupleHolder<each T> {
 // CHECK:       [[T0:%.*]] = copy_value %0 :
 // CHECK:       [[T1:%.*]] = begin_borrow [[T0]]
 // CHECK:       [[RESULT:%.*]] = apply [[T1]]() :
-// CHECK:       destroy_value [[RESULT]]
+// CHECK:       [[MOVE:%.*]] = move_value [var_decl] [[RESULT]]
+// CHECK:       destroy_value [[MOVE]]
 func takesConcreteTupleHolderFactory(factory: () -> TupleHolder<Int, String>) {
   let holder = factory()
 }
@@ -357,8 +358,8 @@ func testStructOfLoadableTuple() -> StructOfLoadableTuple<Int> {
 //   The verifier had some home-grown type-lowering logic that didn't
 //   know about pack expansions.
 // CHECK-LABEL: sil {{.*}}@$s4main22testExistentialErasureyyxxQpRvzlF1gL_yyqd__qd__QpRvzRvd__r__lF :
-// CHECK:         [[T0:%.*]] = init_existential_addr {{.*}} : $*Any, $(repeat each T.Type)
-// CHECK:         tuple_pack_element_addr {{.*}} of [[T0]] : $*(repeat @thick each T.Type) as $*@thick (@pack_element("{{.*}}") each T).Type
+// CHECK:         [[T0:%.*]] = init_existential_addr {{.*}} : $*Any, $(repeat (each T).Type)
+// CHECK:         tuple_pack_element_addr {{.*}} of [[T0]] : $*(repeat @thick (each T).Type) as $*@thick (@pack_element("{{.*}}") each T).Type
 func testExistentialErasure<each T>(_: repeat each T) {
   func g<each U>(_: repeat each U) {
     print((repeat (each T).self))
@@ -366,4 +367,69 @@ func testExistentialErasure<each T>(_: repeat each T) {
   }
 
   g(1, "hi", false)
+}
+
+// Issue #70187
+func identityOnVariadicTuples<each T>(_ value: (repeat each T)) -> (repeat each T) {
+  (repeat each value)
+}
+
+func testPassReturnedVariadicTuple() {
+  takesVariadicTuple(tuple: identityOnVariadicTuples((1, 2, 3)))
+}
+// CHECK-LABEL: sil {{.*}}@$s4main29testPassReturnedVariadicTupleyyF :
+// CHECK:         [[RESULT_PACK:%.*]] = alloc_pack $Pack{Int, Int, Int}
+// CHECK-NEXT:    [[E0_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[I0:%.*]] = scalar_pack_index 0 of $Pack{Int, Int, Int}
+// CHECK-NEXT:    pack_element_set [[E0_ADDR]] : $*Int into [[I0]] of [[RESULT_PACK]] :
+// CHECK-NEXT:    [[E1_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[I1:%.*]] = scalar_pack_index 1 of $Pack{Int, Int, Int}
+// CHECK-NEXT:    pack_element_set [[E1_ADDR]] : $*Int into [[I1]] of [[RESULT_PACK]] :
+// CHECK-NEXT:    [[E2_ADDR:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[I2:%.*]] = scalar_pack_index 2 of $Pack{Int, Int, Int}
+// CHECK-NEXT:    pack_element_set [[E2_ADDR]] : $*Int into [[I2]] of [[RESULT_PACK]] :
+// CHECK-NEXT:    [[ARG_PACK:%.*]] = alloc_pack $Pack{Int, Int, Int}
+// CHECK:         apply {{.*}}<Pack{Int, Int, Int}>([[RESULT_PACK]], [[ARG_PACK]])
+// CHECK:         [[E0:%.*]] = load [trivial] [[E0_ADDR]] : $*Int
+// CHECK-NEXT:    [[E1:%.*]] = load [trivial] [[E1_ADDR]] : $*Int
+// CHECK-NEXT:    [[E2:%.*]] = load [trivial] [[E2_ADDR]] : $*Int
+// CHECK-NEXT:    [[ARG_PACK2:%.*]] = alloc_pack $Pack{Int, Int, Int}
+
+func test() {
+  let tuple = identityOnVariadicTuples((1, 2, 3))
+  takesVariadicTuple(tuple: tuple)
+}
+
+func createTuple<each T>(including: repeat Stored<each T>, from: Int) -> (repeat each T) {
+  fatalError()
+}
+
+// rdar://121489308
+func testTupleExpansionInEnumConstructor<each T>(
+  from: repeat Stored<each T>,
+  to: @escaping (Result<(repeat each T), Error>) -> ()
+) {
+  _ = {
+    let tuple = createTuple(including: repeat each from,
+                            from: 42)
+    to(.success(tuple))
+  }
+}
+// CHECK-LABEL: sil {{.*}}@$s4main35testTupleExpansionInEnumConstructor4from2toyAA6StoredVyxGxQp_ys6ResultOyxxQp_ts5Error_pGctRvzlFyycfU_ :
+// CHECK:         [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T), let, name "tuple"
+//   (a few moments later)
+// CHECK:         metatype $@thin Result<(repeat each T), any Error>.Type
+// CHECK:         [[RESULT_TEMP:%.*]] = alloc_stack $Result<(repeat each T), any Error>
+// CHECK-NEXT:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
+// CHECK-NEXT:    copy_addr [[VAR]] to [init] [[PAYLOAD_ADDR]] : $*(repeat each T)
+// CHECK-NEXT:    inject_enum_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
+
+// rdar://145478336
+
+func convertVoidPayloads() {
+  convertPayloads(as: Void.self)
+}
+
+func convertPayloads<each Value>(as valueTypes: repeat (each Value).Type) -> (repeat each Value) {
+  fatalError()
 }

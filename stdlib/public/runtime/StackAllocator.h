@@ -326,12 +326,24 @@ public:
 
   /// Deallocate memory \p ptr.
   void dealloc(void *ptr) {
-    if (!lastAllocation || lastAllocation->getAllocatedMemory() != ptr)
+    if (!lastAllocation || lastAllocation->getAllocatedMemory() != ptr) {
       SWIFT_FATAL_ERROR(0, "freed pointer was not the last allocation");
+    }
 
     Allocation *prev = lastAllocation->previous;
     lastAllocation->slab->deallocate(lastAllocation);
     lastAllocation = prev;
+  }
+
+  void deallocThrough(void *ptr) {
+    void *current = nullptr;
+    do {
+      if (!lastAllocation) {
+        SWIFT_FATAL_ERROR(0, "freed pointer not among allocations");
+      }
+      current = lastAllocation->getAllocatedMemory();
+      dealloc(current);
+    } while (current != ptr);
   }
 
   /// For unit testing.

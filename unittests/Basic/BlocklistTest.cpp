@@ -14,6 +14,7 @@
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/BlockList.h"
+#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 
@@ -46,7 +47,8 @@ TEST(BlocklistTest, testYamlParsing) {
   ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
       "BlocklistTest.testYamlParsing", temp));
   SWIFT_DEFER { llvm::sys::fs::remove_directories(temp); };
-  BlockListStore store;
+  SourceManager sm;
+  BlockListStore store(sm);
   std::string path1, path2;
   ASSERT_FALSE(emitFileWithContents(temp, "block1.yaml",
                                     "---\n"

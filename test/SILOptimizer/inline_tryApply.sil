@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline -sil-inline-threshold=50 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -early-inline -sil-inline-threshold=50 | %FileCheck %s
 
 sil_stage canonical
 
@@ -9,7 +9,6 @@ import SwiftShims
 
 //CHECK-LABEL: sil @caller_function
 //CHECK-NOT: try_apply
-//CHECK: throw {{.*}} : $any Error
 sil @caller_function : $@convention(thin) () -> @error Error {
 bb0:
   // function_ref main.inner () throws -> ()

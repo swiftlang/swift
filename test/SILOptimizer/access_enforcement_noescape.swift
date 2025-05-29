@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -module-name access_enforcement_noescape -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -module-name access_enforcement_noescape -enforce-exclusivity=checked -Onone -Xllvm -sil-print-types -emit-sil -swift-version 4 -parse-as-library %s | %FileCheck %s
 
 // This tests SILGen and AccessEnforcementSelection as a single set of tests.
 // (Some static/dynamic enforcement selection is done in SILGen, and some is
@@ -60,7 +60,7 @@ func readRead() {
   x = 42
 }
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape8readReadyyF : $@convention(thin) () -> () {
-// CHECK: [[ALLOC:%.*]] = alloc_stack $Int, var, name "x"
+// CHECK: [[ALLOC:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // CHECK-NOT: begin_access
 // CHECK: apply
 // CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape8readReadyyF'

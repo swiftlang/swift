@@ -7,8 +7,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 public func foo<T>(_ array: inout [T]) {
     array.withUnsafeMutableBytes {

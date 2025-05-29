@@ -22,6 +22,7 @@
 #ifndef SWIFT_LOWERING_ARGUMENTSOURCE_H
 #define SWIFT_LOWERING_ARGUMENTSOURCE_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "RValue.h"
 #include "LValue.h"
@@ -222,12 +223,6 @@ public:
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
 
-  /// The kind of operation under which we are querying a storage reference.
-  enum class StorageReferenceOperationKind {
-    Borrow,
-    Consume
-  };
-
   Expr *findStorageReferenceExprForBorrow() &&;
   Expr *findStorageReferenceExprForMoveOnly(SILGenFunction &SGF,
                                       StorageReferenceOperationKind refKind) &&;
@@ -374,6 +369,67 @@ public:
   bool isObviouslyEqual(const PreparedArguments &other) const;
 
   PreparedArguments copyForDiagnostics() const;
+};
+
+/// A class designed to provide a relatively optimal expansion
+/// of an argument source of tuple type.
+class ArgumentSourceExpansion {
+  enum class Kind : uint8_t {
+    ElementRValues,
+    TupleExpr,
+    Vanishing,
+  };
+
+  struct ElementRValuesStorage {
+    llvm::SmallVector<RValue, 4> Elements;
+    SILLocation Loc;
+
+    ElementRValuesStorage(SILLocation loc) : Loc(loc) {}
+  };
+
+  using StorageMembers = ExternalUnionMembers<ElementRValuesStorage,
+                                              TupleExpr *,
+                                              ArgumentSource *>;
+  static StorageMembers::Index getStorageIndexForKind(Kind kind) {
+    switch (kind) {
+    case Kind::ElementRValues:
+      return StorageMembers::indexOf<ElementRValuesStorage>();
+    case Kind::TupleExpr:
+      return StorageMembers::indexOf<TupleExpr*>();
+    case Kind::Vanishing:
+      return StorageMembers::indexOf<ArgumentSource *>();
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  ExternalUnion<Kind, StorageMembers, getStorageIndexForKind> Storage;
+  Kind StoredKind;
+#ifndef NDEBUG
+  unsigned NumRemainingElements;
+#endif
+
+public:
+  /// Begin an expansion of the given argument source, which usually
+  /// must have tuple type.  However, if `vanishes` is passed, the
+  /// the argument source will *not* be expanded; the expansion behaves
+  /// instead as if it were of a nominal singleton tuple containing
+  /// the source.  (This is very useful for dealing with vanishing tuples
+  /// under variadic generics.)
+  ///
+  /// The expansion may keep a reference to the argument source passed in.
+  ArgumentSourceExpansion(SILGenFunction &SGF, ArgumentSource &&arg,
+                          bool vanishes = false);
+
+  ArgumentSourceExpansion(const ArgumentSourceExpansion &) = delete;
+  ArgumentSourceExpansion &operator=(const ArgumentSourceExpansion &) = delete;
+
+  ~ArgumentSourceExpansion() {
+    assert(NumRemainingElements == 0 && "didn't claim all elements?");
+    Storage.destruct(StoredKind);
+  }
+
+  void withElement(unsigned i,
+                   llvm::function_ref<void (ArgumentSource &&)> function);
 };
 
 } // end namespace Lowering

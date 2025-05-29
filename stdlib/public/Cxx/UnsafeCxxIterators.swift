@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@ public protocol UnsafeCxxInputIterator: Equatable {
   ///
   /// Generally, Swift creates this property automatically for C++ types that
   /// define `operator*()`.
+  @_borrowed
   var pointee: Pointee { get }
 
   /// Returns an iterator pointing to the next item in the sequence.
@@ -33,9 +34,9 @@ public protocol UnsafeCxxInputIterator: Equatable {
   func successor() -> Self
 }
 
-extension UnsafePointer: UnsafeCxxInputIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator {}
 
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
@@ -58,6 +59,7 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
 }
 
 public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
+  @_borrowed
   override var pointee: Pointee { get set }
 }
 
@@ -77,10 +79,23 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxRandomAccessIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxRandomAccessIterator {}
 
-public protocol UnsafeCxxMutableRandomAccessIterator: UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
+public protocol UnsafeCxxMutableRandomAccessIterator:
+UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
 extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
+
+/// Bridged C++ iterator that allows traversing elements of a random access
+/// collection that are stored in contiguous memory segments.
+///
+/// Mostly useful for optimizing operations with containers that conform to
+/// `CxxRandomAccessCollection` and should not generally be used directly.
+///
+/// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/ContiguousIterator
+public protocol UnsafeCxxContiguousIterator: UnsafeCxxRandomAccessIterator {}
+
+public protocol UnsafeCxxMutableContiguousIterator:
+UnsafeCxxContiguousIterator, UnsafeCxxMutableRandomAccessIterator {}

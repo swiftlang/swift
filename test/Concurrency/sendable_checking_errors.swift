@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify -strict-concurrency=complete %s
 
-// Don't test SendNonSendable because this test will not make
+// Don't test TransferNonSendable because this test will not make
 // it past Sema to the SIL pass.
 
 // REQUIRES: concurrency
@@ -13,4 +13,8 @@ func f() async {
   @Sendable func nested() {
     n.pointee += 1
   }
+}
+
+struct S: Sendable {
+  var b: Undefined // expected-error{{cannot find type 'Undefined' in scope}}
 }

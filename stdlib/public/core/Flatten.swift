@@ -38,6 +38,8 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
   }
 }
 
+extension FlattenSequence: Sendable where Base: Sendable {}
+
 extension FlattenSequence {
   @frozen // lazy-performance
   public struct Iterator {
@@ -53,6 +55,9 @@ extension FlattenSequence {
     }
   }
 }
+
+extension FlattenSequence.Iterator: Sendable
+  where Base.Iterator: Sendable, Base.Element.Iterator: Sendable {}
 
 extension FlattenSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element.Element
@@ -80,6 +85,7 @@ extension FlattenSequence.Iterator: IteratorProtocol {
       _inner = s!.makeIterator()
     }
     while true
+    fatalError()
   }
 }
 
@@ -160,6 +166,9 @@ extension FlattenSequence where Base: Collection, Base.Element: Collection {
     }
   }
 }
+
+extension FlattenSequence.Index: Sendable
+  where Base.Index: Sendable, Base.Element.Index: Sendable {}
 
 extension FlattenSequence.Index: Equatable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
@@ -289,31 +298,63 @@ extension FlattenCollection: Collection {
 
   @inlinable // lazy-performance
   public func distance(from start: Index, to end: Index) -> Int {
-    // The following check makes sure that distance(from:to:) is invoked on the
-    // _base at least once, to trigger a _precondition in forward only
+    let distanceIsNegative = start > end
+
+    // The following check ensures that distance(from:to:) is invoked on
+    // the _base at least once, to trigger a _precondition in forward only
     // collections.
-    if end < start {
+    if distanceIsNegative {
       _ = _base.distance(from: _base.endIndex, to: _base.startIndex)
     }
-    var _start: Index
-    let _end: Index
+
+    // This path handles indices belonging to the same collection.
+    if start._outer == end._outer {
+      guard let i = start._inner, let j = end._inner else { return 0 }
+      return _base[start._outer].distance(from: i, to: j)
+    }
+
+    // The following path combines the distances of three regions.
+    let lowerBound: Index
+    let upperBound: Index
+
     let step: Int
-    if start > end {
-      _start = end
-      _end = start
+    var distance: Int
+
+    // Note that lowerBound is a valid index because start != end.
+    if distanceIsNegative {
       step = -1
+      lowerBound = end
+      upperBound = start
+      let lowest = _base[lowerBound._outer]
+      distance = lowest.distance(from: lowest.endIndex, to: lowerBound._inner!)
+    } else {
+      step = 01
+      lowerBound = start
+      upperBound = end
+      let lowest = _base[lowerBound._outer]
+      distance = lowest.distance(from: lowerBound._inner!, to: lowest.endIndex)
     }
-    else {
-      _start = start
-      _end = end
-      step = 1
+
+    // We can use each collection's count in the middle region since the
+    // fast path ensures that the other regions cover a nonzero distance,
+    // which means that an extra Int.min distance should trap regardless.
+    var outer = _base.index(after: lowerBound._outer)
+    while outer < upperBound._outer {
+      // 0 ... Int.max can always be negated.
+      distance += _base[outer].count &* step
+      _base.formIndex(after: &outer)
     }
-    var count = 0
-    while _start != _end {
-      count += step
-      formIndex(after: &_start)
+
+    // This unwraps if start != endIndex and end != endIndex. We can use the
+    // positive distance for the same reason that we can use the collection's
+    // count in the middle region.
+    if let inner = upperBound._inner {
+      // 0 ... Int.max can always be negated.
+      let highest = _base[upperBound._outer]
+      distance += highest.distance(from: highest.startIndex, to: inner) &* step
     }
-    return count
+
+    return distance
   }
 
   @inline(__always)

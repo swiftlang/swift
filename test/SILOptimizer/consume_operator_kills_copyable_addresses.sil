@@ -14,7 +14,7 @@ sil hidden [ossa] @$s4test3fooyyAA5KlassCnF : $@convention(thin) (@owned Klass) 
 bb0(%0 : @owned $Klass):
   %1 = begin_borrow [lexical] %0 : $Klass
   debug_value %1 : $Klass, let, name "k", argno 1
-  %3 = alloc_stack [lexical] $Klass, var, name "k2" // expected-error {{'k2' used after consume}}
+  %3 = alloc_stack [lexical] [var_decl] $Klass, var, name "k2" // expected-error {{'k2' used after consume}}
   %4 = copy_value %1 : $Klass
   %5 = move_value [allows_diagnostics] %4 : $Klass
   store %5 to [init] %3 : $*Klass

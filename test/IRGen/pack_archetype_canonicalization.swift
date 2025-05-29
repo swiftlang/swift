@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -disable-availability-checking
+// RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.9-abi-triple
 
 // This would crash.
 public struct G<T> {}

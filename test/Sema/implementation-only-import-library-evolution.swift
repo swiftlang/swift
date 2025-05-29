@@ -5,6 +5,7 @@
 // RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution
 
 @_implementationOnly import BADLibrary
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public struct PublicStructStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}

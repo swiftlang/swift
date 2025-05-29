@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt %s -access-path-verification -o /dev/null
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public struct S {
+}
+
+@available(*, unavailable)
+public struct Unavailable {
+  @_hasStorage @_hasInitialValue public let i: S { get }
+  @_hasStorage @_hasInitialValue static let j: S { get }
+  init()
+}
+
+sil [transparent] @$s28accessed_storage_unavailable11UnavailableV1iAA1SVvpfi : $@convention(thin) () -> S {
+bb0:
+  %0 = function_ref @$s28accessed_storage_unavailable11UnavailableV1jAA1SVvau : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*S
+  %3 = load %2 : $*S
+  return %3 : $S
+}
+
+sil hidden [global_init] @$s28accessed_storage_unavailable11UnavailableV1jAA1SVvau : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+  %1 = apply %0() : $@convention(thin) () -> Never
+  unreachable
+}
+
+sil [transparent] @$s28accessed_storage_unavailable11UnavailableV1iAA1SVvg : $@convention(method) (Unavailable) -> S {
+bb0(%0 : $Unavailable):
+  debug_value %0 : $Unavailable, let, name "self", argno 1
+  %2 = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+  %3 = apply %2() : $@convention(thin) () -> Never
+  unreachable
+}
+
+sil private [global_init_once_fn] @$s28accessed_storage_unavailable11UnavailableV1j_WZ : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+  %2 = apply %1() : $@convention(thin) () -> Never
+  unreachable
+}
+
+sil [noinline] [_semantics "unavailable_code_reached"] @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+
+sil_property #Unavailable.i ()

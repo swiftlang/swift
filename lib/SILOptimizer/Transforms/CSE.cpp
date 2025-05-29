@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-cse"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -517,6 +518,13 @@ public:
         llvm::hash_combine_range(Operands.begin(), Operands.end()),
         X->getElementType());
   }
+
+  hash_code visitTypeValueInst(TypeValueInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(), X->getType(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
+  }
 };
 } // end anonymous namespace
 
@@ -831,8 +839,8 @@ bool CSE::processLazyPropertyGetters(SILFunction &F) {
 /// archetypes. Replace such types by performing type substitutions
 /// according to the provided type substitution map.
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
-                                     ArchetypeType *OldOpenedArchetype,
-                                     ArchetypeType *NewOpenedArchetype) {
+                                     InstructionCloner &Cloner,
+                                     InstructionWorklist &usersToHandle) {
   // Check types of all BB arguments.
   for (auto *Arg : BB->getSILPhiArguments()) {
     if (!Arg->getType().hasOpenedExistential())
@@ -841,13 +849,8 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Try to apply substitutions to it and if it produces a different type,
     // use this type as new type of the BB argument.
     auto OldArgType = Arg->getType();
-    auto NewArgType = OldArgType.subst(BB->getModule(),
-                                       [&](SubstitutableType *type) -> Type {
-                                         if (type == OldOpenedArchetype)
-                                           return NewOpenedArchetype;
-                                         return type;
-                                       },
-                                       MakeAbstractConformanceForGenericType());
+
+    auto NewArgType = Cloner.getOpType(OldArgType);
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg
@@ -860,7 +863,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
       OriginalArgUses.push_back(ArgUse);
     }
     // Then replace all uses by an undef.
-    Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), *BB->getParent()));
+    Arg->replaceAllUsesWith(SILUndef::get(Arg));
     // Replace the type of the BB argument.
     auto *NewArg = BB->replacePhiArgument(Arg->getIndex(), NewArgType,
                                           Arg->getOwnershipKind(),
@@ -868,6 +871,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Restore all uses to refer to the BB argument with updated type.
     for (auto ArgUse : OriginalArgUses) {
       ArgUse->set(NewArg);
+      usersToHandle.pushIfNotVisited(ArgUse->getUser());
     }
   }
 }
@@ -879,7 +883,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
 /// \V is the dominating open_existential_ref instruction
 bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
                                     OpenExistentialRefInst *VI) {
-  llvm::SmallSetVector<SILInstruction *, 16> Candidates;
+  InstructionWorklist usersToHandle(Inst->getFunction());
   const auto OldOpenedArchetype = Inst->getDefinedOpenedArchetype();
   const auto NewOpenedArchetype = VI->getDefinedOpenedArchetype();
 
@@ -895,82 +899,70 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
         }
       }
     }
-
-    Candidates.insert(User);
+    usersToHandle.pushIfNotVisited(User);
   }
+
+  auto *OldEnv = OldOpenedArchetype->getGenericEnvironment();
+  auto *NewEnv = NewOpenedArchetype->getGenericEnvironment();
 
   // Now process candidates.
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
-  Cloner.registerLocalArchetypeRemapping(
-      OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
+  Cloner.registerLocalArchetypeRemapping(OldEnv, NewEnv);
   auto &Builder = Cloner.getBuilder();
 
-  InstructionSet Processed(Inst->getFunction());
   // Now clone each candidate and replace the opened archetype
   // by a dominating one.
-  while (!Candidates.empty()) {
-    auto Candidate = Candidates.pop_back_val();
-    if (Processed.contains(Candidate))
-      continue;
-
-    if (isa<TermInst>(Candidate)) {
+  while (SILInstruction *user = usersToHandle.pop()) {
+    if (isa<TermInst>(user)) {
       // The current use of the opened archetype is a terminator instruction.
       // Check if any of the successor BBs uses this opened archetype in the
       // types of its basic block arguments. If this is the case, replace
       // those uses by the new opened archetype.
-      // FIXME: What about uses of those arguments?
-      for (auto *Successor : Candidate->getParent()->getSuccessorBlocks()) {
+      for (auto *Successor : user->getParent()->getSuccessorBlocks()) {
         if (Successor->args_empty())
           continue;
         // If a BB has any arguments, update their types if necessary.
-        updateBasicBlockArgTypes(Successor, OldOpenedArchetype,
-                                 NewOpenedArchetype);
+        updateBasicBlockArgTypes(Successor, Cloner, usersToHandle);
       }
     }
 
     // Compute if a candidate depends on the old opened archetype.
     // It always does if it has any type-dependent operands.
     bool DependsOnOldOpenedArchetype =
-      !Candidate->getTypeDependentOperands().empty();
+      !user->getTypeDependentOperands().empty();
 
     // Look for dependencies propagated via the candidate's results.
-    for (auto CandidateResult : Candidate->getResults()) {
-      if (CandidateResult->use_empty() ||
-          !CandidateResult->getType().hasOpenedExistential())
+    for (auto result : user->getResults()) {
+      if (result->use_empty() || !result->getType().hasOpenedExistential())
         continue;
 
       // Check if the result type depends on this specific opened existential.
       auto ResultDependsOnOldOpenedArchetype =
-          CandidateResult->getType().getASTType().findIf(
-              [&OldOpenedArchetype](Type t) -> bool {
-                return (CanType(t) == OldOpenedArchetype);
-              });
+          result->getType().getASTType()->hasLocalArchetypeFromEnvironment(OldEnv);
 
       // If it does, the candidate depends on the opened existential.
       if (ResultDependsOnOldOpenedArchetype) {
         DependsOnOldOpenedArchetype = true;
 
         // The users of this candidate are new candidates.
-        for (auto Use : CandidateResult->getUses()) {
-          Candidates.insert(Use->getUser());
+        for (auto Use : result->getUses()) {
+          usersToHandle.pushIfNotVisited(Use->getUser());
         }
       }
     }
-    // Remember that this candidate was processed already.
-    Processed.insert(Candidate);
 
     // No need to clone if there is no dependency on the old opened archetype.
     if (!DependsOnOldOpenedArchetype)
       continue;
 
-    Builder.setInsertionPoint(Candidate);
-    auto NewI = Cloner.clone(Candidate);
+    Builder.setInsertionPoint(user);
+    auto NewI = Cloner.clone(user);
     // Result types of candidate's uses instructions may be using this archetype.
     // Thus, we need to try to replace it there.
-    Candidate->replaceAllUsesPairwiseWith(NewI);
-    eraseFromParentWithDebugInsts(Candidate);
+    user->replaceAllUsesPairwiseWith(NewI);
+    eraseFromParentWithDebugInsts(user);
   }
   return true;
 }
@@ -1098,13 +1090,14 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         if (!isa<SingleValueInstruction>(Inst))
           continue;
 
-        OwnershipRAUWHelper helper(RAUWFixupContext,
-                                   cast<SingleValueInstruction>(Inst),
-                                   cast<SingleValueInstruction>(AvailInst));
+        auto oldValue = cast<SingleValueInstruction>(Inst);
+        auto newValue = cast<SingleValueInstruction>(AvailInst);
+        OwnershipRAUWHelper helper(RAUWFixupContext, oldValue, newValue);
         // If RAUW requires cloning the original, then there's no point. If it
         // also requires introducing a copy and new borrow scope, then it's a
         // very bad idea.
-        if (!helper.isValid() || helper.requiresCopyBorrowAndClone())
+        if (!helper.isValid() || helper.requiresCopyBorrowAndClone() ||
+            helper.mayIntroduceUnoptimizableCopies())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
         nextI = helper.perform();
@@ -1144,8 +1137,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     if (!AI->getFunction()->hasOwnership()) {
       // In non-OSSA we don't balance CSE'd apply results which return an
       // owned value.
-      if (auto ri = AI->getSingleResult()) {
-        if (ri.value().getConvention() != ResultConvention::Unowned)
+      for (const SILResultInfo &ri : AI->getSubstCalleeType()->getResults()) {
+        if (ri.getConvention() != ResultConvention::Unowned)
           return false;
       }
     }
@@ -1155,7 +1148,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
-    auto MB = BCA->getMemoryBehavior(ApplySite(AI), /*observeRetains*/false);
+    auto MB = BCA->getMemoryBehavior(FullApplySite(AI), /*observeRetains*/false);
     if (MB == MemoryBehavior::None)
       return true;
     
@@ -1235,6 +1228,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::ScalarPackIndexInst:
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::TypeValueInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \

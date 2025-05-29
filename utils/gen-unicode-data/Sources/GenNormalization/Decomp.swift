@@ -34,7 +34,7 @@ func getDecompData(
     let decomp = components[5]
     
     // We either 1. don't have decompositions, or 2. the decompositions is for
-    // compatibile forms. We only care about NFD, so ignore these cases.
+    // compatible forms. We only care about NFD, so ignore these cases.
     if decomp == "" || decomp.hasPrefix("<") {
       continue
     }

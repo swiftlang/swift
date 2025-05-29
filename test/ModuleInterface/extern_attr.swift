@@ -4,17 +4,13 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s < %t/Library.swiftinterface
 
-// CHECK:      #if compiler(>=5.3) && $Extern
-// CHECK-NEXT:   @extern(c) public func externalCFunc()
-// CHECK-NEXT: #endif
-@extern(c) public func externalCFunc()
+// REQUIRES: swift_feature_Extern
 
-// CHECK:      #if compiler(>=5.3) && $Extern
-// CHECK-NEXT:   @extern(c, "renamedCFunc") public func externalRenamedCFunc()
-// CHECK-NEXT: #endif
-@extern(c, "renamedCFunc") public func externalRenamedCFunc()
+// CHECK:   @_extern(c) public func externalCFunc()
+@_extern(c) public func externalCFunc()
 
-// CHECK:      #if compiler(>=5.3) && $Extern
-// CHECK-NEXT:   @extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
-// CHECK-NEXT: #endif
-@extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
+// CHECK:   @_extern(c, "renamedCFunc") public func externalRenamedCFunc()
+@_extern(c, "renamedCFunc") public func externalRenamedCFunc()
+
+// CHECK:   @_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
+@_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()

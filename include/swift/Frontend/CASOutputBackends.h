@@ -30,25 +30,35 @@ protected:
 
   llvm::Expected<std::unique_ptr<llvm::vfs::OutputFileImpl>>
   createFileImpl(llvm::StringRef ResolvedPath,
-                 llvm::Optional<llvm::vfs::OutputConfig> Config) override;
+                 std::optional<llvm::vfs::OutputConfig> Config) override;
 
   virtual llvm::Error storeImpl(llvm::StringRef Path, llvm::StringRef Bytes,
-                                llvm::StringRef CorrespondingInput,
-                                file_types::ID OutputKind);
+                                unsigned InputIndex, file_types::ID OutputKind);
 
 private:
   file_types::ID getOutputFileType(llvm::StringRef Path) const;
+
+  /// Return true if the file type is stored into CAS Backend directly.
+  static bool isStoredDirectly(file_types::ID Kind);
 
 public:
   SwiftCASOutputBackend(llvm::cas::ObjectStore &CAS,
                         llvm::cas::ActionCache &Cache,
                         llvm::cas::ObjectRef BaseKey,
                         const FrontendInputsAndOutputs &InputsAndOutputs,
+                        const FrontendOptions &Opts,
                         FrontendOptions::ActionType Action);
   ~SwiftCASOutputBackend();
 
-  llvm::Error storeCachedDiagnostics(llvm::StringRef InputFile,
+  llvm::Error storeCachedDiagnostics(unsigned InputIndex,
                                      llvm::StringRef Bytes);
+
+  llvm::Error storeMakeDependenciesFile(StringRef OutputFilename,
+                                        llvm::StringRef Bytes);
+
+  /// Store the MCCAS CASID \p ID as the object file output for the input
+  /// that corresponds to the \p OutputFilename
+  llvm::Error storeMCCASObjectID(StringRef OutputFilename, llvm::cas::CASID ID);
 
 private:
   class Implementation;

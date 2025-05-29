@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
@@ -148,7 +149,7 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 }
 
 #ifndef NDEBUG
-/// Sanity check to make sure that a noescape partial apply is only ultimately
+/// Soundness check to make sure that a noescape partial apply is only ultimately
 /// used by directly calling it or passing it as argument, but not using it as a
 /// partial_apply callee.
 ///
@@ -219,7 +220,7 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<MoveValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:
     // @block_storage is passed by storing it to the stack. We know this is
@@ -242,8 +243,15 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     // destroy_value %storage : $@callee_owned () -> ()
     return true;
   default:
-    return false;
+    break;
   }
+  if (auto *startAsyncLet = dyn_cast<BuiltinInst>(user)) {
+    if (startAsyncLet->getBuiltinKind() ==
+        BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+      return true;
+    }
+  }
+  return false;
 }
 #endif
 

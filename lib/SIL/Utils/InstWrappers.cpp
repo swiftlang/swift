@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/SILFunction.h"
 
@@ -43,6 +44,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
     return false;
 
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::InitExistentialRefInst:
@@ -51,6 +53,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:
@@ -95,4 +98,14 @@ bool ForwardingOperation::visitForwardedValues(
     assert(args.size() == 1 && "Transforming terminator with multiple args?!");
     return visitor(args[0]);
   });
+}
+
+bool swift::isFixedStorageSemanticsCallKind(SILFunction *function) {
+  for (auto &attr : function->getSemanticsAttrs()) {
+    if (attr == "fixed_storage.check_index" ||
+        attr == "fixed_storage.get_count") {
+      return true;
+    }
+  }
+  return false;
 }

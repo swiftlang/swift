@@ -18,10 +18,10 @@ import SwiftShims
 // ==== -----------------------------------------------------------------------
 // MARK: Precondition executors
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension SerialExecutor {
-  /// Unconditionally if the current task is executing on the expected serial executor,
-  /// and if not crash the program offering information about the executor mismatch.
+  /// Stops program execution if the current task is not executing on this
+  /// serial executor.
   ///
   /// This function's effect varies depending on the build flag used:
   ///
@@ -32,10 +32,22 @@ extension SerialExecutor {
   /// * In `-O` builds (the default for Xcode's Release configuration), stops
   ///   program execution.
   ///
-  /// * In `-Ounchecked` builds, the optimizer may assume that this function is
-  ///   never called. Failure to satisfy that assumption is a serious
-  ///   programming error.
-  @available(SwiftStdlib 5.9, *)
+  /// - Note: Because this check is performed against the actor's serial executor,
+  ///   if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed. From a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default value is
+  ///           the file where this method was called.
+  ///   - line: The line number to print if the assertion fails The default value is
+  ///           the line where this method was called.
+  @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
+  @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   @_unavailableInEmbedded
   public func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -45,7 +57,7 @@ extension SerialExecutor {
       return
     }
 
-    let expectationCheck = _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor)
+    let expectationCheck = unsafe _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor)
 
     /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
     precondition(expectationCheck,
@@ -55,10 +67,10 @@ extension SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
-  /// Unconditionally if the current task is executing on the serial executor of the passed in `actor`,
-  /// and if not crash the program offering information about the executor mismatch.
+  /// Stops program execution if the current task is not executing on this
+  /// actor's serial executor.
   ///
   /// This function's effect varies depending on the build flag used:
   ///
@@ -69,10 +81,22 @@ extension Actor {
   /// * In `-O` builds (the default for Xcode's Release configuration), stops
   ///   program execution.
   ///
-  /// * In `-Ounchecked` builds, the optimizer may assume that this function is
-  ///   never called. Failure to satisfy that assumption is a serious
-  ///   programming error.
-  @available(SwiftStdlib 5.9, *)
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
+  @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   @_unavailableInEmbedded
   public nonisolated func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -82,20 +106,21 @@ extension Actor {
       return
     }
 
-    let expectationCheck = _taskIsCurrentExecutor(self.unownedExecutor.executor)
+    // NOTE: This method will CRASH in new runtime versions,
+    // if it would have previously returned `false`.
+    // It will call through to SerialExecutor.checkIsolated` as a last resort.
+    let expectationCheck = unsafe _taskIsCurrentExecutor(self.unownedExecutor.executor)
 
-    // TODO: offer information which executor we actually got
     precondition(expectationCheck,
-        // TODO: figure out a way to get the typed repr out of the unowned executor
-        "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
+        unsafe "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
         file: file, line: line)
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension GlobalActor {
-  /// Unconditionally if the current task is executing on the serial executor of the passed in `actor`,
-  /// and if not crash the program offering information about the executor mismatch.
+  /// Stops program execution if the current task is not executing on this
+  /// actor's serial executor.
   ///
   /// This function's effect varies depending on the build flag used:
   ///
@@ -106,37 +131,64 @@ extension GlobalActor {
   /// * In `-O` builds (the default for Xcode's Release configuration), stops
   ///   program execution.
   ///
-  /// * In `-Ounchecked` builds, the optimizer may assume that this function is
-  ///   never called. Failure to satisfy that assumption is a serious
-  ///   programming error.
-  @available(SwiftStdlib 5.9, *)
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
+  @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   @_unavailableInEmbedded
   public static func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
-    try Self.shared.preconditionIsolated(message(), file: file, line: line)
+    Self.shared.preconditionIsolated(message(), file: file, line: line)
   }
 }
 
 // ==== -----------------------------------------------------------------------
 // MARK: Assert executors
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension SerialExecutor {
-  /// Performs an executor check in debug builds.
+  /// Stops program execution if the current task is not executing on this
+  /// serial executor.
+  ///
+  /// This function's effect varies depending on the build flag used:
   ///
   /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
-  ///   configuration): If `condition` evaluates to `false`, stop program
-  ///   execution in a debuggable state after printing `message`.
+  ///   configuration), stops program execution in a debuggable state after
+  ///   printing `message`.
   ///
   /// * In `-O` builds (the default for Xcode's Release configuration),
-  ///   `condition` is not evaluated, and there are no effects.
+  ///   the isolation check is not performed and there are no effects.
   ///
-  /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
-  ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
-  ///   assumption is a serious programming error.
-  @available(SwiftStdlib 5.9, *)
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
+  @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   @_unavailableInEmbedded
   public func assertIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -146,7 +198,7 @@ extension SerialExecutor {
       return
     }
 
-    guard _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor) else {
+    guard unsafe _taskIsCurrentExecutor(self.asUnownedSerialExecutor().executor) else {
       // TODO: offer information which executor we actually got
       let msg = "Incorrect actor executor assumption; Expected '\(self)' executor. \(message())"
       /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
@@ -156,21 +208,36 @@ extension SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
-  /// Performs an executor check in debug builds.
+  /// Stops program execution if the current task is not executing on this
+  /// actor's serial executor.
+  ///
+  /// This function's effect varies depending on the build flag used:
   ///
   /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
-  ///   configuration): If `condition` evaluates to `false`, stop program
-  ///   execution in a debuggable state after printing `message`.
+  ///   configuration), stops program execution in a debuggable state after
+  ///   printing `message`.
   ///
   /// * In `-O` builds (the default for Xcode's Release configuration),
-  ///   `condition` is not evaluated, and there are no effects.
+  ///   the isolation check is not performed and there are no effects.
   ///
-  /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
-  ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
-  ///   assumption is a serious programming error.
-  @available(SwiftStdlib 5.9, *)
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
+  @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   @_unavailableInEmbedded
   public nonisolated func assertIsolated(
       _ message: @autoclosure () -> String = String(),
@@ -180,10 +247,8 @@ extension Actor {
       return
     }
 
-    guard _taskIsCurrentExecutor(self.unownedExecutor.executor) else {
-      // TODO: offer information which executor we actually got
-      // TODO: figure out a way to get the typed repr out of the unowned executor
-      let msg = "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())"
+    guard unsafe _taskIsCurrentExecutor(self.unownedExecutor.executor) else {
+      let msg = unsafe "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())"
       /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
       assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
       return
@@ -191,52 +256,96 @@ extension Actor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension GlobalActor {
-  /// Performs an executor check in debug builds.
+  /// Stops program execution if the current task is not executing on this
+  /// actor's serial executor.
+  ///
+  /// This function's effect varies depending on the build flag used:
   ///
   /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
-  ///   configuration): If `condition` evaluates to `false`, stop program
-  ///   execution in a debuggable state after printing `message`.
+  ///   configuration), stops program execution in a debuggable state after
+  ///   printing `message`.
   ///
   /// * In `-O` builds (the default for Xcode's Release configuration),
-  ///   `condition` is not evaluated, and there are no effects.
+  ///   the isolation check is not performed and there are no effects.
   ///
-  /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
-  ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
-  ///   assumption is a serious programming error.
-  @available(SwiftStdlib 5.9, *)
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   that actor's serial executor as its own ``Actor/unownedExecutor``--this
+  ///   check will succeed , as from a concurrency safety perspective, the
+  ///   serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - message: The message to print if the assertion fails.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  @available(SwiftStdlib 5.1, *)
+  #if !$Embedded
+  @backDeployed(before: SwiftStdlib 5.9)
+  #endif
   @_unavailableInEmbedded
   public static func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
-    try Self.shared.assertIsolated(message(), file: file, line: line)
+    Self.shared.assertIsolated(message(), file: file, line: line)
   }
 }
 
 // ==== -----------------------------------------------------------------------
 // MARK: Assume Executor
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
-  /// A safe way to synchronously assume that the current execution context belongs to the passed in actor.
+  /// Assume that the current task is executing on this actor's serial executor,
+  /// or stop program execution otherwise.
   ///
-  /// This API should only be used as last resort, when it is not possible to express the current
-  /// execution context definitely belongs to the specified actor in other ways. E.g. one may need to use
-  /// this in a delegate style API, where a synchronous method is guaranteed to be called by the
-  /// specified actor, however it is not possible to move this method as being declared on the specified actor.
+  /// You call this method to *assume and verify* that the currently
+  /// executing synchronous function is actually executing on the serial
+  /// executor of this actor.
   ///
-  /// - Warning: If the current executor is *not* the expected serial executor, this function will crash.
+  /// If that is the case, the operation is invoked with an `isolated` version
+  /// of the actor, allowing synchronous access to actor local state without
+  /// hopping through asynchronous boundaries.
   ///
-  /// Note that this check is performed against the passed in actor's serial executor, meaning that
-  /// if another actor uses the same serial executor--by using that actor's ``Actor/unownedExecutor``
-  /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
-  /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-  @available(SwiftStdlib 5.9, *)
+  /// If the current context is not running on the actor's serial executor, or
+  /// if the actor is a reference to a remote actor, this method will crash
+  /// with a fatal error (similar to ``preconditionIsolated()``).
+  ///
+  /// Note that this check is performed against the passed in actor's serial
+  /// executor, meaning that if another actor uses the same serial executor--by
+  /// using that actor's ``Actor/unownedExecutor`` as its own
+  /// ``Actor/unownedExecutor``--this check will succeed, as from a concurrency
+  /// safety perspective, the serial executor guarantees mutual exclusion of
+  /// those two actors.
+  ///
+  /// This method can only be used from synchronous functions, as asynchronous
+  /// functions should instead perform a normal method call to the actor, which
+  /// will hop task execution to the target actor if necessary.
+  ///
+  /// - Note: This check is performed against the actor's serial executor,
+  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   another actor's executor as its own ``Actor/unownedExecutor``
+  ///   --this check will succeed , as from a concurrency safety perspective,
+  ///   the serial executor guarantees mutual exclusion of those two actors.
+  ///
+  /// - Parameters:
+  ///   - operation: the operation that will be executed if the current context
+  ///                is executing on the actors serial executor.
+  ///   - file: The file name to print if the assertion fails. The default is
+  ///           where this method was called.
+  ///   - line: The line number to print if the assertion fails The default is
+  ///           where this method was called.
+  /// - Returns: the return value of the `operation`
+  /// - Throws: rethrows the `Error` thrown by the operation if it threw
+  @available(SwiftStdlib 5.1, *)
+  @_alwaysEmitIntoClient
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
   @_unavailableInEmbedded
-  public nonisolated func assumeIsolated<T>(
+  public nonisolated func assumeIsolated<T : Sendable>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line
   ) rethrows -> T {
@@ -245,7 +354,7 @@ extension Actor {
 
     /// This is guaranteed to be fatal if the check fails,
     /// as this is our "safe" version of this API.
-    let executor: Builtin.Executor = self.unownedExecutor.executor
+    let executor: Builtin.Executor = unsafe self.unownedExecutor.executor
     guard _taskIsCurrentExecutor(executor) else {
       // TODO: offer information which executor we actually got
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
@@ -254,9 +363,20 @@ extension Actor {
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
       return try rawFn(self)
     }
+  }
+
+  @available(SwiftStdlib 5.9, *)
+  @usableFromInline
+  @_unavailableInEmbedded
+  @_silgen_name("$sScAsE14assumeIsolated_4file4lineqd__qd__xYiKXE_s12StaticStringVSutKlF")
+  internal nonisolated func __abi__assumeIsolated<T : Sendable>(
+      _ operation: (isolated Self) throws -> T,
+      _ file: StaticString, _ line: UInt
+  ) rethrows -> T {
+    try assumeIsolated(operation, file: file, line: line)
   }
 }
 

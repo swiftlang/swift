@@ -140,3 +140,15 @@ var CAliasInstance = CAlias(#^ALIAS_CONSTRUCTOR_0^#
 // rdar://18586415
 // ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#x: A#}[')'][#CAlias#];
 // ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#y: A#}[')'][#CAlias#];
+
+// https://github.com/apple/swift/issues/57916
+struct Issue57916 {
+  var a: Int
+  var b: Int {
+    get { return a }
+  }
+}
+func test57916() {
+  Issue57916(#^ISSUE_57916^#
+  // ISSUE_57916: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#Issue57916#]; name=a:
+}

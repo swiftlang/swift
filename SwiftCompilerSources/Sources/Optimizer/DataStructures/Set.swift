@@ -135,7 +135,7 @@ struct ValueSet : IntrusiveSet {
 /// This type should be a move-only type, but unfortunately we don't have move-only
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
-struct InstructionSet : IntrusiveSet {
+struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
@@ -145,26 +145,26 @@ struct InstructionSet : IntrusiveSet {
     self.bridged = self.context.allocNodeSet()
   }
 
-  func contains(_ inst: Instruction) -> Bool {
+  func contains(_ inst: InstType) -> Bool {
     bridged.containsInstruction(inst.bridged)
   }
 
   /// Returns true if `inst` was not contained in the set before inserting.
   @discardableResult
-  mutating func insert(_ inst: Instruction) -> Bool {
+  mutating func insert(_ inst: InstType) -> Bool {
     bridged.insertInstruction(inst.bridged)
   }
 
-  mutating func erase(_ inst: Instruction) {
+  mutating func erase(_ inst: InstType) {
     bridged.eraseInstruction(inst.bridged)
   }
 
   var description: String {
     let function = bridged.getFunction().function
     var d = "{\n"
-    for inst in function.instructions {
-      if contains(inst) {
-        d += inst.description
+    for i in function.instructions {
+      if let inst = i as? InstType, contains(inst) {
+        d += inst.description + "\n"
       }
     }
     d += "}\n"
@@ -174,5 +174,109 @@ struct InstructionSet : IntrusiveSet {
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
     context.freeNodeSet(bridged)
+  }
+}
+
+/// An `InstructionSet` which also provides a `count` property.
+struct SpecificInstructionSetWithCount<InstType: Instruction> : IntrusiveSet {
+  private(set) var count = 0
+  private var underlyingSet: SpecificInstructionSet<InstType>
+
+  init(_ context: some Context) {
+    self.underlyingSet = SpecificInstructionSet(context)
+  }
+
+  func contains(_ inst: InstType) -> Bool { underlyingSet.contains(inst) }
+
+  var isEmpty: Bool { count == 0 }
+
+  /// Returns true if `inst` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ inst: InstType) -> Bool {
+    if underlyingSet.insert(inst) {
+      count += 1
+      return true
+    }
+    return false
+  }
+
+  mutating func erase(_ inst: InstType) {
+    if underlyingSet.contains(inst) {
+      count -= 1
+      assert(count >= 0)
+    }
+    underlyingSet.erase(inst)
+  }
+
+  var description: String { underlyingSet.description }
+
+  mutating func deinitialize() { underlyingSet.deinitialize() }
+}
+
+typealias InstructionSet = SpecificInstructionSet<Instruction>
+typealias InstructionSetWithCount = SpecificInstructionSetWithCount<Instruction>
+
+/// A set of operands.
+///
+/// This is an extremely efficient implementation which does not need memory
+/// allocations or hash lookups.
+///
+/// This type should be a move-only type, but unfortunately we don't have move-only
+/// types yet. Therefore it's needed to call `deinitialize()` explicitly to
+/// destruct this data structure, e.g. in a `defer {}` block.
+struct OperandSet : IntrusiveSet {
+
+  private let context: BridgedPassContext
+  private let bridged: BridgedOperandSet
+
+  init(_ context: some Context) {
+    self.context = context._bridged
+    self.bridged = self.context.allocOperandSet()
+  }
+
+  func contains(_ operand: Operand) -> Bool {
+    bridged.contains(operand.bridged)
+  }
+
+  /// Returns true if `inst` was not contained in the set before inserting.
+  @discardableResult
+  mutating func insert(_ operand: Operand) -> Bool {
+    bridged.insert(operand.bridged)
+  }
+
+  mutating func erase(_ operand: Operand) {
+    bridged.erase(operand.bridged)
+  }
+
+  var description: String {
+    let function = bridged.getFunction().function
+    var d = "{\n"
+    for inst in function.instructions {
+      for op in inst.operands {
+        if contains(op) {
+          d += op.description
+        }
+      }
+    }
+    d += "}\n"
+    return d
+  }
+
+  /// TODO: once we have move-only types, make this a real deinit.
+  mutating func deinitialize() {
+    context.freeOperandSet(bridged)
+  }
+}
+
+extension IntrusiveSet {
+  mutating func insert(contentsOf source: some Sequence<Element>) {
+    for element in source {
+      _ = insert(element)
+    }
+  }
+
+  init(insertContentsOf source: some Sequence<Element>, _ context: some Context) {
+    self.init(context)
+    insert(contentsOf: source)
   }
 }

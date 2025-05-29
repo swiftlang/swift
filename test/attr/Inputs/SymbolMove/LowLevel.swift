@@ -5,7 +5,9 @@ public func printMessageMoved() {
 }
 
 @available(OSX 10.7, iOS 7.0, *)
+@available(unrecognizedOS 1.0, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0)
+@_originallyDefinedIn(module: "HighLevel", unrecognizedOS 2.0)
 public struct Entity {
     public let value = "LowLevel"
     public init() {}

@@ -16,15 +16,19 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace llvm {
+namespace swift {
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const SmallBitVector &bv) {
-  for (unsigned i = 0, e = bv.size(); i != e; ++i)
-    os << (bv[i] ? '1' : '0');
-  return os;
+void printBitsAsArray(llvm::raw_ostream &OS, const llvm::SmallBitVector &bits,
+                      bool bracketed);
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const llvm::SmallBitVector &bits) {
+  printBitsAsArray(OS, bits, /*bracketed=*/false);
+  return OS;
 }
 
-} // namespace llvm
+void dumpBits(const llvm::SmallBitVector &bits);
+
+} // namespace swift
 
 #endif

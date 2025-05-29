@@ -19,4 +19,15 @@ struct HasMemberWithUserProvidedDestructor {
   ~HasMemberWithUserProvidedDestructor() {}
 };
 
+void foo();
+
+struct NonCopyable {
+  NonCopyable(int x) : x(x) {}
+  NonCopyable(const NonCopyable &) = delete;
+  NonCopyable(NonCopyable &&other) : x(other.x) { other.x = -123; }
+  ~NonCopyable() { foo(); }
+
+  int x;
+};
+
 #endif // TEST_SIL_OPTIMIZER_CXX_WITH_CUSTOM_DESTRUCTOR_H

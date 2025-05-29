@@ -20,6 +20,8 @@
 #define NOMINMAX
 #include <windows.h>
 
+#pragma comment(lib, "synchronization.lib")
+
 #include "swift/Threading/Errors.h"
 #include "swift/Threading/Impl.h"
 
@@ -97,7 +99,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 #endif
 }
 
-llvm::Optional<swift::threading_impl::stack_bounds>
+std::optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
 #if _WIN32_WINNT >= 0x0602
   ULONG_PTR lowLimit = 0;

@@ -106,6 +106,7 @@ OUTPUT(FixItsOutputPath, TY_SwiftFixIt)
 /// to each .swiftmodule that was loaded while building module NAME for target
 /// TARGET. This format is subject to arbitrary change, however.
 OUTPUT(LoadedModuleTracePath, TY_ModuleTrace)
+OUTPUT(FineModuleTracePath,   TY_FineModuleTrace)
 
 /// The path to which we should output a TBD file.
 ///
@@ -136,6 +137,14 @@ OUTPUT(ModuleInterfaceOutputPath, TY_SwiftModuleInterfaceFile)
 /// \sa ModuleInterfaceOutputPath
 OUTPUT(PrivateModuleInterfaceOutputPath,
             TY_PrivateSwiftModuleInterfaceFile)
+
+/// The path to which we should emit a package module interface.
+///
+/// The package interface contains package decls, SPIs, and public/inlinable decls.
+///
+/// \sa ModuleInterfaceOutputPath
+OUTPUT(PackageModuleInterfaceOutputPath,
+            TY_PackageSwiftModuleInterfaceFile)
 
 /// The path to which we should emit module summary file.
 OUTPUT(ModuleSummaryOutputPath, TY_SwiftModuleSummaryFile)

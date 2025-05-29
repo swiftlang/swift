@@ -5,4 +5,7 @@ add_swift_unittest(SwiftSILOptimizerTests
 target_link_libraries(SwiftSILOptimizerTests
    PRIVATE
    swiftSILOptimizer
+   swiftIRGen
+   swiftAST
+   swiftFrontend
 )

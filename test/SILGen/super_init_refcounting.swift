@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 class Foo {
   init() {}
@@ -11,7 +11,7 @@ class Bar: Foo {
   // CHECK: bb0([[INPUT_SELF:%.*]] : @owned $Bar):
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Bar }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] =  mark_uninitialized [derivedself] [[SELF_BOX]]
-  // CHECK:         [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:         [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:         store [[INPUT_SELF]] to [init] [[PB_SELF_BOX]]
   // CHECK:         [[ORIG_SELF:%.*]] = load [take] [[PB_SELF_BOX]]
@@ -31,7 +31,7 @@ extension Foo {
   // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting3FooC{{[_0-9a-zA-Z]*}}fC
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Foo }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] =  mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:         [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:         [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:         [[SELF_INIT:%.*]] = class_method
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SELF_INIT]](%1)
@@ -76,7 +76,7 @@ class Good: Foo {
   // CHECK-LABEL: sil hidden [ossa] @$s22super_init_refcounting4GoodC{{[_0-9a-zA-Z]*}}fc
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var Good }
   // CHECK:         [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-  // CHECK:         [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+  // CHECK:         [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
   // CHECK:         [[PB_SELF_BOX:%.*]] = project_box [[SELF_LIFETIME]]
   // CHECK:         store %0 to [init] [[PB_SELF_BOX]]
   // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[PB_SELF_BOX]]

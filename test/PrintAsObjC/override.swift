@@ -8,7 +8,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/override.swiftmodule -typecheck -emit-objc-header-path %t/override.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/override.swiftmodule -typecheck -verify -emit-objc-header-path %t/override.h
 // RUN: %FileCheck %s < %t/override.h
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
 // RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | %FileCheck -check-prefix=CLANG %s
@@ -43,6 +43,18 @@ class A_Child : Base {
   override func doAnotherThing() throws {}
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+} // CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface A_Child ({{.*}}) <Proto>
+extension A_Child : Proto {
+  // CHECK-NEXT: - (NSUInteger)proto SWIFT_WARN_UNUSED_RESULT;
+  func proto() -> Int { return 0 }
+
+  // CHECK-NEXT: - (NSUInteger)proto:(NSUInteger)_ SWIFT_WARN_UNUSED_RESULT;
+  func proto(_: Int) -> Int { return 0 }
+
+  // CHECK-NEXT: - (NSUInteger)proto:(NSUInteger)_ y:(NSUInteger)y SWIFT_WARN_UNUSED_RESULT;
+  func proto(_: Int, y: Int) -> Int { return 0 }
 } // CHECK-NEXT: @end
 
 // CHECK-LABEL: @interface A_Grandchild : A_Child

@@ -58,6 +58,9 @@ struct AnyRequestVTable {
     static void noteCycleStep(const void *ptr, DiagnosticEngine &diags) {
       static_cast<const Request *>(ptr)->noteCycleStep(diags);
     }
+    static SourceLoc getNearestLoc(const void *ptr) {
+      return static_cast<const Request *>(ptr)->getNearestLoc();
+    }
   };
 
   const uint64_t typeID;
@@ -66,6 +69,7 @@ struct AnyRequestVTable {
   const std::function<void(const void *, llvm::raw_ostream &)> simpleDisplay;
   const std::function<void(const void *, DiagnosticEngine &)> diagnoseCycle;
   const std::function<void(const void *, DiagnosticEngine &)> noteCycleStep;
+  const std::function<SourceLoc(const void *)> getNearestLoc;
 
   template <typename Request>
   static const AnyRequestVTable *get() {
@@ -75,7 +79,8 @@ struct AnyRequestVTable {
         &Impl<Request>::isEqual,
         &Impl<Request>::simpleDisplay,
         &Impl<Request>::diagnoseCycle,
-        &Impl<Request>::noteCycleStep
+        &Impl<Request>::noteCycleStep,
+        &Impl<Request>::getNearestLoc
     };
     return &vtable;
   }
@@ -173,6 +178,11 @@ public:
     getVTable()->noteCycleStep(getRawStorage(), diags);
   }
 
+  /// Get the best source location describing the parameters to this request.
+  SourceLoc getNearestLoc() const {
+    return getVTable()->getNearestLoc(getRawStorage());
+  }
+
   /// Compare two instances for equality.
   friend bool operator==(const AnyRequestBase<Derived> &lhs,
                          const AnyRequestBase<Derived> &rhs) {
@@ -224,6 +234,8 @@ public:
 ///   - Cycle diagnostics operations:
 ///       void diagnoseCycle(DiagnosticEngine &diags) const;
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
+///   - Source location information:
+///       SourceLoc getNearestLoc() const;
 ///
 class ActiveRequest final : public AnyRequestBase<ActiveRequest> {
   template <typename T>

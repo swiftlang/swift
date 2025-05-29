@@ -47,11 +47,13 @@ set(swift_runtime_sources
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp
+    Exception.cpp
     Exclusivity.cpp
     ExistentialContainer.cpp
     Float16Support.cpp
     FoundationSupport.cpp
     FunctionReplacement.cpp
+    GenericMetadataBuilder.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionCommon.cpp
@@ -63,6 +65,7 @@ set(swift_runtime_sources
     SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
+    LibPrespecialized.cpp
     Metadata.cpp
     MetadataLookup.cpp
     Numeric.cpp
@@ -88,6 +91,7 @@ set(swift_runtime_threading_sources
 
 set(swift_runtime_backtracing_sources
   Backtrace.cpp
+  BacktraceUtils.cpp
   CrashHandlerMacOS.cpp
   CrashHandlerLinux.cpp)
 
@@ -110,47 +114,48 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
-if(SWIFT_BUILD_STATIC_STDLIB)
-  set(static_binary_lnk_file_list)
+set(static_binary_lnk_file_list)
 
-  foreach(sdk ${SWIFT_SDKS})
-    if(NOT "${sdk}" STREQUAL "LINUX" AND NOT "${sdk}" STREQUAL "WASI")
-      continue()
-    endif()
+foreach(sdk ${SWIFT_SDKS})
+  if(NOT SWIFT_SDK_${sdk}_STATIC_LINKING_SUPPORTED)
+    continue()
+  endif()
 
-    string(TOLOWER "${sdk}" lowercase_sdk)
-    set(static_binary_lnk_src "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/${lowercase_sdk}/static-executable-args.lnk")
+  if(SWIFT_BUILD_STATIC_STDLIB OR SWIFT_SDK_${sdk}_STATIC_ONLY)
+    set(lib_dir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(static_binary_lnk_src "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/${lib_dir}/static-executable-args.lnk")
 
     # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
-    set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
+    set(linkfile "${lib_dir}/static-executable-args.lnk")
     add_custom_command_target(swift_static_binary_${sdk}_args
       COMMAND
-        "${CMAKE_COMMAND}" -E copy
-        "${static_binary_lnk_src}"
-        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+      "${CMAKE_COMMAND}" -E copy
+      "${static_binary_lnk_src}"
+      "${SWIFTSTATICLIB_DIR}/${linkfile}"
       OUTPUT
-        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+      "${SWIFTSTATICLIB_DIR}/${linkfile}"
       DEPENDS
-        "${static_binary_lnk_src}")
+      "${static_binary_lnk_src}")
 
     list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
     swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-                               DESTINATION "lib/swift_static/${lowercase_sdk}"
-                               COMPONENT stdlib)
-  endforeach()
-  if(static_binary_lnk_file_list)
-    add_dependencies(stdlib ${static_binary_lnk_file_list})
-    add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
+      DESTINATION "lib/swift_static/${lib_dir}"
+      COMPONENT stdlib)
   endif()
-endif()
+endforeach()
 
-add_swift_target_library(swiftRuntime OBJECT_LIBRARY
+# In modern CMake, we would be able to use the previous name `swiftRuntime`
+# without clashing with the `Runtime` module, but the current build system
+# is architected in such a way that we had to rename this to `swiftRuntimeCore`
+# in order to avoid a clash with the new Swift module.
+add_swift_target_library(swiftRuntimeCore OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
   ${swift_runtime_threading_sources}
   C_COMPILE_FLAGS
     ${swift_runtime_library_compile_flags}
+    ${swift_enable_backtracing}
   LINK_FLAGS ${swift_runtime_linker_flags}
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install)
@@ -243,7 +248,7 @@ foreach(sdk ${SWIFT_SDKS})
                                   "${static_runtime_registrar}"
                                 DEPENDS
                                   "${swiftrtObject}")
-      if(SWIFT_BUILD_DYNAMIC_STDLIB)
+      if(SWIFT_BUILD_DYNAMIC_STDLIB AND NOT SWIFT_SDK_${sdk}_STATIC_ONLY)
         swift_install_in_component(FILES
                                      "${shared_runtime_registrar}"
                                    DESTINATION
@@ -251,7 +256,7 @@ foreach(sdk ${SWIFT_SDKS})
                                    COMPONENT
                                      stdlib)
       endif()
-      if(SWIFT_BUILD_STATIC_STDLIB)
+      if(SWIFT_BUILD_STATIC_STDLIB OR SWIFT_SDK_${sdk}_STATIC_ONLY)
         swift_install_in_component(FILES
                                      "${static_runtime_registrar}"
                                    DESTINATION
@@ -268,10 +273,26 @@ foreach(sdk ${SWIFT_SDKS})
       add_dependencies(stdlib swift-stdlib-${arch_suffix} swiftImageRegistration-${arch_suffix})
     endif()
 
-    # Generate the static-stdlib-args.lnk file used by -static-stdlib option for
-    # 'GenericUnix' (eg linux)
-    if(SWIFT_SDK_${sdk}_OBJECT_FORMAT STREQUAL "ELF")
-      string(TOLOWER "${sdk}" lowercase_sdk)
+  endforeach()
+
+  # Generate the static-stdlib-args.lnk file used by -static-stdlib option for
+  # 'GenericUnix' (eg linux)
+  if(SWIFT_SDK_${sdk}_OBJECT_FORMAT STREQUAL "ELF")
+    set(lib_dir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    set(static_stdlib_lnk_src "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/${lib_dir}/static-stdlib-args.lnk")
+    set(linkfile ${lib_dir}/static-stdlib-args.lnk)
+    if(EXISTS "${static_stdlib_lnk_src}")
+      add_custom_command_target(swift_static_stdlib_${sdk}_args
+        COMMAND
+        "${CMAKE_COMMAND}" -E copy
+        "${static_stdlib_lnk_src}"
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        OUTPUT
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        DEPENDS
+        "${static_stdlib_lnk_src}")
+      list(APPEND static_binary_lnk_file_list ${swift_static_stdlib_${sdk}_args})
+    else()
       set(libpthread -lpthread)
       set(concurrency_libs)
       set(android_libraries)
@@ -282,7 +303,6 @@ foreach(sdk ${SWIFT_SDKS})
         set(concurrency_libs "-ldispatch -lBlocksRuntime")
       endif()
 
-      set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
 -ldl
 ${libpthread}
@@ -294,10 +314,16 @@ ${concurrency_libs}
 -Xlinker -export-dynamic
 -Xlinker --exclude-libs
 -Xlinker ALL")
-
-      swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
-                                 DESTINATION "lib/swift_static/${lowercase_sdk}"
-                                 COMPONENT stdlib)
     endif()
-  endforeach()
+
+    swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
+      DESTINATION "lib/swift_static/${lib_dir}"
+      COMPONENT stdlib)
+  endif()
+
 endforeach()
+
+if(static_binary_lnk_file_list)
+  add_dependencies(stdlib ${static_binary_lnk_file_list})
+  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
+endif()

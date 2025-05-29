@@ -15,6 +15,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -78,10 +79,6 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
@@ -93,12 +90,14 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
+    auto *deba = getAnalysis<DeadEndBlocksAnalysis>();
 
     DiagnosticEmitter diagnosticEmitter(fn);
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         moveIntroducersToProcess;
     searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-        fn, moveIntroducersToProcess, diagnosticEmitter);
+        fn, getAnalysis<PostOrderAnalysis>(), moveIntroducersToProcess,
+        diagnosticEmitter);
 
     LLVM_DEBUG(llvm::dbgs()
                << "Emitting diagnostic when checking for mark must check inst: "
@@ -110,9 +109,10 @@ class MoveOnlyAddressCheckerTesterPass : public SILFunctionTransform {
       LLVM_DEBUG(llvm::dbgs() << "No move introducers found?!\n");
     } else {
       borrowtodestructure::IntervalMapAllocator allocator;
-      MoveOnlyAddressChecker checker{getFunction(), diagnosticEmitter,
-                                     allocator, domTree, poa};
-      madeChange = checker.check(moveIntroducersToProcess);
+      MoveOnlyAddressChecker checker{
+          getFunction(), diagnosticEmitter, allocator, domTree, poa, deba};
+      madeChange = checker.completeLifetimes();
+      madeChange |= checker.check(moveIntroducersToProcess);
     }
 
     // If we did not emit any diagnostics, emit a diagnostic if we missed any

@@ -53,6 +53,7 @@ docs/.docc-build
 
 # SwiftPM
 .build
+.index-build
 .swiftpm
 
 #==============================================================================#
@@ -79,3 +80,21 @@ SortedCFDatabase.def
 htmlcov
 .coverage
 /benchmark/scripts/Benchmark_Driverc
+
+#==============================================================================#
+# Ignore copied Swift Stdlib files while migrating stdlib
+#==============================================================================#
+Runtimes/**/*.swift
+Runtimes/**/*.h
+Runtimes/**/*.cpp
+Runtimes/**/*.c
+Runtimes/**/*.m
+Runtimes/**/*.mm
+Runtimes/**/*.def
+Runtimes/**/*.gyb
+Runtimes/**/*.apinotes
+Runtimes/**/*.yaml
+Runtimes/**/*.inc
+Runtimes/**/*.json
+Runtimes/**/*.modulemap
+Runtimes/**/*.in

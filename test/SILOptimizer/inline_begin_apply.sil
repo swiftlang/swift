@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -inline -verify %s | %FileCheck %s
-// RUN: %target-sil-opt -mandatory-inlining -verify %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -inline -verify %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -mandatory-inlining -verify %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -113,7 +113,7 @@ entry(%flag : $Builtin.Int1):
 yes:
   %10 = integer_literal $Builtin.Int32, 10
   apply %marker(%10) : $@convention(thin) (Builtin.Int32) -> ()
-  end_apply %token
+  end_apply %token as $()
   %20 = integer_literal $Builtin.Int32, 20
   apply %marker(%20) : $@convention(thin) (Builtin.Int32) -> ()
   br cont
@@ -147,7 +147,7 @@ entry(%flag : $Builtin.Int1):
 yes:
   %10 = integer_literal $Builtin.Int32, 10
   apply %marker(%10) : $@convention(thin) (Builtin.Int32) -> ()
-  end_apply %token
+  end_apply %token as $()
   %20 = integer_literal $Builtin.Int32, 20
   apply %marker(%20) : $@convention(thin) (Builtin.Int32) -> ()
   br cont
@@ -223,7 +223,7 @@ entry(%flag : $Builtin.Int1, %flag2 : $Builtin.Int1):
   cond_br %flag2, yes, no
 
 yes:
-  end_apply %token
+  end_apply %token as $()
   br cont
 
 no:
@@ -283,7 +283,7 @@ entry(%flag : $Builtin.Int1, %c: @owned $SomeClass):
   cond_br %flag, yes, no
 
 yes:
-  end_apply %token
+  end_apply %token as $()
   br cont
 
 no:
@@ -359,7 +359,7 @@ entry(%flag : $Builtin.Int1):
 yes:
   %8 = integer_literal $Builtin.Int8, 8
   store %8 to [trivial] %addr : $*Builtin.Int8
-  end_apply %token
+  end_apply %token as $()
   br cont
 
 no:
@@ -370,6 +370,79 @@ cont:
   %ret = tuple ()
   return %ret : $()
 }
+
+sil [transparent] [ossa] [ossa] @yield_inout_result : $@yield_once() -> (@yields @inout Builtin.Int8, Builtin.Int32) {
+entry:
+  %addr = alloc_stack $Builtin.Int8
+  %8 = integer_literal $Builtin.Int8, 8
+  store %8 to [trivial] %addr : $*Builtin.Int8
+  yield %addr : $*Builtin.Int8, resume resume, unwind unwind
+
+resume:
+  %use = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
+  apply %use(%addr) : $@convention(thin) (@in Builtin.Int8) -> ()
+  dealloc_stack %addr: $*Builtin.Int8
+  %42 = integer_literal $Builtin.Int32, 42
+  return %42 : $Builtin.Int32
+
+unwind:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %addr: $*Builtin.Int8
+  unwind
+}
+
+sil [ossa] @test_simple_call_yield_inout_result : $(Builtin.Int1) -> Builtin.Int32 {
+entry(%flag : $Builtin.Int1):
+  %0 = function_ref @yield_inout_result : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8, Builtin.Int32)
+  (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8, Builtin.Int32)
+  cond_br %flag, yes, no
+
+yes:
+  %8 = integer_literal $Builtin.Int8, 8
+  store %8 to [trivial] %addr : $*Builtin.Int8
+  %42 = end_apply %token as $Builtin.Int32
+  br cont(%42 : $Builtin.Int32)
+
+no:
+  abort_apply %token
+  %0val = integer_literal $Builtin.Int32, 0
+  br cont(%0val : $Builtin.Int32)
+
+cont(%ret : $Builtin.Int32):
+  return %ret : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @test_simple_call_yield_inout_result : $@convention(thin) (Builtin.Int1) -> Builtin.Int32 {
+// CHECK:      bb0(%0 : $Builtin.Int1):
+// CHECK-NEXT:   %1 = alloc_stack $Builtin.Int8
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT:   store %2 to [trivial] %1 : $*Builtin.Int8
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+
+// CHECK:      bb1:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT:   store [[T0]] to [trivial] %1 : $*Builtin.Int8
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[USE:%.*]] = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
+// CHECK-NEXT:   apply [[USE]](%1) : $@convention(thin) (@in Builtin.Int8) -> ()
+// CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
+// CHECK-NEXT:   [[NORMAL_RES:%.*]] = integer_literal $Builtin.Int32, 42
+// CHECK-NEXT:   br bb3([[NORMAL_RES]] : $Builtin.Int32) 
+
+// CHECK:      bb2:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
+// CHECK-NEXT:   [[UNWIND_RES:%.*]] = integer_literal $Builtin.Int32, 0
+// CHECK-NEXT:   br bb3([[UNWIND_RES]] : $Builtin.Int32)
+
+// CHECK:      bb3([[RES:%.*]] : $Builtin.Int32):
+// CHECK-NEXT:   return [[RES]] : $Builtin.Int32
+// CHECK:      }
 
 //   We can't inline yet if there are multiple ends.
 // CHECK-LABEL: sil [ossa] @test_multi_end_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
@@ -382,11 +455,11 @@ entry(%flag : $Builtin.Int1):
   cond_br %flag, yes, no
 
 yes:
-  end_apply %token
+  end_apply %token as $()
   br cont
 
 no:
-  end_apply %token
+  end_apply %token as $()
   br cont
 
 cont:
@@ -432,14 +505,6 @@ entry:
 // CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   unreachable
-// CHECK:      bb1:
-// CHECK-NEXT:   // function_ref
-// CHECK-NEXT:   [[USE:%.*]] = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
-// CHECK-NEXT:   apply [[USE]](undef) : $@convention(thin) (@in Builtin.Int8) -> ()
-// CHECK-NEXT:   unreachable
-// CHECK:      bb2:
-// CHECK-NEXT:   [[T0:%.*]] = tuple ()
-// CHECK-NEXT:   return [[T0]] : $()
 // CHECK:      }
 sil [ossa] @test_simple_call_no_yields : $() -> () {
 entry:
@@ -447,7 +512,7 @@ entry:
   (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int8)
   %use = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
   apply %use(%addr) : $@convention(thin) (@in Builtin.Int8) -> ()
-  end_apply %token
+  end_apply %token as $()
   %ret = tuple ()
   return %ret : $()
 }
@@ -503,7 +568,7 @@ bb0:
   %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
   (%value, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
   dealloc_stack %stack : $*Builtin.Int16
-  end_apply %token
+  end_apply %token as $()
   %ret = tuple ()
   return %ret : $()
 }
@@ -534,7 +599,7 @@ bb0:
   %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
   (%value, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
   %stack = alloc_stack $Builtin.Int16
-  end_apply %token
+  end_apply %token as $()
   dealloc_stack %stack : $*Builtin.Int16
   %ret = tuple ()
   return %ret : $()
@@ -545,11 +610,8 @@ bb0:
 // CHECK:   [[A16:%.*]] = alloc_stack $Builtin.Int16
 // CHECK:   [[A32:%.*]] = alloc_stack $Builtin.Int32
 // CHECK: bb1:
-// CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK:   unreachable
 // CHECK: bb2:
-// CHECK:   unreachable
-// CHECK: bb3:
 // CHECK:   dealloc_stack [[A32]] : $*Builtin.Int32
 // CHECK:   dealloc_stack [[A16]] : $*Builtin.Int16
 // CHECK:   return
@@ -566,7 +628,7 @@ bb1:
   unreachable
 
 bb2:
-  end_apply %token
+  end_apply %token as $()
   dealloc_stack %stack : $*Builtin.Int16
   %ret = tuple ()
   return %ret : $()
@@ -606,7 +668,7 @@ entry:
 bb_resume:
   end_borrow %borrow : $*SomeClass
   dealloc_stack %addr : $*SomeClass
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 
@@ -616,4 +678,145 @@ bb_unwind:
   abort_apply %token
   unwind
 
+}
+
+sil [ossa] [transparent] @simplest_in_guaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed () {
+entry:
+  %tuple = tuple ()
+  %addr = alloc_stack $()
+  store %tuple to [trivial] %addr : $*()
+  yield %addr : $*(), resume resume_block, unwind unwind_block
+
+resume_block:
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+
+unwind_block:
+  dealloc_stack %addr : $*()
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @ends_1 : {{.*}} {
+// CHECK:         [[VOID:%[^,]+]] = tuple ()
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $()
+// CHECK:         store [[VOID]] to [trivial] [[ADDR]]
+// CHECK:         cond_br undef, [[GOOD:bb[0-9]+]], [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BAD]]:
+// CHECK:         cond_br undef, [[NORMAL_BAD:bb[0-9]+]], [[REALLY_BAD:bb[0-9]+]]
+// CHECK:       [[NORMAL_BAD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[REALLY_BAD]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'ends_1'
+sil [ossa] @ends_1 : $@convention(thin) () -> () {
+entry:
+  %simplest = function_ref @simplest_in_guaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  (%_, %token) = begin_apply %simplest() : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  cond_br undef, good, bad
+
+good:
+  end_apply %token as $()
+  br exit
+
+bad:
+  cond_br undef, normal_bad, really_bad
+
+normal_bad:
+  abort_apply %token
+  br exit
+
+really_bad:
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Test handling for multiple end_borrows of a token.
+// CHECK-LABEL: sil [ossa] @ends_2 : {{.*}} {
+// CHECK:         [[VOID:%[^,]+]] = tuple ()
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $()
+// CHECK:         store [[VOID]] to [trivial] [[ADDR]] : $*()
+// CHECK:         cond_br undef, [[GOOD:bb[0-9]+]], [[BAD:bb[0-9]+]]
+// CHECK:       [[GOOD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BAD]]:
+// CHECK:         cond_br undef, [[NORMAL_BAD:bb[0-9]+]], [[REALLY_BAD:bb[0-9]+]]
+// CHECK:       [[NORMAL_BAD]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[REALLY_BAD]]:
+// CHECK:         cond_br undef, [[BAD_NEWS_BUNNIES:bb[0-9]+]], [[BAD_NEWS_BEARS:bb[0-9]+]]
+// CHECK:       [[BAD_NEWS_BUNNIES]]:
+// CHECK:         unreachable
+// CHECK:       [[BAD_NEWS_BEARS]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'ends_2'
+sil [ossa] @ends_2 : $@convention(thin) () -> () {
+entry:
+  %simplest = function_ref @simplest_in_guaranteed : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  (%_, %token) = begin_apply %simplest() : $@yield_once @convention(thin) () -> @yields @in_guaranteed ()
+  cond_br undef, good, bad
+
+good:
+  end_apply %token as $()
+  br exit
+
+bad:
+  cond_br undef, normal_bad, really_bad
+
+normal_bad:
+  abort_apply %token
+  br exit
+
+really_bad:
+  cond_br undef, bad_news_bunnies, bad_news_bears
+
+bad_news_bunnies:
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+
+bad_news_bears:
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [transparent] [ossa] @simplest_yield_once_2 : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed () {
+  %addr = alloc_stack $()
+  yield %addr : $*(), resume resume_block, unwind unwind_block
+
+unwind_block:
+  dealloc_stack %addr : $*()
+  unwind
+
+resume_block:
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simplest_begin_apply_yield_once_2 : {{.*}} {
+// CHECK-NOT:     begin_apply
+// CHECK-LABEL: } // end sil function 'simplest_begin_apply_yield_once_2'
+sil [ossa] @simplest_begin_apply_yield_once_2 : $@convention(thin) () -> () {
+  %callee = function_ref @simplest_yield_once_2 : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  (%addr, %token, %allocation) = begin_apply %callee() : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  %retval = tuple ()
+  return %retval : $()
 }

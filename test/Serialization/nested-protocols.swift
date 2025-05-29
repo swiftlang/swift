@@ -4,9 +4,11 @@
 import nestedprotocolsource
 
 // CHECK: usesNested<A>(_:)
+// CHECK-NEXT: Isolation: unspecified
 // CHECK-NEXT: sil @$s4main10usesNestedyyx20nestedprotocolsource5OuterV5InnerRzlF :
 public func usesNested(_ x: some Outer.Inner) {}
 
 // CHECK: usesNestedInExtension<A>(_:)
+// CHECK-NEXT: Isolation: unspecified
 // CHECK-NEXT: sil @$s4main21usesNestedInExtensionyyx20nestedprotocolsource5OuterV05InnerdE0RzlF :
 public func usesNestedInExtension(_ x: some Outer.InnerInExtension) {}

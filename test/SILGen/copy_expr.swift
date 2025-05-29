@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature NoImplicitCopy %s | %FileCheck %s
 
+// REQUIRES: swift_feature_NoImplicitCopy
+
 final class Klass {
   var k: Klass? = nil
 }
@@ -25,7 +27,8 @@ struct ContainKlass {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr22testCopyLoadableRValueyyF : $@convention(thin) () -> () {
 // CHECK: [[X:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thin ContainKlass.Type) -> @owned ContainKlass
-// CHECK: [[BORROW:%.*]] = begin_borrow [lexical] [[X]]
+// CHECK: [[MOVE:%.*]] = move_value [lexical] [var_decl] [[X]]
+// CHECK: [[BORROW:%.*]] = begin_borrow [[MOVE]]
 // CHECK: [[COPY_BORROW:%.*]] = copy_value [[BORROW]]
 // CHECK: explicit_copy_value [[COPY_BORROW]]
 // CHECK: } // end sil function '$s9copy_expr22testCopyLoadableRValueyyF'
@@ -36,7 +39,7 @@ func testCopyLoadableRValue() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr25testCopyLoadableVarLValueyyF : $@convention(thin) () -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var ContainKlass }, var, name "x"
-// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]]
 //
 // CHECK:   [[FINAL_ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT_BOX]]
@@ -77,7 +80,7 @@ protocol P {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr25testCopyAddressOnlyRValueyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
-// CHECK:   [[BOX:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[BOX:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   [[TMP:%.*]] = alloc_stack $T
 // CHECK:   explicit_copy_addr [[BOX]] to [init] [[TMP]]
 // CHECK: } // end sil function '$s9copy_expr25testCopyAddressOnlyRValueyyxmAA1PRzlF'
@@ -88,7 +91,7 @@ func testCopyAddressOnlyRValue<T : P>(_ t: T.Type) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr25testCopyAddressOnlyLValueyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : P> { var τ_0_0 } <T>, var, name "x"
-// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT_BOX]]
@@ -114,7 +117,8 @@ func testCopyAddressOnlyLValueArg<T : P>(_ x: inout T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr31testCallMethodOnLoadableLetCopyyyF : $@convention(thin) () -> () {
 // CHECK: [[ORIG_X:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thin ContainKlass.Type) -> @owned ContainKlass
-// CHECK: [[X:%.*]] = begin_borrow [lexical] [[ORIG_X]]
+// CHECK: [[MOVE:%.*]] = move_value [lexical] [var_decl] [[ORIG_X]]
+// CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
 //
 // Calling consumeFunc.
 // CHECK: [[COPY_X:%.*]] = copy_value [[X]]
@@ -124,6 +128,7 @@ func testCopyAddressOnlyLValueArg<T : P>(_ x: inout T) {
 // CHECK: destroy_value [[COPY_X]]
 //
 // Calling borrowingFunc.
+// CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
 // CHECK: [[COPY_X:%.*]] = copy_value [[X]]
 // CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
 // CHECK: [[FUNC:%.*]] = function_ref @$s9copy_expr12ContainKlassV13borrowingFuncyyF : $@convention(method) (@guaranteed ContainKlass) -> ()
@@ -132,6 +137,7 @@ func testCopyAddressOnlyLValueArg<T : P>(_ x: inout T) {
 // CHECK: destroy_value [[COPY_X]]
 //
 // Calling computedK. It is borrowed.
+// CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
 // CHECK: [[COPY_X:%.*]] = copy_value [[X]]
 // CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
 // CHECK: [[BORROW_EXPLICIT_COPY_X:%.*]] = begin_borrow [[EXPLICIT_COPY_X]]
@@ -142,6 +148,7 @@ func testCopyAddressOnlyLValueArg<T : P>(_ x: inout T) {
 // CHECK: destroy_value [[COPY_X]]
 //
 // Calling computed getter.
+// CHECK: [[X:%.*]] = begin_borrow [[MOVE]]
 // CHECK: [[COPY_X:%.*]] = copy_value [[X]]
 // CHECK: [[EXPLICIT_COPY_X:%.*]] = explicit_copy_value [[COPY_X]]
 // CHECK: [[BORROW_EXPLICIT_COPY_X:%.*]] = begin_borrow [[EXPLICIT_COPY_X]]
@@ -162,7 +169,7 @@ func testCallMethodOnLoadableLetCopy() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr31testCallMethodOnLoadableVarCopyyyF : $@convention(thin) () -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var ContainKlass }
-// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BORROW]]
 //
 // Calling consumeFunc.
@@ -311,27 +318,25 @@ func testCallMethodOnLoadableGlobal() {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr34testCallMethodOnAddressOnlyLetCopyyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
-// CHECK: [[X:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK: [[X:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 //
 // Calling consumeFunc.
 // CHECK: [[TEMP:%.*]] = alloc_stack $T
 // CHECK: explicit_copy_addr [[X]] to [init] [[TEMP]]
 // CHECK: [[FUNC:%.*]] = witness_method $T, #P.consumeFunc : <Self where Self : P> (consuming Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> ()
-// CHECK: apply [[FUNC]]<(T)>([[TEMP]])
+// CHECK: apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling borrowingFunc.
 // CHECK: [[TEMP:%.*]] = alloc_stack $T
 // CHECK: explicit_copy_addr [[X]] to [init] [[TEMP]]
 // CHECK: [[FUNC:%.*]] = witness_method $T, #P.borrowingFunc : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK: apply [[FUNC]]<(T)>([[TEMP]])
+// CHECK: apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling computedK. It is borrowed.
 // CHECK: [[TEMP:%.*]] = alloc_stack $T
 // CHECK: explicit_copy_addr [[X]] to [init] [[TEMP]]
-// CHECK: [[TEMP2:%.*]] = alloc_stack $T
-// CHECK: copy_addr [[TEMP]] to [init] [[TEMP2]]
 // CHECK: [[FUNC:%.*]] = witness_method $T, #P.computedK!getter : <Self where Self : P> (Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Klass
-// CHECK: apply [[FUNC]]<(T)>([[TEMP2]])
+// CHECK: apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling computed consuming getter.
 // CHECK: [[TEMP:%.*]] = alloc_stack $T
@@ -339,7 +344,7 @@ func testCallMethodOnLoadableGlobal() {
 // CHECK: [[TEMP2:%.*]] = alloc_stack $T
 // CHECK: copy_addr [[TEMP]] to [init] [[TEMP2]]
 // CHECK: [[FUNC:%.*]] = witness_method $T, #P.consumingComputedK!getter : <Self where Self : P> (__owned Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned Klass
-// CHECK: apply [[FUNC]]<(T)>([[TEMP2]])
+// CHECK: apply [[FUNC]]<T>([[TEMP2]])
 // CHECK: } // end sil function '$s9copy_expr34testCallMethodOnAddressOnlyLetCopyyyxmAA1PRzlF'
 func testCallMethodOnAddressOnlyLetCopy<T : P>(_ t: T.Type) {
   let x = T.value
@@ -351,7 +356,7 @@ func testCallMethodOnAddressOnlyLetCopy<T : P>(_ t: T.Type) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s9copy_expr34testCallMethodOnAddressOnlyVarCopyyyxmAA1PRzlF : $@convention(thin) <T where T : P> (@thick T.Type) -> () {
 // CHECK:   [[BOX:%.*]] = alloc_box $
-// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PROJECT:%.*]] = project_box [[BORROW]]
 //
 // Calling consumeFunc.
@@ -359,7 +364,7 @@ func testCallMethodOnAddressOnlyLetCopy<T : P>(_ t: T.Type) {
 // CHECK:   [[TEMP:%.*]] = alloc_stack $
 // CHECK:   explicit_copy_addr [[ACCESS]] to [init] [[TEMP]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.consumeFunc : <Self where Self : P> (consuming Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> ()
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling borrowing func.
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
@@ -367,16 +372,14 @@ func testCallMethodOnAddressOnlyLetCopy<T : P>(_ t: T.Type) {
 // CHECK:   explicit_copy_addr [[ACCESS]] to [init] [[TEMP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.borrowingFunc : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling borrowing computed getter
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $
 // CHECK:   explicit_copy_addr [[ACCESS]] to [init] [[TEMP]]
-// CHECK:   [[TEMP2:%.*]] = alloc_stack $
-// CHECK:   copy_addr [[TEMP]] to [init] [[TEMP2]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.computedK!getter : <Self where Self : P> (Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Klass
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP2]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP]])
 //
 // Consuming computed getter.
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
@@ -385,7 +388,7 @@ func testCallMethodOnAddressOnlyLetCopy<T : P>(_ t: T.Type) {
 // CHECK:   [[TEMP2:%.*]] = alloc_stack $
 // CHECK:   copy_addr [[TEMP]] to [init] [[TEMP2]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.consumingComputedK!getter : <Self where Self : P> (__owned Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned Klass
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP2]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP2]])
 // CHECK: } // end sil function '$s9copy_expr34testCallMethodOnAddressOnlyVarCopyyyxmAA1PRzlF'
 func testCallMethodOnAddressOnlyVarCopy<T : P>(_ t: T.Type) {
   var x = T.value
@@ -404,7 +407,7 @@ func testCallMethodOnAddressOnlyVarCopy<T : P>(_ t: T.Type) {
 // CHECK:   [[TEMP:%.*]] = alloc_stack $
 // CHECK:   explicit_copy_addr [[ACCESS]] to [init] [[TEMP]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.consumeFunc : <Self where Self : P> (consuming Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> ()
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling borrowing func.
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[ARG]]
@@ -412,16 +415,14 @@ func testCallMethodOnAddressOnlyVarCopy<T : P>(_ t: T.Type) {
 // CHECK:   explicit_copy_addr [[ACCESS]] to [init] [[TEMP]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.borrowingFunc : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP]])
 //
 // Calling borrowing computed getter
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[ARG]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $
 // CHECK:   explicit_copy_addr [[ACCESS]] to [init] [[TEMP]]
-// CHECK:   [[TEMP2:%.*]] = alloc_stack $
-// CHECK:   copy_addr [[TEMP]] to [init] [[TEMP2]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.computedK!getter : <Self where Self : P> (Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned Klass
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP2]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP]])
 //
 // Consuming computed getter.
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[ARG]]
@@ -430,11 +431,17 @@ func testCallMethodOnAddressOnlyVarCopy<T : P>(_ t: T.Type) {
 // CHECK:   [[TEMP2:%.*]] = alloc_stack $
 // CHECK:   copy_addr [[TEMP]] to [init] [[TEMP2]]
 // CHECK:   [[FUNC:%.*]] = witness_method $T, #P.consumingComputedK!getter : <Self where Self : P> (__owned Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned Klass
-// CHECK:   apply [[FUNC]]<(T)>([[TEMP2]])
+// CHECK:   apply [[FUNC]]<T>([[TEMP2]])
 // CHECK: } // end sil function '$s9copy_expr36testCallMethodOnAddressOnlyInOutCopyyyxzAA1PRzlF'
 func testCallMethodOnAddressOnlyInOutCopy<T : P>(_ x: inout T) {
   (copy x).consumeFunc()
   (copy x).borrowingFunc()
   _ = (copy x).computedK
   _ = (copy x).consumingComputedK
+}
+
+struct Trivial: BitwiseCopyable { var x: Int }
+
+func copyTrivial(x: inout Trivial) -> Trivial {
+    return copy x
 }

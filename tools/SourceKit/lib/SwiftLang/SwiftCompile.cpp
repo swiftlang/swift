@@ -31,10 +31,9 @@ compile::SessionManager::getSession(StringRef name) {
   }
 
   bool inserted = false;
-  std::tie(i, inserted) =
-      sessions.try_emplace(name, std::make_shared<compile::Session>(
-                                     SwiftExecutablePath, RuntimeResourcePath,
-                                     DiagnosticDocumentationPath, Plugins));
+  std::tie(i, inserted) = sessions.try_emplace(
+      name, std::make_shared<compile::Session>(SwiftExecutablePath,
+                                               RuntimeResourcePath, Plugins));
   assert(inserted);
   return i->second;
 }
@@ -128,13 +127,13 @@ void compile::SessionManager::performCompileAsync(
 
 void SwiftLangSupport::performCompile(
     StringRef Name, ArrayRef<const char *> Args,
-    llvm::Optional<VFSOptions> vfsOptions,
+    std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CompilationResult> &)> Receiver) {
 
   std::string error;
   auto fileSystem =
-      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, error);
   if (!fileSystem) {
     Receiver(RequestResult<CompilationResult>::fromError(error));
     return;

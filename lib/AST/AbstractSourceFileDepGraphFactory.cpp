@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
@@ -65,8 +66,7 @@ void AbstractSourceFileDepGraphFactory::addSourceFileNodesToGraph() {
 }
 
 void AbstractSourceFileDepGraphFactory::addADefinedDecl(
-    const DependencyKey &interfaceKey,
-    llvm::Optional<Fingerprint> fingerprint) {
+    const DependencyKey &interfaceKey, std::optional<Fingerprint> fingerprint) {
 
   auto nodePair =
       g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);
@@ -78,7 +78,7 @@ void AbstractSourceFileDepGraphFactory::addADefinedDecl(
 
 void AbstractSourceFileDepGraphFactory::addAUsedDecl(
     const DependencyKey &defKey, const DependencyKey &useKey) {
-  auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, llvm::None,
+  auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, std::nullopt,
                                                   false /* = !isProvides */);
 
   // If the depended-upon node is defined in this file, then don't
@@ -113,7 +113,7 @@ void AbstractSourceFileDepGraphFactory::addAUsedDecl(
 
 void AbstractSourceFileDepGraphFactory::addAnExternalDependency(
     const DependencyKey &defKey, const DependencyKey &useKey,
-    llvm::Optional<Fingerprint> maybeFP) {
+    std::optional<Fingerprint> maybeFP) {
   auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, maybeFP,
                                                   false /* = !isProvides */);
 

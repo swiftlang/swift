@@ -186,7 +186,15 @@ public:
   }
   Operand *takeOperand() { return takeInstance<OperandArgument>("operand"); }
   SILInstruction *takeInstruction() {
-    return takeInstance<InstructionArgument>("instruction");
+    auto argument = takeArgument();
+    if (isa<ValueArgument>(argument)) {
+      auto value = cast<ValueArgument>(argument).getValue();
+      auto *definingInstruction = value.getDefiningInstruction();
+      assert(definingInstruction &&
+             "selected instruction via argument value!?");
+      return definingInstruction;
+    }
+    return getInstance<InstructionArgument>("instruction", argument);
   }
   SILArgument *takeBlockArgument() {
     return takeInstance<BlockArgumentArgument>("block argument");
@@ -201,7 +209,7 @@ public:
 struct UnparsedSpecification {
   /// The string which specifies the test.
   ///
-  /// Not a StringRef because the TestSpecificationInst whose payload is of
+  /// Not a StringRef because the SpecifyTestInst whose payload is of
   /// interest gets deleted.
   std::string string;
   /// The next non-debug instruction.

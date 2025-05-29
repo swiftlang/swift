@@ -18,7 +18,7 @@
 #ifndef SWIFT_TYPECHECKING_TYPECHECKDECL_H
 #define SWIFT_TYPECHECKING_TYPECHECKDECL_H
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 
@@ -59,7 +59,7 @@ enum class AutomaticEnumValueKind {
   Integer,
 };
 
-llvm::Optional<AutomaticEnumValueKind>
+std::optional<AutomaticEnumValueKind>
 computeAutomaticEnumValueKind(EnumDecl *ED);
 
 void validatePrecedenceGroup(PrecedenceGroupDecl *PGD);

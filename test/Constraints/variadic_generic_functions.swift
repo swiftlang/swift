@@ -37,7 +37,6 @@ func call() {
   func multipleSequences<each T, each U>(xs: repeat each T, ys: repeat each U) -> (repeat each T) {
     return (repeat each ys)
     // expected-error@-1 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
-    // expected-error@-2 {{cannot convert return expression of type '(repeat each U)' to return type '(repeat each T)'}}
   }
 
   func multipleSequencesWithSameShape<each T, each U>(xs: repeat each T, ys: repeat each U) -> (repeat each T) where (repeat (each T, each U)): Any {
@@ -56,9 +55,9 @@ func contextualTyping() {
   }
 
   let (_, _): (Int?, String?) = firsts([42], [""]) // OK
-  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '(String?, String?)'}}
-  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '((Int)?, (String)?)' to specified type '([Int], String?)'}}
-  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'((Int)?, (String)?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
+  let (_, _): (String?, String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '(String?, String?)'}}
+  let (_, _): ([Int], String?) = firsts([42], [""]) // expected-error {{cannot convert value of type '(Int?, String?)' to specified type '([Int], String?)'}}
+  let (_, _, _): (String?, String?, Int) = firsts([42], [""]) // expected-error {{'(Int?, String?)' is not convertible to '(String?, String?, Int)', tuples have a different number of elements}}
 
   func dependent<each T>(_ seqs: repeat Array<each T>) -> (repeat Array<each T>.Element?) {
     fatalError()
@@ -74,8 +73,34 @@ func contextualTyping() {
 do {
   func foo<each T>(_: repeat each T = bar().element) {} // expected-note {{in call to function 'foo'}}
   // expected-error@-1 {{variadic parameter cannot have a default value}}
-  // expected-error@-2 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-2 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
   // expected-error@-3 {{generic parameter 'each T' could not be inferred}}
 
   func bar<each T>() -> (repeat each T) {}
+}
+
+
+// apple/swift#69432 - Passing nil to a parameter pack fails to produce diagnostic for expression
+do {
+  func foo<each T>(_ value: repeat each T) {} // expected-note {{in inferring pack element #0 of 'value'}}
+  // expected-note@-1 {{in inferring pack element #0 of 'value'}}
+  // expected-note@-2 {{in inferring pack element #1 of 'value'}}
+
+  foo(nil) // expected-error {{'nil' requires a contextual type}}
+  foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
+  foo(2, nil) // expected-error {{'nil' requires a contextual type}}
+
+  func bar<each T, U, each W>(_ t: repeat each T, u: U, w: repeat each W) {} // expected-note {{in inferring pack element #2 of 'w'}}
+  // expected-note@-1 {{in inferring pack element #3 of 't'}}
+
+  bar(1, 2, 3, nil, "Hello", u: 3, w: 4, 8, nil) // expected-error {{'nil' requires a contextual type}}
+  // expected-error@-1 {{'nil' requires a contextual type}}
+
+
+  func fooWithOverload(_ value: Int) {}
+  func fooWithOverload<each T>(_ value: repeat each T) {}
+  // expected-note@-1 {{in inferring pack element #4 of 'value'}}
+
+  fooWithOverload(0, 1, 2, 3, nil) // expected-error {{'nil' requires a contextual type}}
+
 }

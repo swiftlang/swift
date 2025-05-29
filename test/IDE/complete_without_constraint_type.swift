@@ -1,5 +1,7 @@
 // RUN: %batch-code-completion
 
+// rdar://139212286 - We should only suggest invertible types here.
 struct FileDescriptor: ~#^COMPLETE^# {}
-// FIXME: This should be emitting a `Copyable` declaration instead of a keyword, once there is a declaration for `Copyable`
-// COMPLETE: Keyword/None:                       Copyable; name=Copyable
+// COMPLETE:     Begin completions, 2 items
+// COMPLETE-DAG: Decl[Protocol]/OtherModule[Swift]/IsSystem: Copyable[#Copyable#]; name=Copyable
+// COMPLETE-DAG: Decl[Protocol]/OtherModule[Swift]/IsSystem: Escapable[#Escapable#]; name=Escapable

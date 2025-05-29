@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -parse-stdlib %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-builtin-module %s -emit-ir | %FileCheck %s
 
-import Swift
+import Builtin
 import _Differentiation
 
 @_silgen_name("test_context_builtins_with_type")

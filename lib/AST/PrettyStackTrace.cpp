@@ -67,6 +67,9 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
         case AccessorKind::Get:
           out << "getter";
           break;
+        case AccessorKind::DistributedGet:
+          out << "_distributed_getter";
+          break;
         case AccessorKind::Set:
           out << "setter";
           break;
@@ -90,6 +93,12 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
           break;
         case AccessorKind::Init:
           out << "init";
+          break;
+        case AccessorKind::Modify2:
+          out << "modify2";
+          break;
+        case AccessorKind::Read2:
+          out << "read2";
           break;
         }
 

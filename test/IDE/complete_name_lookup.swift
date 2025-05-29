@@ -49,4 +49,4 @@ extension ObservableConvertibleType {
 // CATCHSEQUENCE_DOT-DAG: Keyword/CurrNominal:                Type[#CatchSequence<_>.Type#]; name=Type
 // CATCHSEQUENCE_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#CatchSequence<_>#]; name=init()
 // CATCHSEQUENCE_DOT-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: catchError()[#Observable<CatchSequence<_>.T>#]; name=catchError()
-// CATCHSEQUENCE_DOT-DAG: Decl[TypeAlias]/Super:              T[#T#]; name=T
+// CATCHSEQUENCE_DOT-DAG: Decl[TypeAlias]/Super: T[#Observable<_.Element.T>.T#]; name=T

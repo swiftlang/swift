@@ -24,14 +24,14 @@ namespace Lowering {
 
 class CalleeTypeInfo {
 public:
-  llvm::Optional<AbstractionPattern> origFormalType;
+  std::optional<AbstractionPattern> origFormalType;
   CanSILFunctionType substFnType;
-  llvm::Optional<AbstractionPattern> origResultType;
+  std::optional<AbstractionPattern> origResultType;
   CanType substResultType;
   ForeignInfo foreign;
 
 private:
-  llvm::Optional<SILFunctionTypeRepresentation> overrideRep;
+  std::optional<SILFunctionTypeRepresentation> overrideRep;
 
 public:
   CalleeTypeInfo() = default;
@@ -39,21 +39,20 @@ public:
   CalleeTypeInfo(
       CanSILFunctionType substFnType, AbstractionPattern origResultType,
       CanType substResultType,
-      const llvm::Optional<ForeignErrorConvention> &foreignError,
-      const llvm::Optional<ForeignAsyncConvention> &foreignAsync,
+      const std::optional<ForeignErrorConvention> &foreignError,
+      const std::optional<ForeignAsyncConvention> &foreignAsync,
       ImportAsMemberStatus foreignSelf,
-      llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
-      : origFormalType(llvm::None), substFnType(substFnType),
-        origResultType(origResultType),
-        substResultType(substResultType), foreign{foreignSelf, foreignError,
-                                                  foreignAsync},
+      std::optional<SILFunctionTypeRepresentation> overrideRep = std::nullopt)
+      : origFormalType(std::nullopt), substFnType(substFnType),
+        origResultType(origResultType), substResultType(substResultType),
+        foreign{foreignSelf, foreignError, foreignAsync},
         overrideRep(overrideRep) {}
 
   CalleeTypeInfo(
       CanSILFunctionType substFnType, AbstractionPattern origResultType,
       CanType substResultType,
-      llvm::Optional<SILFunctionTypeRepresentation> overrideRep = llvm::None)
-      : origFormalType(llvm::None), substFnType(substFnType),
+      std::optional<SILFunctionTypeRepresentation> overrideRep = std::nullopt)
+      : origFormalType(std::nullopt), substFnType(substFnType),
         origResultType(origResultType), substResultType(substResultType),
         foreign(), overrideRep(overrideRep) {}
 

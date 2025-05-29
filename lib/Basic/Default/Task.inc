@@ -17,10 +17,10 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
+#include <optional>
 
 namespace swift {
 namespace sys {
@@ -53,7 +53,7 @@ public:
   llvm::sys::ProcessInfo PI;
 
   Task(const char *ExecPath, llvm::ArrayRef<const char *> Args,
-       llvm::ArrayRef<const char *> Env = llvm::None, void *Context = nullptr,
+       llvm::ArrayRef<const char *> Env = std::nullopt, void *Context = nullptr,
        bool SeparateErrors = false)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
         SeparateErrors(SeparateErrors) {}
@@ -69,8 +69,8 @@ bool Task::execute() {
   Argv.append(Args.begin(), Args.end());
   Argv.push_back(nullptr);
 
-  llvm::Optional<llvm::ArrayRef<llvm::StringRef>> Envp =
-      Env.empty() ? decltype(Envp)(llvm::None)
+  std::optional<llvm::ArrayRef<llvm::StringRef>> Envp =
+      Env.empty() ? decltype(Envp)(std::nullopt)
                   : decltype(Envp)(llvm::toStringRefArray(Env.data()));
 
   if (llvm::sys::fs::createTemporaryFile("stdout", "tmp", StdoutPath))
@@ -83,8 +83,8 @@ bool Task::execute() {
     llvm::sys::RemoveFileOnSignal(StderrPath);
   }
 
-  llvm::Optional<llvm::StringRef> Redirects[] = {
-    llvm::None,
+  std::optional<llvm::StringRef> Redirects[] = {
+      std::nullopt,
       llvm::StringRef{StdoutPath},
       llvm::StringRef{SeparateErrors ? StderrPath : StdoutPath},
   };

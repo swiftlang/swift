@@ -113,12 +113,12 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
   if (copyKind == ArrayCopy::NoAlias || copyKind == ArrayCopy::FrontToBack) {
     if (self->hasLayoutString() && destOp == ArrayDest::Init &&
         srcOp == ArraySource::Copy) {
-      return swift_generic_arrayInitWithCopy(dest, src, count, stride, self);
+      return swift_cvw_arrayInitWithCopy(dest, src, count, stride, self);
     }
 
     if (self->hasLayoutString() && destOp == ArrayDest::Assign &&
         srcOp == ArraySource::Copy) {
-      return swift_generic_arrayAssignWithCopy(dest, src, count, stride, self);
+      return swift_cvw_arrayAssignWithCopy(dest, src, count, stride, self);
     }
 
     auto copy = get_witness_function<destOp, srcOp>(wtable);
@@ -214,7 +214,7 @@ void swift_arrayDestroy(OpaqueValue *begin, size_t count, const Metadata *self) 
 
   auto stride = wtable->getStride();
   if (self->hasLayoutString()) {
-      return swift_generic_arrayDestroy(begin, count, stride, self);
+    return swift_cvw_arrayDestroy(begin, count, stride, self);
   }
 
   for (size_t i = 0; i < count; ++i) {

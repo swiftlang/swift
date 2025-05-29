@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa-kind=all -aa-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-alias-info -o /dev/null | %FileCheck %s
 
 // General black-box alias analysis tests. White-box unit tests are
 // specific to the aa-kind, such as basic-aa.sil and typed-access-tb-aa.sil.
@@ -22,10 +22,10 @@ struct OuterStruct {
 
 // Test overlapping access on a different path; the user has misused an index offset
 // CHECK-LABEL: @testOffsetBehindProjection
-// CHECK: PAIR #23.
-// CHECK:   %3 = index_addr %1 : $*Int64, %2 : $Builtin.Word
-// CHECK:   %5 = struct_element_addr %0 : $*MyStruct, #MyStruct.j
-// CHECK: NoAlias
+// CHECK:       PAIR #23.
+// CHECK-NEXT:    %3 = index_addr %1 : $*Int64, %2 : $Builtin.Word
+// CHECK-NEXT:    %5 = struct_element_addr %0 : $*MyStruct, #MyStruct.j
+// CHECK-NEXT:    NoAlias
 sil shared @testOffsetBehindProjection : $@convention(thin) (@inout MyStruct) -> () {
 bb0(%0 : $*MyStruct):
   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
@@ -40,10 +40,10 @@ bb0(%0 : $*MyStruct):
 }
 
 // CHECK-LABEL: @testOffsetsBehindProjectionOverlap
-// CHECK: PAIR #21.
-// CHECK:   %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.i
-// CHECK:   %6 = struct_element_addr %5 : $*MyStruct, #MyStruct.i
-// CHECK: NoAlias
+// CHECK:       PAIR #21.
+// CHECK-NEXT:    %2 = struct_element_addr %1 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    %6 = struct_element_addr %5 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    NoAlias
 sil shared @testOffsetsBehindProjectionOverlap : $@convention(thin) (@inout OuterStruct) -> () {
 bb0(%0 : $*OuterStruct):
   %1 = struct_element_addr %0 : $*OuterStruct, #OuterStruct.s
@@ -60,14 +60,14 @@ bb0(%0 : $*OuterStruct):
 }
 
 // CHECK-LABEL: @testIndexOf0
-// CHECK: PAIR #8.
-// CHECK:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
-// CHECK:   %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
-// CHECK: MayAlias
-// CHECK: PAIR #9.
-// CHECK:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
-// CHECK:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
-// CHECK: MustAlias
+// CHECK:       PAIR #8.
+// CHECK-NEXT:    %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    %3 = index_addr %0 : $*MyStruct, %2 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #9.
+// CHECK-NEXT:   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:   MayAlias
 sil @testIndexOf0 : $@convention(thin) (@inout MyStruct) -> () {
 bb0(%0 : $*MyStruct):
   %1 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
@@ -81,14 +81,14 @@ bb0(%0 : $*MyStruct):
 }
 
 // CHECK-LABEL: @testUnknownIndex
-// CHECK: PAIR #12.
-// CHECK:   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
-// CHECK:   %3 = index_addr %0 : $*MyStruct, %1 : $Builtin.Word
-// CHECK: MayAlias
-// CHECK: PAIR #13.
-// CHECK:   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
-// CHECK:   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
-// CHECK: MayAlias
+// CHECK:       PAIR #12.
+// CHECK-NEXT:    %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    %3 = index_addr %0 : $*MyStruct, %1 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #13.
+// CHECK-NEXT:    %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
+// CHECK-NEXT:    MayAlias
 sil @testUnknownIndex : $@convention(thin) (@inout MyStruct, Builtin.Word) -> () {
 bb0(%0 : $*MyStruct, %1 : $Builtin.Word):
   %2 = struct_element_addr %0 : $*MyStruct, #MyStruct.i
@@ -96,6 +96,47 @@ bb0(%0 : $*MyStruct, %1 : $Builtin.Word):
   %4 = struct_element_addr %3 : $*MyStruct, #MyStruct.i
   fix_lifetime %2 : $*Int64
   fix_lifetime %4 : $*Int64
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: @testVectorBaseAddr
+// CHECK:       PAIR #18.
+// CHECK-NEXT:      %2 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-NEXT:      %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #21.
+// CHECK-NEXT:      %2 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-NEXT:      %6 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:    NoAlias
+// CHECK:       PAIR #22.
+// CHECK-NEXT:      %2 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-NEXT:      %7 = index_addr %2 : $*Int, %5 : $Builtin.Word
+// CHECK-NEXT:    NoAlias
+// CHECK:       PAIR #27.
+// CHECK-NEXT:      %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT:      %6 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #28.
+// CHECK-NEXT:      %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+// CHECK-NEXT:      %7 = index_addr %2 : $*Int, %5 : $Builtin.Word
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #40.
+// CHECK-NEXT:      %6 = index_addr %2 : $*Int, %4 : $Builtin.Word
+// CHECK-NEXT:      %7 = index_addr %2 : $*Int, %5 : $Builtin.Word
+// CHECK-NEXT:    NoAlias
+sil @testVectorBaseAddr : $@convention(thin) (@inout Builtin.FixedArray<10, Int>, Builtin.Word) -> () {
+bb0(%0 : $*Builtin.FixedArray<10, Int>, %1 : $Builtin.Word):
+  %2 = vector_base_addr %0
+  %3 = index_addr %2, %1
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = integer_literal $Builtin.Word, 2
+  %6 = index_addr %2, %4
+  %7 = index_addr %2, %5
+  fix_lifetime %2
+  fix_lifetime %3
+  fix_lifetime %6
+  fix_lifetime %7
   %99 = tuple ()
   return %99 : $()
 }

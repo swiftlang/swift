@@ -9,8 +9,7 @@ defer { runAllTests() }
 
 var Tests = TestSuite("MoveOnlyTests")
 
-@_moveOnly
-struct FD {
+struct FD: ~Copyable {
   var a = LifetimeTracked(0)
 
   deinit {
@@ -49,8 +48,7 @@ Tests.test("global destroyed once") {
   expectEqual(0, LifetimeTracked.instances)
 }
 
-@_moveOnly
-struct FD2 {
+struct FD2: ~Copyable {
   var field = 5
   static var count = 0
   init() { FD2.count += 1 }
@@ -93,8 +91,7 @@ Tests.test("deinit not called in init when assigned") {
 }
 
 Tests.test("empty struct") {
-  @_moveOnly
-  struct EmptyStruct {
+  struct EmptyStruct: ~Copyable {
     func doSomething() {}
     var value: Bool { false }
   }
@@ -115,8 +112,7 @@ Tests.test("AddressOnly") {
         var name: String { "myName" }
     }
 
-    @_moveOnly
-    struct S<T : P> {
+    struct S<T : P>: ~Copyable {
         var t: T
     }
 
@@ -131,5 +127,31 @@ Tests.test("AddressOnly") {
     if e.t.name.count == 5 {
         let _ = consume e
     }
+}
+
+// coverage for rdar://117082469
+Tests.test("global borrowing access") {
+  class Retainable { var data = 0 }
+
+  struct HasStatic : ~Copyable {
+    var x = 1
+    var y = Retainable()
+
+    static let a = HasStatic()
+    static var b = HasStatic()
+  }
+
+  // test the let 'a'
+  expectEqual(HasStatic.a.x, 1)
+  expectEqual(HasStatic.a.y.data, 0)
+
+  // test the var 'b'
+  expectEqual(HasStatic.b.x, 1)
+  HasStatic.b.x += 10
+  expectEqual(HasStatic.b.x, 11)
+
+  expectEqual(HasStatic.b.y.data, 0)
+  HasStatic.b.y.data += 121
+  expectEqual(HasStatic.b.y.data, 121)
 }
 

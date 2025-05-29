@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 func sequence() {}
 
@@ -123,10 +123,13 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    dealloc_pack [[ARG_PACK]] : $*Pack{Int, String, String}
 //   Load from the pack and bind the locals.
 // CHECK-NEXT:    [[A:%.*]] = load [trivial] [[R0]] : $*Int
-// CHECK-NEXT:    debug_value [[A]] : $Int
+// CHECK-NEXT:    [[MV:%.*]] = move_value [var_decl] %39 : $Int
+// CHECK-NEXT:    debug_value [[MV]] : $Int
 // CHECK-NEXT:    [[B:%.*]] = load [take] [[R1]] : $*String
+// CHECK-NEXT:    ignored_use [[B]]
 // CHECK-NEXT:    [[C:%.*]] = load [take] [[R2]] : $*String
-// CHECK-NEXT:    debug_value [[C]] : $String
+// CHECK-NEXT:    [[C_LIFETIME:%.*]] = move_value [var_decl] [[C]]
+// CHECK-NEXT:    debug_value [[C_LIFETIME]] : $String
 // CHECK-NEXT:    destroy_value [[B]] : $String
 //   End of statement.
 // CHECK-NEXT:    dealloc_stack [[R2]] : $*String
@@ -138,7 +141,8 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    [[SEQUENCE_FN:%.*]] = function_ref @$s4main8sequenceyyF
 // CHECK-NEXT:    apply [[SEQUENCE_FN]]()
 //   Leave the function.
-// CHECK-NEXT:    destroy_value [[C]] : $String
+// CHECK-NEXT:    destroy_value [[C_LIFETIME]] : $String
+// CHECK-NEXT:    extend_lifetime [[MV]] : $Int
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 func callCopyAndDestructure(a: Int, b: String, c: String) {
@@ -149,7 +153,7 @@ func callCopyAndDestructure(a: Int, b: String, c: String) {
 // CHECK-LABEL: @$s4main15callCopyAndBind4argsyxxQp_tRvzlF
 //   Set up the result pack to initialize the elements of the tuple
 //   we're going to bind the local variable to.
-// CHECK:         [[TUPLE:%.*]] = alloc_stack [lexical] $(repeat each T), let, name "result"
+// CHECK:         [[TUPLE:%.*]] = alloc_stack [lexical] [var_decl] $(repeat each T), let, name "result"
 // CHECK-NEXT:    [[RESULT_PACK:%.*]] = alloc_pack $Pack{repeat each T}
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
@@ -216,7 +220,7 @@ struct Wrapper<Value> {
 // CHECK-LABEL: @$s4main17wrapTupleElementsyAA7WrapperVyxGxQp_txxQpRvzlF
 // CHECK-SAME: $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> @pack_out Pack{repeat Wrapper<each T>}
 func wrapTupleElements<each T>(_ value: repeat each T) -> (repeat Wrapper<each T>) {
-// CHECK:         [[VALUES:%.*]] = alloc_stack [lexical] $(repeat Wrapper<each T>), let,
+// CHECK:         [[VALUES:%.*]] = alloc_stack [lexical] [var_decl] $(repeat Wrapper<each T>), let,
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK-NEXT:    [[LEN:%.*]] = pack_length $Pack{repeat each T}

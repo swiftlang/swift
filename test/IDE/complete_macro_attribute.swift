@@ -10,8 +10,9 @@ macro FreestandingMacro
 @attached(#^ATTACHED_ROLE^#)
 macro AttachedMacro
 
-// ATTACHED_ROLE: Begin completions, 6 items
+// ATTACHED_ROLE: Begin completions, 7 items
 // ATTACHED_ROLE-DAG: Keyword/None:                       accessor; name=accessor
+// ATTACHED_ROLE-DAG: Keyword/None:                       body; name=body
 // ATTACHED_ROLE-DAG: Keyword/None:                       memberAttribute; name=memberAttribute
 // ATTACHED_ROLE-DAG: Keyword/None:                       member; name=member
 // ATTACHED_ROLE-DAG: Keyword/None:                       peer; name=peer

@@ -14,8 +14,11 @@
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -47,6 +50,9 @@ enum class Status {
 
   /// The precise revision version doesn't match.
   RevisionIncompatible,
+
+  /// The distribution channel doesn't match.
+  ChannelIncompatible,
 
   /// The module is required to be in OSSA, but is not.
   NotInOSSA,
@@ -82,7 +88,7 @@ enum class Status {
 
   /// The module file was built with a different SDK than the one in use
   /// to build the client.
-  SDKMismatch
+  SDKMismatch,
 };
 
 /// Returns the string for the Status enum.
@@ -100,7 +106,9 @@ struct ValidationInfo {
   version::Version compatibilityVersion = {};
   llvm::VersionTuple userModuleVersion;
   StringRef sdkName = {};
+  StringRef sdkVersion = {};
   StringRef problematicRevision = {};
+  StringRef problematicChannel = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
   std::vector<StringRef> allowableClients;
@@ -123,6 +131,9 @@ class ExtendedValidationInfo {
   StringRef ModuleABIName;
   StringRef ModulePackageName;
   StringRef ExportAsName;
+  StringRef PublicModuleName;
+  CXXStdlibKind CXXStdlib;
+  version::Version SwiftInterfaceCompilerVersion;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -136,7 +147,11 @@ class ExtendedValidationInfo {
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
     unsigned HasCxxInteroperability : 1;
+    unsigned AllowNonResilientAccess: 1;
+    unsigned SerializePackageEnabled: 1;
+    unsigned StrictMemorySafety: 1;
   } Bits;
+
 public:
   ExtendedValidationInfo() : Bits() {}
 
@@ -200,6 +215,14 @@ public:
   void setIsBuiltFromInterface(bool val) {
     Bits.IsBuiltFromInterface = val;
   }
+  bool allowNonResilientAccess() const { return Bits.AllowNonResilientAccess; }
+  void setAllowNonResilientAccess(bool val) {
+    Bits.AllowNonResilientAccess = val;
+  }
+  bool serializePackageEnabled() const { return Bits.SerializePackageEnabled; }
+  void setSerializePackageEnabled(bool val) {
+    Bits.SerializePackageEnabled = val;
+  }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;
   }
@@ -213,6 +236,9 @@ public:
   StringRef getModulePackageName() const { return ModulePackageName; }
   void setModulePackageName(StringRef name) { ModulePackageName = name; }
 
+  StringRef getPublicModuleName() const { return PublicModuleName; }
+  void setPublicModuleName(StringRef name) { PublicModuleName = name; }
+
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }
 
@@ -222,9 +248,28 @@ public:
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
   }
+  bool strictMemorySafety() const {
+    return Bits.StrictMemorySafety;
+  }
+  void setStrictMemorySafety(bool val = true) {
+    Bits.StrictMemorySafety = val;
+  }
+  
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;
+  }
+
+  CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
+  void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
+
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return SwiftInterfaceCompilerVersion;
+  }
+  void setSwiftInterfaceCompilerVersion(StringRef version) {
+    if (auto genericVersion = VersionParser::parseVersionString(
+            version, SourceLoc(), /*Diags=*/nullptr))
+      SwiftInterfaceCompilerVersion = genericVersion.value();
   }
 };
 
@@ -251,16 +296,14 @@ struct SearchPath {
 /// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
-/// \param requiresRevisionMatch if true, expects the swift tag to match in
-/// addition to the module format version number.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
-    bool requiresRevisionMatch = true,
+    StringRef data, bool requiresOSSAModules,
+    StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,

@@ -32,6 +32,6 @@ struct G<T : P2a & P3a> {}
 // CHECK: - τ_0_0.[P2a:T].[P2:T].[concrete: X<τ_0_0.[P3a:U].[P1:T]>] => τ_0_0.[P2a:T].[P2:T]
 // CHECK: }
 // CHECK-LABEL: Property map: {
-// CHECK: τ_0_0.[P2a:T] => { conforms_to: [P2] concrete_type: [concrete: X<τ_0_0.[P3a:U]>] }
-// CHECK: τ_0_0.[P2a:T].[P2:T] => { concrete_type: [concrete: X<τ_0_0.[P3a:U].[P1:T]>] }
+// CHECK: τ_0_0.[P2a:T] => { conforms_to: [P2 Copyable Escapable] concrete_type: [concrete: X<τ_0_0.[P3a:U]>] }
+// CHECK: τ_0_0.[P2a:T].[P2:T] => { conforms_to: [Copyable Escapable] concrete_type: [concrete: X<τ_0_0.[P3a:U].[P1:T]>] }
 // CHECK: }

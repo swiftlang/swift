@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -disable-availability-checking -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -target %target-swift-5.1-abi-triple -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // https://github.com/apple/swift/issues/58301
 

@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %t/extern_c.swift -I%t | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %t/extern_c.swift -I%t | %FileCheck %s --check-prefixes CHECK,CHECK-%target-cpu
+
+// REQUIRES: swift_feature_Extern
 
 //--- c_abi_types.h
 #include <stdbool.h>
@@ -34,25 +36,25 @@ module c_abi_types {
 
 import c_abi_types
 
-@extern(c, "swift_roundtrip_void")
+@_extern(c, "swift_roundtrip_void")
 func swift_roundtrip_void()
-@extern(c, "swift_roundtrip_bool")
+@_extern(c, "swift_roundtrip_bool")
 func swift_roundtrip_bool(_: Bool) -> Bool
-@extern(c, "swift_roundtrip_char")
+@_extern(c, "swift_roundtrip_char")
 func swift_roundtrip_char(_: CChar) -> CChar
-@extern(c, "swift_roundtrip_int")
+@_extern(c, "swift_roundtrip_int")
 func swift_roundtrip_int(_: CInt) -> CInt
-@extern(c, "swift_roundtrip_float")
+@_extern(c, "swift_roundtrip_float")
 func swift_roundtrip_float(_: CFloat) -> CFloat
-@extern(c, "swift_roundtrip_double")
+@_extern(c, "swift_roundtrip_double")
 func swift_roundtrip_double(_: CDouble) -> CDouble
-@extern(c, "swift_roundtrip_opaque_ptr")
+@_extern(c, "swift_roundtrip_opaque_ptr")
 func swift_roundtrip_opaque_ptr(_: OpaquePointer!) -> OpaquePointer!
-@extern(c, "swift_roundtrip_void_star")
+@_extern(c, "swift_roundtrip_void_star")
 func swift_roundtrip_void_star(_: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer!
-@extern(c, "swift_roundtrip_c_struct")
+@_extern(c, "swift_roundtrip_c_struct")
 func swift_roundtrip_c_struct(_: c_struct) -> c_struct
-@extern(c, "swift_roundtrip_c_struct_ptr")
+@_extern(c, "swift_roundtrip_c_struct_ptr")
 func swift_roundtrip_c_struct_ptr(_: UnsafeMutablePointer<c_struct>!) -> UnsafeMutablePointer<c_struct>!
 
 func test() {
@@ -99,8 +101,14 @@ func test() {
 
   // assume %struct.c_struct and %TSo8c_structV have compatible layout
   //
-  // CHECK: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
-  // CHECK: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-x86_64: call void     @c_roundtrip_c_struct(ptr noalias{{( nocapture)?}} sret(%TSo8c_structV){{( captures\(none\))?}} {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK-x86_64: call void @swift_roundtrip_c_struct(ptr noalias{{( nocapture)?}} sret(%TSo8c_structV){{( captures\(none\))?}}   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-arm64:  call void     @c_roundtrip_c_struct(ptr noalias{{( nocapture)?}} sret(%TSo8c_structV){{( captures\(none\))?}} {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK-arm64:  call void @swift_roundtrip_c_struct(ptr noalias{{( nocapture)?}} sret(%TSo8c_structV){{( captures\(none\))?}}   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-wasm32: call void     @c_roundtrip_c_struct(ptr noalias{{( nocapture)?}} sret(%TSo8c_structV){{( captures\(none\))?}} {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK-wasm32: call void @swift_roundtrip_c_struct(ptr noalias{{( nocapture)?}} sret(%TSo8c_structV){{( captures\(none\))?}}   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-armv7k: call [3 x i32]     @c_roundtrip_c_struct([3 x i32] {{.*}})
+  // CHECK-armv7k: call [3 x i32] @swift_roundtrip_c_struct([3 x i32] {{.*}})
   var c_struct_val = c_struct(foo: 496, bar: 28, baz: 8)
   _ = c_roundtrip_c_struct(c_struct_val)
   _ = swift_roundtrip_c_struct(c_struct_val)

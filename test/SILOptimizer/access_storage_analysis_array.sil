@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt %s -access-storage-analysis-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
+
+// This test depends on the _ArrayBuffer type.
+// REQUIRES: OS=macosx || OS=iphoneos
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class UnsafeThing {
+  deinit
+}
+class Container {
+  var fld : [UInt8]
+}
+
+sil_vtable Container {}
+
+class Container2 {
+  var fld : [UnsafeThing]
+}
+sil_vtable Container2 {}
+
+
+// CHECK-LABEL: @release_safe_array
+// CHECK-NOT: unidentified accesses: modify
+sil @release_safe_array : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : $Container):
+  %1 = ref_element_addr %0 : $Container, #Container.fld
+  %2 = struct_element_addr %1 : $*Array<UInt8>, #Array._buffer
+  %3 = struct_element_addr %2 : $*_ArrayBuffer<UInt8>, #_ArrayBuffer._storage
+  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  %5 = load %4 : $*Builtin.BridgeObject
+  strong_release %5: $Builtin.BridgeObject
+  %7 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  strong_release %7: $__ContiguousArrayStorageBase
+  %8 = init_existential_ref %7 : $__ContiguousArrayStorageBase : $__ContiguousArrayStorageBase, $AnyObject
+  strong_retain %8 : $AnyObject
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: @release_unsafe_array
+// CHECK: unidentified accesses: modify
+sil @release_unsafe_array : $@convention(thin) (@guaranteed Container2) -> () {
+bb0(%0 : $Container2):
+  %1 = ref_element_addr %0 : $Container2, #Container2.fld
+  %2 = struct_element_addr %1 : $*Array<UnsafeThing>, #Array._buffer
+  %3 = struct_element_addr %2 : $*_ArrayBuffer<UnsafeThing>, #_ArrayBuffer._storage
+  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  %5 = load %4 : $*Builtin.BridgeObject
+  strong_release %5: $Builtin.BridgeObject
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @someClosure : $@convention(thin) (@guaranteed UnsafeThing) -> ()
+
+// CHECK-LABEL: @testCaptureDeinit
+// CHECK: unidentified accesses: modify
+
+// Releasing the closure will trigger the deinit of the captured class.
+sil @testCaptureDeinit : $@convention(thin) (Int, @guaranteed UnsafeThing) -> () {
+bb0(%0 : $Int, %u : $UnsafeThing):
+  %s1 = alloc_stack $Int
+  store %0 to %s1 : $*Int
+  %s2 = alloc_stack $Int
+  store %0 to %s2 : $*Int
+  %f = function_ref @someClosure : $@convention(thin) (@guaranteed UnsafeThing) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%u) : $@convention(thin) (@guaranteed UnsafeThing) -> ()
+  %access = begin_access [modify] [dynamic] %s1 : $*Int
+  strong_release %pa : $@callee_guaranteed () -> ()
+  end_access %access : $*Int
+  dealloc_stack %s2 : $*Int
+  dealloc_stack %s1 : $*Int
+  %v = tuple ()
+  return %v : $()
+}

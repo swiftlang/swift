@@ -1,4 +1,4 @@
-// RUN: %swift -typecheck -verify -target %target-cpu-apple-macosx11 %s -enable-experimental-feature TypedThrows
+// RUN: %swift -typecheck -verify -target %target-cpu-apple-macosx11 %s
 
 // REQUIRES: OS=macosx
 

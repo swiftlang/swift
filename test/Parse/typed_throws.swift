@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test -enable-experimental-feature TypedThrows
+// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test
 
 // Parsing support for typed throws.
 
@@ -20,6 +20,7 @@ func testClosures() {
   let _ = { (x: Int, y: Int) throws(MyError) -> Int in x + y }
 }
 
+@available(SwiftStdlib 6.0, *)
 func testTypes() {
   let _ = [(Int, Int) throws(MyError) -> Int]()
 }
@@ -29,3 +30,8 @@ func testMissingError() throws() { }
 
 func testRethrowsWithThrownType() rethrows(MyError) { }
 // expected-error@-1{{'rethrows' cannot be combined with a specific thrown error type}}
+
+struct S<Element, Failure: Error> {
+  init(produce: @escaping () async throws(Failure) -> Element?) {
+  }
+}

@@ -30,6 +30,9 @@ entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
       external #G.subscript<Y, X>
   ) <B, A> (%1)
 
+  strong_retain %t : $KeyPath<G<B>, B>
+  strong_retain %u : $KeyPath<G<A>, A>
+
   return undef : $()
 }
 

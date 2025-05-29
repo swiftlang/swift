@@ -19,8 +19,19 @@
 
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 using namespace Lowering;
+
+ManagedValue ManagedValue::forFormalAccessedAddress(SILValue address,
+                                                    SGFAccessKind accessKind) {
+  if (isReadAccess(accessKind)) {
+    return forBorrowedAddressRValue(address);
+  } else {
+    return forLValue(address);
+  }
+}
+
 
 ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
                                               SILValue value) {
@@ -170,7 +181,7 @@ void ManagedValue::assignInto(SILGenFunction &SGF, SILLocation loc,
 
 void ManagedValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                                Initialization *dest) {
-  assert(isPlusOneOrTrivial(SGF));
+  assert(isPlusOneOrTrivial(SGF) || dest->isBorrow());
   dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ true);
   dest->finishInitialization(SGF);
 }

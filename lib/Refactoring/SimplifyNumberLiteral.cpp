@@ -45,7 +45,7 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfoPtr Tok) {
           found = literal;
         }
       }
-      return Action::SkipChildrenIf(found, expr);
+      return Action::SkipNodeIf(found, expr);
     }
   };
 

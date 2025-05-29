@@ -23,6 +23,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -67,19 +68,7 @@ public:
     if (!typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes())
       return subs;
 
-    return subs.subst([&](SubstitutableType *s) -> Type {
-        return substOpaqueTypesWithUnderlyingTypes(s->getCanonicalType(),
-                                                   typeExpansionContext);
-      }, [&](CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
-        return substOpaqueTypesWithUnderlyingTypes(
-               ProtocolConformanceRef(conformedProtocol),
-               conformingReplacementType->getCanonicalType(),
-               typeExpansionContext);
-      },
-      SubstFlags::SubstituteOpaqueArchetypes |
-      SubstFlags::PreservePackExpansionLevel);
+    return substOpaqueTypesWithUnderlyingTypes(subs, typeExpansionContext);
   }
 
   // Substitute a function type.
@@ -252,6 +241,10 @@ public:
                         ? origType->getInvocationGenericSignature()
                         : nullptr;
 
+    extInfo = SILFunctionType::getSubstLifetimeDependencies(
+        genericSig, extInfo, TC.Context, substParams, substYields,
+        substResults);
+
     return SILFunctionType::get(genericSig, extInfo,
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
@@ -275,16 +268,17 @@ public:
       selfType = next;
     }
 
-    auto substConformance = conformance.subst(selfType, IFS);
+    auto substConformance = conformance.subst(IFS);
 
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.
     if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
-      auto substType = IFS.withNewOptions(
-          llvm::None, [&] { return selfType.subst(IFS)->getCanonicalType(); });
+      auto substType = IFS.withNewOptions(std::nullopt, [&] {
+        return selfType.subst(IFS)->getCanonicalType();
+      });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
-            substConformance, substType, typeExpansionContext);
+            substConformance, typeExpansionContext);
       }
     }
 
@@ -297,7 +291,8 @@ public:
   }
 
   SILResultInfo substInterface(SILResultInfo orig) {
-    return SILResultInfo(visit(orig.getInterfaceType()), orig.getConvention());
+    return SILResultInfo(visit(orig.getInterfaceType()), orig.getConvention(),
+                         orig.getOptions());
   }
 
   SILYieldInfo substInterface(SILYieldInfo orig) {
@@ -306,7 +301,7 @@ public:
 
   SILParameterInfo substInterface(SILParameterInfo orig) {
     return SILParameterInfo(visit(orig.getInterfaceType()),
-                            orig.getConvention(), orig.getDifferentiability());
+                            orig.getConvention(), orig.getOptions());
   }
 
   CanType visitSILPackType(CanSILPackType origType) {
@@ -348,6 +343,8 @@ public:
                                 [&](Type substExpansionShape) {
       CanType substComponentType = visit(origType.getPatternType());
       if (substExpansionShape) {
+        if (auto packArchetype = substExpansionShape->getAs<PackArchetypeType>())
+          substExpansionShape = packArchetype->getReducedShape();
         substComponentType = CanPackExpansionType::get(substComponentType,
                                     substExpansionShape->getCanonicalType());
       }
@@ -509,7 +506,7 @@ SILType SILType::subst(SILModule &M, TypeSubstitutionFn subs,
 SILType SILType::subst(TypeConverter &tc, SubstitutionMap subs) const {
   auto sig = subs.getGenericSignature();
 
-  InFlightSubstitutionViaSubMap IFS(subs, llvm::None);
+  InFlightSubstitutionViaSubMap IFS(subs, std::nullopt);
   return subst(tc, IFS, sig.getCanonicalSignature());
 }
 SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
@@ -518,10 +515,10 @@ SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
 
 SILType SILType::subst(SILModule &M, SubstitutionMap subs,
                        TypeExpansionContext context) const {
-  if (isSubstitutionInvariant(*this, llvm::None))
+  if (isSubstitutionInvariant(*this, std::nullopt))
     return *this;
 
-  InFlightSubstitutionViaSubMap IFS(subs, llvm::None);
+  InFlightSubstitutionViaSubMap IFS(subs, std::nullopt);
 
   SILTypeSubstituter STST(M.Types, context, IFS,
                           subs.getGenericSignature().getCanonicalSignature());
@@ -542,7 +539,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule, SubstitutionMap subs,
     return CanSILFunctionType(this);
   }
 
-  InFlightSubstitutionViaSubMap IFS(subs, llvm::None);
+  InFlightSubstitutionViaSubMap IFS(subs, std::nullopt);
 
   return substGenericArgs(silModule, IFS, context);
 }
@@ -554,7 +551,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   TypeExpansionContext context) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
 
-  InFlightSubstitution IFS(subs, conformances, llvm::None);
+  InFlightSubstitution IFS(subs, conformances, std::nullopt);
   return substGenericArgs(silModule, IFS, context);
 }
 

@@ -9,8 +9,8 @@ add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
   AccessNotes.cpp
   AccessRequests.cpp
+  ActorIsolation.cpp
   ArgumentList.cpp
-  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -27,19 +27,29 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityConstraint.cpp
+  AvailabilityContext.cpp
+  AvailabilityDomain.cpp
+  AvailabilityScope.cpp
+  AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
-  CASTBridging.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
+  Concurrency.cpp
   ConcreteDeclRef.cpp
+  ConformanceLookup.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
   DeclNameLoc.cpp
+  DiagnosticArgument.cpp
+  DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
+  DiagnosticGroups.cpp
   DiagnosticList.cpp
   DistributedDecl.cpp
   DocComment.cpp
@@ -48,10 +58,12 @@ add_swift_host_library(swiftAST STATIC
   ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
+  FeatureSet.cpp
   FineGrainedDependencies.cpp
   FineGrainedDependencyFormat.cpp
   FreestandingMacroExpansion.cpp
   FrontendSourceFileDepGraphFactory.cpp
+  FunctionRefInfo.cpp
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
@@ -60,6 +72,8 @@ add_swift_host_library(swiftAST STATIC
   IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
+  LifetimeDependence.cpp
+  LocalArchetypeRequirementCollector.cpp
   Module.cpp
   ModuleDependencies.cpp
   ModuleLoader.cpp
@@ -81,6 +95,7 @@ add_swift_host_library(swiftAST STATIC
   RawComment.cpp
   Requirement.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ApplyInverses.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/Diagnostics.cpp
@@ -110,13 +125,13 @@ add_swift_host_library(swiftAST STATIC
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
+  StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp
   TypeJoinMeet.cpp
-  TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeSubstitution.cpp
   TypeWalker.cpp
@@ -126,6 +141,8 @@ add_swift_host_library(swiftAST STATIC
   LLVM_LINK_COMPONENTS
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
   )
+
+add_subdirectory(Bridging)
 
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
@@ -155,15 +172,13 @@ target_link_libraries(swiftAST INTERFACE
   clangAPINotes
   clangBasic)
 
-if(SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftAST
-    PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-  )
-endif()
-
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftAST
+    PRIVATE swiftASTGen)
+endif()
 
 set_swift_llvm_is_available(swiftAST)

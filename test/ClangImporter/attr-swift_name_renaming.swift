@@ -22,6 +22,9 @@ func test() {
   var p = Point()
   var p2 = PointType() // FIXME: should provide Fix-It expected-error{{cannot find 'PointType' in scope}} {{none}}
 
+  // Initializers with incorrect argument count (rdar://141124373)
+  var p3 = Point(path: "/dev/zero", nil) // expected-warning {{'init(path:_:)' is deprecated: declared Swift name 'init(path:)' was adjusted to 'init(path:_:)' because it does not have the correct number of parameters (1 vs. 2); please report this to its maintainer}}
+
   // Field name remapping
   p.x = 7
 

@@ -11,7 +11,7 @@ struct Lander<void> {};
 template <class T> struct Lander {
   typedef unsigned long size_type;
   // Make sure we don't crash here. Before being specialized, "size_type" is
-  // technically a depedent type because it expands to "Lander<T>::size_type".
+  // technically a dependent type because it expands to "Lander<T>::size_type".
   void test(size_type) { }
 };
 

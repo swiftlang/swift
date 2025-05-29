@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=true %s | %target-sil-opt -enable-sil-verify-all=true | %FileCheck %s
 
+sil_stage lowered
+
 // CHECK-LABEL: sil @markers : {{.*}} {
 // CHECK:         [[MARKER:%[^,]+]] = alloc_pack_metadata
 // CHECK:         dealloc_pack_metadata [[MARKER]]

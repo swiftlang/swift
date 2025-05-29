@@ -1,0 +1,35 @@
+// RUN: %target-swiftc_driver -g -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 2 { loc "simple.swift":1:2 parent @test_debug_value : $@convention(thin) (Builtin.Int64) -> () }
+
+// CHECK-LABEL: @test_debug_value
+// CHECK-SAME: !dbg ![[FUNC_DI:[0-9]+]]
+sil hidden @test_debug_value : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  // CHECK:      #dbg_declare(ptr
+  // CHECK-SAME:                   ![[VAR_DI:[0-9]+]]
+  // CHECK-SAME:                   , ![[LOC_DI:[0-9]+]]
+  debug_value %0 : $Builtin.Int64, var, name "x", loc "simple.swift":1:16, scope 2
+  %zero = integer_literal $Builtin.Int64, 0
+  debug_value %zero : $Builtin.Int64, var, (name "x", loc "simple.swift":1:16, scope 2), loc "simple.swift":3:4, scope 2
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// One debug_value uses the VarInfo way, the other uses the instruction way.
+// They should both resolve to the same variable, so we should only have one x.
+
+// CHECK: !DISubprogram(name: "test_debug_value"
+// CHECK-SAME: retainedNodes: ![[RETAINED:[0-9]+]]
+
+// Only one variable should be retained
+// CHECK: ![[RETAINED]] = !{![[VAR_DI]]}
+
+// CHECK-NOT: !DILocalVariable(name: "x"
+// CHECK: ![[VAR_DI]] = !DILocalVariable(name: "x"
+// CHECK-SAME:                           line: 1
+// CHECK-NOT: !DILocalVariable(name: "x"

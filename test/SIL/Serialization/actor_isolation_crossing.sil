@@ -1,0 +1,58 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow -emit-sorted-sil | %FileCheck %s
+
+sil_stage canonical
+
+sil @asyncCaller : $@async () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil @asyncCallee1 : $@convention(thin) @async () -> () {
+// CHECK: apply [callee_isolation=actor_instance] [caller_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
+// CHECK: } // end sil function 'asyncCallee1'
+sil @asyncCallee1 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @asyncCaller : $@convention(thin) @async () -> ()
+  apply [callee_isolation=actor_instance] [caller_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @asyncCallee2 : $@convention(thin) @async () -> () {
+// CHECK: apply [callee_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
+// CHECK: } // end sil function 'asyncCallee2'
+sil @asyncCallee2 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @asyncCaller : $@convention(thin) @async () -> ()
+  apply [callee_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @asyncCallee3 : $@convention(thin) @async () -> () {
+// CHECK: apply [caller_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
+// CHECK: } // end sil function 'asyncCallee3'
+sil @asyncCallee3 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @asyncCaller : $@convention(thin) @async () -> ()
+  apply [caller_isolation=actor_instance] %0() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @asyncCallee4 : $@convention(thin) @async () -> () {
+// CHECK: apply [caller_isolation=global_actor] %0() : $@convention(thin) @async () -> ()
+// CHECK: } // end sil function 'asyncCallee4'
+sil @asyncCallee4 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @asyncCaller : $@convention(thin) @async () -> ()
+  apply [caller_isolation=global_actor] %0() : $@convention(thin) @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}

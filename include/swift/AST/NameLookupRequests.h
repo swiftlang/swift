@@ -25,6 +25,7 @@
 #include "swift/AST/TypeOrExtensionDecl.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -58,7 +59,8 @@ void simple_display(
 
 /// Describes a set of type declarations that are "direct" referenced by
 /// a particular type in the AST.
-using DirectlyReferencedTypeDecls = llvm::TinyPtrVector<TypeDecl *>;
+using DirectlyReferencedTypeDecls = std::pair<llvm::TinyPtrVector<TypeDecl *>,
+                                              InvertibleProtocolSet>;
 
 /// Request the set of declarations directly referenced by the an "inherited"
 /// type of a type or extension declaration.
@@ -168,7 +170,7 @@ public:
 
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<ClassDecl *> getCachedResult() const;
+  std::optional<ClassDecl *> getCachedResult() const;
   void cacheResult(ClassDecl *value) const;
 };
 
@@ -189,13 +191,34 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  std::optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ProtocolDecl *> value) const;
 
 public:
   // Incremental dependencies
   void writeDependencySink(evaluator::DependencyCollector &tracker,
                            ArrayRef<ProtocolDecl *> result) const;
+};
+
+class AllInheritedProtocolsRequest
+    : public SimpleRequest<
+          AllInheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+          RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *PD) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  std::optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<ProtocolDecl *> value) const;
 };
 
 class ProtocolRequirementsRequest
@@ -214,7 +237,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<ArrayRef<ValueDecl *>> getCachedResult() const;
+  std::optional<ArrayRef<ValueDecl *>> getCachedResult() const;
   void cacheResult(ArrayRef<ValueDecl *> value) const;
 };
 
@@ -237,7 +260,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool) const;
 };
 
@@ -259,7 +282,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<NominalTypeDecl *> getCachedResult() const;
+  std::optional<NominalTypeDecl *> getCachedResult() const;
   void cacheResult(NominalTypeDecl *value) const;
 
 public:
@@ -270,6 +293,7 @@ public:
 
 struct SelfBounds {
   llvm::TinyPtrVector<NominalTypeDecl *> decls;
+  InvertibleProtocolSet inverses;
   bool anyObject = false;
 };
 
@@ -363,7 +387,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<DestructorDecl *> getCachedResult() const;
+  std::optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
 };
 
@@ -384,7 +408,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<GenericParamList *> getCachedResult() const;
+  std::optional<GenericParamList *> getCachedResult() const;
   void cacheResult(GenericParamList *value) const;
 };
 
@@ -709,21 +733,18 @@ public:
 
 class LookupConformanceDescriptor final {
 public:
-  ModuleDecl *Mod;
   Type Ty;
   ProtocolDecl *PD;
 
-  LookupConformanceDescriptor(ModuleDecl *Mod, Type Ty, ProtocolDecl *PD)
-      : Mod(Mod), Ty(Ty), PD(PD) {}
+  LookupConformanceDescriptor(Type Ty, ProtocolDecl *PD) : Ty(Ty), PD(PD) {}
 
   friend llvm::hash_code hash_value(const LookupConformanceDescriptor &desc) {
-    return llvm::hash_combine(desc.Mod, desc.Ty.getPointer(), desc.PD);
+    return llvm::hash_combine(desc.Ty.getPointer(), desc.PD);
   }
 
   friend bool operator==(const LookupConformanceDescriptor &lhs,
                          const LookupConformanceDescriptor &rhs) {
-    return lhs.Mod == rhs.Mod && lhs.Ty.getPointer() == rhs.Ty.getPointer() &&
-           lhs.PD == rhs.PD;
+    return lhs.Ty.getPointer() == rhs.Ty.getPointer() && lhs.PD == rhs.PD;
   }
 
   friend bool operator!=(const LookupConformanceDescriptor &lhs,
@@ -926,6 +947,83 @@ private:
   // Evaluation.
   ProtocolDecl *evaluate(Evaluator &evaluator, const ImplementsAttr *attr,
                          DeclContext *dc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class LookupIntrinsicRequest
+    : public SimpleRequest<LookupIntrinsicRequest,
+                           FuncDecl *(ModuleDecl *, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  FuncDecl *evaluate(Evaluator &evaluator, ModuleDecl *module,
+                     Identifier funcName) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+using ObjCCategoryNameMap =
+  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>;
+
+/// Generate a map of all known extensions of the given class that have an
+/// explicit category name. This request does not force clang categories that
+/// haven't been imported already, but it will generate a new map if new
+/// categories have been imported since the cached value was generated.
+///
+/// \seeAlso ClassDecl::getObjCCategoryNameMap()
+class ObjCCategoryNameMapRequest
+    : public SimpleRequest<ObjCCategoryNameMapRequest,
+                           ObjCCategoryNameMap(ClassDecl *, ExtensionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Convenience to automatically extract `lastExtension`.
+  ObjCCategoryNameMapRequest(ClassDecl *classDecl)
+    : ObjCCategoryNameMapRequest(classDecl, classDecl->getLastExtension())
+  {}
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ObjCCategoryNameMap evaluate(Evaluator &evaluator,
+                               ClassDecl *classDecl,
+                               ExtensionDecl *lastExtension) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct DeclABIRoleInfoResult {
+  llvm::PointerIntPair<Decl *, 2, uint8_t> storage;
+  DeclABIRoleInfoResult(Decl *counterpart, uint8_t roleValue)
+    : storage(counterpart, roleValue) {}
+};
+
+/// Return the ABI role info (role and counterpart) of a given declaration.
+class DeclABIRoleInfoRequest
+    : public SimpleRequest<DeclABIRoleInfoRequest,
+                           DeclABIRoleInfoResult(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  void recordABIOnly(Evaluator &evaluator, Decl *counterpart);
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  DeclABIRoleInfoResult evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

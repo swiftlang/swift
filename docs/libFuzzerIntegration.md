@@ -1,7 +1,6 @@
 # libFuzzer Integration
 
-Custom builds of the Swift toolchain (including development snapshots)
-have a built-in `libFuzzer` integration. In order to use it on a file
+Swift has built-in `libFuzzer` integration. In order to use it on a file
 `myfile.swift`, define an entry point fuzzing function with a
 `@_cdecl("LLVMFuzzerTestOneInput")` annotation:
 

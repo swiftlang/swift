@@ -6,6 +6,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 import CompleteSwiftTypes
 import ObjCLibraryForwardDeclaringCompleteSwiftTypes

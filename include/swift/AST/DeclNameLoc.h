@@ -20,6 +20,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
+#include "llvm/ADT/ArrayRef.h"
+
+class BridgedDeclNameLoc;
+
 namespace swift {
 
 class ASTContext;
@@ -27,6 +31,8 @@ class ASTContext;
 /// Source location information for a declaration name (\c DeclName)
 /// written in the source.
 class DeclNameLoc {
+  friend class ::BridgedDeclNameLoc;
+
   /// Source location information.
   ///
   /// If \c NumArgumentLabels == 0, this is the SourceLoc for the base name.
@@ -56,14 +62,20 @@ class DeclNameLoc {
     return reinterpret_cast<SourceLoc const *>(LocationInfo);
   }
 
+  DeclNameLoc(const void *LocationInfo, unsigned NumArgumentLabels)
+      : LocationInfo(LocationInfo), NumArgumentLabels(NumArgumentLabels) {}
+
 public:
   /// Create an invalid declaration name location.
-  DeclNameLoc() : LocationInfo(0), NumArgumentLabels(0) { }
+  DeclNameLoc() : DeclNameLoc(nullptr, 0) {}
 
   /// Create declaration name location information for a base name.
   explicit DeclNameLoc(SourceLoc baseNameLoc)
-    : LocationInfo(baseNameLoc.getOpaquePointerValue()),
-      NumArgumentLabels(0) { }
+      : DeclNameLoc(baseNameLoc.getOpaquePointerValue(), 0) {}
+
+  explicit DeclNameLoc(ASTContext &ctx, SourceLoc moduleSelectorLoc,
+                       SourceLoc baseNameLoc)
+    : DeclNameLoc(baseNameLoc) { }
 
   /// Create declaration name location information for a compound
   /// name.
@@ -71,6 +83,13 @@ public:
               SourceLoc lParenLoc,
               ArrayRef<SourceLoc> argumentLabelLocs,
               SourceLoc rParenLoc);
+
+  DeclNameLoc(ASTContext &ctx, SourceLoc moduleSelectorLoc,
+              SourceLoc baseNameLoc,
+              SourceLoc lParenLoc,
+              ArrayRef<SourceLoc> argumentLabelLocs,
+              SourceLoc rParenLoc)
+    : DeclNameLoc(ctx, baseNameLoc, lParenLoc, argumentLabelLocs, rParenLoc) { }
 
   /// Whether the location information is valid.
   bool isValid() const { return getBaseNameLoc().isValid(); }
@@ -103,6 +122,10 @@ public:
     if (index >= NumArgumentLabels)
       return SourceLoc();
     return getSourceLocs()[FirstArgumentLabelIndex + index];
+  }
+
+  SourceLoc getModuleSelectorLoc() const {
+    return SourceLoc();
   }
 
   SourceLoc getStartLoc() const {

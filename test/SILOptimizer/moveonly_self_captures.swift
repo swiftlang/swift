@@ -25,12 +25,16 @@ struct Test : ~Copyable {
         capture()
     }
 
-    init(x: ()) {
+    init(x: ()) { // expected-error {{'self' consumed more than once}}
+                  // expected-note@+7{{consumed here}}
+                  // expected-note@+7{{consumed again here}}
+                  // expected-error@-3{{missing reinitialization of closure capture 'self' after consume}}
+                  // expected-note@+5{{consumed here}}
         e = E()
         e2 = E2()
         func capture() {
             let _ = self
-            let _ = self.e2 // expected-error {{cannot partially consume 'self'}}
+            let _ = self.e2
         }
         capture()
     }

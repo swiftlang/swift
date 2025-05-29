@@ -87,7 +87,7 @@ class SelectorBothAsync2: NSObject, SelectorBothAsyncProto {
   func hello() async -> Bool // expected-note {{method 'hello()' declared here}}
 
   @objc(helloWithCompletion:)
-  func hello(completion: @escaping (Bool) -> Void) // expected-warning {{method 'hello(completion:)' with Objective-C selector 'helloWithCompletion:' conflicts with method 'hello()' with the same Objective-C selector; this is an error in Swift 6}}
+  func hello(completion: @escaping (Bool) -> Void) // expected-warning {{method 'hello(completion:)' with Objective-C selector 'helloWithCompletion:' conflicts with method 'hello()' with the same Objective-C selector; this is an error in the Swift 6 language mode}}
 }
 
 // additional coverage for situation like C4, where the method names don't
@@ -111,4 +111,41 @@ class C5 {
 
 class C6: C5, ServiceProvider {
   @MainActor func allOperations() async -> [String] { [] }
+}
+
+extension ImplementsLoadable: @retroactive Loadable {
+  public func loadStuff(withOtherIdentifier otherIdentifier: Int, reply: @escaping () -> Void) {}
+}
+
+class ImplementsDictionaryLoader1: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: NSNumber]?) -> Void) {}
+}
+
+// expected-error@+2 {{type 'ImplementsDictionaryLoader2' does not conform to protocol 'DictionaryLoader'}}
+// expected-note@+1 {{add stubs for conformance}}
+class ImplementsDictionaryLoader2: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: Any]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Any]?) -> Void) -> ()'}}
+}
+
+// expected-error@+2 {{type 'ImplementsDictionaryLoader3' does not conform to protocol 'DictionaryLoader'}}
+// expected-note@+1 {{add stubs for conformance}}
+class ImplementsDictionaryLoader3: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: NSNumber?]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : NSNumber?]?) -> Void) -> ()'}}
+}
+
+// expected-error@+2 {{type 'ImplementsDictionaryLoader4' does not conform to protocol 'DictionaryLoader'}}
+// expected-note@+1 {{add stubs for conformance}}
+class ImplementsDictionaryLoader4: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: Int]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Int]?) -> Void) -> ()'}}
+}
+
+class ImplementsFloatLoader: FloatLoader {
+  public func loadFloat(completionHandler: @escaping (Float) -> Void) {}
+}
+
+class ImplementsFloatLoader2: FloatLoader {
+  public func loadFloat(withCompletionHandler completionHandler: @escaping (Float) -> Void) {}
+  // expected-warning@-1 {{instance method 'loadFloat(withCompletionHandler:)' nearly matches optional requirement 'loadFloat(completionHandler:)' of protocol 'FloatLoader'}}
+  // expected-note@-2 {{rename to 'loadFloat(completionHandler:)' to satisfy this requirement}}
+  // expected-note@-3 {{move 'loadFloat(withCompletionHandler:)' to an extension to silence this warning}}
 }

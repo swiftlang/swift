@@ -1,13 +1,13 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-ir -primary-file %s -primary-file %S/Inputs/opaque_result_type_private_underlying_2.swift | %FileCheck %s --check-prefix=SINGLEMODULE
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-ir -primary-file %s -primary-file %S/Inputs/opaque_result_type_private_underlying_2.swift | %FileCheck %s --check-prefix=SINGLEMODULE
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir -primary-file %s  -DUSEMODULE | %FileCheck %s --check-prefix=NONRESILIENT
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -emit-ir -primary-file %s  -DUSEMODULE | %FileCheck %s --check-prefix=NONRESILIENT
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -enable-library-evolution -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir -primary-file %s  -DUSEMODULE | %FileCheck %s --check-prefix=RESILIENT
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-library-evolution -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -emit-ir -primary-file %s  -DUSEMODULE | %FileCheck %s --check-prefix=RESILIENT
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -enable-library-evolution -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir -primary-file %s -primary-file %S/Inputs/opaque_result_type_private_underlying_3.swift -DUSEMODULE -DUSESECONDFILE | %FileCheck %s --check-prefix=RESILIENT
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-library-evolution -emit-module -emit-module-path=%t/Repo1.swiftmodule -module-name=Repo1 %S/Inputs/opaque_result_type_private_underlying_2.swift
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -emit-ir -primary-file %s -primary-file %S/Inputs/opaque_result_type_private_underlying_3.swift -DUSEMODULE -DUSESECONDFILE | %FileCheck %s --check-prefix=RESILIENT
 
 #if USEMODULE
 import Repo1

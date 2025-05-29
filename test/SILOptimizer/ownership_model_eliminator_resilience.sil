@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -ownership-model-eliminator -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -ownership-model-eliminator -enable-library-evolution %s | %FileCheck %s
 
 // copy_value and destroy_value operations are lowered away, except for
 // address-only types. Make sure we use the correct resilience expansion

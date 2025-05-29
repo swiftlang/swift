@@ -1,3 +1,0 @@
-struct Test {
-  int value;
-};

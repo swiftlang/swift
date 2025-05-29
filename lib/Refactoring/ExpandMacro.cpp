@@ -18,7 +18,7 @@ using namespace swift::refactoring;
 
 /// Retrieve the macro expansion buffer for the given macro expansion
 /// expression.
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 getMacroExpansionBuffer(SourceManager &sourceMgr,
                         MacroExpansionExpr *expansion) {
   return evaluateOrDefault(
@@ -28,7 +28,7 @@ getMacroExpansionBuffer(SourceManager &sourceMgr,
 
 /// Retrieve the macro expansion buffer for the given macro expansion
 /// declaration.
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 getMacroExpansionBuffer(SourceManager &sourceMgr,
                         MacroExpansionDecl *expansion) {
   return evaluateOrDefault(expansion->getASTContext().evaluator,
@@ -80,6 +80,23 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
       auto bufferIDs =
           evaluateOrDefault(ctx.evaluator, ExpandExtensionMacros{nominal}, {});
       allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+    }
+  }
+
+  if (roles.contains(MacroRole::Preamble)) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto bufferIDs =
+          evaluateOrDefault(ctx.evaluator, ExpandPreambleMacroRequest{func}, {});
+      allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+    }
+  }
+
+  if (roles.contains(MacroRole::Body)) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      auto bufferID =
+          evaluateOrDefault(ctx.evaluator, ExpandBodyMacroRequest{func}, {});
+      if (bufferID)
+        allBufferIDs.push_back(*bufferID);
     }
   }
 
@@ -137,7 +154,7 @@ getMacroExpansionBuffers(SourceManager &sourceMgr, ResolvedCursorInfoPtr Info) {
   Finder.resolve();
 
   if (!Finder.getContexts().empty()) {
-    llvm::Optional<unsigned> bufferID;
+    std::optional<unsigned> bufferID;
     if (auto *target = dyn_cast_or_null<MacroExpansionExpr>(
             Finder.getContexts()[0].dyn_cast<Expr *>())) {
       bufferID = getMacroExpansionBuffer(sourceMgr, target);

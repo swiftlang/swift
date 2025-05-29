@@ -19,6 +19,8 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -163,7 +165,19 @@ StringRef getCommonPluralPrefix(StringRef singular, StringRef plural);
 /// Returns the underlying integer type of an enum. If clang treats the type as
 /// an elaborated type, an unwrapped type is returned.
 const clang::Type *getUnderlyingType(const clang::EnumDecl *decl);
+
+inline bool isCFOptionsMacro(const clang::NamedDecl *decl,
+                             clang::Preprocessor &preprocessor) {
+  auto loc = decl->getEndLoc();
+  if (!loc.isMacroID())
+    return false;
+  return llvm::StringSwitch<bool>(preprocessor.getImmediateMacroName(loc))
+      .Case("CF_OPTIONS", true)
+      .Case("NS_OPTIONS", true)
+      .Default(false);
 }
-}
+
+} // namespace importer
+} // namespace swift
 
 #endif // SWIFT_CLANG_IMPORT_ENUM_H

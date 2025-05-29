@@ -2,6 +2,7 @@
 // RUN: %target-run-simple-swift(-O -Xfrontend -enable-experimental-feature -Xfrontend MoveOnlyEnumDeinits -Xfrontend -sil-verify-all) | %FileCheck %s --implicit-check-not closing
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // NOTE: it's important that this test has the `--implicit-check-not closing` flag to catch double deinits!!
 // you also want to make sure all messages start with "closing"

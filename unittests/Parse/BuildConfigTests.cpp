@@ -1,8 +1,8 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/ParseVersion.h"
-#include "llvm/ADT/Optional.h"
 #include "gtest/gtest.h"
+#include <optional>
 
 using namespace swift;
 using namespace llvm;
@@ -11,12 +11,12 @@ class CompilerVersionTest : public ::testing::Test {};
 class VersionTest : public ::testing::Test{};
 class CompilerVersionUnpackingTest : public ::testing::Test {};
 
-Optional<version::Version> CV(const char *VersionString) {
+std::optional<version::Version> CV(const char *VersionString) {
   return VersionParser::parseCompilerVersionString(VersionString, SourceLoc(),
                                                    nullptr);
 }
 
-Optional<version::Version> V(const char *VersionString) {
+std::optional<version::Version> V(const char *VersionString) {
   return VersionParser::parseVersionString(VersionString, SourceLoc(), nullptr);
 }
 

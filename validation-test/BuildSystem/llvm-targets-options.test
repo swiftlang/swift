@@ -8,7 +8,7 @@
 # RUN: mkdir -p %t
 # RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --build-llvm=0 --llvm-ninja-targets="lib/all clangDependencyScanning" --cmake %cmake  2>&1 | %FileCheck --check-prefix=BUILD-LLVM-0-CHECK %s
 
-# BUILD-LLVM-0-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} clean
+# BUILD-LLVM-0-CHECK-NOT: cmake --build {{.*}}/Ninja-DebugAssert/llvm
 
 
 # RUN: %empty-directory(%t)

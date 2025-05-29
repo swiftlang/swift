@@ -1,0 +1,897 @@
+// RUN: %target-sil-opt -module-name infer --test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// PLEASE READ THIS!
+//
+// This test is specifically meant to test how we infer isolation for specific
+// values.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {
+}
+
+actor MyActor {
+  var ns: NonSendableKlass
+
+  func doSomething() async -> NonSendableKlass
+}
+
+sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+sil @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+sil @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+sil @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> ()
+
+sil @useActor : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+sil @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+
+///////////////////////
+// MARK: Basic Tests //
+///////////////////////
+
+// For now we always infer an actor as having unknown isolation since we only
+// talk about isolation of an actor (or other Sendable types).
+//
+// CHECK: begin running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = argument of bb0 : $MyActor
+// CHECK-NEXT: Isolation: unknown
+// CHECK-NEXT: end running test 1 of 1 on actor_self_isolation_unknown: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @actor_self_isolation_unknown : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %0 : $MyActor
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on actor_field_isolation: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %2 = ref_element_addr %0 : $MyActor
+// CHECK-NEXT: Isolation: 'argument'-isolated
+// CHECK-NEXT: end running test 1 of 1 on actor_field_isolation: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @actor_field_isolation : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "argument"
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.ns
+  debug_value [trace] %1 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+/////////////////////////////////
+// MARK: Temporary Alloc Stack //
+/////////////////////////////////
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_same_block: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_same_block: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_infer_from_indirect_arg_same_block : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_stack $NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f(%0) : $@convention(thin) () -> @out NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: global actor '<null>'-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_infer_from_indirect_arg_with_isolation_same_block : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_stack $NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_write_before_in_same_block: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_write_before_in_same_block: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_infer_failure_write_before_in_same_block : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+
+  // First call without transferring (performing a write).
+  %f = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  // Then do it indirect. The write before should have inhibited the inference.
+  %f2 = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f2(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: global actor '<null>'-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_infer_failure_ignore_later_same_block_init : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init_2: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: actor-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_infer_failure_ignore_later_same_block_init_2: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_infer_failure_ignore_later_same_block_init_2 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_simple: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: actor-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_simple: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_simple : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_disrupting_write : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  cond_br undef, bb1, bb2
+
+bb1:
+  // First call without transferring (performing a write).
+  %f2 = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f2(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_2: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_2: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_disrupting_write_2 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  // First call without transferring (performing a write).
+  %f2 = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f2(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb3:
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_3: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_disrupting_write_3: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_disrupting_write_3 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+
+  // First call without transferring (performing a write).
+  %f2 = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f2(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_matching_inits: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_matching_inits: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_matching_inits : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb2:
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb3:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_matching_inits_2: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_matching_inits_2: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_matching_inits_2 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb2:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb3:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// If we see multiple initializations, just leave it as disconnected. This is
+// more conservative.
+//
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_conflicting_inits : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb2:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// If we see multiple initializations along any path... we need to be disconnected.
+//
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits_2: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_conflicting_inits_2: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_conflicting_inits_2 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// More complex CFG work with a loop.
+//
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: global actor '<null>'-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_larger_cfg : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  cond_br undef, bb4, bb6
+
+bb6:
+  br bb7
+
+bb7:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: global actor '<null>'-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_larger_cfg_2 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  cond_br undef, bb4, bb6
+
+bb6:
+  br bb7
+
+bb7:
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: global actor '<null>'-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_larger_cfg_3 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  cond_br undef, bb4, bb6
+
+bb6:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb7
+
+bb7:
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_larger_cfg_4 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %f2 = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f2(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  cond_br undef, bb4, bb6
+
+bb6:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb7
+
+bb7:
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: global actor '<null>'-isolated
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_larger_cfg_5 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  cond_br undef, bb5a, bb6
+
+bb5a:
+  %f2 = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f2(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb4
+
+bb6:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb7
+
+bb7:
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_6: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %0 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_6: sil_isolation_info_inference with: @trace[0]
+sil @temp_alloc_stack_different_block_larger_cfg_6 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+
+  %0 = alloc_stack $NonSendableKlass
+  debug_value [trace] %0 : $*NonSendableKlass
+  %f = function_ref @constructNonSendableKlassIndirectAsync : $@convention(thin) @async () -> @out NonSendableKlass
+
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  br bb4
+
+bb4:
+  br bb5
+
+bb5:
+  cond_br undef, bb5a, bb6
+
+bb5a:
+  %f2 = function_ref @constructNonSendableKlassIndirect : $@convention(thin) () -> @out NonSendableKlass
+  apply %f2(%0) : $@convention(thin) () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb4
+
+bb6:
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
+  destroy_addr %0 : $*NonSendableKlass
+  br bb7
+
+bb7:
+  dealloc_stack %0 : $*NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on lookthrough_test: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %7 = apply %6(%5) : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Isolation: 'argument'-isolated
+// CHECK-NEXT: end running test 1 of 1 on lookthrough_test: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @lookthrough_test : $@convention(thin) (@owned MyActor) -> @owned NonSendableKlass {
+bb0(%0 : @owned $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "argument"
+  %1 = end_init_let_ref %0 : $MyActor
+  %1a = copy_value %1 : $MyActor
+  %1b = move_value %1a : $MyActor
+  %1c = begin_borrow %1b : $MyActor
+  %2 = function_ref @useActor : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %3 = apply %2(%1c) : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %3 : $NonSendableKlass
+  end_borrow %1c : $MyActor
+  destroy_value %1 : $MyActor
+  destroy_value %1b : $MyActor
+  return %3 : $NonSendableKlass
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_1: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_1: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @isolated_variable_test_1 : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = enum $Optional<MyActor>, #Optional.none
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  //debug_value [trace] %1 : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_2:
+// CHECK-NEXT: First Value:   %3 = apply %2(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: 'self'-isolated
+// CHECK-NEXT: Second Value:   %6 = apply %4(%5) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Isolation: 'self'-isolated
+// CHECK-NEXT: Merged Isolation: 'self'-isolated
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_2: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] @isolated_variable_test_2 : $@convention(thin) @async (@guaranteed Optional<MyActor>) -> () {
+bb0(%0 : @guaranteed $Optional<MyActor>):
+  debug_value %0 : $Optional<MyActor>, let, name "self"
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %2 = apply %1(%0) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %3 = function_ref @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %0a = unchecked_enum_data %0 : $Optional<MyActor>, #Optional.some!enumelt
+  %4 = apply %3(%0a) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_3:
+// CHECK-NEXT: First Value:   %4 = apply %2(%3) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: 'self'-isolated
+// CHECK-NEXT: Second Value:   %6 = apply %5(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Isolation: 'self'-isolated
+// CHECK-NEXT: Merged Isolation: 'self'-isolated
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_3: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] @isolated_variable_test_3 : $@convention(thin) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "self"
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %0a = enum $Optional<MyActor>, #Optional.some!enumelt, %0 : $MyActor
+  %2 = apply %1(%0a) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %3 = function_ref @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %4 = apply %3(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on isolated_variable_test_4:
+// CHECK-NEXT: First Value:   %8 = apply %2(%7) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+// CHECK-NEXT: First Isolation: 'self'-isolated
+// CHECK-NEXT: Second Value:   %10 = apply %9(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK-NEXT: Second Isolation: 'self'-isolated
+// CHECK-NEXT: Merged Isolation: 'self'-isolated
+// CHECK-NEXT: end running test 1 of 1 on isolated_variable_test_4: sil-isolation-info-merged-inference with: @trace[0], @trace[1]
+sil [ossa] @isolated_variable_test_4 : $@convention(thin) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  debug_value %0 : $MyActor, let, name "self"
+  specify_test "sil-isolation-info-merged-inference @trace[0] @trace[1]"
+  %1 = function_ref @useOptionalActor : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %0a = init_existential_ref %0 : $MyActor : $MyActor, $AnyObject
+  %0b = unconditional_checked_cast %0a : $AnyObject to MyActor
+  %0c = unchecked_ref_cast %0b : $MyActor to $AnyObject
+  %0d = unchecked_ref_cast %0c : $AnyObject to $MyActor
+  %0e = enum $Optional<MyActor>, #Optional.some!enumelt, %0d : $MyActor
+  %2 = apply %1(%0e) : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> @owned NonSendableKlass
+  %3 = function_ref @$s5infer7MyActorC11doSomethingAA16NonSendableKlassCyYaF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  %4 = apply %3(%0) : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %2 : $NonSendableKlass
+  debug_value [trace] %4 : $NonSendableKlass
+  destroy_value %2 : $NonSendableKlass
+  destroy_value %4 : $NonSendableKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on sending_indirect_result_isnt_actor_isolated: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value: %0 = argument of bb0 : $*Optional<τ_0_0>          // user: %2
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on sending_indirect_result_isnt_actor_isolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @sending_indirect_result_isnt_actor_isolated : $@convention(thin) @async <τ_0_0> (@sil_isolated @guaranteed MyActor) -> (@sil_sending @out Optional<τ_0_0>) {
+bb0(%0 : $*Optional<τ_0_0>, %1 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %0 : $*Optional<τ_0_0>
+  inject_enum_addr %0 : $*Optional<τ_0_0>, #Optional.none!enumelt
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @myactor_sending_result_sync : $@convention(method) <τ_0_0> (@sil_isolated @guaranteed MyActor) -> @sil_sending @out τ_0_0
+
+// CHECK: begin running test 1 of 1 on sending_indirect_result_isnt_actor_isolated_apply: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %3 = alloc_stack $T                             // users: %6, %5, %4
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on sending_indirect_result_isnt_actor_isolated_apply: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @sending_indirect_result_isnt_actor_isolated_apply : $@convention(method) @async <T> (@sil_isolated @guaranteed MyActor) -> @sil_sending @out T {
+bb0(%0 : $*T, %1 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %4 = function_ref @myactor_sending_result_sync : $@convention(method) <τ_0_0> (@sil_isolated @guaranteed MyActor) -> @sil_sending @out τ_0_0
+  %2 = alloc_stack $T
+  debug_value [trace] %2 : $*T
+  %5 = apply %4<T>(%2, %1) : $@convention(method) <τ_0_0> (@sil_isolated @guaranteed MyActor) -> @sil_sending @out τ_0_0
+  copy_addr [take] %2 to [init] %0 : $*T
+  dealloc_stack %2 : $*T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @myactor_sending_result_sync_throws : $@convention(method) <τ_0_0> (@sil_isolated @guaranteed MyActor) -> (@sil_sending @out τ_0_0, @error any Error)
+
+// CHECK-LABEL: begin running test 1 of 1 on sending_indirect_result_isnt_actor_isolated_try_apply: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %3 = alloc_stack $T
+// CHECK-NEXT: Isolation: disconnected
+// CHECK-NEXT: end running test 1 of 1 on sending_indirect_result_isnt_actor_isolated_try_apply: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @sending_indirect_result_isnt_actor_isolated_try_apply : $@convention(method) @async <T> (@sil_isolated @guaranteed MyActor) -> (@sil_sending @out T, @error any Error) {
+bb0(%0 : $*T, %1 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %5 = function_ref @myactor_sending_result_sync_throws : $@convention(method) <τ_0_0> (@sil_isolated @guaranteed MyActor) -> (@sil_sending @out τ_0_0, @error any Error)
+  %2 = alloc_stack $*T
+  try_apply %5<T>(%2, %1) : $@convention(method) <τ_0_0> (@sil_isolated @guaranteed MyActor) -> (@sil_sending @out τ_0_0, @error any Error), normal bb1, error bb2
+
+bb1(%7 : $()):
+  copy_addr [take] %2 to [init] %0 : $*T
+  debug_value [trace] %2 : $*T
+  dealloc_stack %2 : $*T
+  %8 = tuple ()
+  return %8 : $()
+
+bb2(%10 : @owned $any Error):
+  dealloc_stack %2 : $*T
+  throw %10 : $any Error
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on optional_test: sil_isolation_info_inference with: @trace[0]
+// CHECK-NEXT: Input Value:   %5 = ref_element_addr %4 : $MyActor, #MyActor.ns
+// CHECK-NEXT: Isolation: 'argument'-isolated
+// CHECK-NEXT: end running test 1 of 1 on optional_test: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @optional_test : $@convention(thin) (@sil_isolated @guaranteed Optional<MyActor>) -> () {
+bb0(%0 : @guaranteed $Optional<MyActor>):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $Optional<MyActor>, let, name "argument"
+  %1a = copy_value %0 : $Optional<MyActor>
+  %1b = begin_borrow %1a
+  %1c = unchecked_enum_data %1b : $Optional<MyActor>, #Optional.some!enumelt
+  %1d = ref_element_addr %1c : $MyActor, #MyActor.ns
+  debug_value [trace] %1d
+  end_borrow %1b
+  destroy_value %1a
+  %9999 = tuple ()
+  return %9999 : $()
+}

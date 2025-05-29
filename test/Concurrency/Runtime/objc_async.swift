@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -fobjc-arc %S/Inputs/objc_async.m -c -o %t/objc_async_objc.o
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -disable-availability-checking -parse-as-library -module-name main -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -target %target-swift-5.1-abi-triple -parse-as-library -module-name main -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async
 // RUN: %target-run %t/objc_async | %FileCheck %s
 
 // REQUIRES: executable_test

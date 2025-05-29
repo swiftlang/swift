@@ -275,6 +275,13 @@ public:
         size.getValue());
   }
 
+  llvm::CallInst *CreateMemCpy(Address dest, Address src, llvm::Value *size) {
+    return CreateMemCpy(dest.getAddress(),
+                        llvm::MaybeAlign(dest.getAlignment().getValue()),
+                        src.getAddress(),
+                        llvm::MaybeAlign(src.getAlignment().getValue()), size);
+  }
+
   using IRBuilderBase::CreateMemSet;
   llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value, Size size) {
     return CreateMemSet(dest.getAddress(), value, size.getValue(),
@@ -402,6 +409,11 @@ public:
                                {value, expected},
                                name);
   }
+
+  // Creates an @llvm.expect.i1 call, where the value should be an i1 type.
+  llvm::CallInst *CreateExpectCond(IRGenModule &IGM,
+                                   llvm::Value *value,
+                                   bool expectedValue, const Twine &name = "");
 
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which

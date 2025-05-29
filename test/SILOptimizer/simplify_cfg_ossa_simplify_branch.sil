@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -update-borrowed-from -test-runner %s 2>&1 | %FileCheck %s
 
 enum FakeOptional<T> {
   case some(T)
@@ -58,7 +58,7 @@ enum E1<T> {
 // CHECK-LABEL: } // end sil function 'test_simplify_term_with_identical_dest_blocks1'
 sil [ossa] @test_simplify_term_with_identical_dest_blocks1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  specify_test "simplify-cfg-simplify-term-with-identical-dest-blocks @block[0]"
+  specify_test "simplify_cfg_simplify_term_with_identical_dest_blocks @block[0]"
   %1 = begin_borrow %0 : $Klass
   br bb1(%1 : $Klass)
 
@@ -79,7 +79,7 @@ bb2(%5 : @guaranteed $Klass):
 // CHECK-LABEL: } // end sil function 'test_simplify_term_with_identical_dest_blocks2'
 sil [ossa] @test_simplify_term_with_identical_dest_blocks2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  specify_test "simplify-cfg-simplify-term-with-identical-dest-blocks @block[0]"
+  specify_test "simplify_cfg_simplify_term_with_identical_dest_blocks @block[0]"
   br bb1(%0 : $Klass)
 
 bb1(%3 : @owned $Klass):

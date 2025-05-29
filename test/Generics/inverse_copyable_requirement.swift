@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
-
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift
 
 // a concrete move-only type
 struct MO: ~Copyable {
@@ -22,13 +20,13 @@ protocol Box<T> {
   func get() -> T
 }
 
-class RefBox<T>: Box { // expected-note@:14 2{{generic parameter 'T' has an implicit Copyable requirement}}
+class RefBox<T>: Box { // expected-note 2{{'where T: Copyable' is implicit here}}
   var val: T
   init(_ t: T) { val = t }
   func get() -> T { return val }
 }
 
-struct ValBox<T>: Box { // expected-note@:15 2{{generic parameter 'T' has an implicit Copyable requirement}}
+struct ValBox<T>: Box { // expected-note 2{{'where T: Copyable' is implicit here}}
   var val: T
   init(_ t: T) { val = t }
   func get() -> T { return val }
@@ -39,20 +37,20 @@ class NotStoredGenerically<T> {
   func give() -> T { fatalError("todo") }
 }
 
-enum Maybe<T> { // expected-note@:12 {{generic parameter 'T' has an implicit Copyable requirement}}
+enum Maybe<T> { // expected-note {{'where T: Copyable' is implicit here}}
   case none
   case just(T)
 }
 
 func takeConcrete(_ m: borrowing MO) {}
-func takeGeneric<T>(_ t: T) {} // expected-note@:18 5{{generic parameter 'T' has an implicit Copyable requirement}}
+func takeGeneric<T>(_ t: T) {} // expected-note 5{{'where T: Copyable' is implicit here}}
 func takeGenericSendable<T>(_ t: T) where T: Sendable {}
-func takeMaybe<T>(_ m: Maybe<T>) {} // expected-note@:16 2{{generic parameter 'T' has an implicit Copyable requirement}}
+func takeMaybe<T>(_ m: Maybe<T>) {} // expected-note 2{{'where T: Copyable' is implicit here}}
 func takeAnyBoxErased(_ b: any Box) {}
-func takeAnyBox<T>(_ b: any Box<T>) {} // expected-note@:17 2{{generic parameter 'T' has an implicit Copyable requirement}}
+func takeAnyBox<T>(_ b: any Box<T>) {} // expected-note 2{{'where T: Copyable' is implicit here}}
 func takeAny(_ a: Any) {}
 func takeAnyObject(_ a: AnyObject) {}
-func genericVarArg<T>(_ t: T...) {} // expected-note@:20 {{generic parameter 'T' has an implicit Copyable requirement}}
+func genericVarArg<T>(_ t: T...) {} // expected-note {{'where T: Copyable' is implicit here}}
 
 var globalMO: MO = MO()
 
@@ -63,50 +61,50 @@ var globalMO: MO = MO()
 
 // some top-level tests
 let _: MO = globalMO
-takeGeneric(globalMO) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeGeneric'}}
+takeGeneric(globalMO) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
 
 
 
 
 func testAny() {
-  let _: Any = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
-  takeAny(MO()) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  let _: Any = MO() // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
+  takeAny(MO()) // expected-error {{argument type 'MO' does not conform to expected type 'Copyable'}}
 }
 
 func testBasic(_ mo: borrowing MO) {
   takeConcrete(globalMO)
   takeConcrete(MO())
 
-  takeGeneric(globalMO) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeGeneric'}}
-  takeGeneric(MO()) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeGeneric'}}
-  takeGeneric(mo) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeGeneric'}}
+  takeGeneric(globalMO) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
+  takeGeneric(MO()) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
+  takeGeneric(mo) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
 
-  takeAny(mo) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
-  print(mo) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  takeAny(mo) // expected-error {{argument type 'MO' does not conform to expected type 'Copyable'}}
+  print(mo) // expected-error {{argument type 'MO' does not conform to expected type 'Copyable'}}
 
   takeGeneric { () -> Int? in mo.x }
   genericVarArg(5)
-  genericVarArg(mo) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'genericVarArg'}}
+  genericVarArg(mo) // expected-error {{global function 'genericVarArg' requires that 'MO' conform to 'Copyable'}}
 
-  takeGeneric( (mo, 5) ) // expected-error {{tuple with noncopyable element type 'MO' is not supported}}
-  takeGeneric( ((mo, 5), 19) ) // expected-error {{tuple with noncopyable element type 'MO' is not supported}}
-  takeGenericSendable((mo, mo)) // expected-error 2{{tuple with noncopyable element type 'MO' is not supported}}
+  takeGeneric( (mo, 5) ) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
+  takeGeneric( ((mo, 5), 19) ) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
+  takeGenericSendable((mo, mo)) // expected-error {{global function 'takeGenericSendable' requires that 'MO' conform to 'Copyable'}}
 
   let singleton : (MO) = (mo)
-  takeGeneric(singleton) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeGeneric'}}
+  takeGeneric(singleton) // expected-error {{global function 'takeGeneric' requires that 'MO' conform to 'Copyable'}}
 
-  takeAny((mo)) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
-  takeAny((mo, mo)) // expected-error {{noncopyable type '(MO, MO)' cannot be erased to copyable existential type 'Any'}}
+  takeAny((mo)) // expected-error {{argument type 'MO' does not conform to expected type 'Copyable'}}
+  takeAny((mo, mo)) // expected-error {{global function 'takeAny' requires that 'MO' conform to 'Copyable'}}
 }
 
 func checkBasicBoxes() {
   let mo = MO()
 
-  let vb = ValBox(consume mo) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
+  let vb = ValBox(consume mo) // expected-error {{generic struct 'ValBox' requires that 'MO' conform to 'Copyable'}}
   _ = vb.get()
   _ = vb.val
 
-  let rb = RefBox(MO())  // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
+  let rb = RefBox(MO())  // expected-error {{generic class 'RefBox' requires that 'MO' conform to 'Copyable'}}
   _ = rb.get()
   _ = rb.val
 
@@ -114,17 +112,17 @@ func checkBasicBoxes() {
 }
 
 func checkExistential() {
-  takeAnyBox( // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeAnyBox'}}
+  takeAnyBox( // expected-error {{global function 'takeAnyBox' requires that 'MO' conform to 'Copyable'}}
       RefBox(MO()))
 
-  takeAnyBox( // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeAnyBox'}}
+  takeAnyBox( // expected-error {{global function 'takeAnyBox' requires that 'MO' conform to 'Copyable'}}
       ValBox(globalMO))
 
   takeAnyBoxErased(
-      RefBox(MO())) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
+      RefBox(MO())) // expected-error {{generic class 'RefBox' requires that 'MO' conform to 'Copyable'}}
 
   takeAnyBoxErased(
-      ValBox(globalMO)) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
+      ValBox(globalMO)) // expected-error {{generic struct 'ValBox' requires that 'MO' conform to 'Copyable'}}
 }
 
 func checkMethodCalls() {
@@ -132,15 +130,15 @@ func checkMethodCalls() {
   tg.take(MO())
   tg.give()
 
-  let _ = Maybe.just(MO()) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'Maybe'}}
+  let _ = Maybe.just(MO()) // expected-error {{generic enum 'Maybe' requires that 'MO' conform to 'Copyable'}}
 
   let _: Maybe<MO> = .none // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   let _ = Maybe<MO>.just(MO()) // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   let _: Maybe<MO> = .just(MO()) // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
-  takeMaybe(.just(MO())) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeMaybe'}}
+  takeMaybe(.just(MO())) // expected-error {{global function 'takeMaybe' requires that 'MO' conform to 'Copyable'}}
   takeMaybe(true ? .none : .just(MO()))
-  // expected-error@-1 {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeMaybe'}}
+  // expected-error@-1 {{global function 'takeMaybe' requires that 'MO' conform to 'Copyable'}}
 }
 
 func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
@@ -152,22 +150,24 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
   let _: MO = dup.get()
   let _: MO = dup.val
 
-  let _: Any = MO.self // expected-error {{metatype 'MO.Type' cannot be cast to 'Any' because 'MO' is noncopyable}}
-  let _: AnyObject = MO.self // expected-error {{metatype 'MO.Type' cannot be cast to 'AnyObject' because 'MO' is noncopyable}}
-  let _ = MO.self as Any // expected-error {{metatype 'MO.Type' cannot be cast to 'Any' because 'MO' is noncopyable}}
-  let _ = MO.self is Any // expected-warning {{cast from 'MO.Type' to unrelated type 'Any' always fails}}
+  let _: Any = MO.self
+  let _: AnyObject = MO.self // expected-error {{value of type 'MO.Type' expected to be instance of class or class-constrained type}}
+  let _ = MO.self as Any
+  let _ = MO.self is Any // expected-warning {{'is' test is always true}}
 
-  let _: Sendable = (MO(), MO()) // expected-error {{noncopyable type '(MO, MO)' cannot be erased to copyable existential type 'any Sendable'}}
-  let _: Sendable = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any Sendable'}}
-  let _: Copyable = mo // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any Copyable'}}
-  let _: AnyObject = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'AnyObject'}}
-  let _: Any = mo // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  // FIXME: well this message is confusing. It's actually that `any Sendable` requires Copyable, not protocol `Sendable`!
+  let _: Sendable = (MO(), MO()) // expected-error {{protocol 'Sendable' requires that 'MO' conform to 'Copyable'}}
 
-  _ = MO() as P // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any P'}}
-  _ = MO() as any P // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any P'}}
-  _ = MO() as Any // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
+  let _: Sendable = MO() // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
+  let _: Copyable = mo // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
+  let _: AnyObject = MO() // expected-error {{value of type 'MO' expected to be instance of class or class-constrained type}}
+  let _: Any = mo // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
+
+  _ = MO() as P // expected-error {{cannot convert value of type 'MO' to type 'any P' in coercion}}
+  _ = MO() as any P // expected-error {{cannot convert value of type 'MO' to type 'any P' in coercion}}
+  _ = MO() as Any // expected-error {{cannot convert value of type 'MO' to type 'Any' in coercion}}
   _ = MO() as MO
-  _ = MO() as AnyObject // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'AnyObject'}}
+  _ = MO() as AnyObject // expected-error {{value of type 'MO' expected to be instance of class or class-constrained type}}
   _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
   _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
   _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}
@@ -231,22 +231,22 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 // FIXME: rdar://115752211 (deal with existing Swift modules that lack Copyable requirements)
 // the stdlib right now is not yet being compiled with NoncopyableGenerics
 func checkStdlibTypes(_ mo: borrowing MO) {
-  _ = "\(mo)" // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
-  let _: String = String(describing: mo) // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Subject' in 'init(describing:)'}}
+  _ = "\(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
+  let _: String = String(describing: mo) // expected-error {{no exact matches in call to initializer}}
 
-  let _: [MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  let _: [MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       [MO(), MO()]
-  let _: [MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  let _: [MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       []
-  let _: [String: MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
+  let _: [String: MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       ["hello" : MO()]  // expected-error{{type '(String, MO)' containing noncopyable element is not supported}}
 
-  _ = [MO()] // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
+  _ = [MO()] // expected-error {{generic struct 'Array' requires that 'MO' conform to 'Copyable'}}
 
-  let _: Array<MO> = .init() // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
-  _ = [MO]() // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  let _: Array<MO> = .init() // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  _ = [MO]() // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
-  let _: String = "hello \(mo)" // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
+  let _: String = "hello \(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
 }
 
 func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHashable) {
@@ -259,14 +259,14 @@ func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHasha
 // ensure that associated types can't be witnessed by move-only types
 
 protocol HasType<Ty> {
-  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'; add nested type 'Ty' for conformance}}
+  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'}}
 }
 
-class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}}
+class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}} expected-note {{add stubs for conformance}}
   typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
 }
 
-struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
+struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}} expected-note {{add stubs for conformance}}
   struct Ty: ~Copyable {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
@@ -274,7 +274,7 @@ protocol Gives: HasType {
   func give() -> Ty
 }
 
-struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}}
+struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}} expected-note {{add stubs for conformance}}
   typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
   func give() -> Ty {}
 }
@@ -288,9 +288,4 @@ func doBadMetatypeStuff<T>(_ t: T) {
 }
 func tryToDoBadMetatypeStuff() {
   doBadMetatypeStuff(MO.self)
-}
-
-func packingHeat<each T>(_ t: repeat each T) {} // expected-note {{generic parameter 'each T' has an implicit Copyable requirement}}
-func packIt() {
-  packingHeat(MO())  // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'each T' in 'packingHeat'}}
 }

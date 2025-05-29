@@ -45,11 +45,12 @@ namespace swift {
   class SILType;
   class SourceLoc;
   enum class MetadataState : size_t;
+  enum class CoroAllocatorKind : uint8_t;
 
-namespace Lowering {
+  namespace Lowering {
   class TypeConverter;
-}
-  
+  }
+
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
@@ -59,6 +60,7 @@ namespace irgen {
   class IRGenModule;
   class LinkEntity;
   class LocalTypeDataCache;
+  class MetadataDependencyCollector;
   class MetadataResponse;
   class Scope;
   class TypeInfo;
@@ -74,17 +76,22 @@ public:
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   OptimizationMode OptMode;
+  bool isPerformanceConstraint;
 
-  llvm::Function *CurFn;
+  // Destination basic blocks for condfail traps.
+  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
+
+  llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                bool isPerformanceConstraint = false,
                 OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
-                llvm::Optional<SILLocation> DbgLoc = llvm::None);
+                std::optional<SILLocation> DbgLoc = std::nullopt);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
@@ -99,7 +106,8 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
                         Explosion &scalars, bool isSwiftCCReturn,
-                        bool isOutlined);
+                        bool isOutlined, bool mayPeepholeLoad = false,
+                        SILType errorType = {});
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -136,6 +144,9 @@ public:
 
   Address getCallerTypedErrorResultSlot();
   Address getCalleeTypedErrorResultSlot(SILType errorType);
+  void setCalleeTypedErrorResultSlot(Address addr);
+
+  llvm::ConstantInt* getMallocTypeId();
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -145,11 +156,36 @@ public:
     assert(isCoroutine());
     return CoroutineHandle;
   }
+  bool isCalleeAllocatedCoroutine() { return CoroutineAllocator != nullptr; }
+  llvm::Value *getCoroutineAllocator() {
+    assert(isCoroutine());
+    return CoroutineAllocator;
+  }
 
   void setCoroutineHandle(llvm::Value *handle) {
     assert(CoroutineHandle == nullptr && "already set handle");
     assert(handle != nullptr && "setting a null handle");
     CoroutineHandle = handle;
+  }
+
+  void setCoroutineAllocator(llvm::Value *allocator) {
+    assert(CoroutineAllocator == nullptr && "already set allocator");
+    assert(allocator != nullptr && "setting a null allocator");
+    CoroutineAllocator = allocator;
+  }
+
+  std::optional<CoroAllocatorKind> getDefaultCoroutineAllocatorKind();
+
+  llvm::BasicBlock *getCoroutineExitBlock() const {
+    return CoroutineExitBlock;
+  }
+
+  SmallVector<llvm::Value *, 1> coroutineResults;
+  
+  void setCoroutineExitBlock(llvm::BasicBlock *block) {
+    assert(CoroutineExitBlock == nullptr && "already set exit BB");
+    assert(block != nullptr && "setting a null exit BB");
+    CoroutineExitBlock = block;
   }
 
   llvm::Value *getAsyncTask();
@@ -162,7 +198,8 @@ public:
                                        bool restoreCurrentContext = true);
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
-  llvm::Function *getOrCreateResumePrjFn(bool forPrologue = false);
+  llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *popAsyncContext(llvm::Value *calleeContext);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -188,6 +225,8 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  void emitClearSensitive(Address address, llvm::Value *size);
+
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 
@@ -207,6 +246,7 @@ private:
   Address CallerTypedErrorResultSlot;
   Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
+  llvm::Value *CoroutineAllocator = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
@@ -233,7 +273,7 @@ private:
   bool callsAnyAlwaysInlineThunksWithForeignExceptionTraps = false;
 
 public:
-  void emitCoroutineOrAsyncExit();
+  void emitCoroutineOrAsyncExit(bool isUnwind);
 
 //--- Helper methods -----------------------------------------------------------
 public:
@@ -251,6 +291,8 @@ public:
   /// heapified.
   bool canStackPromotePackMetadata() const;
 
+  bool outliningCanCallValueWitnesses() const;
+
   void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
 
@@ -264,7 +306,8 @@ public:
                                  Alignment align, bool allowTaskAlloc = true,
                                  const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
-                                   bool allowTaskDealloc = true);
+                                   bool allowTaskDealloc = true,
+                                   bool useTaskDeallocThrough = false);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -338,6 +381,15 @@ public:
                                               llvm::Value *minor,
                                               llvm::Value *patch);
 
+  llvm::Value *emitTargetVariantOSVersionAtLeastCall(llvm::Value *major,
+                                                     llvm::Value *minor,
+                                                     llvm::Value *patch);
+
+  llvm::Value *emitTargetOSVersionOrVariantOSVersionAtLeastCall(
+      llvm::Value *major, llvm::Value *minor, llvm::Value *patch,
+      llvm::Value *variantMajor, llvm::Value *variantMinor,
+      llvm::Value *variantPatch);
+
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   llvm::Value *emitAllocEmptyBoxCall();
@@ -375,7 +427,9 @@ public:
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
   llvm::Value *emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request);
-  
+
+  llvm::Value *emitValueGenericRef(CanType type);
+
   llvm::Value *emitValueWitnessTableRef(SILType type,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRef(SILType type,
@@ -388,6 +442,12 @@ public:
                                               llvm::Value *&metadataSlot,
                                               ValueWitness index);
 
+  void emitInitializeFieldOffsetVector(SILType T,
+                                       llvm::Value *metadata,
+                                       bool isVWTMutable,
+                                       MetadataDependencyCollector *collector);
+
+
   llvm::Value *optionallyLoadFromConditionalProtocolWitnessTable(
     llvm::Value *wtable);
 
@@ -398,6 +458,8 @@ public:
 
   void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
   void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
+
+  void withLocalStackPackAllocs(llvm::function_ref<void()> fn);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
@@ -415,6 +477,18 @@ public:
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
   void emitTrap(StringRef failureMessage, bool EmitUnreachable);
+
+  void emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                           const SILDebugScope *debugScope = nullptr);
+
+  /// Given at least a src address to a list of elements, runs body over each
+  /// element passing its address. An optional destination address can be
+  /// provided which this will run over as well to perform things like
+  /// 'initWithTake' from src to dest.
+  void emitLoopOverElements(const TypeInfo &elementTypeInfo,
+                            SILType elementType, CanType countType,
+                            Address dest, Address src,
+                          std::function<void (Address dest, Address src)> body);
 
 private:
   llvm::Instruction *AllocaIP;
@@ -556,7 +630,8 @@ public:
   void emitBlockRelease(llvm::Value *value);
 
   void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
-                                                 llvm::Value *value);
+                                                 llvm::Value *value,
+                                                 bool needsNullCheck = false);
 
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).
@@ -581,6 +656,7 @@ public:
   Address emitTaskAlloc(llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(Address address);
+  void emitTaskDeallocThrough(Address address);
 
   llvm::Value *alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val);
 
@@ -673,7 +749,8 @@ public:
   MetadataResponse tryGetConcreteLocalTypeData(LocalTypeDataKey key,
                                                DynamicMetadataRequest request);
   void setUnscopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
-  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
+  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value,
+                              bool mayEmitDebugInfo = true);
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.
@@ -786,7 +863,25 @@ public:
   llvm::Value *getDynamicSelfMetadata();
   void setDynamicSelfMetadata(CanType selfBaseTy, bool selfIsExact,
                               llvm::Value *value, DynamicSelfKind kind);
+#ifndef NDEBUG
+  LocalTypeDataCache const *getLocalTypeData() { return LocalTypeData; }
+#endif
 
+  /// A forwardable argument is a load that is immediately preceeds the apply it
+  /// is used as argument to. If there is no side-effecting instructions between
+  /// said load and the apply, we can memcpy the loads address to the apply's
+  /// indirect argument alloca.
+  void clearForwardableArguments() {
+    forwardableArguments.clear();
+  }
+
+  void setForwardableArgument(unsigned idx) {
+    forwardableArguments.insert(idx);
+  }
+
+  bool isForwardableArgument(unsigned idx) const {
+    return forwardableArguments.contains(idx);
+  }
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -805,6 +900,8 @@ private:
   CanType SelfType;
   bool SelfTypeIsExact = false;
   DynamicSelfKind SelfKind;
+
+  llvm::SmallSetVector<unsigned, 16> forwardableArguments;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

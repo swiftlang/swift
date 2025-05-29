@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_MANGLER_H
 #define SWIFT_BASIC_MANGLER_H
 
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/Debug.h"
@@ -21,6 +22,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -69,6 +71,8 @@ protected:
 
   size_t MaxNumWords = 26;
 
+  ManglingFlavor Flavor = ManglingFlavor::Default;
+
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode = true;
 
@@ -100,6 +104,24 @@ protected:
     return StringRef(Storage.data(), Storage.size());
   }
 
+  void print(llvm::raw_ostream &os) const {
+    os << getBufferStr() << '\n';
+  }
+
+public:
+  /// Dump the current stored state in the Mangler. Only for use in the debugger!
+  SWIFT_DEBUG_DUMPER(dumpBufferStr()) {
+    print(llvm::dbgs());
+  }
+
+  /// Appends the given raw identifier to the buffer in the form required to
+  /// mangle it. This handles the transformations needed for such identifiers
+  /// to retain compatibility with older runtimes.
+  static void
+  appendRawIdentifierForRuntime(StringRef ident,
+                                llvm::SmallVectorImpl<char> &buffer);
+
+protected:
   /// Removes the last characters of the buffer by setting it's size to a
   /// smaller value.
   void resetBuffer(size_t toPos) {
@@ -107,7 +129,6 @@ protected:
     Storage.resize(toPos);
   }
 
-protected:
   Mangler() : Buffer(Storage) { }
 
   /// Begins a new mangling but does not add the mangling prefix.
@@ -124,12 +145,12 @@ protected:
   void finalize(llvm::raw_ostream &stream);
 
   /// Verify that demangling and remangling works.
-  static void verify(StringRef mangledName);
+  static void verify(StringRef mangledName, ManglingFlavor Flavor);
 
   SWIFT_DEBUG_DUMP;
 
   /// Appends a mangled identifier string.
-  void appendIdentifier(StringRef ident);
+  void appendIdentifier(StringRef ident, bool allowRawIdentifiers = true);
 
   // NOTE: the addSubstitution functions perform the value computation before
   // the assignment because there is no sequence point synchronising the

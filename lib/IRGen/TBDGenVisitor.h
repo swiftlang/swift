@@ -52,7 +52,7 @@ struct InstallNameStore {
   std::string InstallName;
   // The install name specific to the platform id. This takes precedence over
   // the default install name.
-  std::map<uint8_t, std::string> PlatformInstallName;
+  std::map<LinkerPlatformId, std::string> PlatformInstallName;
   StringRef getInstallName(LinkerPlatformId Id) const;
 };
 
@@ -61,8 +61,9 @@ class APIRecorder {
 public:
   virtual ~APIRecorder() {}
 
-  virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
-                         SymbolSource source, Decl *decl) {}
+  virtual void addSymbol(StringRef name, llvm::MachO::EncodeKind kind,
+                         SymbolSource source, Decl *decl,
+                         llvm::MachO::SymbolFlags flags) {}
   virtual void addObjCInterface(const ClassDecl *decl) {}
   virtual void addObjCCategory(const ExtensionDecl *decl) {}
   virtual void addObjCMethod(const GenericContext *ctx, SILDeclRef method) {}
@@ -70,14 +71,16 @@ public:
 
 class SimpleAPIRecorder final : public APIRecorder {
 public:
-  using SymbolCallbackFn = llvm::function_ref<void(
-      StringRef, llvm::MachO::SymbolKind, SymbolSource, Decl *)>;
+  using SymbolCallbackFn =
+      llvm::function_ref<void(StringRef, llvm::MachO::EncodeKind, SymbolSource,
+                              Decl *, llvm::MachO::SymbolFlags)>;
 
   SimpleAPIRecorder(SymbolCallbackFn func) : func(func) {}
 
-  void addSymbol(StringRef symbol, llvm::MachO::SymbolKind kind,
-                 SymbolSource source, Decl *decl) override {
-    func(symbol, kind, source, decl);
+  void addSymbol(StringRef symbol, llvm::MachO::EncodeKind kind,
+                 SymbolSource source, Decl *decl,
+                 llvm::MachO::SymbolFlags flags) override {
+    func(symbol, kind, source, decl, flags);
   }
 
 private:
@@ -90,7 +93,7 @@ class TBDGenVisitor : public IRSymbolVisitor {
   llvm::StringSet<> DuplicateSymbolChecker;
 #endif
 
-  llvm::Optional<llvm::DataLayout> DataLayout = llvm::None;
+  std::optional<llvm::DataLayout> DataLayout = std::nullopt;
   const StringRef DataLayoutDescription;
 
   UniversalLinkageInfo UniversalLinkInfo;
@@ -98,22 +101,21 @@ class TBDGenVisitor : public IRSymbolVisitor {
   const TBDGenOptions &Opts;
   APIRecorder &recorder;
 
-  using SymbolKind = llvm::MachO::SymbolKind;
+  using EncodeKind = llvm::MachO::EncodeKind;
+  using SymbolFlags = llvm::MachO::SymbolFlags;
 
   std::vector<Decl*> DeclStack;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     previousInstallNameMap;
   std::unique_ptr<std::map<std::string, InstallNameStore>>
     parsePreviousModuleInstallNameMap();
-  void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
-                         SymbolSource source);
-  void addLinkerDirectiveSymbolsLdHide(StringRef name, llvm::MachO::SymbolKind kind);
-  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, llvm::MachO::SymbolKind kind);
-  void addSymbol(StringRef name, SymbolSource source,
-                 SymbolKind kind = SymbolKind::GlobalSymbol);
+  void addSymbolInternal(StringRef name, EncodeKind kind, SymbolSource source,
+                         SymbolFlags);
+  void addLinkerDirectiveSymbolsLdHide(StringRef name, EncodeKind kind);
+  void addLinkerDirectiveSymbolsLdPrevious(StringRef name, EncodeKind kind);
+  void addSymbol(StringRef name, SymbolSource source, SymbolFlags flags,
+                 EncodeKind kind = EncodeKind::GlobalSymbol);
 
-  void addSymbol(LinkEntity entity);
-  
   bool addClassMetadata(ClassDecl *CD);
 
 public:
@@ -122,7 +124,7 @@ public:
                 APIRecorder &recorder)
       : DataLayoutDescription(dataLayoutString),
         UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false,
-                          /*static=*/false),
+                          /*static=*/false, /*mergeableSymbols*/false),
         SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
 

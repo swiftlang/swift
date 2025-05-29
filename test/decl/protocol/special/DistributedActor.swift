@@ -55,22 +55,37 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{'dist()' declared here}}
 }
 
+// expected-error@+1{{conformance of 'D5' to distributed protocol 'P1' uses non-distributed operations}}
 distributed actor D5: P1 {
+  // expected-note@-1{{mark all declarations used in the conformance 'distributed'}}
+  
   func dist() -> String { "" }
-  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy actor-isolated protocol requirement}}
-  // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method satisfy the protocol requirement}}{{3-3=distributed }}
+  // expected-note@-1{{non-distributed instance method 'dist()'}}
 }
 
 // ==== Tests ------------------------------------------------------------------
 
 // Make sure the conformances have been added implicitly.
 func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
-func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
+func acceptAnyActor<Act: AnyActor>(_: Act.Type) { } // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
 func testConformance() {
   acceptDistributedActor(D1.self)
   acceptAnyActor(D1.self)
 }
+
+// https://github.com/apple/swift/issues/69244
+protocol P {
+  func foo() -> Void
+}
+
+// expected-error@+1{{conformance of 'A' to protocol 'P' involves isolation mismatches and can cause data races}}
+distributed actor A: P {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  typealias ActorSystem = LocalTestingDistributedActorSystem
+  distributed func foo() { }
+  // expected-note@-1{{actor-isolated distributed instance method 'foo()' cannot satisfy nonisolated requirement}}
+}
+// ---

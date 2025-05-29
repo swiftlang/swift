@@ -45,10 +45,13 @@ STATISTIC(TotalExternalFuncDecls, "Number of external funcs declarations");
 // Linkage statistics
 STATISTIC(TotalPublicFuncs, "Number of public funcs");
 STATISTIC(TotalPublicNonABIFuncs, "Number of public non-ABI funcs");
+STATISTIC(TotalPackageFuncs, "Number of package funcs");
+STATISTIC(TotalPackageNonABIFuncs, "Number of package non-ABI funcs");
 STATISTIC(TotalHiddenFuncs, "Number of hidden funcs");
 STATISTIC(TotalPrivateFuncs, "Number of private funcs");
 STATISTIC(TotalSharedFuncs, "Number of shared funcs");
 STATISTIC(TotalPublicExternalFuncs, "Number of public external funcs");
+STATISTIC(TotalPackageExternalFuncs, "Number of package external funcs");
 STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
 
 // Individual instruction statistics
@@ -119,6 +122,12 @@ class InstCount : public SILFunctionTransform {
     case SILLinkage::PublicNonABI:
       ++TotalPublicNonABIFuncs;
       break;
+    case SILLinkage::Package:
+      ++TotalPackageFuncs;
+      break;
+    case SILLinkage::PackageNonABI:
+      ++TotalPackageNonABIFuncs;
+      break;
     case SILLinkage::Hidden:
       ++TotalHiddenFuncs;
       break;
@@ -130,6 +139,9 @@ class InstCount : public SILFunctionTransform {
       break;
     case SILLinkage::PublicExternal:
       ++TotalPublicExternalFuncs;
+      break;
+    case SILLinkage::PackageExternal:
+      ++TotalPackageExternalFuncs;
       break;
     case SILLinkage::HiddenExternal:
       ++TotalHiddenExternalFuncs;

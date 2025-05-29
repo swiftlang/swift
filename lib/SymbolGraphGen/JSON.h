@@ -53,7 +53,7 @@ void filterGenericParams(
 /// Filter generic requirements on an extension that aren't relevant
 /// for documentation.
 void filterGenericRequirements(
-    ArrayRef<Requirement> Requirements, const NominalTypeDecl *Self,
+    ArrayRef<Requirement> Requirements, const ProtocolDecl *Self,
     SmallVectorImpl<Requirement> &FilteredRequirements,
     SubstitutionMap SubMap = {},
     ArrayRef<const GenericTypeParamType *> FilteredParams = {});

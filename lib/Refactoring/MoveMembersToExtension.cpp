@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RefactoringActions.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift::refactoring;
 
@@ -21,7 +22,7 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
   case RangeKind::MultiTypeMemberDecl: {
     DeclContext *DC = Info.RangeContext;
 
-    // The the common decl context is not a nomial type, we cannot create an
+    // The common decl context is not a nomial type, we cannot create an
     // extension for it
     if (!DC || !DC->getInnermostDeclarationDeclContext() ||
         !isa<NominalTypeDecl>(DC->getInnermostDeclarationDeclContext()))

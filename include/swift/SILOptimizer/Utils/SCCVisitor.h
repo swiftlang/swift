@@ -132,6 +132,7 @@ private:
     case TermKind::ReturnInst:
     case TermKind::SwitchValueInst:
     case TermKind::ThrowInst:
+    case TermKind::ThrowAddrInst:
     case TermKind::UnwindInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
 

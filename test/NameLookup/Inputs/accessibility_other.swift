@@ -2,7 +2,7 @@ import has_accessibility
 
 public let a = 0 // expected-note * {{did you mean 'a'?}}
 internal let b = 0 // expected-note * {{did you mean 'b'?}}
-private let c = 0
+private let c = 0 // expected-note {{'c' declared here}}
 
 extension Foo {
   public static func a() {}

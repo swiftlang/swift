@@ -1,20 +1,20 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -O -sil-verify-all -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 //////////////////
 // Declarations //
 //////////////////
 
 class OrdinaryClass {}
 
-@_moveOnly
-public enum MaybeKlass {
+public enum MaybeKlass: ~Copyable {
     case just(Klass)
     case none
 }
 
-@_moveOnly
-public class Klass {
+public class Klass: ~Copyable {
     var intField: Int
     var klsField: OrdinaryClass // FIXME(104504239): this is suppose to be MaybeKlass, or better yet, Optional<Klass>
 

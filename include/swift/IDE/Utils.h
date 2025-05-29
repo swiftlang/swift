@@ -17,9 +17,10 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/Effects.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IDE/IDEBridging.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -79,8 +80,11 @@ struct SourceCompleteResult {
 };
 
 SourceCompleteResult
-isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
-SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
+                      SourceFileKind SFKind, const LangOptions &LangOpts);
+SourceCompleteResult isSourceInputComplete(StringRef Text,
+                                           SourceFileKind SFKind,
+                                           const LangOptions &LangOpts);
 
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.
@@ -112,7 +116,7 @@ std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
 
-llvm::Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
+std::optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
 class XMLEscapingPrinter : public StreamPrinter {
   public:
@@ -170,10 +174,10 @@ private:
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
   bool IsRef = true;
-  Type Ty;
+  Type SolutionSpecificInterfaceType;
   Type ContainerType;
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
-      llvm::None;
+  std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
+      std::nullopt;
 
   bool IsKeywordArgument = false;
   /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
@@ -195,13 +199,15 @@ public:
   ResolvedValueRefCursorInfo() = default;
   explicit ResolvedValueRefCursorInfo(
       SourceFile *SF, SourceLoc Loc, ValueDecl *ValueD, TypeDecl *CtorTyRef,
-      ExtensionDecl *ExtTyRef, bool IsRef, Type Ty, Type ContainerType,
-      llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
+      ExtensionDecl *ExtTyRef, bool IsRef, Type SolutionSpecificInterfaceType,
+      Type ContainerType,
+      std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
       bool IsKeywordArgument, bool IsDynamic,
       SmallVector<NominalTypeDecl *> ReceiverTypes,
       SmallVector<ValueDecl *> ShorthandShadowedDecls)
       : ResolvedCursorInfo(CursorInfoKind::ValueRef, SF, Loc), ValueD(ValueD),
-        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef), Ty(Ty),
+        CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef),
+        SolutionSpecificInterfaceType(SolutionSpecificInterfaceType),
         ContainerType(ContainerType), CustomAttrRef(CustomAttrRef),
         IsKeywordArgument(IsKeywordArgument), IsDynamic(IsDynamic),
         ReceiverTypes(ReceiverTypes),
@@ -215,7 +221,9 @@ public:
 
   bool isRef() const { return IsRef; }
 
-  Type getType() const { return Ty; }
+  Type getSolutionSpecificInterfaceType() const {
+    return SolutionSpecificInterfaceType;
+  }
 
   Type getContainerType() const { return ContainerType; }
 
@@ -240,7 +248,7 @@ public:
 
   ValueDecl *typeOrValue() { return CtorTyRef ? CtorTyRef : ValueD; }
 
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>>
+  std::optional<std::pair<const CustomAttr *, Decl *>>
   getCustomAttrRef() const {
     return CustomAttrRef;
   }
@@ -300,99 +308,10 @@ struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
 
 void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
 
-struct UnresolvedLoc {
-  SourceLoc Loc;
-  bool ResolveArgLocs;
-};
-
-enum class LabelRangeType {
-  None,
-  CallArg,    // foo([a: ]2) or .foo([a: ]String)
-  Param,  // func([a b]: Int)
-  NoncollapsibleParam, // subscript([a a]: Int)
-  Selector,   // #selector(foo.func([a]:))
-};
-
-struct ResolvedLoc {
-  ASTWalker::ParentTy Node;
-  CharSourceRange Range;
-  std::vector<CharSourceRange> LabelRanges;
-  llvm::Optional<unsigned> FirstTrailingLabel;
-  LabelRangeType LabelType;
-  bool IsActive;
-  bool IsInSelector;
-};
-
 /// Used by NameMatcher to track parent CallExprs when walking a checked AST.
 struct CallingParent {
   Expr *ApplicableTo;
   CallExpr *Call;
-};
-
-
-/// Finds the parse-only AST nodes and corresponding name and param/argument
-/// label ranges for a given list of input name start locations
-///
-/// Resolved locations also indicate the nature of the matched occurrence (e.g.
-/// whether it is within active/inactive code, or a selector or string literal).
-class NameMatcher: public ASTWalker {
-  SourceFile &SrcFile;
-  std::vector<UnresolvedLoc> LocsToResolve;
-  std::vector<ResolvedLoc> ResolvedLocs;
-  ArrayRef<Token> TokensToCheck;
-
-  /// The \c ArgumentList of a parent \c CustomAttr (if one exists) and
-  /// the \c SourceLoc of the type name it applies to.
-  llvm::Optional<Located<ArgumentList *>> CustomAttrArgList;
-  unsigned InactiveConfigRegionNestings = 0;
-  unsigned SelectorNestings = 0;
-
-  /// The stack of parent CallExprs and the innermost expression they apply to.
-  std::vector<CallingParent> ParentCalls;
-
-  SourceManager &getSourceMgr() const;
-
-  SourceLoc nextLoc() const;
-  bool isDone() const { return LocsToResolve.empty(); };
-  bool isActive() const { return !InactiveConfigRegionNestings; };
-  bool isInSelector() const { return SelectorNestings; };
-  bool checkComments();
-  void skipLocsBefore(SourceLoc Start);
-  bool shouldSkip(Expr *E);
-  bool shouldSkip(SourceRange Range);
-  bool shouldSkip(CharSourceRange Range);
-  bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc);
-  bool tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
-                  ArgumentList *Args);
-  bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
-                  LabelRangeType RangeType, ArrayRef<CharSourceRange> LabelLocs,
-                  llvm::Optional<unsigned> FirstTrailingLabel);
-  bool handleCustomAttrs(Decl *D);
-  ArgumentList *getApplicableArgsFor(Expr* E);
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-  PreWalkAction walkToDeclPre(Decl *D) override;
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override;
-  PreWalkAction walkToTypeReprPre(TypeRepr *T) override;
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override;
-  bool shouldWalkIntoGenericParams() override { return true; }
-  bool shouldWalkIntoUncheckedMacroDefinitions() override { return true; }
-
-  PreWalkResult<ArgumentList *>
-  walkToArgumentListPre(ArgumentList *ArgList) override;
-
-  // FIXME: Remove this
-  bool shouldWalkAccessorsTheOldWay() override { return true; }
-
-public:
-  explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
-  std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
-  ResolvedLoc resolve(UnresolvedLoc Loc);
 };
 
 enum class RangeKind : int8_t {
@@ -516,7 +435,7 @@ public:
   DeclNameViewer() : DeclNameViewer(StringRef()) {}
   operator bool() const { return !BaseName.empty(); }
   StringRef base() const { return BaseName; }
-  llvm::ArrayRef<StringRef> args() const { return llvm::makeArrayRef(Labels); }
+  llvm::ArrayRef<StringRef> args() const { return llvm::ArrayRef(Labels); }
   unsigned argSize() const { return Labels.size(); }
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
@@ -525,25 +444,58 @@ public:
 };
 
 enum class RegionType {
+  /// We could not match the rename location to a symbol to be renamed and the
+  /// symbol was originally a text match result (has `RenameLocUsage::Unknown`).
   Unmatched,
+  /// We could not match the rename location to a symbol to be renamed and the
+  /// symbol came from the index (does not have `RenameLocUsage::Unknown`).
   Mismatch,
+  /// We were able to match the result to a location in source code that's
+  /// active with respect to the current compiler arguments.
   ActiveCode,
+  /// We were able to match the result to a location in source code that's
+  /// inactive with respect to the current compiler arguments.
+  ///
+  /// Currently, we don't evaluate #if so all occurrences inside #if blocks
+  /// are considered inactive.
   InactiveCode,
+  /// The location is inside a string literal.
   String,
+  /// The location is inside a `#selector`.
   Selector,
+  /// The location is inside a comment.
   Comment,
 };
 
 enum class RefactoringRangeKind {
-  BaseName,                    // func [foo](a b: Int)
-  KeywordBaseName,             // [init](a: Int)
-  ParameterName,               // func foo(a[ b]: Int)
-  NoncollapsibleParameterName, // subscript(a[ a]: Int)
-  DeclArgumentLabel,           // func foo([a] b: Int)
-  CallArgumentLabel,           // foo([a]: 1)
-  CallArgumentColon,           // foo(a[: ]1)
-  CallArgumentCombined,        // foo([]1) could expand to foo([a: ]1)
-  SelectorArgumentLabel,       // foo([a]:)
+  /// `func [foo](a b: Int)`
+  BaseName,
+  
+  /// `[init](a: Int)`
+  KeywordBaseName,
+  
+  /// `func foo(a[ b]: Int)`
+  ParameterName,
+  
+  /// `subscript(a[ a]: Int)`
+  NoncollapsibleParameterName,
+  
+  /// `func foo([a] b: Int)`
+  DeclArgumentLabel,
+  
+  /// `foo([a]: 1)`
+  CallArgumentLabel,
+  
+  /// `foo(a[: ]1)`
+  CallArgumentColon,
+  
+  /// `foo([]1) could expand to foo([a: ]1)`
+  /// Also used for enum case declarations without a label, eg.
+  /// `case foo([]String)` should expand to `case foo([a: ]String)`.
+  CallArgumentCombined,
+
+  /// `foo([a]:)`
+  SelectorArgumentLabel,
 };
 
 struct NoteRegion {
@@ -554,7 +506,7 @@ struct NoteRegion {
   unsigned StartColumn;
   unsigned EndLine;
   unsigned EndColumn;
-  llvm::Optional<unsigned> ArgIndex;
+  std::optional<unsigned> ArgIndex;
 };
 
 struct Replacement {
@@ -687,7 +639,7 @@ getCallArgInfo(SourceManager &SM, ArgumentList *Args, LabelRangeEndAt EndKind);
 // Get the ranges of argument labels from an Arg, either tuple or paren, and
 // the index of the first trailing closure argument, if any. This includes empty
 // ranges for any unlabelled arguments, including the first trailing closure.
-std::pair<std::vector<CharSourceRange>, llvm::Optional<unsigned>>
+std::pair<std::vector<CharSourceRange>, std::optional<unsigned>>
 getCallArgLabelRanges(SourceManager &SM, ArgumentList *Args,
                       LabelRangeEndAt EndKind);
 
@@ -735,6 +687,19 @@ bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> get
 /// Adds the resolved nominal types of \p Base to \p Types.
 void getReceiverType(Expr *Base,
                      SmallVectorImpl<NominalTypeDecl *> &Types);
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+/// Entry point to run the NameMatcher written in swift-syntax.
+///
+/// - Parameters:
+///   - sourceFile: The source file from which to load the SwiftSyntax tree
+///   - locations: The locations to resolve
+/// - Returns: A list of `ResolvedLoc` that have been resolved. This list might
+///   be shorteder than `locations` if some locations could not be resolved and
+///   the resolved locations might be in a different order than `locations`.
+std::vector<ResolvedLoc> runNameMatcher(const SourceFile &sourceFile,
+                                        ArrayRef<SourceLoc> locations);
+#endif
 
 } // namespace ide
 } // namespace swift

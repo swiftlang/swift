@@ -100,7 +100,7 @@ struct StackOverflow {
 
 // CHECK: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} static StackOverflow.main() + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:25:5
 // CHECK-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} static StackOverflow.$main() + {{[0-9]+}} in StackOverflow at {{.*}}/<compiler-generated>
-// CHECK-NEXT: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} main + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift
+// CHECK-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift
 
 // CHECK: Registers:
 
@@ -129,7 +129,7 @@ struct StackOverflow {
 
 // LIMITED: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} static StackOverflow.main() + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift:25:5
 // LIMITED-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} static StackOverflow.$main() + {{[0-9]+}} in StackOverflow at {{.*}}/<compiler-generated>
-// LIMITED-NEXT: {{[0-9]+}} [ra]          0x{{[0-9a-f]+}} main + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift
+// LIMITED-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StackOverflow at {{.*}}/StackOverflow.swift
 
 // FRIENDLY: *** Program crashed: Bad pointer dereference at 0x{{[0-9a-f]+}} ***
 

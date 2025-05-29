@@ -1,8 +1,14 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature RawLayout %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature RawLayout -enable-builtin-module %s | %FileCheck %s
 
-// CHECK: @_rawLayout(size: 4, alignment: 4) @_moveOnly struct Lock
-// CHECK: @_rawLayout(like: T) @_moveOnly struct Cell<T>
-// CHECK: @_rawLayout(likeArrayOf: T, count: 8) @_moveOnly struct SmallVectorBuf<T>
+// REQUIRES: swift_feature_RawLayout
+
+
+
+// CHECK: @_rawLayout(size: 4, alignment: 4) struct Lock : ~Copyable
+// CHECK: @_rawLayout(like: T) struct Cell<T> : ~Copyable
+// CHECK: @_rawLayout(likeArrayOf: T, count: 8) struct SmallVectorBuf<T> : ~Copyable
+
+import Builtin
 
 @_rawLayout(size: 4, alignment: 4)
 struct Lock: ~Copyable {
@@ -20,7 +26,18 @@ struct Lock: ~Copyable {
 }
 
 @_rawLayout(like: T)
-struct Cell<T>: ~Copyable {}
+struct Cell<T>: ~Copyable {
+    // CHECK-LABEL: sil {{.*}} @$s10raw_layout4CellV7addressSpyxGvg : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
+    // CHECK:         {{%.*}} = builtin "addressOfRawLayout"<Cell<T>>({{%.*}} : $*Cell<T>) : $Builtin.RawPointer
+    // CHECK-LABEL: } // end sil function '$s10raw_layout4CellV7addressSpyxGvg'
+    var address: UnsafeMutablePointer<T> {
+        .init(Builtin.addressOfRawLayout(self))
+    }
+
+    init(_ value: consuming T) {
+        address.initialize(to: value)
+    }
+}
 
 @_rawLayout(likeArrayOf: T, count: 8)
 struct SmallVectorBuf<T>: ~Copyable {}

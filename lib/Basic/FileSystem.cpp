@@ -12,9 +12,8 @@
 
 #include "swift/Basic/FileSystem.h"
 
+#include "swift/Basic/Assertions.h"
 #include "clang/Basic/FileManager.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -24,6 +23,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include <optional>
 
 using namespace swift;
 
@@ -86,8 +86,8 @@ canUseTemporaryForWrite(const llvm::StringRef outputPath) {
 ///
 /// \returns The path to the temporary file that was opened, or \c None if the
 /// file couldn't be created.
-static llvm::Optional<std::string>
-tryToOpenTemporaryFile(llvm::Optional<llvm::raw_fd_ostream> &openedStream,
+static std::optional<std::string>
+tryToOpenTemporaryFile(std::optional<llvm::raw_fd_ostream> &openedStream,
                        const llvm::StringRef outputPath) {
   namespace fs = llvm::sys::fs;
 
@@ -111,7 +111,7 @@ tryToOpenTemporaryFile(llvm::Optional<llvm::raw_fd_ostream> &openedStream,
   if (EC) {
     // Ignore the specific error; the caller has to fall back to not using a
     // temporary anyway.
-    return llvm::None;
+    return std::nullopt;
   }
 
   openedStream.emplace(fd, /*shouldClose=*/true);
@@ -134,9 +134,9 @@ std::error_code swift::atomicallyWritingToFile(
   if (std::error_code error = canUseTemporary.getError())
     return error;
 
-  llvm::Optional<std::string> temporaryPath;
+  std::optional<std::string> temporaryPath;
   {
-    llvm::Optional<llvm::raw_fd_ostream> OS;
+    std::optional<llvm::raw_fd_ostream> OS;
     if (canUseTemporary.get()) {
       temporaryPath = tryToOpenTemporaryFile(OS, outputPath);
 

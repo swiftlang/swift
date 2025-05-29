@@ -17,16 +17,16 @@ import SIL
 //===--------------------------------------------------------------------===//
 
 /// Instructions which can be simplified at all optimization levels
-protocol Simplifyable : Instruction {
+protocol Simplifiable : Instruction {
   func simplify(_ context: SimplifyContext)
 }
 
 /// Instructions which can be simplified at -Onone
-protocol OnoneSimplifyable : Simplifyable {
+protocol OnoneSimplifiable : Simplifiable {
 }
 
 /// Instructions which can only be simplified at the end of the -Onone pipeline
-protocol LateOnoneSimplifyable : Instruction {
+protocol LateOnoneSimplifiable : Instruction {
   func simplifyLate(_ context: SimplifyContext)
 }
 
@@ -37,8 +37,8 @@ protocol LateOnoneSimplifyable : Instruction {
 let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
   (function: Function, context: FunctionPassContext) in
 
-  _ = runSimplification(on: function, context, preserveDebugInfo: true) {
-    if let i = $0 as? OnoneSimplifyable {
+  runSimplification(on: function, context, preserveDebugInfo: true) {
+    if let i = $0 as? OnoneSimplifiable {
       i.simplify($1)
     }
   }
@@ -47,8 +47,8 @@ let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
 let simplificationPass = FunctionPass(name: "simplification") {
   (function: Function, context: FunctionPassContext) in
 
-  _ = runSimplification(on: function, context, preserveDebugInfo: false) {
-    if let i = $0 as? Simplifyable {
+  runSimplification(on: function, context, preserveDebugInfo: false) {
+    if let i = $0 as? Simplifiable {
       i.simplify($1)
     }
   }
@@ -57,10 +57,10 @@ let simplificationPass = FunctionPass(name: "simplification") {
 let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification") {
   (function: Function, context: FunctionPassContext) in
 
-  _ = runSimplification(on: function, context, preserveDebugInfo: true) {
-    if let i = $0 as? LateOnoneSimplifyable {
+  runSimplification(on: function, context, preserveDebugInfo: true) {
+    if let i = $0 as? LateOnoneSimplifiable {
       i.simplifyLate($1)
-    } else if let i = $0 as? OnoneSimplifyable {
+    } else if let i = $0 as? OnoneSimplifiable {
       i.simplify($1)
     }
   }
@@ -70,7 +70,7 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
 //                         Pass implementation
 //===--------------------------------------------------------------------===//
 
-
+@discardableResult
 func runSimplification(on function: Function, _ context: FunctionPassContext,
                        preserveDebugInfo: Bool,
                        _ simplify: (Instruction, SimplifyContext) -> ()) -> Bool {

@@ -60,10 +60,8 @@ func rethrowThroughWAE(_ zz: (Int, Int, Int) throws -> Int, _ value: Int) throws
   }
 }
 
-// There should be two errors - here one for async -> sync, and another throws -> non-throws
 let _: ((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> () = withoutActuallyEscaping(_:do:)
-// expected-error@-1 {{invalid conversion from throwing function of type '((Int) -> Int, (@escaping (Int) -> Int) async throws -> ()) async throws -> ()' to non-throwing function type '((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()'}}
-// expected-error@-2 {{invalid conversion from 'async' function of type '((Int) -> Int, (@escaping (Int) -> Int) async throws -> ()) async throws -> ()' to synchronous function type '((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()'}}
+// expected-error@-1 {{invalid conversion from 'async' function of type '((Int) -> Int, (@escaping (Int) -> Int) async -> ()) async -> ()' to synchronous function type '((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()'}}
 
 
 // Failing to propagate @noescape into non-single-expression
@@ -90,4 +88,25 @@ class Box<T> {
       return v
     }
   }
+}
+
+enum HomeworkError: Error {
+  case forgot
+  case dogAteIt
+}
+
+enum MyError: Error {
+  case fail
+}
+
+func letEscapeThrowTyped(f: () throws(HomeworkError) -> () -> ()) throws(HomeworkError) -> () -> () {
+  // Note: thrown error type inference for closures will fix this error below.
+  return try withoutActuallyEscaping(f) { return try $0() }
+  // expected-error@-1{{thrown expression type 'any Error' cannot be converted to error type 'HomeworkError'}}
+}
+
+func letEscapeThrowTypedBad(f: () throws(HomeworkError) -> () -> ()) throws(MyError) -> () -> () {
+  // Note: thrown error type inference for closures will change this error below.
+  return try withoutActuallyEscaping(f) { return try $0() }
+  // expected-error@-1{{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
 }

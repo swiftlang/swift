@@ -35,10 +35,6 @@ class SILBasicBlock;
 class SILType;
 class SILUndef;
 
-/// Independent utility that canonicalizes BB arguments by reusing structurally
-/// equivalent arguments and replacing the original arguments with casts.
-SILValue replaceBBArgWithCast(SILPhiArgument *arg);
-
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.
 class SILSSAUpdater {
@@ -79,7 +75,8 @@ public:
   }
 
   /// Initialize for a use of a value of type and ownershipKind
-  void initialize(SILType type, ValueOwnershipKind ownershipKind);
+  void initialize(SILFunction *fn, SILType type,
+                  ValueOwnershipKind ownershipKind);
 
   bool hasValueForBlock(SILBasicBlock *block) const;
   void addAvailableValue(SILBasicBlock *block, SILValue value);

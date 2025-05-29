@@ -1,14 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -enable-import-ptrauth-field-function-pointers -O -emit-module -o %t/Module.swiftmodule %t/Module.swift -enable-experimental-feature Embedded -import-objc-header %t/header.h
+// RUN: %target-swift-frontend -O -emit-module -o %t/Module.swiftmodule %t/Module.swift -enable-experimental-feature Embedded -import-objc-header %t/header.h
 
-// RUN: %target-swift-frontend -enable-import-ptrauth-field-function-pointers -O -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded -import-objc-header %t/header.h
+// RUN: %target-swift-frontend -O -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded -import-objc-header %t/header.h
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: VENDOR=apple
-// REQUIRES: OS=macosx
 // REQUIRES: CPU=arm64e
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN header.h
 
@@ -37,7 +36,7 @@ public func mainfunc(x: UnsafePointer<MyStruct>) {
     test2(x: x)
 }
 
-// CHECK: define {{.*}}@"$s4Main5test11xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test11xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 0) ]
-// CHECK: define {{.*}}@"$s4Main5test21xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test21xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 16962) ]

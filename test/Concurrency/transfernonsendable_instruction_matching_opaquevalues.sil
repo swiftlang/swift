@@ -1,0 +1,202 @@
+// RUN: %target-sil-opt -send-non-sendable -enable-sil-opaque-values -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify -o /dev/null
+
+// REQUIRES: concurrency
+// REQUIRES: objc_interop
+// REQUIRES: swift_feature_RegionBasedIsolation
+
+// PLEASE READ THIS!
+//
+// This test is specifically to test out individual instruction interactions,
+// not for crashers. The idea is to make it so that we have one test for every
+// SIL instruction, so please add a test here when you add a new instruction.
+//
+// For assign/lookthrough, just add a test that triggers an ownership error. If it is
+// a more complex instruction, talk with @gottesmm.
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+class NonSendableKlass {}
+
+final class SendableKlass : Sendable {}
+
+struct NonSendableMoveOnlyStruct: ~Copyable {
+  var ns: NonSendableKlass
+}
+
+struct NonSendableStruct {
+  var ns: NonSendableKlass
+}
+
+sil @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+sil @transferSendableKlass : $@convention(thin) @async (@guaranteed SendableKlass) -> ()
+sil @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
+
+sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @initNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+
+sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @initIndirect : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+
+sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+protocol P {
+  func doSomething()
+}
+
+sil @initP : $@convention(thin) () -> @owned P
+sil @transferP : $@async @convention(thin) (@guaranteed P) -> ()
+sil @useP : $@convention(thin) (@in_guaranteed P) -> ()
+
+protocol PAnyObject : AnyObject {}
+
+sil @initPAnyObject : $@convention(thin) () -> @owned PAnyObject
+sil @initPAnyObjectOptional : $@convention(thin) () -> @owned Optional<PAnyObject>
+sil @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
+sil @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
+sil @usePAnyObject : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> ()
+
+extension NonSendableKlass : P {
+  func doSomething()
+}
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+sil [ossa] @test_unowned_copy_value : $@convention(thin) @async <T where T : AnyObject> (@owned T) -> () {
+bb0(%owned_value : @owned $T):
+  %unowned_value = unowned_copy_value %owned_value : $T
+
+  %4 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %4<@sil_unowned T>(%unowned_value) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  destroy_value %unowned_value : $@sil_unowned T
+  //destroy_value %value : $T
+  destroy_value %owned_value : $T
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Make sure that tuple_pack_extract is look through.
+sil [ossa] @tuple_pack_extract_test : $@async @convention(thin) <each T> () -> () {
+bb0:
+  %initIndirect = function_ref @initIndirect : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %0 = apply %initIndirect<(repeat each T)>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %1 = begin_borrow %0 : $(repeat each T)
+  %zero = integer_literal $Builtin.Word, 0
+  %index = dynamic_pack_index %zero of $Pack{repeat each T}
+  open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
+  %elt = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{access can happen concurrently}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+  end_borrow %1 : $(repeat each T)
+  destroy_value %0 : $(repeat each T)
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @open_existential_value_test : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initP : $@convention(thin) () -> @owned P
+  %p = apply %f() : $@convention(thin) () -> @owned P
+
+  %transferP = function_ref @transferP : $@async @convention(thin) (@guaranteed P) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%p) : $@async @convention(thin) (@guaranteed P) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  %b = begin_borrow %p : $P
+  %v = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %w = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.doSomething, %v : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %b : $P
+  destroy_value %p : $P
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @weak_copy_value_test : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initPAnyObjectOptional : $@convention(thin) () -> @owned Optional<PAnyObject>
+  %p = apply %f() : $@convention(thin) () -> @owned Optional<PAnyObject>
+
+  %pBorrowed = begin_borrow %p : $Optional<PAnyObject>
+  %pExt = unchecked_enum_data %pBorrowed : $Optional<PAnyObject>, #Optional.some!enumelt
+  %transferP = function_ref @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
+  %weakFunc = function_ref @usePAnyObjectWeak : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> ()
+  apply %weakFunc(%w) : $@convention(thin) (@guaranteed @sil_weak Optional<PAnyObject>) -> () // expected-note {{access can happen concurrently}}
+  destroy_value %w : $@sil_weak Optional<PAnyObject>
+
+  end_borrow %pBorrowed : $Optional<PAnyObject>
+  destroy_value %p : $Optional<PAnyObject>
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @strong_copy_weak_value_test : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initPAnyObjectOptional : $@convention(thin) () -> @owned Optional<PAnyObject>
+  %p = apply %f() : $@convention(thin) () -> @owned Optional<PAnyObject>
+
+  %pBorrowed = begin_borrow %p : $Optional<PAnyObject>
+  %pExt = unchecked_enum_data %pBorrowed : $Optional<PAnyObject>, #Optional.some!enumelt
+  %transferP = function_ref @transferPAnyObject : $@async @convention(thin) (@guaranteed PAnyObject) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferP(%pExt) : $@async @convention(thin) (@guaranteed PAnyObject) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  %w = weak_copy_value %pBorrowed : $Optional<PAnyObject>
+  %s = strong_copy_weak_value %w : $@sil_weak Optional<PAnyObject>
+  %weakFunc = function_ref @usePAnyObject : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> ()
+  apply %weakFunc(%s) : $@convention(thin) (@guaranteed Optional<PAnyObject>) -> () // expected-note {{access can happen concurrently}}
+  destroy_value %s : $Optional<PAnyObject>
+  destroy_value %w : $@sil_weak Optional<PAnyObject>
+
+  end_borrow %pBorrowed : $Optional<PAnyObject>
+  destroy_value %p : $Optional<PAnyObject>
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @test_init_existential_value : $@async @convention(thin) () -> () {
+bb0:
+  %f = function_ref @initNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %1 = apply %f() : $@convention(thin) () -> @owned NonSendableKlass
+
+  %2 = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{}}
+  // expected-note @-2 {{}}
+
+  %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P
+  %f2 = function_ref @useP : $@convention(thin) (@in_guaranteed P) -> ()
+  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{access can happen concurrently}}
+  destroy_value %i : $P
+
+  %9999 = tuple ()
+  return %9999 : $()
+}

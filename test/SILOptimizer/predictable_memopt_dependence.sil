@@ -1,0 +1,552 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+class SomeClass {}
+
+struct SomeClassPair {
+  var x: SomeClass
+  var y: SomeClass
+}
+
+///////////////////////////////
+// mark_dependence semantics //
+///////////////////////////////
+
+// Test mark_dependence base: box promotion
+//
+// Eliminate the load [copy]
+// Update the mark_dependence base to the available value.
+//
+// TODO: box promotion is unsupported:
+// - Eliminate the allocation and store
+// - Update the mark_dependence base to the available value
+//
+// CHECK-LABEL: sil [ossa] @markdep_base_promote_box : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
+// CHECK: [[ST:%.*]] = copy_value %0 : $SomeClass
+// CHECK: store %0 to [init]
+// CHECK: return [[ST]]
+// CHECK-LABEL: } // end sil function 'markdep_base_promote_box'
+sil [ossa] @markdep_base_promote_box : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
+bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  store %0 to [init] %2a : $*SomeClass
+  %md = mark_dependence %1 : $UnsafeMutablePointer<Int> on %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %ld = load [copy] %2a : $*SomeClass
+  %rawp = struct_extract %md : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  return %ld : $SomeClass
+}
+
+// Test mark_dependence base: stack promotion
+//
+// Eliminate the allocation, store, and load.
+// Update the mark_dependence base to the available value.
+//
+// CHECK-LABEL: sil [ossa] @markdep_base_promote_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
+// CHECK: [[ST:%.*]] = copy_value %0 : $SomeClass
+// CHECK: [[MD:%.*]] = mark_dependence %1 : $UnsafeMutablePointer<Int> on %0 : $SomeClass
+// CHECK: struct_extract [[MD]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+// CHECK: return [[ST]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_base_promote_stack'
+sil [ossa] @markdep_base_promote_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
+bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_stack $SomeClass
+  store %0 to [init] %2 : $*SomeClass
+  %md = mark_dependence %1 : $UnsafeMutablePointer<Int> on %2 : $*SomeClass
+  %ld = load [copy] %2 : $*SomeClass
+  %rawp = struct_extract %md : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_addr %2 : $*SomeClass
+  dealloc_stack %2 : $*SomeClass
+  return %ld : $SomeClass
+}
+
+// Test mark_dependence base: stack promotion on trivial allocation
+//
+// CHECK-LABEL: sil [ossa] @markdep_trivial_base_promote_stack : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> Int {
+// CHECK: bb0(%0 : $Int, %1 : $UnsafeMutablePointer<Int>):
+// CHECK-NOT: alloc_stack
+// CHECK:   mark_dependence %1 : $UnsafeMutablePointer<Int> on %0 : $Int
+// CHECK:   return %0 : $Int
+// CHECK: } // end sil function 'markdep_trivial_base_promote_stack'
+sil [ossa] @markdep_trivial_base_promote_stack : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> Int {
+bb0(%0 : $Int, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_stack $Int
+  store %0 to [trivial] %2 : $*Int
+  %md = mark_dependence %1 : $UnsafeMutablePointer<Int> on %2 : $*Int
+  %ld = load [trivial] %2 : $*Int
+  %rawp = struct_extract %md : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_addr %2 : $*Int
+  dealloc_stack %2 : $*Int
+  return %ld : $Int
+}
+
+// Test mark_dependence source: box promotion
+//
+// Eliminate the load and promote the mark_dependence.
+//
+// Update the mark_dependence source to the available value.
+//
+// TODO: box promotion is unsupported:
+// - Eliminate the allocation and store
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_promote_box : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
+// CHECK: [[CP1:%.*]] = copy_value %0 : $SomeClass
+// CHECK: store %0 to [init]
+// CHECK: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
+// CHECK: destroy_value %{{.*}} : $<τ_0_0> { var τ_0_0 } <SomeClass>
+// CHECK: return [[MD]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_promote_box'
+sil [ossa] @markdep_source_promote_box : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
+bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  store %0 to [init] %2a : $*SomeClass
+  %md = mark_dependence %2a : $*SomeClass on %1 : $SomeClass
+  %ld = load [copy] %md : $*SomeClass
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  return %ld : $SomeClass
+}
+
+// Test mark_dependence source: stack promotion
+//
+// Eliminate the allocation, store, and load.
+// Update the mark_dependence source to the available value.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_promote_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
+// CHECK:   [[CP1:%.*]] = copy_value %0 : $SomeClass
+// CHECK:   [[MD_OLD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
+// CHECK:   [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
+// CHECK:   destroy_value [[MD_OLD]] : $SomeClass
+// CHECK:   return [[MD]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_promote_stack'
+sil [ossa] @markdep_source_promote_stack: $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
+bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+  %2 = alloc_stack $SomeClass
+  store %0 to [init] %2 : $*SomeClass
+  %md = mark_dependence %2 : $*SomeClass on %1 : $SomeClass
+  %ld = load [copy] %md : $*SomeClass
+  destroy_addr %2 : $*SomeClass
+  dealloc_stack %2 : $*SomeClass
+  return %ld : $SomeClass
+}
+
+// Test mark_dependence source: stack promotion on trivial allocation.
+//
+// CHECK-LABEL: sil [ossa] @markdep_trivial_source_promote_stack : $@convention(thin) (Int, @guaranteed SomeClass) -> Int {
+// CHECK: bb0(%0 : $Int, %1 : @guaranteed $SomeClass):
+// CHECK-NEXT:   [[MD:%.*]] = mark_dependence %0 : $Int on %1 : $SomeClass
+// CHECK-NEXT:   return [[MD]] : $Int
+// CHECK-LABEL: } // end sil function 'markdep_trivial_source_promote_stack'
+sil [ossa] @markdep_trivial_source_promote_stack: $@convention(thin) (Int, @guaranteed SomeClass) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $SomeClass):
+  %2 = alloc_stack $Int
+  store %0 to [trivial] %2 : $*Int
+  %md = mark_dependence %2 : $*Int on %1 : $SomeClass
+  %ld = load [trivial] %md : $*Int
+  destroy_addr %2 : $*Int
+  dealloc_stack %2 : $*Int
+  return %ld : $Int
+}
+
+// Test mark_dependence base: dead box
+//
+// Currently, no optimization here.
+//
+// TODO: box promotion is unsupported:
+// - Eliminate the allocation and store.
+// - Promote the mark_dependence base.
+// - The stored value must not be destroyed until after the end_access
+//
+// CHECK-LABEL: sil [ossa] @markdep_base_dead_box : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> Int {
+// CHECK:   store %0 to [init] %{{.*}} : $*SomeClass
+// CHECK:   %{{.*}} = mark_dependence %1 : $UnsafeMutablePointer<Int> on %{{.*}} : $<τ_0_0> { var τ_0_0 } <SomeClass>
+// CHECK:   end_access %{{.*}} : $*Int
+// CHECK:   destroy_value %{{.*}} : $<τ_0_0> { var τ_0_0 } <SomeClass>
+// CHECK-LABEL: } // end sil function 'markdep_base_dead_box'
+sil [ossa] @markdep_base_dead_box : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> Int {
+bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  store %0 to [init] %2a : $*SomeClass
+  %md = mark_dependence %1 : $UnsafeMutablePointer<Int> on %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %rawp = struct_extract %md : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  return %ldp : $Int
+}
+
+// Test mark_dependence base: dead stack
+//
+// Eliminate the allocation and store.
+// Update the mark_dependence to the stored value.
+// The stored value must not be destroyed until after the end_access
+//
+// CHECK-LABEL: sil [ossa] @markdep_base_dead_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> Int {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: mark_dependence %1 : $UnsafeMutablePointer<Int> on %0 : $SomeClass
+// CHECK: end_access %{{.*}} : $*Int
+// CHECK: destroy_value %0 : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_base_dead_stack'
+sil [ossa] @markdep_base_dead_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> Int {
+bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_stack $SomeClass
+  store %0 to [init] %2 : $*SomeClass
+  %md = mark_dependence %1 : $UnsafeMutablePointer<Int> on %2 : $*SomeClass
+  %rawp = struct_extract %md : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_addr %2 : $*SomeClass
+  dealloc_stack %2: $*SomeClass
+  return %ldp : $Int
+}
+
+// Test mark_dependence source: dead box
+//
+// Promote the mark_dependence and eliminate the load.
+//
+// TODO: box promotion is unsupported:
+// - Eliminate the allocation and store.
+// - The stored value must not be destroyed until after the end_access
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_dead_box : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
+// CHECK: [[CP1:%.*]] = copy_value %0 : $SomeClass
+// CHECK: store %0 to [init]
+// CHECK: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
+// CHECK: destroy_value %{{.*}} : $<τ_0_0> { var τ_0_0 } <SomeClass>
+// CHECK: destroy_value [[MD]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_dead_box'
+sil [ossa] @markdep_source_dead_box : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
+bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  store %0 to [init] %2a : $*SomeClass
+  %md = mark_dependence %2a : $*SomeClass on %1 : $SomeClass
+  %ld = load [copy] %md : $*SomeClass
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  destroy_value %ld : $SomeClass
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test mark_dependence source: dead stack
+//
+// Eliminate the allocation, store, mark_dependence, and load.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+// CHECK-NEXT: [[CP1:%.*]] = copy_value %0 : $SomeClass
+// CHECK-NEXT: [[MD_OLD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
+// CHECK-NEXT: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
+// CHECK-NEXT: destroy_value [[MD_OLD]] : $SomeClass
+// CHECK-NEXT: destroy_value [[MD]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_dead_stack'
+sil [ossa] @markdep_source_dead_stack: $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
+bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+  %2 = alloc_stack $SomeClass
+  store %0 to [init] %2 : $*SomeClass
+  %md = mark_dependence %2 : $*SomeClass on %1 : $SomeClass
+  %ld = load [copy] %md : $*SomeClass
+  destroy_addr %2 : $*SomeClass
+  dealloc_stack %2 : $*SomeClass
+  destroy_value %ld : $SomeClass
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test mark_dependence source: fully available before a partial init
+//
+// Elimimate the alocation and stores.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_before_partial : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+// CHECK-NEXT:  struct $SomeClassPair (%0 : $SomeClass, %1 : $SomeClass)
+// CHECK-NEXT:  destroy_value
+// CHECK-LABEL: } // end sil function 'markdep_source_before_partial'
+sil [ossa] @markdep_source_before_partial : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+  %stack = alloc_stack $SomeClassPair
+  %md = mark_dependence %stack : $*SomeClassPair on %2 : $SomeClass
+  %stack0 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.x
+  %stack1 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.y
+  store %0 to [init] %stack0 : $*SomeClass
+  store %1 to [init] %stack1 : $*SomeClass
+  destroy_addr %stack : $*SomeClassPair
+  dealloc_stack %stack : $*SomeClassPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test mark_dependence source: partially available before init
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_partial_preinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+// CHECK-NEXT: [[PAIR:%.*]] = struct $SomeClassPair (%0 : $SomeClass, %1 : $SomeClass)
+// CHECK-NEXT: destroy_value [[PAIR]] : $SomeClassPair
+// CHECK-NOT: destroy_addr
+// CHECK-LABEL: } // end sil function 'markdep_source_partial_preinit'
+sil [ossa] @markdep_source_partial_preinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+  %stack = alloc_stack $SomeClassPair
+  %stack0 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.x
+  %stack1 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.y
+  %md0 = mark_dependence %stack0 : $*SomeClass on %2 : $SomeClass
+  store %0 to [init] %md0 : $*SomeClass
+  store %1 to [init] %stack1 : $*SomeClass
+  destroy_addr %stack : $*SomeClassPair
+  dealloc_stack %stack : $*SomeClassPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test mark_dependence source: partially available after init
+//
+// TODO: Partially available values are not handled by dependent dataflow.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_partial_postinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+// CHECK: [[STK:%.*]] = alloc_stack $SomeClassPair
+// CHECK: [[STK1:%.*]] = struct_element_addr [[STK]] : $*SomeClassPair, #SomeClassPair.y
+// CHECK: store %1 to [init] [[STK1]] : $*SomeClass
+// CHECK: [[MD:%.*]] = mark_dependence [[STK1]] : $*SomeClass on %2 : $SomeClass
+// CHECK: destroy_addr [[STK]] : $*SomeClassPair
+// CHECK-LABEL: } // end sil function 'markdep_source_partial_postinit'
+sil [ossa] @markdep_source_partial_postinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+  %stack = alloc_stack $SomeClassPair
+  %stack0 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.x
+  %stack1 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.y
+  store %0 to [init] %stack0 : $*SomeClass
+  store %1 to [init] %stack1 : $*SomeClass
+  %md1 = mark_dependence %stack1 : $*SomeClass on %2 : $SomeClass
+  destroy_addr %stack : $*SomeClassPair
+  dealloc_stack %stack : $*SomeClassPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test mark_dependence source: load from dependent phi value.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_load_phi :
+// CHECK:       bb0(%0 : @guaranteed $SomeClass):
+// CHECK-NEXT:    [[CP0:%.*]] = copy_value %0 : $SomeClass
+// CHECK:       bb1:
+// CHECK-NEXT:    [[CP1:%.*]] = copy_value [[CP0]]
+// CHECK-NEXT:    br bb3([[CP1]] : $SomeClass)
+// CHECK:       bb2:
+// CHECK-NEXT:    [[CP2:%.*]] = copy_value [[CP0]]
+// CHECK-NEXT:    br bb3([[CP2]] : $SomeClass)
+// CHECK:       bb3([[PHI:%.*]] : @owned $SomeClass):
+// CHECK:         [[MD:%.*]] = mark_dependence [[PHI]] : $SomeClass on %0 : $SomeClass
+// CHECK:         return [[MD]]
+// CHECK-LABEL: } // end sil function 'markdep_source_load_phi'
+sil [ossa] @markdep_source_load_phi : $@convention(thin) (@guaranteed SomeClass) -> @owned SomeClass {
+bb0(%0 : @guaranteed $SomeClass):
+  %1 = alloc_stack $SomeClass
+  %copy = copy_value %0 : $SomeClass
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %copy to [init] %1 : $*SomeClass
+  br bb3
+
+bb2:
+  store %copy to [init] %1 : $*SomeClass
+  br bb3
+
+bb3:
+  %md = mark_dependence %1 : $*SomeClass on %0 : $SomeClass
+  %ld = load [copy] %md : $*SomeClass
+  destroy_addr %1 : $*SomeClass
+  dealloc_stack %1 : $*SomeClass
+  return %ld : $SomeClass
+}
+
+// Test mark_dependence source: dead dependent phi.
+//
+// Eliminate the loads, allocation, and stores.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_dead_phi : $@convention(thin) (@guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : @guaranteed $SomeClass):
+// CHECK-NOT: alloc_stack
+// CHECK: cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK-NOT: load
+// CHECK: bb2:
+// CHECK-NOT: store
+// CHECK-NOT: load
+// CHECK: bb3:
+// CHECK-NEXT: [[MD:%.*]] = mark_dependence %1 : $SomeClass on %0 : $SomeClass
+// CHECK-NEXT: destroy_value [[MD]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_dead_phi'
+sil [ossa] @markdep_source_dead_phi : $@convention(thin) (@guaranteed SomeClass) -> () {
+bb0(%0 : @guaranteed $SomeClass):
+  %1 = alloc_stack $SomeClass
+  %copy = copy_value %0 : $SomeClass
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %copy to [init] %1 : $*SomeClass
+  %ld1 = load [copy] %1 : $*SomeClass
+  destroy_value %ld1 : $SomeClass
+  br bb3
+
+bb2:
+  store %copy to [init] %1 : $*SomeClass
+  %ld2 = load [copy] %1 : $*SomeClass
+  destroy_value %ld2 : $SomeClass
+  br bb3
+
+bb3:
+  %md = mark_dependence %1 : $*SomeClass on %0 : $SomeClass
+  destroy_addr %1 : $*SomeClass
+  dealloc_stack %1 : $*SomeClass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test mark_dependence source: conflicting available values.
+//
+// No optimization.
+//
+// TODO: the current algorithm can't handle this. With the current
+// approach, we would need to run a completely separate dataflow for
+// each mark_dependence.
+// CHECK-LABEL: sil [ossa] @markdep_source_conflicting_load : $@convention(thin) (@guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : @guaranteed $SomeClass):
+// CHECK:   %1 = alloc_stack $SomeClass
+// CHECK:   store %{{.*}} to [init] %1 : $*SomeClass
+// CHECK: bb1:
+// CHECK:   %{{.*}} = mark_dependence %1 : $*SomeClass on %0 : $SomeClass
+// CHECK: bb2:
+// CHECK:   load [take] %1 : $*SomeClass
+// CHECK:   store %{{.*}} to [init] %1 : $*SomeClass
+// CHECK: bb3:
+// CHECK:   load [copy] %1 : $*SomeClass
+// CHECK:   destroy_addr %1 : $*SomeClass
+// CHECK:   dealloc_stack %1 : $*SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_conflicting_load'
+sil [ossa] @markdep_source_conflicting_load : $@convention(thin) (@guaranteed SomeClass) -> () {
+bb0(%0 : @guaranteed $SomeClass):
+  %1 = alloc_stack $SomeClass
+  %copy0 = copy_value %0 : $SomeClass
+  store %copy0 to [init] %1 : $*SomeClass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %md = mark_dependence %1 : $*SomeClass on %0 : $SomeClass
+  br bb3
+
+bb2:
+  %ld2 = load [take] %1 : $*SomeClass
+  destroy_value %ld2 : $SomeClass
+  %copy2 = copy_value %0 : $SomeClass
+  store %copy2 to [init] %1 : $*SomeClass
+  br bb3
+
+bb3:
+  %ld3 = load [copy] %1 : $*SomeClass
+  destroy_value %ld3 : $SomeClass
+  destroy_addr %1 : $*SomeClass
+  dealloc_stack %1 : $*SomeClass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test mark_dependence source with a mark_dependence base use.
+//
+// Promote both mark_dependence instructions during dead allocatio eliminiation,
+// reusing the promoted instruction as the available value.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_base_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass, UnsafeMutablePointer<Int>) -> Int {
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass, %2 : $UnsafeMutablePointer<Int>):
+// CHECK-NEXT: [[MD1:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
+// CHECK-NEXT: [[MD2:%.*]] = mark_dependence %2 : $UnsafeMutablePointer<Int> on [[MD1]] : $SomeClass
+// CHECK-NOT:  mark_dependence
+// CHECK:      struct_extract [[MD2]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+// CHECK:      destroy_value [[MD1]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_base_dead_stack'
+sil [ossa] @markdep_source_base_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass, UnsafeMutablePointer<Int>) -> Int {
+bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass, %2 : $UnsafeMutablePointer<Int>):
+  %stk = alloc_stack $SomeClass
+  store %0 to [init] %stk : $*SomeClass
+  %md1 = mark_dependence %stk : $*SomeClass on %1 : $SomeClass
+  %md2 = mark_dependence %2 : $UnsafeMutablePointer<Int> on %md1 : $*SomeClass
+  %rawp = struct_extract %md2 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_addr %md1 : $*SomeClass
+  dealloc_stack %stk: $*SomeClass
+  return %ldp : $Int
+}
+
+// Test mark_dependence source with a load [take] use.
+//
+// Promote the mark_dependence and eliminate the load.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_load_take : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+// CHECK-NEXT: [[MD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
+// CHECK-NEXT: return [[MD]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_source_load_take'
+sil [ossa] @markdep_source_load_take : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
+bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+  %stk = alloc_stack $SomeClass
+  store %0 to [init] %stk : $*SomeClass
+  %md1 = mark_dependence %stk : $*SomeClass on %1 : $SomeClass
+  %ld = load [take] %md1 : $*SomeClass
+  dealloc_stack %stk: $*SomeClass
+  return %ld : $SomeClass
+}
+
+// Test a chain of mark_dependence that are promoted during dataflow,
+// but need to be deleted after a conflict is detected.
+//
+// CHECK-LABEL: sil [ossa] @markdep_source_chain_cleanup : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+// CHECK:   [[STK:%.*]] = alloc_stack $SomeClassPair
+// CHECK:   [[Y:%.*]] = struct_element_addr [[STK]] : $*SomeClassPair, #SomeClassPair.y
+// CHECK:   store %1 to [init] [[Y]] : $*SomeClass
+// CHECK-NOT: mark_dependence %{{.*}} : $SomeClass
+// CHECK:   [[MD1:%.*]] = mark_dependence [[Y]] : $*SomeClass on %2 : $SomeClass
+// CHECK:   mark_dependence [[MD1]] : $*SomeClass on %2 : $SomeClass
+// CHECK:   destroy_addr [[STK]] : $*SomeClassPair
+// CHECK-LABEL: } // end sil function 'markdep_source_chain_cleanup'
+sil [ossa] @markdep_source_chain_cleanup : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
+bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+  %stack = alloc_stack $SomeClassPair
+  %stack0 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.x
+  %stack1 = struct_element_addr %stack : $*SomeClassPair, #SomeClassPair.y
+  store %0 to [init] %stack0 : $*SomeClass
+  store %1 to [init] %stack1 : $*SomeClass
+  %md1 = mark_dependence %stack1 : $*SomeClass on %2 : $SomeClass
+  %md2 = mark_dependence %md1 : $*SomeClass on %2 : $SomeClass
+  destroy_addr %stack : $*SomeClassPair
+  dealloc_stack %stack : $*SomeClassPair
+  %9999 = tuple()
+  return %9999 : $()
+}

@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public struct FirstSmallStruct {
     public var x: UInt32
@@ -30,7 +30,7 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct;
 
 // CHECK: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Structs::FirstSmallStruct> = true;
 
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
@@ -85,15 +85,15 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Structs::FirstSmallStruct> {
-// CHECK-NEXT: SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT: SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:   return Structs::_impl::$s7Structs16FirstSmallStructVMa(0)._0;
 // CHECK-NEXT: }
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: inline const constexpr bool isValueType<Structs::FirstSmallStruct> = true;
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isOpaqueLayout<Structs::FirstSmallStruct> = true;
+// CHECK-NEXT: inline const constexpr bool isOpaqueLayout<Structs::FirstSmallStruct> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct implClassFor<Structs::FirstSmallStruct> { using type = Structs::_impl::_impl_FirstSmallStruct; };
 // CHECK-NEXT: } // namespace
@@ -221,50 +221,50 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 }
 
 // CHECK:      SWIFT_INLINE_THUNK LargeStruct createLargeStruct(swift::Int x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::$s7Structs17createLargeStructyAA0cD0VSiF(result, x);
+// CHECK-NEXT:   return Structs::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Structs::_impl::$s7Structs17createLargeStructyAA0cD0VSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK StructWithRefCountStoredProp createStructWithRefCountStoredProp() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::$s7Structs34createStructWithRefCountStoredPropAA0cdefgH0VyF(result);
+// CHECK-NEXT:   return Structs::_impl::_impl_StructWithRefCountStoredProp::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Structs::_impl::$s7Structs34createStructWithRefCountStoredPropAA0cdefgH0VyF(result);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void mutateSmall(FirstSmallStruct& x) noexcept SWIFT_SYMBOL({{.*}}) {
-// CHECK-NEXT:   return _impl::$s7Structs11mutateSmallyyAA05FirstC6StructVzF(_impl::_impl_FirstSmallStruct::getOpaquePointer(x));
+// CHECK-NEXT:   Structs::_impl::$s7Structs11mutateSmallyyAA05FirstC6StructVzF(Structs::_impl::_impl_FirstSmallStruct::getOpaquePointer(x));
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void printSmallAndLarge(const FirstSmallStruct& x, const LargeStruct& y) noexcept SWIFT_SYMBOL({{.*}}) {
-// CHECK-NEXT:   return _impl::$s7Structs18printSmallAndLargeyyAA05FirstC6StructV_AA0eG0VtF(_impl::_impl_FirstSmallStruct::getOpaquePointer(x), _impl::_impl_LargeStruct::getOpaquePointer(y));
+// CHECK-NEXT:   Structs::_impl::$s7Structs18printSmallAndLargeyyAA05FirstC6StructV_AA0eG0VtF(Structs::_impl::_impl_FirstSmallStruct::getOpaquePointer(x), Structs::_impl::_impl_LargeStruct::getOpaquePointer(y));
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
+// CHECK-NEXT:   return Structs::_impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK:      SWIFT_INLINE_THUNK void FirstSmallStruct::setX(uint32_t value) {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvs(value, _getOpaquePointer());
+// CHECK-NEXT:   Structs::_impl::$s7Structs16FirstSmallStructV1xs6UInt32Vvs(value, _getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK void FirstSmallStruct::dump() const {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT:   Structs::_impl::$s7Structs16FirstSmallStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK void FirstSmallStruct::mutate() {
-// CHECK-NEXT:   return _impl::$s7Structs16FirstSmallStructV6mutateyyF(_getOpaquePointer());
+// CHECK-NEXT:   Structs::_impl::$s7Structs16FirstSmallStructV6mutateyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK swift::Int LargeStruct::getX1() const {
-// CHECK-NEXT: return _impl::$s7Structs11LargeStructV2x1Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Structs::_impl::$s7Structs11LargeStructV2x1Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::$s7Structs11LargeStructV010firstSmallC0AA05FirsteC0Vvg(result, _getOpaquePointer());
+// CHECK-NEXT: return Structs::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Structs::_impl::$s7Structs11LargeStructV010firstSmallC0AA05FirsteC0Vvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK void LargeStruct::dump() const {
-// CHECK-NEXT: return _impl::$s7Structs11LargeStructV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT: Structs::_impl::$s7Structs11LargeStructV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void StructWithRefCountStoredProp::dump() const {
-// CHECK-NEXT:   return _impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
+// CHECK-NEXT:   Structs::_impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }

@@ -1,0 +1,66 @@
+//===--- PartitionOpError.def ----------------------------*- C++ -*--------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+///
+/// This file contains macros for creating PartitionOpErrors for use with
+/// SendNonSendable. This just makes it easier to add these errors without
+/// needing to write so much boielr plate.
+///
+//===----------------------------------------------------------------------===//
+
+#ifndef PARTITION_OP_ERROR
+#define PARTITION_OP_ERROR(Name)
+#endif
+
+/// An error created if we discover a value was locally used after it
+/// was already sent.
+///
+/// The arguments in the type are:
+///
+/// 1. The PartitionOp that required the element to be alive.
+///
+/// 2. The element in the PartitionOp that was asked to be alive.
+///
+/// 3. The operand of the instruction that originally sent the region. Can be
+/// used to get the immediate value sent or the sending instruction.
+PARTITION_OP_ERROR(LocalUseAfterSend)
+
+/// This is called if we detect a never sendable element that was actually sent.
+///
+/// E.x.: passing a main actor exposed value to a sending parameter.
+PARTITION_OP_ERROR(SentNeverSendable)
+
+/// This is emitted when a never sendable value is passed into a sending
+/// result. The sending result will be viewed in our caller as disconnected and
+/// able to be sent.
+PARTITION_OP_ERROR(AssignNeverSendableIntoSendingResult)
+
+/// This is emitted when an inout sending parameter has been sent in a function
+/// body but has not been reinitialized at the end of the function.
+PARTITION_OP_ERROR(InOutSendingNotInitializedAtExit)
+
+/// This is emitted when an inout sending parameter has been assigned a
+/// non-disconnected value (e.x.: a value exposed to main actor isolated code)
+/// at end of function without being reinitialized with something disconnected.
+PARTITION_OP_ERROR(InOutSendingNotDisconnectedAtExit)
+
+/// Used to signify an "unknown code pattern" has occured while performing
+/// dataflow.
+///
+/// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback
+/// to our user so that we can emit that error as we process.
+PARTITION_OP_ERROR(UnknownCodePattern)
+
+/// Used to signify that an isolation crossing function is returning a
+/// non-Sendable value.
+PARTITION_OP_ERROR(NonSendableIsolationCrossingResult)
+
+#undef PARTITION_OP_ERROR

@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -enable-experimental-move-only ) | %FileCheck %s
 
-// A small sanity check.
+// A small soundness check.
 
 // REQUIRES: executable_test
 

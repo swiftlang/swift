@@ -196,21 +196,35 @@ extension DefaultStringInterpolation {
   }
 }
 
+/// A type that provides a custom `StringInterpolation` type.
+struct CustomInterpolation: ExpressibleByStringInterpolation {
+    struct StringInterpolation: StringInterpolationProtocol {
+        init(literalCapacity: Int, interpolationCount: Int) {}
+        mutating func appendLiteral(_ literal: String) {}
+        mutating func appendInterpolation<T>(_ interp: T) {}
+    }
+    init(stringInterpolation: StringInterpolation) {}
+    init(stringLiteral: String) {}
+}
+
 func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   print("Always some, Always some, Always some: \(o)")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}} 
+  // expected-note@-2 {{use a default value parameter to avoid this warning}} {{52-52=, default: <#default value#>}}
   // expected-note@-3 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
+  // expected-note@-4 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
   var i: Int? = o
   print("Always some, Always some, Always some: \(i)")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
+  // expected-note@-2 {{use a default value parameter to avoid this warning}} {{52-52=, default: <#default value#>}}
   // expected-note@-3 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
+  // expected-note@-4 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
   i = nil
   print("Always some, Always some, Always some: \(o.map { $0 + 1 })")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{67-67=)}} 
+  // expected-note@-2 {{use a default value parameter to avoid this warning}} {{67-67=, default: <#default value#>}}
   // expected-note@-3 {{provide a default value to avoid this warning}} {{67-67= ?? <#default value#>}}
+  // expected-note@-4 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{67-67=)}}
 
   print("Always some, Always some, Always some: \(o as Int?)") // No warning
   print("Always some, Always some, Always some: \(o.debugDescription)") // No warning.
@@ -221,6 +235,32 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   
   print("Always some, Always some, Always some: \(ooST)")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{55-55=)}} 
-  // expected-note@-3 {{provide a default value to avoid this warning}} {{55-55= ?? <#default value#>}}  
+  // expected-note@-2 {{use a default value parameter to avoid this warning}} {{55-55=, default: <#default value#>}}
+  // expected-note@-3 {{provide a default value to avoid this warning}} {{55-55= ?? <#default value#>}}
+  // expected-note@-4 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{55-55=)}}
+
+  // Don't provide a `\(_:default:)` fix-it for optional strings; the `??`
+  // operator is the recommended warning resolution.
+  let s: String? = o.map(String.init)
+  print("Always some, Always some, Always some: \(s)")
+  // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
+  // expected-note@-2 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
+  // expected-note@-3 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
+  
+  // Don't provide a `\(_:default:)` fix-it for interpolations that don't resolve
+  // to strings.
+  let _: CustomInterpolation = "Always some, Always some, Always some: \(o)"
+  // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
+  // expected-note@-2 {{provide a default value to avoid this warning}} {{75-75= ?? <#default value#>}}
+  // expected-note@-3 {{use 'String(describing:)' to silence this warning}} {{74-74=String(describing: }} {{75-75=)}}
+}
+
+// Make sure we don't double diagnose
+_ = {
+  func foo(_ y: Int?) {
+    let _: Any = y // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+    // expected-note@-1 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+    // expected-note@-2 {{provide a default value to avoid this warning}}
+    // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  }
 }

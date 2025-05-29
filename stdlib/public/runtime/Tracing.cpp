@@ -27,8 +27,15 @@ namespace trace {
 
 os_log_t ScanLog;
 swift::once_t LogsToken;
+bool TracingEnabled;
 
 void setupLogs(void *unused) {
+  if (!shouldEnableTracing()) {
+    TracingEnabled = false;
+    return;
+  }
+
+  TracingEnabled = true;
   ScanLog = os_log_create(SWIFT_LOG_SUBSYSTEM, SWIFT_LOG_SECTION_SCAN_CATEGORY);
 }
 

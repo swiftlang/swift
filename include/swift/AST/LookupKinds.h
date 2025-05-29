@@ -41,7 +41,8 @@ enum NLOptions : unsigned {
 
   /// Don't check access when doing lookup into a type.
   ///
-  /// This option is not valid when performing lookup into a module.
+  /// When performing lookup into a module, this option only applies to
+  /// declarations in the same module the lookup is coming from.
   NL_IgnoreAccessControl = 1 << 3,
 
   /// This lookup should only return type declarations.
@@ -58,6 +59,14 @@ enum NLOptions : unsigned {
 
   /// This lookup should only return macro declarations.
   NL_OnlyMacros = 1 << 8,
+
+  /// Include members that would otherwise be filtered out because they come
+  /// from a module that has not been imported.
+  NL_IgnoreMissingImports = 1 << 9,
+
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  NL_ABIProviding = 1 << 10,
 
   /// The default set of options used for qualified name lookup.
   ///
@@ -92,6 +101,9 @@ void simple_display(llvm::raw_ostream &out, NLOptions options);
 enum class ModuleLookupFlags : unsigned {
   /// Exclude names introduced by macro expansions in the top-level module.
   ExcludeMacroExpansions = 1 << 0,
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  ABIProviding = 1 << 1,
 };
 
 } // end namespace swift

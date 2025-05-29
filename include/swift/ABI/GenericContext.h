@@ -21,7 +21,9 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/MetadataRef.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/ABI/TrailingObjects.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Demangling/Demangle.h"
 
 namespace swift {
@@ -72,6 +74,10 @@ struct TargetGenericContextDescriptorHeader {
   ///   same order as the requirement descriptors which satisfy
   ///   hasKeyArgument().
   ///
+  ///   a sequence of values, in the same order as the parameter descriptors
+  ///   which satisify getKind() == GenericParamKind::Value and
+  ///   hasKeyArgument();
+  ///
   /// The elements above which are packs are precisely those appearing
   /// in the sequence of trailing GenericPackShapeDescriptors.
   uint16_t NumKeyArguments;
@@ -102,6 +108,10 @@ struct TargetGenericContextDescriptorHeader {
 
   bool hasArguments() const {
     return getNumArguments() > 0;
+  }
+
+  bool hasConditionalInvertedProtocols() const {
+    return Flags.hasConditionalInvertedProtocols();
   }
 };
 using GenericContextDescriptorHeader =
@@ -137,6 +147,20 @@ public:
     ///
     /// Only valid if the requirement has Layout kind.
     GenericRequirementLayoutKind Layout;
+
+    /// The set of invertible protocols whose check is disabled, along
+    /// with the index of the generic parameter to which this applies.
+    ///
+    /// The index is technically redundant with the subject type, but its
+    /// storage is effectively free because this union is 32 bits anyway. The
+    /// index 0xFFFF is reserved for "not a generic parameter", in which case
+    /// the constraints are on the subject type.
+    ///
+    /// Only valid if the requirement has InvertedProtocols kind.
+    struct {
+      uint16_t GenericParamIndex;
+      InvertibleProtocolSet Protocols;
+    } InvertedProtocols;
   };
 
   constexpr GenericRequirementFlags getFlags() const {
@@ -204,6 +228,18 @@ public:
     return Layout;
   }
 
+  /// Retrieve the set of inverted protocols.
+  InvertibleProtocolSet getInvertedProtocols() const {
+    assert(getKind() == GenericRequirementKind::InvertedProtocols);
+    return InvertedProtocols.Protocols;
+  }
+
+  /// Retrieve the invertible protocol kind.
+  uint16_t getInvertedProtocolsGenericParamIndex() const {
+    assert(getKind() == GenericRequirementKind::InvertedProtocols);
+    return InvertedProtocols.GenericParamIndex;
+  }
+
   /// Determine whether this generic requirement has a known kind.
   ///
   /// \returns \c false for any future generic requirement kinds.
@@ -215,6 +251,7 @@ public:
     case GenericRequirementKind::SameConformance:
     case GenericRequirementKind::SameType:
     case GenericRequirementKind::SameShape:
+    case GenericRequirementKind::InvertedProtocols:
       return true;
     }
 
@@ -266,6 +303,38 @@ struct GenericPackShapeDescriptor {
   uint16_t Unused;
 };
 
+/// A count for the number of requirements for the number of requirements
+/// for a given conditional conformance to a invertible protocols.
+struct ConditionalInvertibleProtocolsRequirementCount {
+  uint16_t count;
+};
+
+/// A invertible protocol set used for the conditional conformances in a
+/// generic context.
+struct ConditionalInvertibleProtocolSet: InvertibleProtocolSet {
+  using InvertibleProtocolSet::InvertibleProtocolSet;
+};
+
+/// A generic requirement for describing a conditional conformance to a
+/// invertible protocol.
+///
+/// This type is equivalent to a `TargetGenericRequirementDescriptor`, and
+/// differs only because it needs to occur alongside
+template<typename Runtime>
+struct TargetConditionalInvertibleProtocolRequirement: TargetGenericRequirementDescriptor<Runtime> { };
+
+struct GenericValueHeader {
+  /// The total number of generic parameters in this signature where
+  /// getKind() == GenericParamKind::Value.
+  uint32_t NumValues;
+};
+
+/// The GenericValueHeader is followed by an array of these descriptors,
+/// whose length is given by the header's NumValues field.
+struct GenericValueDescriptor {
+  GenericValueType Type;
+};
+
 /// An array of generic parameter descriptors, all
 /// GenericParamDescriptor::implicit(), which is by far
 /// the most common case.  Some generic context storage can
@@ -303,26 +372,33 @@ class RuntimeGenericSignature {
   const TargetGenericRequirementDescriptor<Runtime> *Requirements;
   GenericPackShapeHeader PackShapeHeader;
   const GenericPackShapeDescriptor *PackShapeDescriptors;
+  GenericValueHeader ValueHeader;
+  const GenericValueDescriptor *ValueDescriptors;
 
 public:
   RuntimeGenericSignature()
-    : Header{0, 0, 0, 0}, Params(nullptr), Requirements(nullptr),
-      PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr) {}
+    : Header{0, 0, 0, GenericContextDescriptorFlags(false, false, false)},
+      Params(nullptr), Requirements(nullptr),
+      PackShapeHeader{0, 0}, PackShapeDescriptors(nullptr), ValueHeader{0},
+      ValueDescriptors(nullptr) {}
 
   RuntimeGenericSignature(const TargetGenericContextDescriptorHeader<Runtime> &header,
                           const GenericParamDescriptor *params,
                           const TargetGenericRequirementDescriptor<Runtime> *requirements,
                           const GenericPackShapeHeader &packShapeHeader,
-                          const GenericPackShapeDescriptor *packShapeDescriptors)
+                          const GenericPackShapeDescriptor *packShapeDescriptors,
+                          const GenericValueHeader &valueHeader,
+                          const GenericValueDescriptor *valueDescriptors)
     : Header(header), Params(params), Requirements(requirements),
-      PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors) {}
+      PackShapeHeader(packShapeHeader), PackShapeDescriptors(packShapeDescriptors),
+      ValueHeader(valueHeader), ValueDescriptors(valueDescriptors) {}
 
   llvm::ArrayRef<GenericParamDescriptor> getParams() const {
-    return llvm::makeArrayRef(Params, Header.NumParams);
+    return llvm::ArrayRef(Params, Header.NumParams);
   }
 
   llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>> getRequirements() const {
-    return llvm::makeArrayRef(Requirements, Header.NumRequirements);
+    return llvm::ArrayRef(Requirements, Header.NumRequirements);
   }
 
   const GenericPackShapeHeader &getGenericPackShapeHeader() const {
@@ -330,7 +406,15 @@ public:
   }
 
   llvm::ArrayRef<GenericPackShapeDescriptor> getGenericPackShapeDescriptors() const {
-    return llvm::makeArrayRef(PackShapeDescriptors, PackShapeHeader.NumPacks);
+    return llvm::ArrayRef(PackShapeDescriptors, PackShapeHeader.NumPacks);
+  }
+
+  const GenericValueHeader &getGenericValueHeader() const {
+    return ValueHeader;
+  }
+
+  llvm::ArrayRef<GenericValueDescriptor> getGenericValueDescriptors() const {
+    return llvm::ArrayRef(ValueDescriptors, ValueHeader.NumValues);
   }
 
   size_t getArgumentLayoutSizeInWords() const {
@@ -379,20 +463,20 @@ class TargetGenericEnvironment
 public:
   /// Retrieve the cumulative generic parameter counts at each level of genericity.
   llvm::ArrayRef<uint16_t> getGenericParameterCounts() const {
-    return llvm::makeArrayRef(this->template getTrailingObjects<uint16_t>(),
-                              Flags.getNumGenericParameterLevels());
+    return llvm::ArrayRef(this->template getTrailingObjects<uint16_t>(),
+                          Flags.getNumGenericParameterLevels());
   }
 
   /// Retrieve the generic parameters descriptors.
   llvm::ArrayRef<GenericParamDescriptor> getGenericParameters() const {
-    return llvm::makeArrayRef(
+    return llvm::ArrayRef(
         this->template getTrailingObjects<GenericParamDescriptor>(),
         getGenericParameterCounts().back());
   }
 
   /// Retrieve the generic requirements.
   llvm::ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
-    return llvm::makeArrayRef(
+    return llvm::ArrayRef(
         this->template getTrailingObjects<GenericRequirementDescriptor>(),
         Flags.getNumGenericRequirements());
   }
@@ -425,6 +509,11 @@ class TrailingGenericContextObjects<TargetSelf<Runtime>,
       TargetGenericRequirementDescriptor<Runtime>,
       GenericPackShapeHeader,
       GenericPackShapeDescriptor,
+      ConditionalInvertibleProtocolSet,
+      ConditionalInvertibleProtocolsRequirementCount,
+      TargetConditionalInvertibleProtocolRequirement<Runtime>,
+      GenericValueHeader,
+      GenericValueDescriptor,
       FollowingTrailingObjects...>
 {
 protected:
@@ -432,13 +521,19 @@ protected:
   using GenericContextHeaderType = TargetGenericContextHeaderType<Runtime>;
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
-
+  using GenericConditionalInvertibleProtocolRequirement =
+    TargetConditionalInvertibleProtocolRequirement<Runtime>;
   using TrailingObjects = swift::ABI::TrailingObjects<Self,
     GenericContextHeaderType,
     GenericParamDescriptor,
     GenericRequirementDescriptor,
     GenericPackShapeHeader,
     GenericPackShapeDescriptor,
+    ConditionalInvertibleProtocolSet,
+    ConditionalInvertibleProtocolsRequirementCount,
+    GenericConditionalInvertibleProtocolRequirement,
+    GenericValueHeader,
+    GenericValueDescriptor,
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
@@ -467,7 +562,84 @@ public:
     /// HeaderType ought to be convertible to GenericContextDescriptorHeader.
     return getFullGenericContextHeader();
   }
-  
+
+  bool hasConditionalInvertedProtocols() const {
+    if (!asSelf()->isGeneric())
+      return false;
+
+    return getGenericContextHeader().hasConditionalInvertedProtocols();
+  }
+
+  const InvertibleProtocolSet &
+  getConditionalInvertedProtocols() const {
+    assert(hasConditionalInvertedProtocols());
+    return *this->template
+        getTrailingObjects<ConditionalInvertibleProtocolSet>();
+  }
+
+  /// Retrieve the counts for # of conditional invertible protocols for each
+  /// conditional conformance to a invertible protocol.
+  ///
+  /// The counts are cumulative, so the first entry in the array is the
+  /// number of requirements for the first conditional conformance. The
+  /// second entry in the array is the number of requirements in the first
+  /// and second conditional conformances. The last entry is, therefore, the
+  /// total count of requirements in the structure.
+  llvm::ArrayRef<ConditionalInvertibleProtocolsRequirementCount>
+  getConditionalInvertibleProtocolRequirementCounts() const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
+      return {};
+
+    return {
+      this->template
+        getTrailingObjects<ConditionalInvertibleProtocolsRequirementCount>(),
+      getNumConditionalInvertibleProtocolsRequirementCounts()
+    };
+  }
+
+  /// Retrieve the array of requirements for conditional conformances to
+  /// the ith conditional conformance to a invertible protocol.
+  llvm::ArrayRef<GenericConditionalInvertibleProtocolRequirement>
+  getConditionalInvertibleProtocolRequirementsAt(unsigned i) const {
+    auto counts = getConditionalInvertibleProtocolRequirementCounts();
+    assert(i < counts.size());
+
+    unsigned startIndex = (i == 0) ? 0 : counts[i-1].count;
+    unsigned endIndex = counts[i].count;
+
+    auto basePtr =
+      this->template
+        getTrailingObjects<GenericConditionalInvertibleProtocolRequirement>();
+    return { basePtr + startIndex, basePtr + endIndex };
+  }
+
+  /// Retrieve the array of requirements for conditional conformances to
+  /// the ith conditional conformance to a invertible protocol.
+  llvm::ArrayRef<GenericConditionalInvertibleProtocolRequirement>
+  getConditionalInvertibleProtocolRequirementsFor(
+      InvertibleProtocolKind kind
+  ) const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
+      return { };
+
+    auto conditionallyInverted = getConditionalInvertedProtocols();
+    if (!conditionallyInverted.contains(kind))
+      return { };
+
+    // Count the number of "set" bits up to (but not including) the
+    // bit we're looking at.
+    unsigned targetBit = static_cast<uint8_t>(kind);
+    auto invertedBits = conditionallyInverted.rawBits();
+    unsigned priorBits = 0;
+    for (unsigned i = 0; i != targetBit; ++i) {
+      if (invertedBits & 0x01)
+        ++priorBits;
+      invertedBits = invertedBits >> 1;
+    }
+
+    return getConditionalInvertibleProtocolRequirementsAt(priorBits);
+  }
+
   const TargetGenericContext<Runtime> *getGenericContext() const {
     if (!asSelf()->isGeneric())
       return nullptr;
@@ -510,13 +682,41 @@ public:
             header.NumPacks};
   }
 
+  GenericValueHeader getGenericValueHeader() const {
+    if (!asSelf()->isGeneric())
+      return {0};
+    if (!getGenericContextHeader().Flags.hasValues())
+      return {0};
+    return *this->template getTrailingObjects<GenericValueHeader>();
+  }
+
+  llvm::ArrayRef<GenericValueDescriptor> getGenericValueDescriptors() const {
+    auto header = getGenericValueHeader();
+
+    if (header.NumValues == 0)
+      return {};
+
+    return {this->template getTrailingObjects<GenericValueDescriptor>(),
+            header.NumValues};
+  }
+
   RuntimeGenericSignature<Runtime> getGenericSignature() const {
     if (!asSelf()->isGeneric()) return RuntimeGenericSignature<Runtime>();
     return {getGenericContextHeader(),
             getGenericParams().data(),
             getGenericRequirements().data(),
             getGenericPackShapeHeader(),
-            getGenericPackShapeDescriptors().data()};
+            getGenericPackShapeDescriptors().data(),
+            getGenericValueHeader(),
+            getGenericValueDescriptors().data()};
+  }
+
+  static size_t trailingTypeCount() {
+    return TrailingObjects::trailingTypeCount();
+  }
+
+  size_t sizeWithTrailingTypeCount(size_t n) const {
+    return TrailingObjects::sizeWithTrailingTypeCount(n);
   }
 
 protected:
@@ -547,6 +747,49 @@ protected:
       return 0;
 
     return getGenericPackShapeHeader().NumPacks;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<ConditionalInvertibleProtocolSet>
+  ) const {
+    return asSelf()->hasConditionalInvertedProtocols() ? 1 : 0;
+  }
+
+  unsigned getNumConditionalInvertibleProtocolsRequirementCounts() const {
+    if (!asSelf()->hasConditionalInvertedProtocols())
+      return 0;
+
+    return popcount(getConditionalInvertedProtocols().rawBits());
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<ConditionalInvertibleProtocolsRequirementCount>
+  ) const {
+    return getNumConditionalInvertibleProtocolsRequirementCounts();
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<GenericConditionalInvertibleProtocolRequirement>
+  ) const {
+    auto counts = getConditionalInvertibleProtocolRequirementCounts();
+    return counts.empty() ? 0 : counts.back().count;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericValueHeader>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    return getGenericContextHeader().Flags.hasValues() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericValueDescriptor>) const {
+    if (!asSelf()->isGeneric())
+      return 0;
+
+    if (!getGenericContextHeader().Flags.hasValues())
+      return 0;
+
+    return getGenericValueHeader().NumValues;
   }
 
 #if defined(_MSC_VER) && _MSC_VER < 1920

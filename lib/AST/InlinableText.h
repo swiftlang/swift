@@ -19,11 +19,11 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-class SourceManager;
+class ASTContext;
 
 /// Extracts the text of this ASTNode from the source buffer, ignoring
 /// all #if declarations and clauses except the elements that are active.
-StringRef extractInlinableText(SourceManager &sourceMgr, ASTNode node,
+StringRef extractInlinableText(ASTContext &ctx, ASTNode node,
                                SmallVectorImpl<char> &scratch);
 
 } // end namespace swift

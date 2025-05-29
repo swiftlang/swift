@@ -67,5 +67,5 @@ func loadableOriginal<T: AdditiveArithmetic>(_ loadable: LoadableOriginal<T>) ->
 // #10 0x0000000000f8248b swift::autodiff::PullbackEmitter::emitZeroDerivativesForNonvariedResult(swift::SILValue)
 // #11 0x0000000000f7fcae swift::autodiff::PullbackEmitter::run()
 // #12 0x0000000000f3fba4 swift::autodiff::VJPEmitter::run()
-// #13 0x0000000000eb1669 (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::IsSerialized_t)
+// #13 0x0000000000eb1669 (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::SerializedKind_t)
 // #14 0x0000000000eaea5e (anonymous namespace)::Differentiation::run()

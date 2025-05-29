@@ -39,7 +39,7 @@ SWIFT_RUNTIME_STDLIB_API
 
 @implementation SwiftNativeNSObject
 
-+ (id)allocWithZone: (NSZone *)zone {
++ (instancetype)allocWithZone: (NSZone *)zone {
   // Allocate the object with swift_allocObject().
   // Note that this doesn't work if called on SwiftNativeNSObject itself,
   // which is not a Swift class.
@@ -50,7 +50,7 @@ SWIFT_RUNTIME_STDLIB_API
   return reinterpret_cast<id>(result);
 }
 
-- (id)initWithCoder: (NSCoder *)coder {
+- (instancetype)initWithCoder: (NSCoder *)coder {
   return [super init];
 }
 

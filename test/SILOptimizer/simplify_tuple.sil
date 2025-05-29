@@ -1,0 +1,79 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=tuple | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=tuple | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: sil [ossa] @forward_owned :
+// CHECK-NOT:     tuple
+// CHECK:         return %0
+// CHECK:       } // end sil function 'forward_owned'
+sil [ossa] @forward_owned : $@convention(thin) (@owned (String, Int)) -> @owned (String, Int) {
+bb0(%0 : @owned $(String, Int)):
+  (%3, %4) = destructure_tuple %0 : $(String, Int)
+  %2 = tuple (%3 : $String, %4 : $Int)
+  return %2 : $(String, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @forward_borrowed :
+// CHECK-NOT:     tuple
+// CHECK:         fix_lifetime %0
+// CHECK:       } // end sil function 'forward_borrowed'
+sil [ossa] @forward_borrowed : $@convention(thin) (@guaranteed (String, Int)) -> () {
+bb0(%0 : @guaranteed $(String, Int)):
+  (%3, %4) = destructure_tuple %0 : $(String, Int)
+  %2 = tuple (%3 : $String, %4 : $Int)
+  fix_lifetime %2 : $(String, Int)
+   %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_owned_with_uses :
+// CHECK:         destructure_tuple
+// CHECK:         tuple
+// CHECK:       } // end sil function 'dont_forward_owned_with_uses'
+sil [ossa] @dont_forward_owned_with_uses : $@convention(thin) (@owned (String, Int)) -> @owned (String, Int) {
+bb0(%0 : @owned $(String, Int)):
+  (%5, %6) = destructure_tuple %0 : $(String, Int)
+  %3 = begin_borrow %5 : $String
+  end_borrow %3 : $String
+  %2 = tuple (%5 : $String, %6 : $Int)
+  return %2 : $(String, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @forward_owned_with_debug_use :
+// CHECK-ONONE:   destructure_tuple
+// CHECK-ONONE:   tuple
+// CHECK-O:       return %0
+// CHECK:       } // end sil function 'forward_owned_with_debug_use'
+sil [ossa] @forward_owned_with_debug_use : $@convention(thin) (@owned (String, Int)) -> @owned (String, Int) {
+bb0(%0 : @owned $(String, Int)):
+  (%4, %5) = destructure_tuple %0 : $(String, Int)
+  debug_value %4 : $String, let, name "t"
+  %2 = tuple (%4 : $String, %5 : $Int)
+  return %2 : $(String, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_label_change :
+// CHECK:         destructure_tuple
+// CHECK:         tuple
+// CHECK-LABEL: } // end sil function 'dont_forward_label_change'
+sil [ossa] @dont_forward_label_change : $@convention(thin) (@owned (s: String, i: Int)) -> @owned (String, Int) {
+bb0(%0 : @owned $(s: String, i: Int)):
+  (%4, %5) = destructure_tuple %0 : $(s: String, i: Int)
+  %2 = tuple (%4 : $String, %5 : $Int)
+  return %2 : $(String, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_flipped_arguments :
+// CHECK:         destructure_tuple
+// CHECK:         tuple
+// CHECK-LABEL: } // end sil function 'dont_forward_flipped_arguments'
+sil [ossa] @dont_forward_flipped_arguments : $@convention(thin) (@owned (String, String)) -> @owned (String, String) {
+bb0(%0 : @owned $(String, String)):
+  (%4, %5) = destructure_tuple %0 : $(String, String)
+  %2 = tuple (%5 : $String, %4 : $String)
+  return %2 : $(String, String)
+}

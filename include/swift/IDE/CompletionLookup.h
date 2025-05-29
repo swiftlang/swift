@@ -166,7 +166,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   /// Innermost method that the code completion point is in.
   const AbstractFunctionDecl *CurrentMethod = nullptr;
 
-  llvm::Optional<SemanticContextKind> ForcedSemanticContext = llvm::None;
+  std::optional<SemanticContextKind> ForcedSemanticContext = std::nullopt;
   bool IsUnresolvedMember = false;
 
 public:
@@ -184,6 +184,11 @@ private:
   /// \c where clause for a context.
   /// \p selfTy must be a \c Self type of the context.
   static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD);
+
+  /// Retrieve the type to use as the base for a member completion.
+  Type getMemberBaseType() const {
+    return BaseType ? BaseType : ExprType;
+  }
 
 public:
   struct RequestedResultsTy {
@@ -234,11 +239,9 @@ public:
   void setIsStaticMetatype(bool value) { IsStaticMetatype = value; }
 
   void setExpectedTypes(
-      ArrayRef<Type> Types, bool isImplicitSingleExpressionReturn,
-      bool preferNonVoid = false,
+      ArrayRef<Type> Types, bool isImpliedResult, bool preferNonVoid = false,
       OptionSet<CustomAttributeKind> expectedCustomAttributeKinds = {}) {
-    expectedTypeContext.setIsImplicitSingleExpressionReturn(
-        isImplicitSingleExpressionReturn);
+    expectedTypeContext.setIsImpliedResult(isImpliedResult);
     expectedTypeContext.setPreferNonVoid(preferNonVoid);
     expectedTypeContext.setPossibleTypes(Types);
     expectedTypeContext.setExpectedCustomAttributeKinds(
@@ -269,8 +272,8 @@ public:
     if (expectedTypeContext.empty() &&
         !expectedTypeContext.getPreferNonVoid()) {
       return CodeCompletionContext::TypeContextKind::None;
-    } else if (expectedTypeContext.isImplicitSingleExpressionReturn()) {
-      return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
+    } else if (expectedTypeContext.isImpliedResult()) {
+      return CodeCompletionContext::TypeContextKind::Implied;
     } else {
       return CodeCompletionContext::TypeContextKind::Required;
     }
@@ -306,7 +309,7 @@ public:
   void includeInstanceMembers() { IncludeInstanceMembers = true; }
 
   bool isHiddenModuleName(Identifier Name) {
-    return (Name.str().startswith("_") || Name == Ctx.SwiftShimsModuleName ||
+    return (Name.hasUnderscoredNaming() || Name == Ctx.SwiftShimsModuleName ||
             Name.str() == SWIFT_ONONE_SUPPORT);
   }
 
@@ -318,7 +321,7 @@ public:
 
   void
   addModuleName(ModuleDecl *MD,
-                llvm::Optional<ContextualNotRecommendedReason> R = llvm::None);
+                std::optional<ContextualNotRecommendedReason> R = std::nullopt);
 
   void addImportModuleNames();
 
@@ -336,6 +339,8 @@ public:
 
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
+
+  void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
 
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
 
@@ -362,7 +367,7 @@ public:
 
   void analyzeActorIsolation(
       const ValueDecl *VD, Type T, bool &implicitlyAsync,
-      llvm::Optional<ContextualNotRecommendedReason> &NotRecommended);
+      std::optional<ContextualNotRecommendedReason> &NotRecommended);
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo);
@@ -393,7 +398,7 @@ public:
                                    const AbstractFunctionDecl *AFD,
                                    bool forceAsync = false);
 
-  void addPoundAvailable(llvm::Optional<StmtKind> ParentKind);
+  void addPoundAvailable(std::optional<StmtKind> ParentKind);
 
   void addPoundSelector(bool needPound);
 
@@ -403,11 +408,11 @@ public:
 
   void addSubscriptCallPattern(
       const AnyFunctionType *AFT, const SubscriptDecl *SD,
-      const llvm::Optional<SemanticContextKind> SemanticContext = llvm::None);
+      const std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   void addFunctionCallPattern(
       const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
-      const llvm::Optional<SemanticContextKind> SemanticContext = llvm::None);
+      const std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD);
 
@@ -416,8 +421,8 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
                           DynamicLookupInfo dynamicLookupInfo,
-                          llvm::Optional<Type> BaseType,
-                          llvm::Optional<Type> Result, bool IsOnType = true,
+                          std::optional<Type> BaseType,
+                          std::optional<Type> Result, bool IsOnType = true,
                           Identifier addName = Identifier());
 
   void addConstructorCallsForType(Type type, Identifier name,
@@ -429,6 +434,9 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
+
+  Type getTypeAliasType(const TypeAliasDecl *TAD,
+                        DynamicLookupInfo dynamicLookupInfo);
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo);
@@ -443,9 +451,15 @@ public:
 
   void addPrecedenceGroupRef(PrecedenceGroupDecl *PGD);
 
+  /// Add a builtin member reference pattern. This is used for members that
+  /// do not have associated decls, e.g tuple access and '.isolation'.
+  void addBuiltinMemberRef(StringRef Name, Type TypeAnnotation);
+
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
+  void addMacroCallArguments(const MacroDecl *MD, DeclVisibilityKind Reason,
+                             bool forTrivialTrailingClosure = false);
   void addMacroExpansion(const MacroDecl *MD, DeclVisibilityKind Reason);
 
   void addKeyword(
@@ -508,9 +522,12 @@ public:
 
   bool tryTupleExprCompletions(Type ExprType);
 
+  /// Try add the completion for '.isolation' for @isolated(any) function types.
+  void tryFunctionIsolationCompletion(Type ExprType);
+
   bool tryFunctionCallCompletions(
       Type ExprType, const ValueDecl *VD,
-      llvm::Optional<SemanticContextKind> SemanticContext = llvm::None);
+      std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   bool tryModuleCompletions(Type ExprType, CodeCompletionFilter Filter);
 
@@ -588,20 +605,22 @@ public:
 
   void getTypeCompletions(Type BaseType);
 
+  /// Add completions for types that can appear after a \c ~ prefix.
+  void getInvertedTypeCompletions();
+
   void getGenericRequirementCompletions(DeclContext *DC,
                                         SourceLoc CodeCompletionLoc);
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                    bool IsConcurrencyEnabled,
-                                    llvm::Optional<DeclKind> DK,
-                                    StringRef Name);
+                                    const LangOptions &langOpts,
+                                    std::optional<DeclKind> DK, StringRef Name);
 
-  void getAttributeDeclCompletions(bool IsInSil, llvm::Optional<DeclKind> DK);
+  void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
 
-  void getTypeAttributeKeywordCompletions();
+  void getTypeAttributeKeywordCompletions(CompletionKind completionKind);
 
   void collectPrecedenceGroups();
 
@@ -627,8 +646,6 @@ public:
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
 
   void getOptionalBindingCompletions(SourceLoc Loc);
-
-  void getWithoutConstraintTypes();
 };
 
 } // end namespace ide

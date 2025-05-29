@@ -166,6 +166,7 @@ struct ContainsEnum {
     switch n { // expected-error {{switch must be exhaustive}}
     // expected-note@-1 {{missing case: '.Mere(_)'}}
     // expected-note@-2 {{missing case: '.Twain(_, _)'}}
+    // expected-note@-3 {{add missing cases}}
     case ContainsEnum.Possible<Int>.Naught,
          ContainsEnum.Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
          Possible<Int>.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
@@ -180,6 +181,7 @@ func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   switch n { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Mere(_)'}}
   // expected-note@-2 {{missing case: '.Twain(_, _)'}}
+  // expected-note@-3 {{add missing cases}}
   case ContainsEnum.Possible<Int>.Naught,
        .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     ()
@@ -404,7 +406,7 @@ func testNonBinding5(_ x: Int, y: [Int]) {
 func testNonBinding6(y: [Int], z: Int) -> Int {
   switch 0 {
   // We treat 'z' here as a binding, which is invalid.
-  case let y[z]: // expected-error {{pattern variable binding cannot appear in an expression}}
+  case let y[z]: // expected-error 2{{pattern variable binding cannot appear in an expression}}
     z
   case y[z]: // This is fine
     0

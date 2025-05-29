@@ -24,11 +24,13 @@
 #include "SwiftObject.h"
 #include "SwiftValue.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Threading/Mutex.h"
 #include "Private.h"
 #include "SwiftEquatableSupport.h"
 #include "SwiftHashableSupport.h"
@@ -36,6 +38,7 @@
 #include <Foundation/Foundation.h>
 
 #include <new>
+#include <unordered_set>
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -427,6 +430,11 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     }
   }
 
+//  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+//    // Legacy behavior only proxies isEqual: for Hashable, not Equatable
+//    return NO;
+//  }
+
   if (auto equatableConformance = selfHeader->getEquatableConformance()) {
     if (auto selfEquatableBaseType = selfHeader->getEquatableBaseType()) {
       auto otherEquatableBaseType = otherHeader->getEquatableBaseType();
@@ -446,15 +454,48 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
 }
 
 - (NSUInteger)hash {
+  // If Swift type is Hashable, get the hash value from there
   auto selfHeader = getSwiftValueHeader(self);
   auto hashableConformance = selfHeader->getHashableConformance();
-  if (!hashableConformance) {
-    return (NSUInteger)self;
+  if (hashableConformance) {
+	  return _swift_stdlib_Hashable_hashValue_indirect(
+	    getSwiftValuePayload(self,
+				 getSwiftValuePayloadAlignMask(selfHeader->type)),
+	    selfHeader->type, hashableConformance);
   }
-  return _swift_stdlib_Hashable_hashValue_indirect(
-      getSwiftValuePayload(self,
-                           getSwiftValuePayloadAlignMask(selfHeader->type)),
-      selfHeader->type, hashableConformance);
+
+//  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+//    // Legacy behavior doesn't honor Equatable conformance, only Hashable
+//    return (NSUInteger)self;
+//  }
+
+  // If Swift type is Equatable but not Hashable,
+  // we have to return something here that is compatible
+  // with the `isEqual:` above.
+  auto equatableConformance = selfHeader->getEquatableConformance();
+  if (equatableConformance) {
+    // Warn once per type about this
+    auto metadata = getSwiftValueTypeMetadata(self);
+    static Lazy<std::unordered_set<const Metadata *>> warned;
+    static LazyMutex warnedLock;
+    LazyMutex::ScopedLock guard(warnedLock);
+    auto result = warned.get().insert(metadata);
+    auto inserted = std::get<1>(result);
+    if (inserted) {
+      TypeNamePair typeName = swift_getTypeName(metadata, true);
+      warning(0,
+	      "Obj-C `-hash` invoked on a Swift value of type `%s` that is Equatable but not Hashable; "
+	      "this can lead to severe performance problems.\n",
+	      typeName.data);
+    }
+    // Constant value (yuck!) is the only choice here
+    return (NSUInteger)1;
+  }
+
+  // If the Swift type is neither Equatable nor Hashable,
+  // then we can hash the identity, which should be pretty
+  // good in practice.
+  return (NSUInteger)self;
 }
 
 static id getValueDescription(__SwiftValue *self) {

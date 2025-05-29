@@ -432,9 +432,7 @@ final class TangentVectorWB: DummyAdditiveArithmetic, Differentiable {
     self.b = b
   }
 }
-// expected-error @+3 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
-// expected-note @+2 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
-// expected-error @+1 2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}} FIXME: Duplicate error
+// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 final class VectorSpaceTypeAlias: DummyAdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -609,7 +607,9 @@ class WrappedProperties: Differentiable {
 // Test derived conformances in disallowed contexts.
 
 extension OtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring class 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 extension GenericOtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring generic class 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}

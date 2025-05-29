@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -plugin-path %swift-plugin-dir
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -plugin-path %swift-plugin-dir
 
 // REQUIRES: observation
 // REQUIRES: concurrency
@@ -8,6 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: rdar112623492
+// REQUIRES: swift_feature_Macros
 
 import Observation
 

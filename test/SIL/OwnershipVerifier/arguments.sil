@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -disable-swift-verification -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 // This is a test that verifies ownership behavior around arguments that should
@@ -38,7 +38,7 @@ bb1(%1 : @guaranteed $Builtin.NativeObject):
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'no_end_borrow_error2'
 // CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK: Value: %3 = argument of bb1 : $Builtin.NativeObject
+// CHECK: Value: %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK-LABEL: Error#: 0. End Error in Function: 'no_end_borrow_error2'
 //
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'no_end_borrow_error2'
@@ -272,8 +272,8 @@ bb6:
 // CHECK: User:   end_borrow %5 : $Builtin.NativeObject           // id: %13
 // CHECK: Block: bb2
 // CHECK: Consuming Users:
-// CHECK:   end_borrow %5 : $Builtin.NativeObject           // id: %13
-// CHECK:   end_borrow %5 : $Builtin.NativeObject           // id: %7
+// CHECK:   end_borrow %5 : $Builtin.NativeObject
+// CHECK:   end_borrow %5 : $Builtin.NativeObject
 // CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level'
 //
 // CHECK-LABEL: Error#: 7. Begin Error in Function: 'bad_order_add_a_level'
@@ -282,36 +282,18 @@ bb6:
 // CHECK: Post Dominating Failure Blocks:
 // CHECK: bb3
 // CHECK: Error#: 7. End Error in Function: 'bad_order_add_a_level'
-
-// CHECK: Error#: 9. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Error! Found a leak due to a consuming post-dominance failure!
+//
+// CHECK-LABEL: Error#: 9. Begin Error in Function: 'bad_order_add_a_level'
+// CHECK: Found outside of lifetime use!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
-// CHECK: Post Dominating Failure Blocks:
-// CHECK: bb3
+// CHECK: User:  %9 = begin_borrow %5 : $Builtin.NativeObject
+// CHECK: Block: bb3
 // CHECK-LABEL: Error#: 9. End Error in Function: 'bad_order_add_a_level'
 //
 // CHECK-LABEL: Error#: 10. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Found outside of lifetime use!
-// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
-// CHECK: User:  br bb4(%9 : $Builtin.NativeObject)              // id: %10
-// CHECK: Block: bb3
-// CHECK-LABEL: Error#: 10. End Error in Function: 'bad_order_add_a_level'
-//
-// We found a use that we didn't visit. For our purposes, we consider this to be
-// an outside lifetime use rather than use after freer to unite it with errors
-// from uses that are not reachable from the definition of the value.
-//
-// CHECK-LABEL: Error#: 11. Begin Error in Function: 'bad_order_add_a_level'
-// CHECK: Found outside of lifetime use!
-// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %9, %7
-// CHECK: User:  %9 = begin_borrow %5 : $Builtin.NativeObject    // user: %10
-// CHECK: Block: bb3
-// CHECK: Error#: 11. End Error in Function: 'bad_order_add_a_level'
-//
-// CHECK-LABEL: Error#: 12. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK: Value: %11 = argument of bb4 : $Builtin.NativeObject
-// CHECK: Error#: 12. End Error in Function: 'bad_order_add_a_level'
+// CHECK: Value: %9 = begin_borrow %5 : $Builtin.NativeObject
+// CHECK: Error#: 10. End Error in Function: 'bad_order_add_a_level'
 sil [ossa] @bad_order_add_a_level : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject

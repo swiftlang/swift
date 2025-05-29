@@ -60,4 +60,19 @@ func someTypeIsTheSame() {
   f = barString.foo(MyFoo()) // expected-error{{cannot assign}}
   f = barInt.foo(YourFoo()) // expected-error{{cannot convert value of type 'YourFoo' to expected argument type 'MyFoo'}}
   f = barString.foo(MyFoo()) // expected-error{{cannot assign}}
+
+  var g = globalComputedVar
+  g = globalVar // expected-error{{cannot assign}}
+  g = globalComputedVar
+  g = 123 // expected-error{{cannot assign}}
+
+  var h = globalVar
+  h = globalComputedVar // expected-error{{cannot assign}}
+  h = globalVar
+  h = 123 // expected-error{{cannot assign}}
+
+  var i = globalVarTuple
+  i = (123, foo(123)) // expected-error{{cannot assign}}
+  i = globalVarTuple
+  i = (globalVarTuple.0, globalVarTuple.1)
 }

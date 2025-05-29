@@ -183,7 +183,9 @@ private:
 #define REF_STORAGE(Name, ...) \
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
-  
+  const TypeInfo *convertBuiltinFixedArrayType(BuiltinFixedArrayType *T);
+
+
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
@@ -247,7 +249,7 @@ private:
   /// error.
   bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
-  llvm::Optional<YAMLTypeInfoNode>
+  std::optional<YAMLTypeInfoNode>
   getLegacyTypeInfo(NominalTypeDecl *decl) const;
 
   // Debugging aids.
@@ -406,6 +408,12 @@ bool tryEmitDestroyUsingDeinit(IRGenFunction &IGF,
 bool tryEmitConsumeUsingDeinit(IRGenFunction &IGF,
                                Explosion &explosion,
                                SILType T);
+
+/// Most fixed size types currently are always ABI accessible (value operations
+/// can be done without metadata). One notable exception is non-copyable types
+/// with a deinit. Their type metadata is required to call destroy if the deinit
+/// function is not available to the current SIL module.
+IsABIAccessible_t isTypeABIAccessibleIfFixedSize(IRGenModule &IGM, CanType ty);
 
 } // end namespace irgen
 } // end namespace swift

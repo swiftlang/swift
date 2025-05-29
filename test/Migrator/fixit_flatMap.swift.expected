@@ -3,6 +3,7 @@
 // RUN: diff -u %s.expected %t.result
 
 // REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=xros
 
 func migrate<T, U: Sequence, V: Collection>(lseq: LazySequence<T>, lcol: LazyCollection<T>, seq: U, col: V, test: Bool) {
   _ = lseq.compactMap { test ? nil : $0 }

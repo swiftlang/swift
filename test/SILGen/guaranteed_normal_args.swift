@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 // This test checks specific codegen related to normal arguments being passed at
 // +0. Eventually, it should be merged into normal SILGen tests.
@@ -170,7 +170,7 @@ struct ReabstractionThunkTest : Protocol {
 // result.
 extension FakeDictionary {
   // CHECK-LABEL: sil hidden [ossa] @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
-  // CHECK:   [[X:%.*]] = alloc_stack [lexical] $(Key, Value), let, name "x"
+  // CHECK:   [[X:%.*]] = alloc_stack [lexical] [var_decl] $(Key, Value), let, name "x"
   // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt
   // CHECK:   [[INDUCTION_VAR_0:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 0
   // CHECK:   [[INDUCTION_VAR_1:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 1

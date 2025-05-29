@@ -1,0 +1,29 @@
+module Categories_A {
+  header "Categories_A.h"
+  export *
+}
+
+module Categories_B {
+  header "Categories_B.h"
+  export *
+}
+
+module Categories_C {
+  header "Categories_C.h"
+  export *
+}
+
+module Categories_D {
+  header "Categories_D.h"
+  export *
+
+  explicit module Submodule {
+    header "Submodule.h"
+    export *
+  }
+}
+
+module Underlying {
+  header "Underlying.h"
+  export *
+}

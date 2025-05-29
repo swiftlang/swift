@@ -175,7 +175,7 @@ class Generic<T> {
 // DEMANGLE-DECL: $s19generic_local_types7GenericCfd7Alias15L_a
 // DEMANGLE-DECL: $s19generic_local_types7GenericC6methodyySiF6nestedL_yylF5AliasL_a
 
-// CHECK-DECL: generic_local_types.(file).Generic.local context.local context.Alias1
+// CHECK-DECL: generic_local_types.(file).Generic.pattern binding initializer.serialized abstract closure.Alias1
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias2
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias3
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias4
@@ -186,7 +186,7 @@ class Generic<T> {
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias9
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias10
 // CHECK-DECL: generic_local_types.(file).Generic.<anonymous>.Alias11
-// CHECK-DECL: generic_local_types.(file).Generic.method(_:).local context.local context.Alias12
+// CHECK-DECL: generic_local_types.(file).Generic.method(_:).default argument initializer.serialized abstract closure.Alias12
 // CHECK-DECL: generic_local_types.(file).Generic.method(_:).Alias13
 // CHECK-DECL: generic_local_types.(file).Generic.init().Alias14
 // CHECK-DECL: generic_local_types.(file).Generic.deinit.Alias15

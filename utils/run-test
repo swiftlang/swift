@@ -35,7 +35,6 @@ TEST_SUBSETS = [
     'only_validation',
     'only_long',
     'only_stress',
-    'only_early_swiftdriver'
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
@@ -128,6 +127,8 @@ def main():
     parser.add_argument("--build-jobs",
                         type=int,
                         help="The number of parallel build jobs to use")
+    parser.add_argument("--color", choices=["true", "false"], default="true",
+                        help="Whether to enable color output (default: true)")
     parser.add_argument("--target",
                         type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
@@ -265,6 +266,10 @@ def main():
 
     for param in args.param:
         test_args += ['--param', param]
+
+    # Enable colors if we're on a tty.
+    if args.color == 'true' and sys.stdout.isatty():
+        test_args += ['--param', 'color_output']
 
     if args.result_dir:
         test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,

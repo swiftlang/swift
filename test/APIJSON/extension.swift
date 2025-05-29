@@ -2,9 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5
-// RUN: %target-swift-api-extract -o - -pretty-print %t/MyModule.swiftinterface -module-name MyModule -module-cache-path %t/ModuleCache | %FileCheck %s --check-prefixes=CHECK,CHECK-EXTRACT
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json
-// RUN: %validate-json %t/api.json | %FileCheck %s --check-prefixes=CHECK,CHECK-EMIT
+// RUN: %validate-json %t/api.json | %FileCheck %s
 
 import Foundation
 
@@ -45,20 +44,24 @@ extension B {
   public func fun() {}
 }
 
+// This creates a category with a custom name.
+@objc(CustomCategoryName)
+extension B {
+  public func doIt() {}
+}
+
 // CHECK:      "interfaces": [
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "name": "_TtC8MyModule1B",
 // CHECK-NEXT:      "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift",
+// CHECK-NEXT:      "file": "SOURCE_DIR/test/APIJSON/extension.swift",
 // CHECK-NEXT:      "linkage": "exported",
 // CHECK-NEXT:      "super": "NSObject",
 // CHECK-NEXT:      "instanceMethods": [
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "name": "init",
 // CHECK-NEXT:          "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift"
+// CHECK-NEXT:          "file": "SOURCE_DIR/test/APIJSON/extension.swift"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "classMethods": []
@@ -66,18 +69,16 @@ extension B {
 // CHECK-NEXT:  ],
 // CHECK-NEXT:  "categories": [
 // CHECK-NEXT:    {
-// CHECK-NEXT:      "name": "MyModule",
+// CHECK-NEXT:      "name": "CustomCategoryName",
 // CHECK-NEXT:      "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift",
+// CHECK-NEXT:      "file": "SOURCE_DIR/test/APIJSON/extension.swift",
 // CHECK-NEXT:      "linkage": "exported",
-// CHECK-NEXT:      "interface": "NSDictionary",
+// CHECK-NEXT:      "interface": "_TtC8MyModule1B",
 // CHECK-NEXT:      "instanceMethods": [
 // CHECK-NEXT:        {
-// CHECK-NEXT:          "name": "__custom_name:",
+// CHECK-NEXT:          "name": "doIt",
 // CHECK-NEXT:          "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift"
+// CHECK-NEXT:          "file": "SOURCE_DIR/test/APIJSON/extension.swift"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "classMethods": []
@@ -85,16 +86,29 @@ extension B {
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "name": "MyModule",
 // CHECK-NEXT:      "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift",
+// CHECK-NEXT:      "file": "SOURCE_DIR/test/APIJSON/extension.swift",
+// CHECK-NEXT:      "linkage": "exported",
+// CHECK-NEXT:      "interface": "NSDictionary",
+// CHECK-NEXT:      "instanceMethods": [
+// CHECK-NEXT:        {
+// CHECK-NEXT:          "name": "__custom_name:",
+// CHECK-NEXT:          "access": "public",
+// CHECK-NEXT:          "file": "SOURCE_DIR/test/APIJSON/extension.swift"
+// CHECK-NEXT:        }
+// CHECK-NEXT:      ],
+// CHECK-NEXT:      "classMethods": []
+// CHECK-NEXT:    },
+// CHECK-NEXT:    {
+// CHECK-NEXT:      "name": "MyModule",
+// CHECK-NEXT:      "access": "public",
+// CHECK-NEXT:      "file": "SOURCE_DIR/test/APIJSON/extension.swift",
 // CHECK-NEXT:      "linkage": "exported",
 // CHECK-NEXT:      "interface": "_TtC8MyModule1B",
 // CHECK-NEXT:      "instanceMethods": [
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "name": "run",
 // CHECK-NEXT:          "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift"
+// CHECK-NEXT:          "file": "SOURCE_DIR/test/APIJSON/extension.swift"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "classMethods": []
@@ -102,16 +116,14 @@ extension B {
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "name": "MyModule1",
 // CHECK-NEXT:      "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift",
+// CHECK-NEXT:      "file": "SOURCE_DIR/test/APIJSON/extension.swift",
 // CHECK-NEXT:      "linkage": "exported",
 // CHECK-NEXT:      "interface": "_TtC8MyModule1B",
 // CHECK-NEXT:      "instanceMethods": [
 // CHECK-NEXT:        {
 // CHECK-NEXT:          "name": "fun",
 // CHECK-NEXT:          "access": "public",
-// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
-// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/extension.swift"
+// CHECK-NEXT:          "file": "SOURCE_DIR/test/APIJSON/extension.swift"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "classMethods": []

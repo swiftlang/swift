@@ -26,6 +26,12 @@
 using namespace swift;
 using namespace reflection;
 
+#ifdef DEBUG_TYPE_LOWERING
+  #define DEBUG_LOG(expr) expr;
+#else
+  #define DEBUG_LOG(expr)
+#endif
+
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   std::ostream &stream;
   unsigned Indent;
@@ -122,6 +128,31 @@ public:
     stream << ")";
   }
 
+  void visitPackTypeRef(const PackTypeRef *P) {
+    printHeader("pack");
+
+    for (auto Element : P->getElements()) {
+      printRec(Element);
+    }
+    stream << ")";
+  }
+
+  void visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    printHeader("pack_expansion");
+
+    Indent += 2;
+    stream << "\n";
+    printHeader("pattern");
+    printRec(PE->getPattern());
+
+    stream << "\n";
+    printHeader("count");
+    printRec(PE->getCount());
+
+    stream << ")";
+    Indent -= 2;
+  }
+
   void visitFunctionTypeRef(const FunctionTypeRef *F) {
     printHeader("function");
 
@@ -172,6 +203,15 @@ public:
       }
       Indent += 2;
     }
+    if (F->getExtFlags().isIsolatedAny()) {
+      printField("isolated", "any");
+    }
+    if (F->getExtFlags().hasSendingResult()) {
+      printField("", "sending-result");
+    }
+    if (F->getExtFlags().isNonIsolatedCaller()) {
+      printField("execution", "caller");
+    }
 
     stream << "\n";
     Indent += 2;
@@ -186,17 +226,17 @@ public:
         stream << "\n";
       }
 
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         printHeader("inout");
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         printHeader("shared");
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         printHeader("owned");
         break;
       }
@@ -206,6 +246,9 @@ public:
 
       if (flags.isVariadic())
         printHeader("variadic");
+
+      if (flags.isSending())
+        printHeader("sending");
 
       printRec(param.getType());
 
@@ -386,6 +429,19 @@ public:
     printHeader("opaque");
     stream << ")";
   }
+
+  void visitIntegerTypeRef(const IntegerTypeRef *I) {
+    printHeader("integer");
+    printField("value", std::to_string(I->getValue()));
+    stream << ")";
+  }
+
+  void visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    printHeader("builtin_fixed_array");
+    printRec(BA->getSizeType());
+    printRec(BA->getElementType());
+    stream << ")";
+  }
 };
 
 struct TypeRefIsConcrete
@@ -420,6 +476,18 @@ struct TypeRefIsConcrete
         return false;
     }
     return true;
+  }
+
+  bool visitPackTypeRef(const PackTypeRef *P) {
+    for (auto Element : P->getElements()) {
+      if (!visit(Element))
+        return false;
+    }
+    return true;
+  }
+
+  bool visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    return false;
   }
 
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -481,6 +549,13 @@ struct TypeRefIsConcrete
   }
     
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
+    for (auto Args : O->getArgumentLists()) {
+      for (auto *Arg : Args) {
+        if (!visit(Arg))
+          return false;
+      }
+    }
+
     return false;
   }
 
@@ -496,6 +571,14 @@ struct TypeRefIsConcrete
 
   bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     return true;
+  }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return true;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
   }
 };
 
@@ -531,6 +614,8 @@ public:
   Demangle::NodePointer visit(const TypeRef *typeRef) {
     auto node = TypeRefVisitor<DemanglingForTypeRef,
                                 Demangle::NodePointer>::visit(typeRef);
+    if (!node)
+      return nullptr;
 
     // Wrap all nodes in a Type node, as consumers generally expect.
     auto typeNode = Dem.createNode(Node::Kind::Type);
@@ -639,6 +724,20 @@ public:
     return tuple;
   }
 
+  Demangle::NodePointer visitPackTypeRef(const PackTypeRef *P) {
+    auto pack = Dem.createNode(Node::Kind::Pack);
+    for (auto Element : P->getElements())
+      pack->addChild(visit(Element), Dem);
+    return pack;
+  }
+
+  Demangle::NodePointer visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    auto expansion = Dem.createNode(Node::Kind::PackExpansion);
+    expansion->addChild(visit(PE->getPattern()), Dem);
+    expansion->addChild(visit(PE->getCount()), Dem);
+    return expansion;
+  }
+
   Demangle::NodePointer visitFunctionTypeRef(const FunctionTypeRef *F) {
     Node::Kind kind;
     switch (F->getFlags().getConvention()) {
@@ -670,22 +769,25 @@ public:
       if (flags.isNoDerivative()) {
         wrapInput(Node::Kind::NoDerivative);
       }
-      switch (flags.getValueOwnership()) {
-      case ValueOwnership::Default:
+      switch (flags.getOwnership()) {
+      case ParameterOwnership::Default:
         /* nothing */
         break;
-      case ValueOwnership::InOut:
+      case ParameterOwnership::InOut:
         wrapInput(Node::Kind::InOut);
         break;
-      case ValueOwnership::Shared:
+      case ParameterOwnership::Shared:
         wrapInput(Node::Kind::Shared);
         break;
-      case ValueOwnership::Owned:
+      case ParameterOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
       }
       if (flags.isIsolated()) {
         wrapInput(Node::Kind::Isolated);
+      }
+      if (flags.isSending()) {
+        wrapInput(Node::Kind::Sending);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -751,10 +853,26 @@ public:
     result->addChild(resultTy, Dem);
 
     auto funcNode = Dem.createNode(kind);
+
+    // This needs to use the same order as the demangler.
+
+    // TODO: the C function type would go here
+
+    if (F->getExtFlags().hasSendingResult()) {
+      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
+      funcNode->addChild(node, Dem);
+    }
+
     if (auto globalActor = F->getGlobalActor()) {
       auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
       auto globalActorNode = visit(globalActor);
       node->addChild(globalActorNode, Dem);
+      funcNode->addChild(node, Dem);
+    } else if (F->getExtFlags().isIsolatedAny()) {
+      auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
+      funcNode->addChild(node, Dem);
+    } else if (F->getExtFlags().isNonIsolatedCaller()) {
+      auto node = Dem.createNode(Node::Kind::NonIsolatedCallerFunctionType);
       funcNode->addChild(node, Dem);
     }
 
@@ -779,8 +897,17 @@ public:
           Dem);
     }
 
-    if (F->getFlags().isThrowing())
-      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (F->getFlags().isThrowing()) {
+      if (auto thrownError = F->getThrownError()) {
+        auto node = Dem.createNode(Node::Kind::TypedThrowsAnnotation);
+        auto thrownErrorNode = visit(thrownError);
+        node->addChild(thrownErrorNode, Dem);
+        funcNode->addChild(node, Dem);
+      } else {
+        funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+      }
+    }
+
     if (F->getFlags().isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
@@ -865,7 +992,7 @@ public:
       node->addChild(MemberId, Dem);
     } else {
       // Otherwise, build up a DependentAssociatedTR node with
-      // the member Identifer and protocol
+      // the member Identifier and protocol
       auto AssocTy = Dem.createNode(Node::Kind::DependentAssociatedTypeRef);
       AssocTy->addChild(MemberId, Dem);
       auto Proto = Dem.demangleType(MangledProtocol);
@@ -1019,13 +1146,34 @@ public:
     
     return node;
   }
+
+  Demangle::NodePointer createInteger(intptr_t value) {
+    if (value >= 0) {
+      return Dem.createNode(Node::Kind::Integer, value);
+    } else {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
+    }
+  }
+
+  Demangle::NodePointer visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return createInteger(I->getValue());
+  }
+
+  Demangle::NodePointer visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto ba = Dem.createNode(Node::Kind::BuiltinFixedArray);
+
+    ba->addChild(visit(BA->getSizeType()), Dem);
+    ba->addChild(visit(BA->getElementType()), Dem);
+
+    return ba;
+  }
 };
 
 Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
   return DemanglingForTypeRef(Dem).visit(this);
 }
 
-llvm::Optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
+std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   NodePointer node = getDemangling(Dem);
   if (!node)
     return {};
@@ -1037,7 +1185,7 @@ llvm::Optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   auto global = Dem.createNode(Node::Kind::Global);
   global->addChild(node, Dem);
 
-  auto mangling = mangleNode(global);
+  auto mangling = mangleNode(global, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess())
     return {};
   return mangling.result();
@@ -1057,7 +1205,7 @@ unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
     switch (P->getKind()) {
     case TypeRefKind::Nominal:
-      return 1 + cast<NominalTypeRef>(P)->getDepth();
+      return cast<NominalTypeRef>(P)->getDepth();
     case TypeRefKind::BoundGeneric:
       return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
     default:
@@ -1067,7 +1215,7 @@ unsigned NominalTypeTrait::getDepth() const {
   return 0;
 }
 
-llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
+std::optional<GenericArgumentMap> TypeRef::getSubstMap() const {
   GenericArgumentMap Substitutions;
   switch (getKind()) {
     case TypeRefKind::Nominal: {
@@ -1082,13 +1230,13 @@ llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
       unsigned Index = 0;
       for (auto Param : BG->getGenericParams()) {
         if (!Param->isConcrete())
-          return llvm::None;
+          return std::nullopt;
         Substitutions.insert({{Depth, Index++}, Param});
       }
       if (auto Parent = BG->getParent()) {
         auto ParentSubs = Parent->getSubstMap();
         if (!ParentSubs)
-          return llvm::None;
+          return std::nullopt;
         Substitutions.insert(ParentSubs->begin(), ParentSubs->end());
       }
       break;
@@ -1155,6 +1303,19 @@ public:
     return TupleTypeRef::create(Builder, Elements, Labels);
   }
 
+  const TypeRef *visitPackTypeRef(const PackTypeRef *P) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : P->getElements())
+      Elements.push_back(visit(Element));
+    return PackTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    auto *Pattern = visit(PE->getPattern());
+    auto *Count = visit(PE->getCount());
+    return PackExpansionTypeRef::create(Builder, Pattern, Count);
+  }
+
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
     std::vector<remote::FunctionParam<const TypeRef *>> SubstitutedParams;
     for (const auto &Param : F->getParameters()) {
@@ -1166,12 +1327,20 @@ public:
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    auto extFlags = F->getExtFlags();
+
+    const TypeRef *thrownErrorType = nullptr;
+    if (F->getThrownError()) {
+      thrownErrorType = visit(F->getThrownError());
+      // FIXME: fold Never and any Error to their canonical representation?
+    }
+
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags(),
+                                   SubstitutedResult, F->getFlags(), extFlags,
                                    F->getDifferentiabilityKind(),
-                                   globalActorType);
+                                   globalActorType, thrownErrorType);
   }
 
   const TypeRef *
@@ -1239,6 +1408,14 @@ public:
     return O;
   }
 
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
+                                            visit(BA->getElementType()));
+  }
 };
 
 static const TypeRef *
@@ -1250,15 +1427,49 @@ class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
   TypeRefBuilder &Builder;
   GenericArgumentMap Substitutions;
-  // Set true iff the Substitution map was actually used
-  bool DidSubstitute;
+
+  std::vector<unsigned> ActivePackExpansions;
+
+  /// Simplified variant of InFlightSubstitution::expandPackExpansionShape()
+  /// that only implements the case where the replacement packs are concrete,
+  /// that is, they do not contain more pack expansions. This will always be
+  /// true here, because even more generally, our "substitution maps" do not
+  /// contain type parameters.
+  template<typename Fn>
+  bool expandPackExpansion(const PackExpansionTypeRef *origExpansion,
+                           Fn handleComponent) {
+    // Substitute the shape using the baseline substitutions, not the
+    // current elementwise projections.
+    auto *substShape = origExpansion->getCount()->subst(Builder, Substitutions);
+
+    auto *substPackShape = dyn_cast<PackTypeRef>(substShape);
+    if (!substPackShape) {
+      DEBUG_LOG(fprintf(stderr, "Replacement for pack must be another pack"));
+      return false;
+    }
+
+    ActivePackExpansions.push_back(0);
+    for (auto *substShapeElt : substPackShape->getElements()) {
+      if (isa<PackExpansionTypeRef>(substShapeElt)) {
+        DEBUG_LOG(fprintf(stderr, "Replacement pack cannot contain further expansions"));
+        return false;
+      }
+
+      auto *origPattern = origExpansion->getPattern();
+      auto *substElt = visit(origPattern);
+      handleComponent(substElt);
+
+      ++ActivePackExpansions.back();
+    }
+    ActivePackExpansions.pop_back();
+    return true;
+  }
+
 public:
   using TypeRefVisitor<TypeRefSubstitution, const TypeRef *>::visit;
 
   TypeRefSubstitution(TypeRefBuilder &Builder, GenericArgumentMap Substitutions)
-      : Builder(Builder), Substitutions(Substitutions), DidSubstitute(false) {}
-
-  bool didSubstitute() const { return DidSubstitute; }
+      : Builder(Builder), Substitutions(Substitutions) {}
 
   const TypeRef *visitBuiltinTypeRef(const BuiltinTypeRef *B) {
     return B;
@@ -1283,30 +1494,87 @@ public:
   }
 
   const TypeRef *visitTupleTypeRef(const TupleTypeRef *T) {
+    std::vector<std::string> Labels;
     std::vector<const TypeRef *> Elements;
-    for (auto Element : T->getElements())
-      Elements.push_back(visit(Element));
-    auto Labels = T->getLabels();
+    for (auto NameElement : llvm::zip_first(T->getLabels(), T->getElements())) {
+      auto *Element = std::get<1>(NameElement);
+      if (auto *PE = dyn_cast<PackExpansionTypeRef>(Element)) {
+        bool result = expandPackExpansion(PE, [&](const TypeRef *substElt) {
+          Labels.push_back(std::get<0>(NameElement));
+          Elements.push_back(substElt);
+        });
+        if (!result)
+          return T;
+      } else {
+        Labels.push_back(std::get<0>(NameElement));
+        Elements.push_back(visit(Element));
+      }
+    }
+
+    // Unwrap one-element tuples.
+    if (Elements.size() == 1 && Labels[0].empty() &&
+        !isa<PackExpansionTypeRef>(Elements[0])) {
+      return Elements[0];
+    }
+
     return TupleTypeRef::create(Builder, Elements, Labels);
+  }
+
+  const TypeRef *visitPackTypeRef(const PackTypeRef *P) {
+    std::vector<const TypeRef *> Elements;
+    for (auto Element : P->getElements()) {
+      if (auto *PE = dyn_cast<PackExpansionTypeRef>(Element)) {
+        bool result = expandPackExpansion(PE, [&](const TypeRef *substElt) {
+          Elements.push_back(substElt);
+        });
+        if (!result)
+          return P;
+      } else {
+        Elements.push_back(visit(Element));
+      }
+    }
+    return PackTypeRef::create(Builder, Elements);
+  }
+
+  const TypeRef *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    return nullptr;
   }
 
   const TypeRef *visitFunctionTypeRef(const FunctionTypeRef *F) {
     std::vector<remote::FunctionParam<const TypeRef *>> SubstitutedParams;
     for (const auto &Param : F->getParameters()) {
-      auto typeRef = Param.getType();
-      SubstitutedParams.push_back(Param.withType(visit(typeRef)));
+      auto *TR = Param.getType();
+      if (auto *PE = dyn_cast<PackExpansionTypeRef>(TR)) {
+        bool result = expandPackExpansion(PE, [&](const TypeRef *substElt) {
+          SubstitutedParams.push_back(Param.withType(visit(substElt)));
+        });
+        if (!result)
+          return F;
+      } else {
+        SubstitutedParams.push_back(Param.withType(visit(TR)));
+      }
     }
 
     auto SubstitutedResult = visit(F->getResult());
+
+    auto flags = F->getFlags();
+    auto extFlags = F->getExtFlags();
 
     const TypeRef *globalActorType = nullptr;
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    const TypeRef *thrownErrorType = nullptr;
+    if (F->getThrownError()) {
+      thrownErrorType = visit(F->getThrownError());
+      // FIXME: fold Never / any Error to their canonical representations?
+    }
+
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags(),
+                                   SubstitutedResult, flags, extFlags,
                                    F->getDifferentiabilityKind(),
-                                   globalActorType);
+                                   globalActorType, thrownErrorType);
   }
 
   const TypeRef *
@@ -1336,11 +1604,11 @@ public:
     return EM;
   }
 
-  llvm::Optional<TypeRefRequirement>
+  std::optional<TypeRefRequirement>
   visitTypeRefRequirement(const TypeRefRequirement &req) {
     auto newFirst = visit(req.getFirstType());
     if (!newFirst)
-      return llvm::None;
+      return std::nullopt;
 
     switch (req.getKind()) {
     case RequirementKind::SameShape:
@@ -1349,7 +1617,7 @@ public:
     case RequirementKind::SameType: {
       auto newSecond = visit(req.getFirstType());
       if (!newSecond)
-        return llvm::None;
+        return std::nullopt;
       return TypeRefRequirement(req.getKind(), newFirst, newSecond);
     }
     case RequirementKind::Layout:
@@ -1378,13 +1646,30 @@ public:
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
     if (found == Substitutions.end())
       return GTP;
-    assert(found->second->isConcrete());
-    DidSubstitute = true; // We actually used the Substitutions
+
+    auto substType = found->second;
+    assert(substType->isConcrete());
+
+    if (!ActivePackExpansions.empty()) {
+      auto *P = dyn_cast<PackTypeRef>(substType);
+      if (!P) {
+        DEBUG_LOG(fprintf(stderr, "Replacement for pack is not a pack: "); P->dump());
+        return nullptr;
+      }
+
+      unsigned index = ActivePackExpansions.back();
+      if (index >= P->getElements().size()) {
+        DEBUG_LOG(fprintf(stderr, "Packs with wrong shape: "); P->dump());
+        return nullptr;
+      }
+
+      substType = P->getElements()[index];
+    }
 
     // When substituting a concrete type containing a metatype into a
     // type parameter, (eg: T, T := C.Type), we must also represent
     // the metatype as a value.
-    return thickenMetatypes(Builder, found->second);
+    return thickenMetatypes(Builder, substType);
   }
 
   const TypeRef *visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
@@ -1484,20 +1769,20 @@ public:
                                           O->getOrdinal(),
                                           newArgLists);
   }
+
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
+                                            visit(BA->getElementType()));
+  }
 };
 
 const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
                               const GenericArgumentMap &Subs) const {
   return TypeRefSubstitution(Builder, Subs).visit(this);
-}
-
-const TypeRef *TypeRef::subst(TypeRefBuilder &Builder,
-                              const GenericArgumentMap &Subs,
-			      bool &DidSubstitute) const {
-  auto subst = TypeRefSubstitution(Builder, Subs);
-  auto TR = subst.visit(this);
-  DidSubstitute = subst.didSubstitute();
-  return TR;
 }
 
 bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,

@@ -91,13 +91,17 @@ public:
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention);
+                                  ParameterConvention calleeConvention,
+                                  SILFunctionTypeIsolation resultIsolation =
+                                      SILFunctionTypeIsolation::forUnknown());
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
-                                  ParameterConvention calleeConvention) {
+                                  ParameterConvention calleeConvention,
+                                  SILFunctionTypeIsolation resultIsolation =
+                                      SILFunctionTypeIsolation::forUnknown()) {
     return createPartialApply(loc, fn.getValue(), subs, args,
-                              calleeConvention);
+                              calleeConvention, resultIsolation);
   }
 
   using SILBuilder::createStructExtract;
@@ -271,10 +275,14 @@ public:
 
   /// Create a SILArgument for an input parameter. Asserts if used to create a
   /// function argument for an out parameter.
+  ///
+  /// \arg isImplicitParameter set to true if this is an implicit parameter that
+  /// is inserted by SILGen and does not show up at the AST level.
   ManagedValue createInputFunctionArgument(
       SILType type, ValueDecl *decl, bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isClosureCapture = false, bool isFormalParameterPack = false);
+      bool isClosureCapture = false, bool isFormalParameterPack = false,
+      bool isImplicitParameter = false);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out
@@ -285,7 +293,7 @@ public:
   /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
   /// user to be explicit that they want to use this API.
   ManagedValue createInputFunctionArgument(SILType type,
-                                           llvm::Optional<SILLocation> loc);
+                                           std::optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,
@@ -299,13 +307,16 @@ public:
                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCast;
-  ManagedValue createUnconditionalCheckedCast(SILLocation loc,
-                                              ManagedValue op,
-                                              SILType destLoweredTy,
-                                              CanType destFormalTy);
+  ManagedValue createUnconditionalCheckedCast(
+      SILLocation loc,
+      CastingIsolatedConformances isolatedConformances,
+      ManagedValue op,
+      SILType destLoweredTy,
+      CanType destFormalTy);
 
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
+                               CastingIsolatedConformances isolatedConformances,
                                ManagedValue op,
                                CanType sourceFormalTy,
                                SILType destLoweredTy,
@@ -335,6 +346,11 @@ public:
   using SILBuilder::createUncheckedReinterpretCast;
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
+
+  using SILBuilder::createUncheckedForwardingCast;
+  ManagedValue createUncheckedForwardingCast(SILLocation loc,
+                                             ManagedValue original,
+                                             SILType type);
 
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
@@ -461,15 +477,30 @@ public:
 
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
-                                    ManagedValue base);
+                                    ManagedValue base,
+                                    MarkDependenceKind dependencekind);
+
+  SILValue emitBeginAccess(SILLocation loc, SILValue address,
+                           SILAccessKind kind,
+                           SILAccessEnforcement enforcement);
+
+  ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
+                                             ManagedValue address);
+  ManagedValue createOpaqueConsumeBeginAccess(SILLocation loc,
+                                              ManagedValue address);
 
   using SILBuilder::createBeginBorrow;
-  ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
-                                 bool isLexical = false);
+  ManagedValue createBeginBorrow(
+      SILLocation loc, ManagedValue value, IsLexical_t isLexical = IsNotLexical,
+      BeginBorrowInst::IsFixed_t isFixed = BeginBorrowInst::IsNotFixed);
+
+  ManagedValue createFormalAccessBeginBorrow(
+      SILLocation loc, ManagedValue value, IsLexical_t isLexical = IsNotLexical,
+      BeginBorrowInst::IsFixed_t isFixed = BeginBorrowInst::IsNotFixed);
 
   using SILBuilder::createMoveValue;
   ManagedValue createMoveValue(SILLocation loc, ManagedValue value,
-                               bool isLexical = false);
+                               IsLexical_t isLexical = IsNotLexical);
 
   using SILBuilder::createOwnedMoveOnlyWrapperToCopyableValue;
   ManagedValue createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc,
@@ -492,7 +523,9 @@ public:
   using SILBuilder::createMarkUnresolvedNonCopyableValueInst;
   ManagedValue createMarkUnresolvedNonCopyableValueInst(
       SILLocation loc, ManagedValue value,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind);
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind,
+      MarkUnresolvedNonCopyableValueInst::IsStrict_t strict
+        = MarkUnresolvedNonCopyableValueInst::IsNotStrict);
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
@@ -504,6 +537,19 @@ public:
   using SILBuilder::createEndLifetime;
   void createEndLifetime(SILLocation loc, ManagedValue selfValue) {
     createEndLifetime(loc, selfValue.forward(SGF));
+  }
+
+  using SILBuilder::createTupleAddrConstructor;
+
+  void createTupleAddrConstructor(SILLocation loc, SILValue destAddr,
+                                  ArrayRef<ManagedValue> elements,
+                                  IsInitialization_t isInitOfDest) {
+    SmallVector<SILValue, 8> values;
+    for (auto mv : elements) {
+      values.push_back(mv.forward(SGF));
+    }
+
+    createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
 };
 

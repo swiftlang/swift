@@ -18,7 +18,7 @@ func acceptHashable<T: Hashable>(_: T) {}
 func acceptComparable<T: Comparable>(_: T) {}
 // expected-note@-1 {{where 'T' = 'NSNotification.Name'}}
 
-func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
+func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name, z: NSFileAttributeKey) {
   acceptEquatable(x)
   acceptHashable(x)
   acceptComparable(x) // expected-error {{global function 'acceptComparable' requires that 'NSNotification.Name' conform to 'Comparable'}}
@@ -28,6 +28,8 @@ func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
   _ = x != y
   _ = x.hashValue
   _ = x as NSString
+
+  _ = z as NSString
 }
 
 

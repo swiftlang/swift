@@ -9,8 +9,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -58,8 +58,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} -primary-file {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-02-[[SWIFTDOC02:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*}}file-02-[[OBJ02:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} -primary-file {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-02-[[SWIFTDOC02:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*}}file-02-[[OBJ02:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -107,8 +107,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*}}swift{{(-frontend|c)?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} -primary-file {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-03-[[SWIFTDOC03:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*}}file-03-[[OBJ03:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?}}",
+// CHECK-NEXT:   "command": "{{.*}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} -primary-file {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-03-[[SWIFTDOC03:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*}}file-03-[[OBJ03:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -156,8 +156,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?(\\")?}} -frontend -c {{.*[\\/]}}file-01.swift{{(\\")?}} {{.*[\\/]}}file-02.swift{{(\\")?}} {{.*[\\/]}}file-03.swift{{(\\")?}} -primary-file {{.*[\\/]}}main.swift{{(\\")?}} -emit-module-path {{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*[\\/]}}main-[[SWIFTDOCMAIN:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?(\\")?}} -frontend -c {{.*[\\/]}}file-01.swift{{(\\")?}} {{.*[\\/]}}file-02.swift{{(\\")?}} {{.*[\\/]}}file-03.swift{{(\\")?}} -primary-file {{.*[\\/]}}main.swift{{(\\")?}} -emit-module-path {{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*[\\/]}}main-[[SWIFTDOCMAIN:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} {{.*}} -module-name main -o {{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -249,8 +249,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}file-01-[[MODULE01]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-02-[[MODULE02]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-03-[[MODULE03]].swiftmodule{{(\\")?}} {{.*[\\/]}}main-[[MODULEMAIN]].swiftmodule{{(\\")?}} {{.*}} -emit-module-doc-path main.swiftdoc -emit-module-source-info-path main.swiftsourceinfo -module-name main -o main.swiftmodule",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(-frontend|c)?(\.exe)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}file-01-[[MODULE01]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-02-[[MODULE02]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-03-[[MODULE03]].swiftmodule{{(\\")?}} {{.*[\\/]}}main-[[MODULEMAIN]].swiftmodule{{(\\")?}} {{.*}} -emit-module-doc-path main.swiftdoc -emit-module-source-info-path main.swiftsourceinfo -module-name main -o main.swiftmodule",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-merge-modules",

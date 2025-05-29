@@ -58,6 +58,16 @@ func testStruct() {
   s[0] = z
   s[0] += 1
 
+  // CHECK-DAG: declare extern_weak {{.+}} @"$s25weak_import_native_helper1SV11extensionFnyyF"
+  s.extensionFn()
+
+  // CHECK-DAG: declare extern_weak {{.+}} @"$s25weak_import_native_helper1SV13extensionPropSivg"
+  // CHECK-DAG: declare extern_weak {{.+}} @"$s25weak_import_native_helper1SV13extensionPropSivs"
+  // CHECK-DAG: declare extern_weak {{.+}} @"$s25weak_import_native_helper1SV13extensionPropSivM"
+  let yy = s.extensionProp
+  s.extensionProp = yy
+  s.extensionProp += 1
+
   // CHECK-DAG: declare extern_weak {{.+}} @"$s25weak_import_native_helper5WeakSV0A6MemberyyF"
   let w = WeakS()
   w.weakMember()

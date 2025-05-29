@@ -1,0 +1,30 @@
+// RUN: %target-sil-opt -send-non-sendable -strict-concurrency=complete -swift-version 5 %s -verify -verify-additional-prefix complete-
+// RUN: %target-sil-opt -send-non-sendable -swift-version 6 %s -verify -verify-additional-prefix tns-
+
+// READ THIS: This test takes advantage of the semantics of concurrency to
+// validate that sil-opt can properly set the swift-version flag in a way that
+// the rest of the compiler can understand. Please do not add actual concurrency
+// code to this test and always keep it simple if additional code needs to be
+// added since we aren't actually trying to test concurrency here!
+
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+import Swift
+import _Concurrency
+
+class NonSendableKlass {}
+
+sil @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+
+sil [ossa] @test : $@convention(thin) @async (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = function_ref  @transfer_to_main : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %1(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-complete-warning @-1 {{}}
+  // expected-complete-note @-2 {{}}
+  // expected-tns-error @-3 {{}}
+  // expected-tns-note @-4 {{}}
+  %9999 = tuple ()
+  return %9999 : $()
+}

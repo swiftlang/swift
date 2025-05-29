@@ -14,8 +14,8 @@
 #define LLVM_SOURCEKITD_TEST_TESTOPTIONS_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
+#include <optional>
 #include <string>
 
 namespace sourcekitd_test {
@@ -56,7 +56,6 @@ enum class SourceKitRequest {
   PrintDiags,
   ExtractComment,
   ModuleGroups,
-  SyntacticRename,
   FindRenameRanges,
   FindLocalRenameRanges,
   NameTranslation,
@@ -90,18 +89,18 @@ struct TestOptions {
   std::string TextInputFile;
   std::string JsonRequestPath;
   std::string RenameSpecPath;
-  llvm::Optional<std::string> SourceText;
+  std::optional<std::string> SourceText;
   std::string ModuleGroupName;
   std::string InterestedUSR;
   unsigned Line = 0;
   unsigned Col = 0;
   unsigned EndLine = 0;
   unsigned EndCol = 0;
-  llvm::Optional<unsigned> Offset;
+  std::optional<unsigned> Offset;
   unsigned Length = 0;
   std::string SwiftVersion;
   bool PassVersionAsString = false;
-  llvm::Optional<std::string> ReplaceText;
+  std::optional<std::string> ReplaceText;
   std::string ModuleName;
   std::string HeaderPath;
   bool PassAsSourceText = false;
@@ -121,7 +120,7 @@ struct TestOptions {
   std::string CancelRequest;
   /// If set, simulate that the request takes x ms longer than it actually
   /// does. The request can be cancelled while waiting this duration.
-  llvm::Optional<uint64_t> SimulateLongRequest;
+  std::optional<uint64_t> SimulateLongRequest;
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
   bool PrintRequest = true;
@@ -136,9 +135,7 @@ struct TestOptions {
   bool measureInstructions = false;
   bool DisableImplicitConcurrencyModuleImport = false;
   bool DisableImplicitStringProcessingModuleImport = false;
-  bool EnableImplicitBacktracingModuleImport = false;
-  bool DisableImplicitBacktracingModuleImport = false;
-  llvm::Optional<unsigned> CompletionCheckDependencyInterval;
+  std::optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
   struct VFSFile {
     std::string path;
@@ -147,8 +144,8 @@ struct TestOptions {
         : path(std::move(path)), passAsSourceText(passAsSourceText) {}
   };
   llvm::StringMap<VFSFile> VFSFiles;
-  llvm::Optional<std::string> VFSName;
-  llvm::Optional<bool> CancelOnSubsequentRequest;
+  std::optional<std::string> VFSName;
+  std::optional<bool> CancelOnSubsequentRequest;
   bool ShellExecution = false;
   std::string IndexStorePath;
   std::string IndexUnitOutputPath;

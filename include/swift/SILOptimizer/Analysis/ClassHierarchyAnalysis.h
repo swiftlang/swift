@@ -95,7 +95,7 @@ private:
   SILModule *M;
 
   /// A cache that maps a class to all of its known direct subclasses.
-  llvm::Optional<ClassListMap> DirectSubclassesCache;
+  std::optional<ClassListMap> DirectSubclassesCache;
 
   /// A cache that maps a class to all of its known indirect subclasses.
   ClassListMap IndirectSubclassesCache;

@@ -32,6 +32,8 @@ typedef int my_int_t SWIFT_NAME(MyInt);
 void spuriousAPINotedSwiftName(int);
 void poorlyNamedFunction(const char *);
 
+PointType readPoint(const char *path, void **errorOut) SWIFT_NAME(Point.init(path:));
+
 struct BoxForConstants {
   int dummy;
 };
@@ -43,10 +45,11 @@ enum {
 #if __OBJC__
 @interface Foo
 - (instancetype)init;
+- (instancetype)initWithFoo SWIFT_NAME(initWithFoo()); // expected-warning {{custom Swift name 'initWithFoo()' ignored because it is not valid for initializer; imported as 'init(foo:)' instead}}
 @end
 
-void acceptsClosure(id value, void (*fn)(void)) SWIFT_NAME(Foo.accepts(self:closure:));
-void acceptsClosureStatic(void (*fn)(void)) SWIFT_NAME(Foo.accepts(closure:));
+void acceptsClosure(id value, void (*fn)(void)) SWIFT_NAME(Foo.accepts(self:closure:)); // expected-note * {{'acceptsClosure' was obsoleted in Swift 3}}
+void acceptsClosureStatic(void (*fn)(void)) SWIFT_NAME(Foo.accepts(closure:)); // expected-note * {{'acceptsClosureStatic' was obsoleted in Swift 3}}
 
 enum {
   // Note that there was specifically a crash when renaming onto an ObjC class,

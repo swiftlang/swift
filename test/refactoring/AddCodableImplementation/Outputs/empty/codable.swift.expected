@@ -1,7 +1,7 @@
 
 struct User: Codable {
 
-    enum CodingKeys: CodingKey {
+    private enum CodingKeys: CodingKey {
     }
 
     init(from decoder: any Decoder) throws {

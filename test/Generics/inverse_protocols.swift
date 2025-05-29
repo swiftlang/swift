@@ -1,13 +1,13 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift
 
-// REQUIRES: asserts
+
 
 protocol Eq: ~Copyable {
   func same(as: borrowing Self) -> Bool
   func different(from: borrowing Self) -> Bool
 }
 
-extension Eq {
+extension Eq where Self: ~Copyable {
   func different(from other: borrowing Self) -> Bool { !same(as: other) }
 }
 
@@ -21,7 +21,7 @@ struct File: ~Copyable, Eq {
 }
 
 func check<T: ~Copyable>(_ a: T, _ b: borrowing T) -> Bool where T: Eq {
-// expected-error@-1 {{noncopyable parameter must specify its ownership}}
+// expected-error@-1 {{parameter of noncopyable type 'T' must specify ownership}}
 // expected-note@-2 {{add 'borrowing' for an immutable reference}}
 // expected-note@-3 {{add 'inout' for a mutable reference}}
 // expected-note@-4 {{add 'consuming' to take the value from the caller}}

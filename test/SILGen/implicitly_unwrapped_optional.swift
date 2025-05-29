@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name implicitly_unwrapped_optional -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name implicitly_unwrapped_optional -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f
@@ -8,7 +8,7 @@ func foo(f f: (() -> ())!) {
 // CHECK: sil hidden [ossa] @{{.*}}foo{{.*}} : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> ()>) -> () {
 // CHECK: bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> ()>):
 // CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
-// CHECK:   [[F_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[F]]
+// CHECK:   [[F_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[F]]
 // CHECK:   [[PF:%.*]] = project_box [[F_LIFETIME]]
 // CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
@@ -73,7 +73,10 @@ func f_46343() {
   // Verify that there are no additional reabstractions introduced.
   // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional7f_46343yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in_guaranteed Optional<Any>) -> () to $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
-  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
+  // CHECK: [[MOVED_F:%.*]] = move_value [lexical] [var_decl] [[F]]
+  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[MOVED_F]]
+  // CHECK: [[COPIED_F:%.*]] = copy_value [[BORROWED_F]]
+  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[COPIED_F]]
   // CHECK: = apply [[BORROWED_F]]({{%.+}}) : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: end_borrow [[BORROWED_F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }

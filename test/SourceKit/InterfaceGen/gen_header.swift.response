@@ -1,18 +1,13 @@
 public func doSomethingInHead(_ arg: Int32)
-
 open class BaseInHead {
 
     open func doIt(_ arg: Int32)
 }
-
 /// Awesome name.
 /// �������
 /// Awesome name.
 open class SameName {
 }
-
-// random comment.
-
 public protocol SameNameProtocol {
 }
 
@@ -49,97 +44,92 @@ public protocol SameNameProtocol {
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 45,
+    key.offset: 44,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 50,
+    key.offset: 49,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 56,
+    key.offset: 55,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 74,
+    key.offset: 73,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 79,
+    key.offset: 78,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 84,
+    key.offset: 83,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 89,
+    key.offset: 88,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 91,
+    key.offset: 90,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 96,
+    key.offset: 95,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 106,
+    key.offset: 104,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 124,
+    key.offset: 122,
     key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 150,
+    key.offset: 148,
     key.length: 18
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 168,
+    key.offset: 166,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 173,
+    key.offset: 171,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 179,
+    key.offset: 177,
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 193,
-    key.length: 19
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 213,
+    key.offset: 190,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 220,
+    key.offset: 197,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 229,
+    key.offset: 206,
     key.length: 16
   }
 ]
@@ -152,7 +142,7 @@ public protocol SameNameProtocol {
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 96,
+    key.offset: 95,
     key.length: 5,
     key.is_system: 1
   }
@@ -187,15 +177,15 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "BaseInHead",
-    key.offset: 50,
+    key.offset: 49,
     key.length: 54,
-    key.nameoffset: 56,
+    key.nameoffset: 55,
     key.namelength: 10,
-    key.bodyoffset: 68,
+    key.bodyoffset: 67,
     key.bodylength: 35,
     key.attributes: [
       {
-        key.offset: 45,
+        key.offset: 44,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -205,13 +195,13 @@ public protocol SameNameProtocol {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.open,
         key.name: "doIt(_:)",
-        key.offset: 79,
+        key.offset: 78,
         key.length: 23,
-        key.nameoffset: 84,
+        key.nameoffset: 83,
         key.namelength: 18,
         key.attributes: [
           {
-            key.offset: 74,
+            key.offset: 73,
             key.length: 4,
             key.attribute: source.decl.attribute.open
           }
@@ -220,7 +210,7 @@ public protocol SameNameProtocol {
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "arg",
-            key.offset: 89,
+            key.offset: 88,
             key.length: 12,
             key.typename: "Int32"
           }
@@ -232,17 +222,17 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.class,
     key.accessibility: source.lang.swift.accessibility.open,
     key.name: "SameName",
-    key.offset: 173,
+    key.offset: 171,
     key.length: 18,
-    key.nameoffset: 179,
+    key.nameoffset: 177,
     key.namelength: 8,
-    key.bodyoffset: 189,
+    key.bodyoffset: 187,
     key.bodylength: 1,
-    key.docoffset: 106,
+    key.docoffset: 104,
     key.doclength: 62,
     key.attributes: [
       {
-        key.offset: 168,
+        key.offset: 166,
         key.length: 4,
         key.attribute: source.decl.attribute.open
       }
@@ -252,15 +242,15 @@ public protocol SameNameProtocol {
     key.kind: source.lang.swift.decl.protocol,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "SameNameProtocol",
-    key.offset: 220,
+    key.offset: 197,
     key.length: 29,
-    key.nameoffset: 229,
+    key.nameoffset: 206,
     key.namelength: 16,
-    key.bodyoffset: 247,
+    key.bodyoffset: 224,
     key.bodylength: 1,
     key.attributes: [
       {
-        key.offset: 213,
+        key.offset: 190,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

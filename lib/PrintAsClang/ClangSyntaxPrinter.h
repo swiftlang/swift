@@ -13,6 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
@@ -49,7 +50,7 @@ class ClangSyntaxPrinter {
 public:
   enum class LeadingTrivia { None, Comma };
 
-  ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
+  ClangSyntaxPrinter(const ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
@@ -94,6 +95,10 @@ public:
   bool printNominalTypeOutsideMemberDeclInnerStaticAssert(
       const NominalTypeDecl *typeDecl);
 
+  // Returns true when no qualifiers were printed.
+  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D,
+                                          bool forC = false) const;
+
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.
   ///
@@ -135,6 +140,13 @@ public:
                       llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
                       NamespaceTrivia trivia = NamespaceTrivia::None) const;
 
+  /// Prints the C++ namespaces of the outer types for a nested type.
+  /// E.g., for struct Foo { struct Bar {...} } it will print
+  /// namespace __FooNested { ..body.. } // namespace __FooNested
+  void printParentNamespaceForNestedTypes(
+      const ValueDecl *D, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+      NamespaceTrivia trivia = NamespaceTrivia::None) const;
+
   /// Print an extern C block with given body.
   void
   printExternC(llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const;
@@ -157,7 +169,7 @@ public:
   void printInlineForHelperFunction() const;
 
   void printNullability(
-      llvm::Optional<OptionalTypeKind> kind,
+      std::optional<OptionalTypeKind> kind,
       NullabilityPrintKind printKind = NullabilityPrintKind::After) const;
 
   /// Returns true if \p name matches a keyword in any Clang language mode.
@@ -183,16 +195,16 @@ public:
 
   /// Print the Swift generic signature as C++ template declaration alongside
   /// its requirements.
-  void printGenericSignature(const CanGenericSignature &signature);
+  void printGenericSignature(GenericSignature signature);
 
   /// Print the `static_assert` statements used for legacy type-checking for
   /// generics in C++14/C++17 mode.
   void
-  printGenericSignatureInnerStaticAsserts(const CanGenericSignature &signature);
+  printGenericSignatureInnerStaticAsserts(GenericSignature signature);
 
   /// Print the C++ template parameters that should be passed for a given
   /// generic signature.
-  void printGenericSignatureParams(const CanGenericSignature &signature);
+  void printGenericSignatureParams(GenericSignature signature);
 
   /// Print the call to the C++ type traits that computes the underlying type /
   /// witness table pointer value that are passed to Swift for the given generic

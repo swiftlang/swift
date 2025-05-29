@@ -223,6 +223,7 @@ let _: ImplicitMembers = .implicit[funcOptional: ()]()!.another
 let _: ImplicitMembers? = .implicit[funcOptional: ()]()?.another
 let _: ImplicitMembers = .implicit[optionalFunc: ()]!().another
 let _: ImplicitMembers? = .implicit[optionalFunc: ()]?().another
+let _: ImplicitMembers = .implicit.self
 
 func implicit(_ i: inout ImplicitMembers) {
     if i == .implicit {}
@@ -371,5 +372,40 @@ func rdar68094328() {
     foo(C.bar, .init(string: str)) // Ok
     foo(C.bar, .init(string: str).value) // Ok
     foo(C.bar, .init(string: str).baz(str: "")) // Ok
+  }
+}
+
+// Ensure postfix operator is not a part of implicit member chain.
+postfix operator ^
+postfix func ^ (_ lhs: ImplicitMembers) -> Int { 0 }
+func acceptInt(_ x: Int) {}
+func postfixOpIsNotAMemberChain() {
+  acceptInt(.implicit.another^)
+}
+
+// Ensure that base type doesn't get bound to a protocol type too eagerly
+do {
+  struct V : Hashable {
+    static let v1: V = V()
+    static let v2: V = V()
+  }
+
+  let _: Set = [V.v1, .v2] // Ok
+
+  struct Elements : RandomAccessCollection {
+    init() {}
+    init(_ elements: [Int]) {}
+
+    var startIndex: Int { 0 }
+    var endIndex: Int { 0 }
+    subscript(index: Int) -> Int { 0 }
+  }
+
+  struct TestNilCoalescing {
+    var data: Elements?
+
+    func test() {
+      for _ in self.data ?? .init() {} // Ok
+    }
   }
 }

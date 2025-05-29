@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend-emit-module -I %t -emit-module-path %t/distributed_actor_protocol_isolation.swiftmodule -module-name distributed_actor_protocol_isolation -disable-availability-checking %s
-// X: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -15,7 +14,7 @@ protocol Greeting: DistributedActor {
 }
 
 extension Greeting {
-  func greetLocal(name: String) {
+  func greetLocal(name: String) { // expected-note{{distributed actor-isolated instance method 'greetLocal(name:)' declared here}}
     print("\(greeting()), \(name)!") // okay, we're on the actor
   }
 }
@@ -28,10 +27,12 @@ extension Greeting where SerializationRequirement == Codable {
   }
 }
 
-extension Greeting {
+extension Greeting where Self.SerializationRequirement == Codable {
   nonisolated func greetAliceALot() async throws {
-//    try await greetDistributed(name: "Alice") // okay, via Codable
-//    let rawGreeting = try await greeting() // okay, via Self's serialization requirement
-//    greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+    try await self.greetDistributed(name: "Alice") // okay, via Codable
+    let rawGreeting = try await greeting() // okay, via Self's serialization requirement
+    _ = rawGreeting
+
+    greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }

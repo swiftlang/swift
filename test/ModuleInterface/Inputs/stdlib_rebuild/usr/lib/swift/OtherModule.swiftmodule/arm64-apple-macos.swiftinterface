@@ -1,0 +1,10 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target arm64-apple-macosx15.0 -module-name OtherModule -O
+
+import Swift
+import ClangModule
+
+public struct OtherStruct {
+    var x : Int
+    public init()
+}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -365,6 +365,50 @@ extension MutableCollection where SubSequence == Slice<Self> {
 }
 
 //===----------------------------------------------------------------------===//
+// moveSubranges(_:to:)
+//===----------------------------------------------------------------------===//
+
+#if !$Embedded
+extension MutableCollection {
+  /// Moves the elements in the given subranges to just before the element at
+  /// the specified index.
+  ///
+  /// This example finds all the uppercase letters in the array and then
+  /// moves them to between `"i"` and `"j"`.
+  ///
+  ///     var letters = Array("ABCdeFGhijkLMNOp")
+  ///     let uppercaseRanges = letters.indices(where: { $0.isUppercase })
+  ///     let rangeOfUppercase = letters.moveSubranges(uppercaseRanges, to: 10)
+  ///     // String(letters) == "dehiABCFGLMNOjkp"
+  ///     // rangeOfUppercase == 4..<13
+  ///
+  /// - Parameters:
+  ///   - subranges: The subranges of the elements to move.
+  ///   - insertionPoint: The index to use as the destination of the elements.
+  /// - Returns: The new bounds of the moved elements.
+  ///
+  /// - Complexity: O(*n* log *n*) where *n* is the length of the collection.
+  @available(SwiftStdlib 6.0, *)
+  @discardableResult
+  public mutating func moveSubranges(
+    _ subranges: RangeSet<Index>, to insertionPoint: Index
+  ) -> Range<Index> {
+    let lowerCount = distance(from: startIndex, to: insertionPoint)
+    let upperCount = distance(from: insertionPoint, to: endIndex)
+    let start = _indexedStablePartition(
+      count: lowerCount,
+      range: startIndex..<insertionPoint,
+      by: { subranges.contains($0) })
+    let end = _indexedStablePartition(
+      count: upperCount,
+      range: insertionPoint..<endIndex,
+      by: { !subranges.contains($0) })
+    return start..<end
+  }
+}
+#endif
+
+//===----------------------------------------------------------------------===//
 // _rotate(in:shiftingToStart:)
 //===----------------------------------------------------------------------===//
 
@@ -473,8 +517,6 @@ extension MutableCollection {
   }
 }
 
-// the legacy swap free function
-//
 /// Exchanges the values of the two arguments.
 ///
 /// The two arguments must not alias each other. To swap two elements of a
@@ -485,25 +527,26 @@ extension MutableCollection {
 ///   - a: The first value to swap.
 ///   - b: The second value to swap.
 @inlinable
-public func swap<T>(_ a: inout T, _ b: inout T) {
-  // Semantically equivalent to (a, b) = (b, a).
-  // Microoptimized to avoid retain/release traffic.
-#if $BuiltinUnprotectedAddressOf
-  let p1 = Builtin.unprotectedAddressOf(&a)
-  let p2 = Builtin.unprotectedAddressOf(&b)
-#else
-  let p1 = Builtin.addressof(&a)
-  let p2 = Builtin.addressof(&b)
-#endif
-  _debugPrecondition(
-    p1 != p2,
-    "swapping a location with itself is not supported")
-
-  // Take from P1.
-  let tmp: T = Builtin.take(p1)
-  // Transfer P2 into P1.
-  Builtin.initialize(Builtin.take(p2) as T, p1)
-  // Initialize P2.
-  Builtin.initialize(tmp, p2)
+@_preInverseGenerics
+public func swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {
+  let temp = consume a
+  a = consume b
+  b = consume temp
 }
 
+/// Replaces the value of a mutable value with the supplied new value,
+/// returning the original.
+///
+/// - Parameters:
+///   - item: A mutable binding.
+///   - newValue: The new value of `item`.
+/// - Returns: The original value of `item`.
+@_alwaysEmitIntoClient
+public func exchange<T: ~Copyable>(
+  _ item: inout T,
+  with newValue: consuming T
+) -> T {
+  let oldValue = consume item
+  item = consume newValue
+  return oldValue
+}

@@ -4,17 +4,17 @@
   key.members: [
     {
       key.name: "methodForTarget1()",
-      key.sourcetext: "methodForTarget1()",
       key.description: "methodForTarget1()",
       key.typename: "ConcreteTarget1",
-      key.typeusr: "$s8MyModule15ConcreteTarget1VD"
+      key.typeusr: "$s8MyModule15ConcreteTarget1VD",
+      key.sourcetext: "methodForTarget1()"
     },
     {
       key.name: "methodForTarget2()",
-      key.sourcetext: "methodForTarget2()",
       key.description: "methodForTarget2()",
       key.typename: "ConcreteTarget2",
-      key.typeusr: "$s8MyModule15ConcreteTarget2VD"
+      key.typeusr: "$s8MyModule15ConcreteTarget2VD",
+      key.sourcetext: "methodForTarget2()"
     }
   ]
 }
@@ -24,17 +24,17 @@
   key.members: [
     {
       key.name: "methodForTarget1()",
-      key.sourcetext: "methodForTarget1()",
       key.description: "methodForTarget1()",
       key.typename: "ConcreteTarget1",
-      key.typeusr: "$s8MyModule15ConcreteTarget1VD"
+      key.typeusr: "$s8MyModule15ConcreteTarget1VD",
+      key.sourcetext: "methodForTarget1()"
     },
     {
       key.name: "methodForTarget2()",
-      key.sourcetext: "methodForTarget2()",
       key.description: "methodForTarget2()",
       key.typename: "ConcreteTarget2",
-      key.typeusr: "$s8MyModule15ConcreteTarget2VD"
+      key.typeusr: "$s8MyModule15ConcreteTarget2VD",
+      key.sourcetext: "methodForTarget2()"
     }
   ],
   key.reusingastcontext: 1

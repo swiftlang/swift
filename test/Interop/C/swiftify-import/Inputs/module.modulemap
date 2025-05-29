@@ -1,0 +1,28 @@
+module CountedByClang {
+    header "counted-by.h"
+    export *
+}
+module CountedByNoEscapeClang {
+    header "counted-by-noescape.h"
+    export *
+}
+module SizedByClang {
+    header "sized-by.h"
+    export *
+}
+module SizedByNoEscapeClang {
+    header "sized-by-noescape.h"
+    export *
+}
+module SizedByLifetimeboundClang {
+    header "sized-by-lifetimebound.h"
+    export *
+}
+module CountedByLifetimeboundClang {
+    header "counted-by-lifetimebound.h"
+    export *
+}
+module CommentsClang {
+    header "comments.h"
+    export *
+}

@@ -29,7 +29,9 @@ function(add_swift_macro_library name)
   set(ASML_SOURCES ${ARGN})
 
   # Add the library.
-  add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
+  add_pure_swift_host_library(${name} SHARED
+    PACKAGE_NAME Toolchain
+    ${ASML_SOURCES})
 
   # If we don't have the Swift swift parser, bail out, because the above
   # add_pure_swift_host_library did nothing.
@@ -60,6 +62,9 @@ function(add_swift_macro_library name)
   set(destination_dir "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins")
 
   swift_install_in_component(TARGETS ${name}
+    RUNTIME
+      DESTINATION bin
+      COMPONENT compiler
     LIBRARY
       DESTINATION "${destination_dir}"
       COMPONENT compiler

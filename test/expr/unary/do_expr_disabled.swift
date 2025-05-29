@@ -92,3 +92,39 @@ func test12() -> Int {
 
   return fn() // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
 }
+
+func test13() -> Int {
+  let x = if .random() {
+    do { 0 } // expected-warning {{integer literal is unused}}
+  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    1
+  }
+  return x
+}
+
+func test14() -> Int {
+  let x = if .random() {
+    1
+  } else {
+    do { 2 } catch { 3 } // expected-warning 2{{integer literal is unused}}
+    // expected-warning@-1 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  } // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+  return x
+}
+
+func test15() -> Int {
+  if .random() {
+    do { 0 } // expected-warning {{integer literal is unused}}
+  } else {
+    1 // expected-warning {{integer literal is unused}}
+  }
+}
+
+func test16() -> Int {
+  if .random() {
+    1 // expected-warning {{integer literal is unused}}
+  } else {
+    do { 2 } catch { 3 } // expected-warning 2{{integer literal is unused}}
+    // expected-warning@-1 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  }
+}

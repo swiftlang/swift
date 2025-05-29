@@ -87,8 +87,8 @@ do {
 // DEMANGLE-DECL: $sSo7NSCacheCySo8NSNumberCSo8NSStringCG
 // DEMANGLE-DECL: $sSo26NSPropertyListWriteOptionsa
 
-// CHECK-DECL: Foundation.(file).NSSet
-// CHECK-DECL: Foundation.(file).NSFastEnumeration
+// CHECK-DECL: Foundation.(file).NSSet@{{.*}}NSSet.h:{{[0-9]+}}:{{[0-9]+}}
+// CHECK-DECL: Foundation.(file).NSFastEnumeration@{{.*}}NSEnumerator.h:{{[0-9]+}}:{{[0-9]+}}
 // CHECK-DECL: objc_classes.(file).OurObjCProtocol
-// CHECK-DECL: Foundation.(file).NSCache
-// CHECK-DECL: Foundation.(file).PropertyListSerialization extension.WriteOptions
+// CHECK-DECL: Foundation.(file).NSCache@{{.*}}NSCache.h:{{[0-9]+}}:{{[0-9]+}}
+// CHECK-DECL: Foundation.(file).PropertyListSerialization extension.WriteOptions@{{.*}}NSPropertyList.h:{{[0-9]+}}:{{[0-9]+}}

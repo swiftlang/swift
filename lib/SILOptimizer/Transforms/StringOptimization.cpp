@@ -103,7 +103,7 @@ private:
   static StringInfo getStringInfo(SILValue value);
   static StringInfo getStringFromStaticLet(SILValue value);
 
-  static llvm::Optional<int> getIntConstant(SILValue value);
+  static std::optional<int> getIntConstant(SILValue value);
   static void replaceAppendWith(ApplyInst *appendCall, SILValue newValue);
   static SILValue copyValue(SILValue value, SILInstruction *before);
   ApplyInst *createStringInit(StringRef str, SILInstruction *beforeInst);
@@ -304,14 +304,14 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.
-  llvm::Optional<int> isQualifiedOpt =
+  std::optional<int> isQualifiedOpt =
       getIntConstant(typeNameCall->getArgument(1));
   if (!isQualifiedOpt)
     return false;
   bool isQualified = isQualifiedOpt.value();
 
   // Create the constant type string by mangling + demangling.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(ty->getASTContext());
   std::string mangledTypeName = mangler.mangleTypeForTypeName(ty);
 
   Demangle::DemangleOptions options;
@@ -441,6 +441,8 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::LoadInst:
         break;
+      case SILInstructionKind::LoadBorrowInst:
+        break;
       case SILInstructionKind::DebugValueInst:
         if (DebugValueInst::hasAddrVal(user))
           break;
@@ -547,7 +549,7 @@ StringOptimization::StringInfo StringOptimization::getStringInfo(SILValue value)
     // An empty string initializer with initial capacity.
     int reservedCapacity = std::numeric_limits<int>::max();
     if (apply->getNumArguments() > 0) {
-      if (llvm::Optional<int> capacity = getIntConstant(apply->getArgument(0)))
+      if (std::optional<int> capacity = getIntConstant(apply->getArgument(0)))
         reservedCapacity = capacity.value();
     }
     return StringInfo("", reservedCapacity);
@@ -579,12 +581,13 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   //   %ptr_to_global = apply %addressor()
   //   %global_addr = pointer_to_address %ptr_to_global
   //   %value = load %global_addr
-  auto *load = dyn_cast<LoadInst>(value);
-  if (!load)
-    return StringInfo::unknown();
+  if (!isa<LoadInst>(value) && !isa<LoadBorrowInst>(value)) {
+        return StringInfo::unknown();
+  }
+  auto *load = value->getDefiningInstruction();
 
   SILFunction *initializer = nullptr;
-  auto *globalAddr = dyn_cast<GlobalAddrInst>(load->getOperand());
+  auto *globalAddr = dyn_cast<GlobalAddrInst>(load->getOperand(0));
   if (globalAddr) {
     // The global accessor is inlined.
 
@@ -600,7 +603,7 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   } else {
     // The global accessor is not inlined, yet.
 
-    auto *pta = dyn_cast<PointerToAddressInst>(load->getOperand());
+    auto *pta = dyn_cast<PointerToAddressInst>(load->getOperand(0));
     if (!pta)
       return StringInfo::unknown();
 
@@ -651,7 +654,7 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
   // This check is probably not needed, but let's be on the safe side:
   // it prevents an infinite recursion if the initializer of the global is
   // itself a load of another global, and so on.
-  if (isa<LoadInst>(initVal))
+  if (isa<LoadInst>(initVal) || isa<LoadBorrowInst>(initVal))
     return StringInfo::unknown();
 
   return getStringInfo(initVal);
@@ -659,14 +662,14 @@ StringOptimization::getStringFromStaticLet(SILValue value) {
 
 /// Returns the constant integer value if \a value is an Int or Bool struct with
 /// an integer_literal as operand.
-llvm::Optional<int> StringOptimization::getIntConstant(SILValue value) {
+std::optional<int> StringOptimization::getIntConstant(SILValue value) {
   auto *boolOrIntStruct = dyn_cast<StructInst>(value);
   if (!boolOrIntStruct || boolOrIntStruct->getNumOperands() != 1)
-    return llvm::None;
+    return std::nullopt;
 
   auto *literal = dyn_cast<IntegerLiteralInst>(boolOrIntStruct->getOperand(0));
   if (!literal || literal->getValue().getActiveBits() > 64)
-    return llvm::None;
+    return std::nullopt;
 
   return literal->getValue().getSExtValue();
 }

@@ -1,4 +1,8 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-deadalloc-elim | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -predictable-deadalloc-elim \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage canonical
 
@@ -20,6 +24,11 @@ enum FakeOptional<T> {
 case none
 case some(T)
 }
+
+protocol P {}
+struct S: P {}
+
+struct NE: ~Escapable {}
 
 ///////////
 // Tests //
@@ -156,8 +165,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
 // CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : $*Builtin.NativeObject):
 // CHECK-NOT: alloc_stack
 // CHECK:  destroy_value [[ARG0]]
-// CHECK:  [[ARG1_LOADED:%.*]] = load [take] [[ARG1]]
-// CHECK:  destroy_value [[ARG1_LOADED]]
+// CHECK:  destroy_addr [[ARG1]]
 // CHECK: } // end sil function 'simple_init_take'
 sil [ossa] @simple_init_take : $@convention(thin) (@owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
@@ -697,4 +705,83 @@ bb0(%arg : @owned $Builtin.NativeObject):
   %1 = load [take] %mem : $*Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   unreachable
+}
+
+enum ErrorEnum : Error {
+  case errorCase(label: [any Error])
+  case other
+}
+
+sil [ossa] @test_complete_lifetime : $@convention(thin) (@owned ErrorEnum) -> () {
+
+bb0(%0 : @owned $ErrorEnum):
+  %1 = alloc_stack $any Error
+  %2 = alloc_existential_box $any Error, $ErrorEnum
+  %3 = project_existential_box $ErrorEnum in %2 : $any Error
+  store %2 to [init] %1 : $*any Error
+  store %0 to [init] %3 : $*ErrorEnum
+  %6 = load [take] %1 : $*any Error
+  dealloc_stack %1 : $*any Error
+  %8 = alloc_stack $any Error
+  %9 = copy_value %6 : $any Error
+  store %9 to [init] %8 : $*any Error
+  %11 = alloc_stack $ErrorEnum
+  checked_cast_addr_br copy_on_success any Error in %8 : $*any Error to ErrorEnum in %11 : $*ErrorEnum, bb2, bb3
+
+bb1:
+  %13 = tuple ()
+  return %13 : $()
+
+bb2:
+  %15 = load [take] %11 : $*ErrorEnum
+  destroy_value %15 : $ErrorEnum
+  dealloc_stack %11 : $*ErrorEnum
+  destroy_addr %8 : $*any Error
+  dealloc_stack %8 : $*any Error
+  destroy_value %6 : $any Error
+  br bb1
+
+bb3:
+  dealloc_stack %11 : $*ErrorEnum
+  destroy_addr %8 : $*any Error
+  dealloc_stack %8 : $*any Error
+  %25 = copy_value %6 : $any Error
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @testStoredOnlyExistential :
+// CHECK:         alloc_stack
+// CHECK:       } // end sil function 'testStoredOnlyExistential'
+sil [ossa] @testStoredOnlyExistential : $@convention(thin) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $any P
+  %4 = init_existential_addr %1 : $*any P, $S
+  store %0 to [trivial] %4 : $*S
+  unreachable
+}
+
+// Preserve ownership for empty ~Escapable structs.
+//
+// CHECK-LABEL: sil hidden [ossa] @testEmptyNonEscapable : $@convention(method) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+// CHECK: bb0(%0 : @guaranteed $NE):
+// CHECK-NEXT:   %1 = copy_value %0 : $NE
+// CHECK-NEXT:   return %1 : $NE
+// CHECK-LABEL: } // end sil function 'testEmptyNonEscapable'
+sil hidden [ossa] @testEmptyNonEscapable : $@convention(method) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+bb0(%0 : @guaranteed $NE):
+  %1 = copy_value %0
+  %13 = alloc_stack $NE
+  store %1 to [init] %13
+  %22 = load [take] %13
+  dealloc_stack %13
+  return %22
 }

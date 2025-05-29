@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -41,20 +42,20 @@ void findAndDeleteTraceValues(SILFunction *function,
 bool isDeleteableTestInstruction(SILInstruction const *instruction) {
   if (auto *dvi = dyn_cast<DebugValueInst>(instruction))
     return dvi->hasTrace();
-  if (isa<TestSpecificationInst>(instruction))
+  if (isa<SpecifyTestInst>(instruction))
     return true;
   return false;
 }
 
-SILInstruction *findAnchorInstructionAfter(TestSpecificationInst *tsi) {
+SILInstruction *findAnchorInstructionAfter(SpecifyTestInst *tsi) {
   for (auto *instruction = tsi->getNextInstruction(); instruction;
        instruction = instruction->getNextInstruction()) {
     if (!isDeleteableTestInstruction(instruction))
       return instruction;
   }
-  // This can't happen because a TestSpecificationInst isn't a terminator itself
+  // This can't happen because a SpecifyTestInst isn't a terminator itself
   // nor are any deleteable instructions.
-  llvm_unreachable("found no anchor after TestSpecificationInst!?");
+  llvm_unreachable("found no anchor after SpecifyTestInst!?");
 }
 
 // Helpers: Looking up subobjects by index
@@ -201,7 +202,7 @@ private:
 
   bool empty() { return specification.empty(); }
 
-  bool peekPrefix(StringRef prefix) { return specification.startswith(prefix); }
+  bool peekPrefix(StringRef prefix) { return specification.starts_with(prefix); }
 
   bool consumePrefix(StringRef prefix) {
     return specification.consume_front(prefix);
@@ -234,32 +235,32 @@ private:
 
   // Argument parsing: Primitives
 
-  llvm::Optional<BoolArgument> parseBool() {
+  std::optional<BoolArgument> parseBool() {
     if (consumeAll("true")) {
       return BoolArgument{true};
     } else if (consumeAll("false")) {
       return BoolArgument{false};
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<UIntArgument> parseUInt() {
+  std::optional<UIntArgument> parseUInt() {
     unsigned long long value;
     if (llvm::consumeUnsignedInteger(specification, /*radix=*/10, value))
-      return llvm::None;
+      return std::nullopt;
     return UIntArgument{value};
   }
 
-  llvm::Optional<StringArgument> parseString() {
+  std::optional<StringArgument> parseString() {
     auto retval = StringArgument{specification};
     specification = specification.drop_front(specification.size());
     return retval;
   }
 
-  llvm::Optional<TaggedUnion<unsigned long long, long long, StringRef>>
+  std::optional<TaggedUnion<unsigned long long, long long, StringRef>>
   parseSubscript() {
     if (!consumePrefix("["))
-      return llvm::None;
+      return std::nullopt;
     if (peekPrefix("+") || peekPrefix("-")) {
       bool positive = false;
       if (consumePrefix("+")) {
@@ -307,10 +308,10 @@ private:
     llvm_unreachable("bad suffix after 'trace'!?");
   }
 
-  llvm::Optional<Argument> parseTraceReference(SILFunction *within) {
+  std::optional<Argument> parseTraceReference(SILFunction *within) {
     auto trace = parseTraceComponent(within);
     if (!trace)
-      return llvm::None;
+      return std::nullopt;
     if (!consumePrefix("."))
       return ValueArgument{trace};
     auto *instruction = trace.getDefiningInstruction();
@@ -336,10 +337,10 @@ private:
     llvm_unreachable("bad suffix after 'operand'!?");
   }
 
-  llvm::Optional<Argument> parseOperandReference(SILInstruction *within) {
+  std::optional<Argument> parseOperandReference(SILInstruction *within) {
     auto *operand = parseOperandComponent(within);
     if (!operand)
-      return llvm::None;
+      return std::nullopt;
     return OperandArgument{operand};
   }
 
@@ -358,10 +359,10 @@ private:
     llvm_unreachable("bad suffix after 'result'!?");
   }
 
-  llvm::Optional<Argument> parseResultReference(SILInstruction *within) {
+  std::optional<Argument> parseResultReference(SILInstruction *within) {
     auto result = parseResultComponent(within);
     if (!result)
-      return llvm::None;
+      return std::nullopt;
     return ValueArgument{result};
   }
 
@@ -383,17 +384,17 @@ private:
     llvm_unreachable("bad suffix after 'argument'!?");
   }
 
-  llvm::Optional<Argument> parseBlockArgumentReference(SILBasicBlock *block) {
+  std::optional<Argument> parseBlockArgumentReference(SILBasicBlock *block) {
     auto *argument = parseBlockArgumentComponent(block);
     if (!argument)
-      return llvm::None;
+      return std::nullopt;
     return BlockArgumentArgument{argument};
   }
 
   using InstructionContext = TaggedUnion<SILFunction *, SILBasicBlock *>;
 
   SILInstruction *
-  parseInstructionComponent(llvm::Optional<InstructionContext> within) {
+  parseInstructionComponent(std::optional<InstructionContext> within) {
     if (!consumePrefix("instruction"))
       return nullptr;
     auto getInstructionAtIndex = [](unsigned index, InstructionContext within) {
@@ -427,11 +428,11 @@ private:
     llvm_unreachable("bad suffix after 'instruction'!?");
   }
 
-  llvm::Optional<Argument>
-  parseInstructionReference(llvm::Optional<InstructionContext> within) {
+  std::optional<Argument>
+  parseInstructionReference(std::optional<InstructionContext> within) {
     auto *instruction = parseInstructionComponent(within);
     if (!instruction)
-      return llvm::None;
+      return std::nullopt;
     if (!consumePrefix("."))
       return InstructionArgument{instruction};
     if (auto arg = parseOperandReference(instruction))
@@ -468,10 +469,10 @@ private:
     llvm_unreachable("bad suffix after 'block'!?");
   }
 
-  llvm::Optional<Argument> parseBlockReference(SILFunction *within) {
+  std::optional<Argument> parseBlockReference(SILFunction *within) {
     auto *block = parseBlockComponent(within);
     if (!block)
-      return llvm::None;
+      return std::nullopt;
     if (!consumePrefix("."))
       return BlockArgument{block};
     if (auto arg = parseBlockArgumentReference(block))
@@ -511,10 +512,10 @@ private:
     llvm_unreachable("bad suffix after 'function'!?");
   }
 
-  llvm::Optional<Argument> parseFunctionReference(SILModule *within) {
+  std::optional<Argument> parseFunctionReference(SILModule *within) {
     auto *function = parseFunctionComponent(within);
     if (!function)
-      return llvm::None;
+      return std::nullopt;
     if (!consumePrefix("."))
       return FunctionArgument{function};
     if (auto arg = parseBlockArgumentReference(function->getEntryBlock()))
@@ -553,16 +554,16 @@ private:
     return value;
   }
 
-  llvm::Optional<Argument> parseValueReference() {
+  std::optional<Argument> parseValueReference() {
     auto value = parseValueComponent();
     if (!value)
-      return llvm::None;
+      return std::nullopt;
     return ValueArgument{value};
   }
 
-  llvm::Optional<Argument> parseReference() {
+  std::optional<Argument> parseReference() {
     if (!consumePrefix("@"))
-      return llvm::None;
+      return std::nullopt;
     if (auto arg = parseTraceReference(nullptr))
       return *arg;
     if (auto arg =
@@ -570,13 +571,13 @@ private:
       return *arg;
     if (auto arg = parseBlockArgumentReference(nullptr))
       return *arg;
-    if (auto arg = parseInstructionReference(llvm::None))
+    if (auto arg = parseInstructionReference(std::nullopt))
       return *arg;
     if (auto arg = parseBlockReference(nullptr))
       return *arg;
     if (auto arg = parseFunctionReference(nullptr))
       return *arg;
-    return llvm::None;
+    return std::nullopt;
   }
 
   Argument parseArgument() {
@@ -701,7 +702,7 @@ void swift::test::getTestSpecifications(
     SmallVectorImpl<UnparsedSpecification> &specifications) {
   for (auto &block : *function) {
     for (SILInstruction &inst : block.deletableInstructions()) {
-      if (auto *tsi = dyn_cast<TestSpecificationInst>(&inst)) {
+      if (auto *tsi = dyn_cast<SpecifyTestInst>(&inst)) {
         auto ref = tsi->getArgumentsSpecification();
         auto *anchor = findAnchorInstructionAfter(tsi);
         specifications.push_back(

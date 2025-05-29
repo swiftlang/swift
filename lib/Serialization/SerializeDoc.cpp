@@ -21,6 +21,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/Serialization.h"
@@ -184,7 +185,7 @@ public:
     for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
-    return llvm::makeArrayRef(ViewBuffer);
+    return llvm::ArrayRef(ViewBuffer);
   }
 
   bool isEnable() {
@@ -232,7 +233,7 @@ public:
 
     // Source order.
     dataLength += numLen;
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
@@ -244,7 +245,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(data.Brief.size());
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
@@ -300,7 +301,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
                             ArrayRef<StringRef> Names) {
   llvm::SmallString<32> Blob;
   llvm::raw_svector_ostream BlobStream(Blob);
-  endian::Writer Writer(BlobStream, little);
+  endian::Writer Writer(BlobStream, llvm::endianness::little);
   Writer.write<uint32_t>(Names.size());
   for (auto N : Names) {
     Writer.write<uint32_t>(N.size());
@@ -386,7 +387,7 @@ static void writeDeclCommentTable(
       if (!shouldIncludeDecl(D, /*ForSourceInfo*/false)) {
         // Pattern binding decls don't have comments to serialize, but we should
         // still visit their vars.
-        return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+        return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
       }
       if (!shouldSerializeDoc(D))
         return Action::Continue();
@@ -414,16 +415,16 @@ static void writeDeclCommentTable(
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 
@@ -433,7 +434,7 @@ static void writeDeclCommentTable(
   SmallVector<const FileUnit *, 1> Scratch;
   if (SF) {
     Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
+    files = llvm::ArrayRef(Scratch);
   } else {
     files = M->getFiles();
   }
@@ -447,7 +448,7 @@ static void writeDeclCommentTable(
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = Writer.generator.Emit(blobStream);
   }
 
@@ -519,7 +520,7 @@ public:
     const unsigned numLen = 4;
     uint32_t keyLength = key.size();
     uint32_t dataLength = numLen;
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(keyLength);
     return { keyLength, dataLength };
   }
@@ -530,7 +531,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(data);
   }
 };
@@ -540,12 +541,12 @@ class DeclUSRsTableWriter {
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
 public:
   uint32_t peekNextId() const { return USRs.size(); }
-  llvm::Optional<uint32_t> getNewUSRId(StringRef USR) {
+  std::optional<uint32_t> getNewUSRId(StringRef USR) {
     // Attempt to insert the USR into the StringSet.
     auto It = USRs.insert(USR);
     // If the USR exists in the StringSet, return None.
     if (!It.second)
-      return llvm::None;
+      return std::nullopt;
     auto Id = USRs.size() - 1;
     // We have to insert the USR from the StringSet because it's where the
     // memory is owned.
@@ -560,7 +561,7 @@ public:
     {
       llvm::raw_svector_ostream blobStream(hashTableBlob);
       // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, little);
+      endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
       tableOffset = generator.Emit(blobStream);
     }
     USRsList.emit(scratch, tableOffset, hashTableBlob);
@@ -637,7 +638,7 @@ public:
     }
 
     llvm::raw_svector_ostream OS(Buffer);
-    endian::Writer Writer(OS, little);
+    endian::Writer Writer(OS, llvm::endianness::little);
     Writer.write<uint32_t>(DocRanges.size());
     for (const auto &DocRange : DocRanges) {
       writeRawLoc(DocRange.first, Writer, Strings);
@@ -666,27 +667,27 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
                            DocWriter(DocWriter) {}
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    return Action::SkipChildren(S);
+    return Action::SkipNode(S);
   }
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
   PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Expansion;
   }
 
-  llvm::Optional<uint32_t> calculateNewUSRId(Decl *D) {
+  std::optional<uint32_t> calculateNewUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSR(D, OS))
-      return llvm::None;
+      return std::nullopt;
     return USRWriter.getNewUSRId(OS.str());
   }
 
@@ -700,7 +701,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     if (!shouldIncludeDecl(D, /*ForSourceInfo*/true)) {
       // Pattern binding decls don't have comments to serialize, but we should
       // still visit their vars.
-      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D));
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
     if (!shouldSerializeSourceLoc(D))
       return Action::Continue();
@@ -719,10 +720,10 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::sys::fs::make_absolute(AbsolutePath);
 
     llvm::raw_svector_ostream Out(Buffer);
-    endian::Writer Writer(Out, little);
+    endian::Writer Writer(Out, llvm::endianness::little);
     Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
-    Writer.write<uint32_t>(DocWriter.getDocRangesOffset(
-        D, llvm::makeArrayRef(RawLocs->DocRanges)));
+    Writer.write<uint32_t>(
+        DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
     writeRawLoc(RawLocs->Loc, Writer, FWriter);
     writeRawLoc(RawLocs->StartLoc, Writer, FWriter);
     writeRawLoc(RawLocs->EndLoc, Writer, FWriter);
@@ -782,7 +783,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
                            .count();
 
       llvm::raw_svector_ostream out(Buffer);
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       // FilePath.
       writer.write<uint32_t>(fileID);
 

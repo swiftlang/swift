@@ -1,0 +1,40 @@
+//===--- PlaygroundOptions.def - Playground Transform Options ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines options that can be specified for the playground transform.
+//
+//
+// PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn)
+//
+//   The PLAYGROUND_OPTION macro describes each named option that controls
+//   an aspect of the "playground transform" step in Sema.
+//
+//     OptionName: The name of this playground transform option (both in source
+//       code and as a `-playground` parameter), e.g. ScopeEvents
+//     Description: A string literal that describes the option, e.g. "Enables
+//       logging of scope entry and exit events"
+//     DefaultOn: Whether the option is enabled by default
+//     HighPerfOn: Whether the option is enabled in "high performance" mode
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef PLAYGROUND_OPTION
+#  error define PLAYGROUND_OPTION before including PlaygroundOptions.def
+#endif
+
+PLAYGROUND_OPTION(ScopeEvents, "Scope entry/exit events",
+  /* enabled by default */ true, /* enabled in high-perf mode */ false)
+
+PLAYGROUND_OPTION(FunctionParameters, "Values of function parameters",
+  /* enabled by default */ true, /* enabled in high-perf mode */ false)
+
+#undef PLAYGROUND_OPTION

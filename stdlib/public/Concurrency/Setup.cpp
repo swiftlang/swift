@@ -33,9 +33,15 @@
       MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
 #include "swift/Demangling/StandardTypesMangling.def"
 
+// Defined in Swift, redeclared here so we can register it with the runtime.
+extern "C" SWIFT_CC(swift)
+bool _swift_task_isCurrentGlobalActor(
+    const swift::Metadata *, const swift::WitnessTable *);
+
 // Register our type descriptors with standard manglings when the concurrency
 // runtime is loaded. This allows the runtime to quickly resolve those standard
 // manglings.
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((constructor)) static void setupStandardConcurrencyDescriptors() {
   static const swift::ConcurrencyStandardTypeDescriptors descriptors = {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)
@@ -43,5 +49,8 @@ __attribute__((constructor)) static void setupStandardConcurrencyDescriptors() {
   &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)),
 #include "swift/Demangling/StandardTypesMangling.def"
   };
-  _swift_registerConcurrencyStandardTypeDescriptors(&descriptors);
+  _swift_registerConcurrencyRuntime(
+      &descriptors,
+      &_swift_task_isCurrentGlobalActor);
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END

@@ -13,6 +13,7 @@
 #include "OwnershipLiveRange.h"
 #include "OwnershipPhiOperand.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 
@@ -105,8 +106,10 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
-        if (v->getOwnershipKind() != OwnershipKind::Owned)
+        if (v->getOwnershipKind() != OwnershipKind::Owned &&
+            !isa<BorrowedFromInst>(user)) {
           continue;
+        }
         llvm::copy(v->getUses(), std::back_inserter(worklist));
       }
       continue;
@@ -147,7 +150,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
   llvm::copy(tmpForwardingConsumingUses, std::back_inserter(consumingUses));
   llvm::copy(tmpUnknownConsumingUses, std::back_inserter(consumingUses));
 
-  auto cUseArrayRef = llvm::makeArrayRef(consumingUses);
+  auto cUseArrayRef = llvm::ArrayRef(consumingUses);
   destroyingUses = cUseArrayRef.take_front(tmpDestroyingUses.size());
   ownershipForwardingUses = cUseArrayRef.slice(
       tmpDestroyingUses.size(), tmpForwardingConsumingUses.size());
@@ -166,7 +169,7 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
   //
   // TODO: Hoist this out?
   SILInstruction *inst = introducer.value->getDefiningInstruction();
-  llvm::Optional<ValueLifetimeAnalysis> analysis;
+  std::optional<ValueLifetimeAnalysis> analysis;
   if (!inst) {
     analysis.emplace(cast<SILArgument>(introducer.value),
                      getAllConsumingInsts());
@@ -278,7 +281,6 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::Phi: {
     auto *phiArg = cast<SILPhiArgument>(introducer.value);
     phiArg->setOwnershipKind(OwnershipKind::Guaranteed);
-    phiArg->setReborrow(computeIsReborrow(phiArg));
     return phiArg;
   }
   case OwnedValueIntroducerKind::Struct: {

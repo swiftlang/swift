@@ -16,6 +16,7 @@ import Foundation
 
 extension Set {
   func _rawIdentifier() -> Int {
+    _blackHole(self)
     return unsafeBitCast(self, to: Int.self)
   }
 }

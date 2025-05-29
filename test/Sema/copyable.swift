@@ -8,7 +8,8 @@ typealias WhatIfIQualify = Swift.Copyable
 
 class C: Copyable {} 
 
-@_moveOnly struct MOStruct: Copyable {} // expected-error {{noncopyable struct 'MOStruct' cannot conform to 'Copyable'}}
+struct MOStruct: Copyable, ~Copyable {}
+// expected-error@-1 {{struct 'MOStruct' required to be 'Copyable' but is marked with '~Copyable'}}
 
 
 func whatever<T>(_ t: T) where T: Copyable {} 
@@ -25,4 +26,8 @@ enum namespace {
   typealias Copyable = Int
 
   func Copyable() -> Copyable { return 0 }
+}
+
+extension Copyable { // expected-error {{cannot extend protocol 'Copyable'}}
+  func hello() {}
 }

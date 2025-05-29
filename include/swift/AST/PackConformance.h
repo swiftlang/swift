@@ -74,7 +74,8 @@ public:
 
   PackConformance *getCanonicalConformance() const;
 
-  PackType *getAssociatedType(Type assocType) const;
+  PackType *getTypeWitness(AssociatedTypeDecl *assocType,
+                           SubstOptions options=std::nullopt) const;
 
   PackConformance *
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const;
@@ -82,13 +83,13 @@ public:
   /// The ProtocolConformanceRef either stores a pack conformance, or
   /// it is invalid in the case of substitution failure.
   ProtocolConformanceRef subst(SubstitutionMap subMap,
-                               SubstOptions options = llvm::None) const;
+                               SubstOptions options = std::nullopt) const;
 
   /// The ProtocolConformanceRef either stores a pack conformance, or
   /// it is invalid in the case of substitution failure.
   ProtocolConformanceRef subst(TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
-                               SubstOptions options = llvm::None) const;
+                               SubstOptions options = std::nullopt) const;
 
   /// Apply an in-flight substitution to the conformances in this
   /// protocol conformance ref.

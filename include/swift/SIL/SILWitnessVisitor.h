@@ -100,7 +100,7 @@ public:
       // If this is a new associated type (which does not override an
       // existing associated type), add it.
       if (associatedType->getOverriddenDecls().empty())
-        asDerived().addAssociatedType(AssociatedType(associatedType));
+        asDerived().addAssociatedType(associatedType);
     }
 
     if (asDerived().shouldVisitRequirementSignatureOnly())
@@ -129,6 +129,8 @@ public:
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
+        addDistributedWitnessMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
       }
     });
   }
@@ -146,11 +148,12 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (func->requiresNewWitnessTableEntry()) {
-      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
-      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
-      addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
-    }
+    if (!func->requiresNewWitnessTableEntry())
+      return;
+
+    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -160,22 +163,13 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // We already visited these in the first pass.
   }
-    
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {
     // We don't care about these by themselves for witnesses.
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
-  }
-
-  void visitIfConfigDecl(IfConfigDecl *icd) {
-    // We only care about the active members, which were already subsumed by the
-    // enclosing type.
-  }
-
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
-    // We don't care about diagnostics at this stage.
   }
 
 private:
@@ -200,11 +194,14 @@ private:
 
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
-    if (!AFD->isDistributed())
+    if (!AFD)
       return;
 
-    // Add another which will be witnessed by the 'distributed thunk'
-    SILDeclRef declRef(AFD, kind);
+    auto thunk = AFD->getDistributedThunk();
+    if (!thunk)
+      return;
+
+    SILDeclRef declRef(thunk, kind);
     asDerived().addMethod(declRef.asDistributed());
   }
 };

@@ -1,0 +1,298 @@
+// RUN: %target-swift-frontend -emit-irgen -disable-availability-checking -enable-experimental-feature BuiltinModule %s | %FileCheck %s
+
+// REQUIRES: swift_feature_BuiltinModule
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: define{{.*}} @trivial_fixed
+sil @trivial_fixed: $@convention(thin) (Builtin.FixedArray<2, Int>) -> (Builtin.FixedArray<2, Int>, Builtin.FixedArray<2, Int>) {
+entry(%v : $Builtin.FixedArray<2, Int>):
+    // CHECK: [[T0:%.*]] = insertvalue {{.*}} undef, {{i[0-9]+}} %0, 0
+    // CHECK: [[T1:%.*]] = insertvalue {{.*}} [[T0]], {{i[0-9]+}} %1, 1
+    // CHECK: [[T2:%.*]] = insertvalue {{.*}} [[T1]], {{i[0-9]+}} %0, 2
+    // CHECK: [[T3:%.*]] = insertvalue {{.*}} [[T2]], {{i[0-9]+}} %1, 3
+    // CHECK: ret {{.*}} [[T3]]
+    %r = tuple (%v : $Builtin.FixedArray<2, Int>, %v : $Builtin.FixedArray<2, Int>)
+    return %r : $(Builtin.FixedArray<2, Int>, Builtin.FixedArray<2, Int>)
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_fixed
+sil @loadable_fixed: $@convention(thin) (@owned Builtin.FixedArray<2, AnyObject>) -> @owned (Builtin.FixedArray<2, AnyObject>, Builtin.FixedArray<2, AnyObject>) {
+entry(%v : $Builtin.FixedArray<2, AnyObject>):
+    // CHECK: call {{.*}} @swift_{{.*}}etain({{.*}} %0)
+    // CHECK: call {{.*}} @swift_{{.*}}etain({{.*}} %1)
+    retain_value %v : $Builtin.FixedArray<2, AnyObject>
+    // CHECK: [[T0:%.*]] = insertvalue {{.*}} undef, ptr %0, 0
+    // CHECK: [[T1:%.*]] = insertvalue {{.*}} [[T0]], ptr %1, 1
+    // CHECK: [[T2:%.*]] = insertvalue {{.*}} [[T1]], ptr %0, 2
+    // CHECK: [[T3:%.*]] = insertvalue {{.*}} [[T2]], ptr %1, 3
+    // CHECK: ret {{.*}} [[T3]]
+    %r = tuple (%v : $Builtin.FixedArray<2, AnyObject>, %v : $Builtin.FixedArray<2, AnyObject>)
+    return %r : $(Builtin.FixedArray<2, AnyObject>, Builtin.FixedArray<2, AnyObject>)
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_fixed_indirect
+sil @loadable_fixed_indirect: $@convention(thin) (@in Builtin.FixedArray<420, AnyObject>) -> @out (Builtin.FixedArray<420, AnyObject>, Builtin.FixedArray<420, AnyObject>) {
+entry(%r : $*(Builtin.FixedArray<420, AnyObject>, Builtin.FixedArray<420, AnyObject>), %v : $*Builtin.FixedArray<420, AnyObject>):
+    // CHECK:   [[A:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0, {{i[0-9]+}} 0
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<420, AnyObject>, Builtin.FixedArray<420, AnyObject>), 0
+
+    // CHECK:   br label %[[COPY_LOOP_ENTRY:.*]]
+    // CHECK: [[COPY_LOOP_ENTRY]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ 420, %entry ], [ [[DEC_COUNT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[DEST_ELT:%.*]] = phi ptr [ [[A]], %entry ], [ [[INC_DEST_ELT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT:%.*]] = phi ptr [ %1, %entry ], [ [[INC_SRC_ELT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT0:%.*]] = getelementptr {{.*}} ptr [[SRC_ELT]],
+    // CHECK:   [[SRC_ELT_VAL:%.*]] = load ptr, ptr [[SRC_ELT0]]
+    // CHECK:   call {{.*}} @swift_{{.*}}etain({{.*}} [[SRC_ELT_VAL]])
+    // CHECK:   [[DEST_ELT0:%.*]] = getelementptr {{.*}} ptr [[DEST_ELT]],
+    // CHECK:   store ptr [[SRC_ELT_VAL]], ptr [[DEST_ELT0]]
+    // CHECK:   [[INC_DEST_ELT]] = getelementptr inbounds %AnyObject, ptr [[DEST_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[INC_SRC_ELT]] = getelementptr inbounds %AnyObject, ptr [[SRC_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[DEC_COUNT]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[DEC_COUNT]], 0
+    // CHECK:   br i1 [[DONE]], label %[[COPY_LOOP_END:.*]], label %[[COPY_LOOP_ENTRY]]
+    // CHECK: [[COPY_LOOP_END]]:
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<420, AnyObject>
+
+    // CHECK:   [[B:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0, {{i[0-9]+}} 1
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<420, AnyObject>, Builtin.FixedArray<420, AnyObject>), 1
+
+    // CHECK:   br label %[[TAKE_LOOP_ENTRY:.*]]
+    // CHECK: [[TAKE_LOOP_ENTRY]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ 420, %[[COPY_LOOP_END]] ], [ [[DEC_COUNT:%.*]], %[[TAKE_LOOP_ENTRY]] ]
+    // CHECK:   [[DEST_ELT:%.*]] = phi ptr [ [[B]], %[[COPY_LOOP_END]] ], [ [[INC_DEST_ELT:%.*]], %[[TAKE_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT:%.*]] = phi ptr [ %1, %[[COPY_LOOP_END]] ], [ [[INC_SRC_ELT:%.*]], %[[TAKE_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT0:%.*]] = getelementptr {{.*}} ptr [[SRC_ELT]],
+    // CHECK:   [[SRC_ELT_VAL:%.*]] = load ptr, ptr [[SRC_ELT0]]
+    // CHECK:   [[DEST_ELT0:%.*]] = getelementptr {{.*}} ptr [[DEST_ELT]],
+    // CHECK:   store ptr [[SRC_ELT_VAL]], ptr [[DEST_ELT0]]
+    // CHECK:   [[INC_DEST_ELT]] = getelementptr inbounds %AnyObject, ptr [[DEST_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[INC_SRC_ELT]] = getelementptr inbounds %AnyObject, ptr [[SRC_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[DEC_COUNT]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[DEC_COUNT]], 0
+    // CHECK:   br i1 [[DONE]], label %[[TAKE_LOOP_END:.*]], label %[[TAKE_LOOP_ENTRY]]
+    // CHECK: [[TAKE_LOOP_END]]:
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<420, AnyObject>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_fixed_indirect_to_direct
+sil @loadable_fixed_indirect_to_direct: $@convention(thin) (@in Builtin.FixedArray<2, AnyObject>) -> @owned Builtin.FixedArray<2, AnyObject> {
+entry(%v : $*Builtin.FixedArray<2, AnyObject>):
+    // CHECK: [[V0:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0
+    // CHECK: [[V0_0:%.*]] = getelementptr {{.*}} [[V0]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
+    // CHECK: [[V0_VALUE:%.*]] = load {{.*}} [[V0_0]], align
+
+    // CHECK: [[V1:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 1
+    // CHECK: [[V1_0:%.*]] = getelementptr {{.*}} [[V1]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
+    // CHECK: [[V1_VALUE:%.*]] = load {{.*}} [[V1_0]], align
+    %a = load %v : $*Builtin.FixedArray<2, AnyObject>
+
+    // CHECK: [[R0:%.*]] = insertvalue {{.*}} undef, ptr [[V0_VALUE]], 0
+    // CHECK: [[R1:%.*]] = insertvalue {{.*}} [[R0]], ptr [[V1_VALUE]], 1
+    // CHECK: ret {{.*}} [[R1]]
+    return %a : $Builtin.FixedArray<2, AnyObject>
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_fixed_direct_to_indirect
+sil @loadable_fixed_direct_to_indirect: $@convention(thin) (@owned Builtin.FixedArray<2, AnyObject>) -> @out Builtin.FixedArray<2, AnyObject> {
+entry(%r : $*Builtin.FixedArray<2, AnyObject>, %v : $Builtin.FixedArray<2, AnyObject>):
+    // CHECK: [[R0:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0
+    // CHECK: [[R0_0:%.*]] = getelementptr {{.*}} [[R0]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
+    // CHECK: store {{.*}}, ptr [[R0_0]],
+
+    // CHECK: [[R1:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 1
+    // CHECK: [[R1_0:%.*]] = getelementptr {{.*}} [[R1]], {{i[0-9]+}} 0, {{i[0-9]+}} 0
+    // CHECK: store {{.*}}, ptr [[R1_0]],
+    store %v to %r : $*Builtin.FixedArray<2, AnyObject>
+    return undef : $()
+}
+
+struct Padded {
+    var a: Int16
+    var b: Int8
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_padded_fixed_indirect_to_direct
+sil @loadable_padded_fixed_indirect_to_direct: $@convention(thin) (@in Builtin.FixedArray<2, Padded>) -> @owned Builtin.FixedArray<2, Padded> {
+entry(%v : $*Builtin.FixedArray<2, Padded>):
+    // ensure the elements are indexed using the byte stride rather than the
+    // packed struct representation
+    // CHECK: getelementptr inbounds i8, ptr %0, {{i[0-9]+}} 0
+    // CHECK: getelementptr inbounds i8, ptr %0, {{i[0-9]+}} 4
+    %a = load %v : $*Builtin.FixedArray<2, Padded>
+    return %a : $Builtin.FixedArray<2, Padded>
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_padded_fixed_direct_to_indirect
+sil @loadable_padded_fixed_direct_to_indirect: $@convention(thin) (@owned Builtin.FixedArray<2, Padded>) -> @out Builtin.FixedArray<2, Padded> {
+entry(%r : $*Builtin.FixedArray<2, Padded>, %v : $Builtin.FixedArray<2, Padded>):
+    // ensure the elements are indexed using the byte stride rather than the
+    // packed struct representation
+    // CHECK: getelementptr inbounds i8, ptr %0, {{i[0-9]+}} 0
+    // CHECK: getelementptr inbounds i8, ptr %0, {{i[0-9]+}} 4
+    store %v to %r : $*Builtin.FixedArray<2, Padded>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @ao_fixed
+sil @ao_fixed: $@convention(thin) (@in Builtin.FixedArray<2, Any>) -> @out (Builtin.FixedArray<2, Any>, Builtin.FixedArray<2, Any>) {
+entry(%r : $*(Builtin.FixedArray<2, Any>, Builtin.FixedArray<2, Any>), %v : $*Builtin.FixedArray<2, Any>):
+    // CHECK:   [[A:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0, {{i[0-9]+}} 0
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<2, Any>, Builtin.FixedArray<2, Any>), 0
+
+    // CHECK:   br label %[[COPY_LOOP_ENTRY:.*]]
+    // CHECK: [[COPY_LOOP_ENTRY]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ 2, %entry ], [ [[DEC_COUNT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[DEST_ELT:%.*]] = phi ptr [ [[A]], %entry ], [ [[INC_DEST_ELT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT:%.*]] = phi ptr [ %1, %entry ], [ [[INC_SRC_ELT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   call ptr @"$sypWOc"(ptr [[SRC_ELT]], ptr [[DEST_ELT]])
+    // CHECK:   [[INC_DEST_ELT]] = getelementptr inbounds %Any, ptr [[DEST_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[INC_SRC_ELT]] = getelementptr inbounds %Any, ptr [[SRC_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[DEC_COUNT]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[DEC_COUNT]], 0
+    // CHECK:   br i1 [[DONE]], label %[[COPY_LOOP_END:.*]], label %[[COPY_LOOP_ENTRY]]
+    // CHECK: [[COPY_LOOP_END]]:
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<2, Any>
+
+    // CHECK:   [[B:%.*]] = getelementptr {{.*}} %0, {{i[0-9]+}} 0, {{i[0-9]+}} 1
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<2, Any>, Builtin.FixedArray<2, Any>), 1
+
+    // CHECK:   br label %[[TAKE_LOOP_ENTRY:.*]]
+    // CHECK: [[TAKE_LOOP_ENTRY]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ 2, %[[COPY_LOOP_END]] ], [ [[DEC_COUNT:%.*]], %[[TAKE_LOOP_ENTRY]] ]
+    // CHECK:   [[DEST_ELT:%.*]] = phi ptr [ [[B]], %[[COPY_LOOP_END]] ], [ [[INC_DEST_ELT:%.*]], %[[TAKE_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT:%.*]] = phi ptr [ %1, %[[COPY_LOOP_END]] ], [ [[INC_SRC_ELT:%.*]], %[[TAKE_LOOP_ENTRY]] ]
+    // CHECK:   call ptr @"$sypWOb"(ptr [[SRC_ELT]], ptr [[DEST_ELT]])
+    // CHECK:   [[INC_DEST_ELT]] = getelementptr inbounds %Any, ptr [[DEST_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[INC_SRC_ELT]] = getelementptr inbounds %Any, ptr [[SRC_ELT]], {{i[0-9]+}} 1
+    // CHECK:   [[DEC_COUNT]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[DEC_COUNT]], 0
+    // CHECK:   br i1 [[DONE]], label %[[TAKE_LOOP_END:.*]], label %[[TAKE_LOOP_ENTRY]]
+    // CHECK: [[TAKE_LOOP_END]]:
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<2, Any>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @dep_fixed
+sil @dep_fixed: $@convention(thin) <T>(@in Builtin.FixedArray<2, T>) -> @out (Builtin.FixedArray<2, T>, Builtin.FixedArray<2, T>) {
+entry(%r : $*(Builtin.FixedArray<2, T>, Builtin.FixedArray<2, T>), %v : $*Builtin.FixedArray<2, T>):
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<2, T>, Builtin.FixedArray<2, T>), 0
+
+    // CHECK:   br label %[[COPY_LOOP_ENTRY:.*]]
+    // CHECK: [[COPY_LOOP_ENTRY]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ 2, %entry ], [ [[DEC_COUNT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[DEST_ELT:%.*]] = phi ptr [ %0, %entry ], [ [[INC_DEST_ELT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   [[SRC_ELT:%.*]] = phi ptr [ %1, %entry ], [ [[INC_SRC_ELT:%.*]], %[[COPY_LOOP_ENTRY]] ]
+    // CHECK:   call ptr %InitializeWithCopy(ptr noalias [[DEST_ELT]], ptr noalias [[SRC_ELT]], ptr %T)
+    // CHECK:   [[STRIDE:%.*]] = mul nsw {{i[0-9]+}} 1, %stride
+    // CHECK:   [[INC_DEST_ELT]] = getelementptr inbounds i8, ptr [[DEST_ELT]], {{i[0-9]+}} [[STRIDE]]
+    // CHECK:   [[STRIDE:%.*]] = mul nsw {{i[0-9]+}} 1, %stride
+    // CHECK:   [[INC_SRC_ELT]] = getelementptr inbounds i8, ptr [[SRC_ELT]], {{i[0-9]+}} [[STRIDE]]
+    // CHECK:   [[DEC_COUNT]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[DEC_COUNT]], 0
+    // CHECK:   br i1 [[DONE]], label %[[COPY_LOOP_END:.*]], label %[[COPY_LOOP_ENTRY]]
+    // CHECK: [[COPY_LOOP_END]]:
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<2, T>
+
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<2, T>, Builtin.FixedArray<2, T>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<2, T>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @trivial_dep
+sil @trivial_dep: $@convention(thin) <let N: Int>(@in Builtin.FixedArray<N, Int>) -> @out (Builtin.FixedArray<N, Int>, Builtin.FixedArray<N, Int>) {
+entry(%r : $*(Builtin.FixedArray<N, Int>, Builtin.FixedArray<N, Int>), %v : $*Builtin.FixedArray<N, Int>):
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, Int>, Builtin.FixedArray<N, Int>), 0
+    // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
+    // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
+    // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
+    // CHECK: [[LOOP]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds %TSi, ptr [[DEST]], {{i[0-9]+}} 1
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds %TSi, ptr [[SRC]], {{i[0-9]+}} 1
+    // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
+    // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<N, Int>
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<N, Int>, Builtin.FixedArray<N, Int>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<N, Int>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @loadable_dep
+sil @loadable_dep: $@convention(thin) <let N: Int>(@in Builtin.FixedArray<N, AnyObject>) -> @out (Builtin.FixedArray<N, AnyObject>, Builtin.FixedArray<N, AnyObject>) {
+entry(%r : $*(Builtin.FixedArray<N, AnyObject>, Builtin.FixedArray<N, AnyObject>), %v : $*Builtin.FixedArray<N, AnyObject>):
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, AnyObject>, Builtin.FixedArray<N, AnyObject>), 0
+    // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
+    // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
+    // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
+    // CHECK: [[LOOP]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds %AnyObject, ptr [[DEST]], {{i[0-9]+}} 1
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds %AnyObject, ptr [[SRC]], {{i[0-9]+}} 1
+    // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
+    // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<N, AnyObject>
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<N, AnyObject>, Builtin.FixedArray<N, AnyObject>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<N, AnyObject>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @ao_dep
+sil @ao_dep: $@convention(thin) <let N: Int>(@in Builtin.FixedArray<N, Any>) -> @out (Builtin.FixedArray<N, Any>, Builtin.FixedArray<N, Any>) {
+entry(%r : $*(Builtin.FixedArray<N, Any>, Builtin.FixedArray<N, Any>), %v : $*Builtin.FixedArray<N, Any>):
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, Any>, Builtin.FixedArray<N, Any>), 0
+    // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
+    // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
+    // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
+    // CHECK: [[LOOP]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds %Any, ptr [[DEST]], {{i[0-9]+}} 1
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds %Any, ptr [[SRC]], {{i[0-9]+}} 1
+    // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
+    // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<N, Any>
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<N, Any>, Builtin.FixedArray<N, Any>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<N, Any>
+    return undef : $()
+}
+
+// CHECK-LABEL: define{{.*}} @dep_dep
+sil @dep_dep: $@convention(thin) <let N: Int, T>(@in Builtin.FixedArray<N, T>) -> @out (Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>) {
+entry(%r : $*(Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>), %v : $*Builtin.FixedArray<N, T>):
+    %a = tuple_element_addr %r : $*(Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>), 0
+    // CHECK:   [[SIZE_NEG:%.*]] = icmp slt {{i[0-9]+}} %N, 0
+    // CHECK:   [[SIZE:%.*]] = select i1 [[SIZE_NEG]], {{i[0-9]+}} 0, {{i[0-9]+}} %N
+    // CHECK:   [[IS_ZERO:%.*]] = icmp eq {{i[0-9]+}} [[SIZE]], 0
+    // CHECK:   br i1 [[IS_ZERO]], label %[[LOOP_END:.*]], label %[[LOOP:.*]]
+    // CHECK: [[LOOP]]:
+    // CHECK:   [[COUNT:%.*]] = phi {{i[0-9]+}} [ [[SIZE]], %entry ], [ [[SIZE_DEC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[DEST:%.*]] = phi ptr [ %0, %entry ], [ [[DEST_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   [[SRC:%.*]] = phi ptr [ %1, %entry ], [ [[SRC_INC:%.*]], %[[LOOP]] ]
+    // CHECK:   %stride = load
+    // CHECK:   [[DIST:%.*]] = mul nsw {{i[0-9]+}} 1, %stride
+    // CHECK:   [[DEST_INC]] = getelementptr inbounds i8, ptr [[DEST]], i{{[0-9]+}} [[DIST]]
+    // CHECK:   [[DIST:%.*]] = mul nsw {{i[0-9]+}} 1, %stride
+    // CHECK:   [[SRC_INC]] = getelementptr inbounds i8, ptr [[SRC]], i{{[0-9]+}} [[DIST]]
+    // CHECK:   [[SIZE_DEC]] = sub {{i[0-9]+}} [[COUNT]], 1
+    // CHECK:   [[DONE:%.*]] = icmp eq {{i[0-9]+}} [[SIZE_DEC]], 0
+    // CHECK:   br i1 [[DONE]], label %[[LOOP_END]], label %[[LOOP]]
+    copy_addr %v to [init] %a: $*Builtin.FixedArray<N, T>
+    %b = tuple_element_addr %r : $*(Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>), 1
+    copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<N, T>
+    return undef : $()
+}

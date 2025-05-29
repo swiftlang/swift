@@ -26,6 +26,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Threading.h"
 
+#include <csignal>
 #include <xpc/xpc.h>
 
 using namespace SourceKit;
@@ -40,12 +41,12 @@ static void postNotification(sourcekitd_response_t Notification) {
     goto done;
 
   {
-    xpc_object_t contents = xpc_array_create(nullptr, 0);
+    xpc_object_t contents = xpc_array_create_empty();
     xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                          (uint64_t)xpc::Message::Notification);
     xpc_array_set_value(contents, XPC_ARRAY_APPEND, Notification);
 
-    xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+    xpc_object_t msg = xpc_dictionary_create_empty();
     xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
     xpc_release(contents);
 
@@ -84,12 +85,12 @@ static sourcekitd_uid_t xpcSKDUIDFromUIdent(UIdent UID) {
   if (!peer)
     return nullptr;
 
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_string(contents, XPC_ARRAY_APPEND, UID.c_str());
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -121,12 +122,12 @@ static UIdent xpcUIdentFromSKDUID(sourcekitd_uid_t SKDUID) {
   if (!Peer)
     return UIdent();
 
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND, uintptr_t(SKDUID));
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -224,13 +225,6 @@ static std::string getSwiftExecutablePath() {
   return path.str().str();
 }
 
-static std::string getDiagnosticDocumentationPath() {
-  llvm::SmallString<128> path;
-  getToolchainPrefixPath(path);
-  llvm::sys::path::append(path, "share", "doc", "swift", "diagnostics");
-  return path.str().str();
-}
-
 static dispatch_queue_t msgHandlingQueue;
 static dispatch_queue_t requestQueue;
 
@@ -277,10 +271,10 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         };
 
         if (sourcekitd::requestIsEnableBarriers(req)) {
+          RequestBarriersEnabled = true;
           dispatch_barrier_async(requestQueue, ^{
             auto Responder = std::make_shared<XPCResponder>(event, peer);
             xpc_release(event);
-            RequestBarriersEnabled = true;
             sourcekitd::sendBarriersEnabledResponse([Responder](sourcekitd_response_t response) {
               Responder->sendReply(response);
             });
@@ -290,8 +284,7 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         } else {
           dispatch_async(requestQueue, handler);
         }
-      } else if (xpc_object_t contents =
-                     xpc_dictionary_get_value(event, "ping")) {
+      } else if (xpc_dictionary_get_value(event, "ping") != nullptr) {
         // Ping back.
         xpc_object_t reply = xpc_dictionary_create_reply(event);
         xpc_release(event);
@@ -307,24 +300,27 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
           sourcekitd::cancelRequest(/*CancellationToken=*/cancelToken);
         });
+        xpc_release(event);
       } else if (SourceKitCancellationToken cancelToken =
                      reinterpret_cast<SourceKitCancellationToken>(
                          xpc_dictionary_get_uint64(
                              event, xpc::KeyDisposeRequestHandle))) {
         sourcekitd::disposeCancellationToken(/*CancellationToken=*/cancelToken);
+        xpc_release(event);
       } else {
         assert(false && "unexpected message");
+        xpc_release(event);
       }
     });
   }
 }
 
 static void getInitializationInfo(xpc_connection_t peer) {
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::Initialization);
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -337,7 +333,6 @@ static void getInitializationInfo(xpc_connection_t peer) {
 
   assert(xpc_get_type(reply) == XPC_TYPE_DICTIONARY);
   uint64_t Delay = xpc_dictionary_get_uint64(reply, xpc::KeySemaEditorDelay);
-  xpc_release(reply);
 
   if (Delay != 0) {
     llvm::SmallString<4> Buf;
@@ -347,6 +342,23 @@ static void getInitializationInfo(xpc_connection_t peer) {
     }
     setenv("SOURCEKIT_DELAY_SEMA_EDITOR", Buf.c_str(), /*overwrite=*/1);
   }
+
+  // Only call once, in case there is a second connection.
+  static std::once_flag flag;
+  std::call_once(flag, [reply] {
+    std::vector<std::string> registeredPlugins;
+    xpc_object_t plugins = xpc_dictionary_get_value(reply, xpc::KeyPlugins);
+    if (plugins && xpc_get_type(plugins) == XPC_TYPE_ARRAY)
+      for (size_t i = 0, e = xpc_array_get_count(plugins); i < e; ++i)
+        registeredPlugins.push_back(xpc_array_get_string(plugins, i));
+    sourcekitd::PluginInitParams pluginParams(
+        /*isClientOnly=*/false, sourcekitd::pluginRegisterRequestHandler,
+        sourcekitd::pluginRegisterCancellationHandler,
+        sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance());
+    sourcekitd::loadPlugins(registeredPlugins, pluginParams);
+  });
+
+  xpc_release(reply);
 }
 
 static void sourcekitdServer_event_handler(xpc_connection_t peer) {
@@ -385,6 +397,7 @@ static void fatal_error_handler(void *user_data, const char *reason,
 }
 
 int main(int argc, const char *argv[]) {
+  std::signal(SIGTERM, SIG_DFL);
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
   sourcekitd_set_uid_handlers(
@@ -395,7 +408,6 @@ int main(int argc, const char *argv[]) {
         return xpcUIdentFromSKDUID(uid).c_str();
       });
   sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
-                                getDiagnosticDocumentationPath(),
                                 postNotification);
 
   // Increase the file descriptor limit.

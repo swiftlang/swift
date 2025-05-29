@@ -134,7 +134,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   return false;
 }
 
-Expr *InstrumenterBase::buildIDArgumentExpr(llvm::Optional<DeclNameRef> name,
+Expr *InstrumenterBase::buildIDArgumentExpr(std::optional<DeclNameRef> name,
                                             SourceRange SR) {
   if (!name)
     return IntegerLiteralExpr::createFromUnsigned(Context, 0, SR.End);

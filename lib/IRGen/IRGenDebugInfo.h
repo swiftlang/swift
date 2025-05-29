@@ -160,7 +160,7 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               llvm::Optional<SILLocation> VarLoc,
+                               std::optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
                                IndirectionKind Indirection = DirectValue,
                                ArtificialKind Artificial = RealValue,
@@ -182,11 +182,15 @@ public:
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
-                                     llvm::Optional<SILLocation> Loc);
+                                     std::optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        unsigned Depth, unsigned Index, StringRef Name);
+                        GenericTypeParamType *Type);
+
+  /// Emit debug metadata for a (protocol) witness table.
+  void emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
+                        StringRef Name, ProtocolDecl *protocol);
 
   /// Emit debug info for the IR function parameter holding the size of one or
   /// more parameter / type packs.
@@ -195,9 +199,6 @@ public:
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();
-
-  /// Decode (and cache) a SourceLoc.
-  SILLocation::FilenameAndLocation decodeSourceLoc(SourceLoc SL);
 };
 
 /// An RAII object that autorestores the debug location.

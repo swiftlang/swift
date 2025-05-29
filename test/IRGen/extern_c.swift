@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %s | %FileCheck %s
 
+// REQUIRES: swift_feature_Extern
+
 func test() {
   // CHECK: call void @explicit_extern_c()
   explicit_extern_c()
@@ -15,10 +17,10 @@ func test() {
 test()
 
 // CHECK: declare void @explicit_extern_c()
-@extern(c, "explicit_extern_c") func explicit_extern_c()
+@_extern(c, "explicit_extern_c") func explicit_extern_c()
 
 // CHECK: declare void @implicit_extern_c()
-@extern(c) func implicit_extern_c()
+@_extern(c) func implicit_extern_c()
 
 // CHECK: declare void @default_arg_value(i32)
-@extern(c) func default_arg_value(_: Int32 = 42)
+@_extern(c) func default_arg_value(_: Int32 = 42)

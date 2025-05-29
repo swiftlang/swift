@@ -982,26 +982,35 @@ using SmallMutex =
 
 // Enforce literal requirements for static variants.
 #if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static_assert(std::is_literal_type<StaticMutex>::value,
               "StaticMutex must be literal type");
 static_assert(std::is_literal_type<StaticUnsafeMutex>::value,
               "StaticUnsafeMutex must be literal type");
+#pragma clang diagnostic pop
 #else
 // Your platform doesn't currently support statically allocated Mutex
 // you will possibly see global-constructors warnings
 #endif
 
 #if SWIFT_CONDITION_SUPPORTS_CONSTEXPR
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static_assert(std::is_literal_type<StaticConditionVariable>::value,
               "StaticConditionVariable must be literal type");
+#pragma clang diagnostic pop
 #else
 // Your platform doesn't currently support statically allocated ConditionVar
 // you will possibly see global-constructors warnings
 #endif
 
 #if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static_assert(std::is_literal_type<StaticReadWriteLock>::value,
               "StaticReadWriteLock must be literal type");
+#pragma clang diagnostic pop
 #else
 // Your platform doesn't currently support statically allocated ReadWriteLocks
 // you will possibly see global-constructors warnings

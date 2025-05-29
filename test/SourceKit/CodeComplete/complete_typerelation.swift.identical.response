@@ -3,107 +3,107 @@
     {
       key.kind: source.lang.swift.decl.enumelement,
       key.name: "bar()",
-      key.sourcetext: "bar(<#T##Int#>)",
       key.description: "bar(Int)",
       key.typename: "MyEnum",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO3baryACSicACmF",
-      key.modulename: "complete_typerelation"
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "bar(<#T##Int#>)"
     },
     {
       key.kind: source.lang.swift.decl.enumelement,
       key.name: "foo",
-      key.sourcetext: "foo",
       key.description: "foo",
       key.typename: "MyEnum",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO3fooyA2CmF",
-      key.modulename: "complete_typerelation"
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "foo"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "intanceReturnMyEnum(:)",
-      key.sourcetext: "intanceReturnMyEnum(<#T##self: MyEnum##MyEnum#>)",
-      key.description: "intanceReturnMyEnum(self: MyEnum)",
+      key.name: "instanceReturnMyEnum(:)",
+      key.description: "instanceReturnMyEnum(self: MyEnum)",
       key.typename: "() -> MyEnum",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO013intanceReturncD0ACyF",
-      key.modulename: "complete_typerelation"
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO014instanceReturncD0ACyF",
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "instanceReturnMyEnum(<#T##self: MyEnum##MyEnum#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "intanceReturnVoid(:)",
-      key.sourcetext: "intanceReturnVoid(<#T##self: MyEnum##MyEnum#>)",
-      key.description: "intanceReturnVoid(self: MyEnum)",
+      key.name: "instanceReturnVoid(:)",
+      key.description: "instanceReturnVoid(self: MyEnum)",
       key.typename: "() -> Void",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO17intanceReturnVoidyyF",
-      key.modulename: "complete_typerelation"
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO18instanceReturnVoidyyF",
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "instanceReturnVoid(<#T##self: MyEnum##MyEnum#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "intanceReturnVoidDeprecated(:)",
-      key.sourcetext: "intanceReturnVoidDeprecated(<#T##self: MyEnum##MyEnum#>)",
-      key.description: "intanceReturnVoidDeprecated(self: MyEnum)",
+      key.name: "instanceReturnVoidDeprecated(:)",
+      key.description: "instanceReturnVoidDeprecated(self: MyEnum)",
       key.typename: "() -> Void",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
       key.not_recommended: 1,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO27intanceReturnVoidDeprecatedyyF",
-      key.modulename: "complete_typerelation"
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO28instanceReturnVoidDeprecatedyyF",
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "instanceReturnVoidDeprecated(<#T##self: MyEnum##MyEnum#>)"
     },
     {
       key.kind: source.lang.swift.keyword,
       key.name: "self",
-      key.sourcetext: "self",
       key.description: "self",
       key.typename: "MyEnum.Type",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0
+      key.num_bytes_to_erase: 0,
+      key.sourcetext: "self"
     },
     {
       key.kind: source.lang.swift.decl.function.method.class,
       key.name: "staticReturnMyEnum()",
-      key.sourcetext: "staticReturnMyEnum()",
       key.description: "staticReturnMyEnum()",
       key.typename: "MyEnum",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.convertible,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO012staticReturncD0ACyFZ",
-      key.modulename: "complete_typerelation"
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "staticReturnMyEnum()"
     },
     {
       key.kind: source.lang.swift.decl.function.method.class,
       key.name: "staticReturnVoid()",
-      key.sourcetext: "staticReturnVoid()",
       key.description: "staticReturnVoid()",
       key.typename: "Void",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:21complete_typerelation6MyEnumO16staticReturnVoidyyFZ",
-      key.modulename: "complete_typerelation"
+      key.modulename: "complete_typerelation",
+      key.sourcetext: "staticReturnVoid()"
     },
     {
       key.kind: source.lang.swift.keyword,
       key.name: "Type",
-      key.sourcetext: "Type",
       key.description: "Type",
       key.typename: "MyEnum.Type",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0
+      key.num_bytes_to_erase: 0,
+      key.sourcetext: "Type"
     }
   ]
 }

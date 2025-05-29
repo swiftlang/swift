@@ -469,7 +469,7 @@ struct Size24Enum : Value {
   var containsEnum: Bool { true }
 }
 
-// Can't use the default random generator becaus we need deterministic results
+// Can't use the default random generator because we need deterministic results
 struct RandomGenerator : RandomNumberGenerator {
   var state: (UInt64, UInt64, UInt64, UInt64) = (15042304078070129153, 10706435816813474385, 14710304063852993123, 11070704559760783939)
 

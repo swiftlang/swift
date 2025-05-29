@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,25 +17,50 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include <limits.h>
+#include <optional>
 
 using namespace swift;
 
 LangOptions::LangOptions() {
-  // Note: Introduce default-on language options here.
-#ifndef NDEBUG
-  Features.insert(Feature::ParserRoundTrip);
-  Features.insert(Feature::ParserValidation);
+  // Add all promoted language features
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  enableFeature(Feature::FeatureName);
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#include "swift/Basic/Features.def"
+
+  // Special case: remove macro support if the compiler wasn't built with a
+  // host Swift.
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  disableFeature(Feature::Macros);
+  disableFeature(Feature::FreestandingExpressionMacros);
+  disableFeature(Feature::AttachedMacros);
+  disableFeature(Feature::ExtensionMacros);
 #endif
+
+  // Note: Introduce default-on language options here.
+  enableFeature(Feature::NoncopyableGenerics);
+  enableFeature(Feature::BorrowingSwitch);
+  enableFeature(Feature::MoveOnlyPartialConsumption);
+
+  // Enable any playground options that are enabled by default.
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  if (DefaultOn) \
+    PlaygroundOptions.insert(PlaygroundOption::OptionName);
+#include "swift/Basic/PlaygroundOptions.def"
 }
 
 struct SupportedConditionalValue {
@@ -55,6 +80,8 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "tvOS",
   "watchOS",
   "iOS",
+  "visionOS",
+  "xrOS",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -78,7 +105,9 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv32",
   "riscv64",
+  "avr"
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -87,6 +116,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationEndianness
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationPointerBitWidths[] = {
+  "_16",
   "_32",
   "_64"
 };
@@ -94,6 +124,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationPointerBit
 static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
+  "_multithreaded",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationTargetEnvironments[] = {
@@ -263,28 +294,85 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
       != CustomConditionalCompilationFlags.end();
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (Features.contains(feature))
+bool LangOptions::FeatureState::isEnabled() const {
+  return state == FeatureState::Kind::Enabled;
+}
+
+bool LangOptions::FeatureState::isEnabledForMigration() const {
+  ASSERT(feature.isMigratable() && "You forgot to make the feature migratable!");
+
+  return state == FeatureState::Kind::EnabledForMigration;
+}
+
+LangOptions::FeatureStateStorage::FeatureStateStorage()
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
+
+void LangOptions::FeatureStateStorage::setState(Feature feature,
+                                                FeatureState::Kind state) {
+  auto index = size_t(feature);
+
+  states[index] = state;
+}
+
+LangOptions::FeatureState
+LangOptions::FeatureStateStorage::getState(Feature feature) const {
+  auto index = size_t(feature);
+
+  return FeatureState(feature, states[index]);
+}
+
+LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
+    return state;
+
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version)) {
+      return FeatureState(feature, FeatureState::Kind::Enabled);
+    }
+  }
+
+  return state;
+}
+
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
-  if (feature == Feature::BareSlashRegexLiterals &&
-      EnableBareSlashRegexLiterals)
-    return true;
-
-  if (auto version = getFeatureLanguageVersion(feature))
+  if (auto version = feature.getLanguageVersion())
     return isSwiftVersionAtLeast(*version);
+
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
-  if (auto feature = getUpcomingFeature(featureName))
-    return hasFeature(*feature);
-
-  if (auto feature = getExperimentalFeature(featureName))
+  auto feature = llvm::StringSwitch<std::optional<Feature>>(featureName)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  .Case(#FeatureName, Feature::FeatureName)
+#include "swift/Basic/Features.def"
+                     .Default(std::nullopt);
+  if (feature)
     return hasFeature(*feature);
 
   return false;
+}
+
+void LangOptions::enableFeature(Feature feature, bool forMigration) {
+  if (forMigration) {
+    ASSERT(feature.isMigratable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForMigration);
+    return;
+  }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
+}
+
+void LangOptions::disableFeature(Feature feature) {
+  featureStates.setState(feature, FeatureState::Kind::Off);
 }
 
 void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
@@ -385,6 +473,16 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
   }
 }
 
+static bool isMultiThreadedRuntime(llvm::Triple triple) {
+  if (triple.getOS() == llvm::Triple::WASI) {
+    return triple.getEnvironmentName() == "threads";
+  }
+  if (triple.getOSName() == "none") {
+    return false;
+  }
+  return true;
+}
+
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllPlatformConditionValues();
   clearAtomicBitWidths();
@@ -424,6 +522,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::IOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
+    break;
+  case llvm::Triple::XROS:
+    addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
     break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)
@@ -503,8 +605,14 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
     break;
+  case llvm::Triple::ArchType::riscv32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv32");
+    break;
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
+    break;
+  case llvm::Triple::ArchType::avr:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "avr");
     break;
   default:
     UnsupportedArch = true;
@@ -529,7 +637,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   }
 
   // Set the "_pointerBitWidth" platform condition.
-  if (Target.isArch32Bit()) {
+  if (Target.isArch16Bit()) {
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_16");
+  } else if (Target.isArch32Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
   } else if (Target.isArch64Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
@@ -557,6 +667,11 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "macabi");
 
+  if (isMultiThreadedRuntime(Target)) {
+    addPlatformConditionValue(PlatformConditionKind::Runtime,
+                              "_multithreaded");
+  }
+
   // Set the "_hasHasAtomicBitWidth" platform condition.
   setHasAtomicBitWidth(triple);
 
@@ -567,75 +682,22 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   return { false, false };
 }
 
-llvm::StringRef swift::getFeatureName(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return #FeatureName;
-#include "swift/Basic/Features.def"
+llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
+  switch (option) {
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  case PlaygroundOption::OptionName: return #OptionName;
+#include "swift/Basic/PlaygroundOptions.def"
   }
   llvm_unreachable("covered switch");
 }
 
-bool swift::isSuppressibleFeature(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return false;
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return true;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-bool swift::isFeatureAvailableInProduction(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  case Feature::FeatureName: return true;
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
-  case Feature::FeatureName: return AvailableInProd;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-      .Default(llvm::None);
-}
-
-llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-      .Default(llvm::None);
-}
-
-llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-  case Feature::FeatureName: return Version;
-#include "swift/Basic/Features.def"
-  default:
-    return llvm::None;
-  }
-}
-
-bool swift::includeInModuleInterface(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
-  case Feature::FeatureName: return true;
-#define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
-  case Feature::FeatureName: return false;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
+std::optional<PlaygroundOption>
+swift::getPlaygroundOption(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<PlaygroundOption>>(name)
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  .Case(#OptionName, PlaygroundOption::OptionName)
+#include "swift/Basic/PlaygroundOptions.def"
+      .Default(std::nullopt);
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
@@ -653,26 +715,48 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   llvm_unreachable("covered switch");
 }
 
+namespace {
+  constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
+       {"-I",
+        "-F",
+        "-fmodule-map-file=",
+        "-iquote",
+        "-idirafter",
+        "-iframeworkwithsysroot",
+        "-iframework",
+        "-iprefix",
+        "-iwithprefixbefore",
+        "-iwithprefix",
+        "-isystemafter",
+        "-isystem",
+        "-isysroot",
+        "-ivfsoverlay",
+        "-working-directory=",
+        "-working-directory"};
+
+  constexpr std::array<std::string_view, 16>
+      knownClangDependencyIgnorablePrefiexes = {"-I",
+                                                "-F",
+                                                "-fmodule-map-file=",
+                                                "-ffile-compilation-dir",
+                                                "-iquote",
+                                                "-idirafter",
+                                                "-iframeworkwithsysroot",
+                                                "-iframework",
+                                                "-iprefix",
+                                                "-iwithprefixbefore",
+                                                "-iwithprefix",
+                                                "-isystemafter",
+                                                "-isystem",
+                                                "-isysroot",
+                                                "-working-directory=",
+                                                "-working-directory"};
+}
+
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     std::function<std::string(StringRef)> pathRemapCallback) const {
   auto consumeIncludeOption = [](StringRef &arg, StringRef &prefix) {
-    static StringRef options[] = {"-I",
-                                  "-F",
-                                  "-fmodule-map-file=",
-                                  "-iquote",
-                                  "-idirafter",
-                                  "-iframeworkwithsysroot",
-                                  "-iframework",
-                                  "-iprefix",
-                                  "-iwithprefixbefore",
-                                  "-iwithprefix",
-                                  "-isystemafter",
-                                  "-isystem",
-                                  "-isysroot",
-                                  "-ivfsoverlay",
-                                  "-working-directory=",
-                                  "-working-directory"};
-    for (StringRef &option : options)
+    for (const auto &option : knownSearchPathPrefiexes)
       if (arg.consume_front(option)) {
         prefix = option;
         return true;
@@ -704,4 +788,46 @@ std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     }
   }
   return args;
+}
+
+std::vector<std::string>
+ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
+  auto matchIncludeOption = [](StringRef &arg) {
+    for (const auto &option : knownClangDependencyIgnorablePrefiexes)
+      if (arg.consume_front(option))
+        return true;
+    return false;
+  };
+
+  std::vector<std::string> filtered_args;
+  bool skip_next = false;
+  std::vector<std::string> args;
+  for (auto A : ExtraArgs) {
+    StringRef arg(A);
+    if (skip_next) {
+      skip_next = false;
+      continue;
+    } else if (matchIncludeOption(arg)) {
+      if (arg.empty()) {
+        // Option pair
+        skip_next = true;
+      } // else non-pair option e.g. '-I/search/path'
+      continue;
+    } else {
+      filtered_args.push_back(A);
+    }
+  }
+
+  return filtered_args;
+}
+
+std::string ClangImporterOptions::getPCHInputPath() const {
+  if (!BridgingHeaderPCH.empty())
+    return BridgingHeaderPCH;
+
+  if (llvm::sys::path::extension(BridgingHeader)
+          .ends_with(file_types::getExtension(file_types::TY_PCH)))
+    return BridgingHeader;
+
+  return {};
 }

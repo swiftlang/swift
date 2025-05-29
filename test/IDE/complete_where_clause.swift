@@ -64,14 +64,14 @@ extension A1 where T1.#^GP6^# {}
 // A1-DAG: Decl[GenericTypeParam]/Local:       T1[#T1#]; name=T1
 // A1-DAG: Decl[GenericTypeParam]/Local:       T2[#T2#]; name=T2
 // A1-DAG: Decl[GenericTypeParam]/Local:       T3[#T3#]; name=T3
-// A1-DAG: Decl[Class]/Local:                  A1[#A1#]; name=A1
+// A1-DAG: Decl[Class]/Local:                  A1[#A1<T1, T2, T3>#]; name=A1
 // A1-NOT: T4
 // A1-NOT: T5
 // A1-NOT: Self
 
 // TYPE1-DAG: Decl[Protocol]/CurrModule:          P1[#P1#]; name=P1
-// TYPE1-DAG: Decl[Class]/CurrModule:             A1[#A1#]; name=A1
-// TYPE1-DAG: Decl[Class]/CurrModule:             A2[#A2#]; name=A2
+// TYPE1-DAG: Decl[Class]/CurrModule:             A1[#A1<T1, T2, T3>#]; name=A1
+// TYPE1-DAG: Decl[Class]/CurrModule:             A2[#A2<T4, T5>#]; name=A2
 // TYPE1-NOT: T1
 // TYPE1-NOT: T2
 // TYPE1-NOT: T3
@@ -138,7 +138,7 @@ enum E2<T> where T.#^ENUM_2^# {}
 // GEN_T_NOMINAL: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 
 // ANYTYPE-DAG: Decl[GenericTypeParam]/Local: T[#T#];
-// ANYTYPE-DAG: Decl[Class]/CurrModule: A1[#A1#];
+// ANYTYPE-DAG: Decl[Class]/CurrModule: A1[#A1<T1, T2, T3>#];
 // ANYTYPE-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#];
 
 protocol P2 {
@@ -190,7 +190,7 @@ extension TA1 where #^NOMINAL_TYPEALIAS_EXT^# { }
 // NOMINAL_TYPEALIAS_EXT: Begin completions, 4 items
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 // NOMINAL_TYPEALIAS_EXT-DAG: Decl[TypeAlias]/CurrNominal:        U[#T.Q#];
-// NOMINAL_TYPEALIAS_EXT-DAG: Decl[Struct]/Local:                 TA1[#TA1#];
+// NOMINAL_TYPEALIAS_EXT-DAG: Decl[Struct]/Local:                 TA1[#TA1<T>#];
 // NOMINAL_TYPEALIAS_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA1<T>#];
 
 struct TA2<T: Assoc> {
@@ -209,21 +209,17 @@ struct TA2<T: Assoc> {
 // NOMINAL_TYPEALIAS_NESTED2-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 }
 extension TA2.Inner1 where #^NOMINAL_TYPEALIAS_NESTED1_EXT^# {}
-// NOMINAL_TYPEALIAS_NESTED1_EXT: Begin completions, 6 items
+// NOMINAL_TYPEALIAS_NESTED1_EXT: Begin completions, 5 items
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[GenericTypeParam]/Local:       U[#U#];
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
-// FIXME : We shouldn't be suggesting Inner1 because it's not fully-qualified
-// NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Decl[Struct]/Local:                 Inner1[#TA2.Inner1#];
 // NOMINAL_TYPEALIAS_NESTED1_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA2<T>.Inner1<U>#];
 extension TA2.Inner2 where #^NOMINAL_TYPEALIAS_NESTED2_EXT^# {}
-// NOMINAL_TYPEALIAS_NESTED2_EXT: Begin completions, 5 items
+// NOMINAL_TYPEALIAS_NESTED2_EXT: Begin completions, 4 items
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[GenericTypeParam]/Local:       T[#T#];
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X1[#T#];
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[TypeAlias]/CurrNominal:        X2[#T.Q#];
-// FIXME : We shouldn't be suggesting Inner2 because it's not fully-qualified
-// NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Decl[Struct]/Local:                 Inner2[#TA2.Inner2#];
 // NOMINAL_TYPEALIAS_NESTED2_EXT-DAG: Keyword[Self]/CurrNominal:          Self[#TA2<T>.Inner2#];
 
 protocol WithAssoc {

@@ -18,26 +18,19 @@
 // CHECK-NEXT:  increment_profiler_counter 1
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s11coverage_do3fooyyF"
-// CHECK-NEXT:  [[@LINE+11]]:12 -> [[@LINE+18]]:2 : 0
-// CHECK-NEXT:  [[@LINE+11]]:9 -> [[@LINE+15]]:4 : 0
-// CHECK-NEXT:  [[@LINE+11]]:8 -> [[@LINE+11]]:17 : 0
-// CHECK-NEXT:  [[@LINE+10]]:18 -> [[@LINE+10]]:28 : 1
-// CHECK-NEXT:  [[@LINE+9]]:28 -> [[@LINE+12]]:4 : (0 - 1)
-// CHECK-NEXT:  [[@LINE+9]]:8 -> [[@LINE+9]]:17 : (0 - 1)
-// CHECK-NEXT:  [[@LINE+8]]:18 -> [[@LINE+8]]:29 : 2
-// CHECK-NEXT:  [[@LINE+7]]:29 -> [[@LINE+8]]:11 : ((0 - 1) - 2)
-// CHECK-NEXT:  [[@LINE+8]]:4 -> [[@LINE+10]]:2 : 2
-// CHECK-NEXT:  [[@LINE+8]]:6 -> [[@LINE+8]]:8 : 2
-// CHECK-NEXT:  [[@LINE+7]]:8 -> [[@LINE+8]]:2 : 2
-func foo() {
-  x: do {
-    if .random() { return }
-    if .random() { break x }
+func foo() {       // CHECK-NEXT: [[@LINE]]:12   -> [[@LINE+11]]:2 : 0
+  x: do {          // CHECK-NEXT: [[@LINE]]:9    -> [[@LINE+8]]:4  : 0
+    if .random() { // CHECK-NEXT: [[@LINE]]:8    -> [[@LINE]]:17   : 0
+      return       // CHECK-NEXT: [[@LINE-1]]:18 -> [[@LINE+1]]:6  : 1
+    }              // CHECK-NEXT: [[@LINE]]:6    -> [[@LINE+4]]:11 : (0 - 1)
+    if .random() { // CHECK-NEXT: [[@LINE]]:8    -> [[@LINE]]:17   : (0 - 1)
+      break x      // CHECK-NEXT: [[@LINE-1]]:18 -> [[@LINE+1]]:6  : 2
+    }              // CHECK-NEXT: [[@LINE]]:6    -> [[@LINE+1]]:11 : ((0 - 1) - 2)
     return
-  }
-  do {}
-}
-// CHECK-NEXT: }
+  }                // CHECK-NEXT: [[@LINE]]:4   -> [[@LINE+2]]:2 : 2
+  do {}            // CHECK-NEXT: [[@LINE]]:6   -> [[@LINE]]:8   : 2
+}                  // CHECK-NEXT: [[@LINE-1]]:8 -> [[@LINE]]:2   : 2
+                   // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s11coverage_do4foobyyF"
 func foob() {

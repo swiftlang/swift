@@ -52,6 +52,11 @@ bool parseSanitizerAddressUseODRIndicator(
     const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
     DiagnosticEngine &Diags);
 
+/// Parse -sanitize-stable-abi's value
+bool parseSanitizerUseStableABI(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags);
+
 /// Returns the active sanitizers as a comma-separated list.
 std::string getSanitizerList(const OptionSet<SanitizerKind> &Set);
 }

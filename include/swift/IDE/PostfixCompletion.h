@@ -50,12 +50,12 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
     /// we know that we can't retrieve a value from it anymore.
     bool ExpectsNonVoid;
 
-    /// If the code completion expression occurs as a single statement in a
-    /// single-expression closure. In such cases we don't want to disfavor
-    /// results that produce 'Void' because the user might intend to make the
-    /// closure a multi-statment closure, in which case this expression is no
-    /// longer implicitly returned.
-    bool IsImplicitSingleExpressionReturn;
+    /// If the code completion expression occurs as e.g a single statement in a
+    /// single-expression closure, where the return is implied. In such cases
+    /// we don't want to disfavor results that produce 'Void' because the user
+    /// might intend to make the closure a multi-statment closure, in which case
+    /// this expression is no longer implicitly returned.
+    bool IsImpliedResult;
 
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
@@ -66,13 +66,9 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
     llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
         ClosureActorIsolations;
 
-    /// Checks whether this result has the same \c BaseTy and \c BaseDecl as
-    /// \p Other and if the two can thus be merged to be one value lookup in
-    /// \c deliverResults.
-    bool canBeMergedWith(const Result &Other, DeclContext &DC) const;
-
-    /// Merge this result with \p Other. Assumes that they can be merged.
-    void merge(const Result &Other, DeclContext &DC);
+    /// Merge this result with \p Other, returning \c true if
+    /// successful, else \c false.
+    bool tryMerge(const Result &Other, DeclContext *DC);
   };
 
   CodeCompletionExpr *CompletionExpr;

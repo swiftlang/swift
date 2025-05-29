@@ -4,5 +4,5 @@ import MethodRequires
 
 var s = MyStruct()
 s.foo(123)
-// CHECK-NOT: calledFromConceptBody
+// CHECK-NOT: shouldNotBeCalledOrEmitted
 // CHECK: calledFromMethodBody

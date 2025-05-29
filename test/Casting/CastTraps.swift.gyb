@@ -105,11 +105,11 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 % end
 
 protocol P2 {}
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 6.0, *) {
 CastTrapsTestSuite.test("Unexpected null")
-  .crashOutputMatches("Found unexpected null pointer value while trying to cast value of type '")
+  .crashOutputMatches("Found a null pointer in a value of type '")
   .crashOutputMatches("Foo'")
-  .crashOutputMatches(" to '")
+  .crashOutputMatches("(Detected while casting to '")
   .crashOutputMatches("P2'")
   .code
 {
@@ -125,11 +125,10 @@ CastTrapsTestSuite.test("Unexpected null")
 
 
 #if _runtime(_ObjC)
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 6.0, *) {
 CastTrapsTestSuite.test("Unexpected Obj-C null")
-  .crashOutputMatches("Found unexpected null pointer value while trying to cast value of type '")
-  .crashOutputMatches("NSObject'")
-  .crashOutputMatches(" to '")
+  .crashOutputMatches("Found a null pointer in a value of type 'NSObject'")
+  .crashOutputMatches("(Detected while casting to '")
   .crashOutputMatches("P2'")
   .code
 {
@@ -142,5 +141,36 @@ CastTrapsTestSuite.test("Unexpected Obj-C null")
 }
 }
 #endif
+
+class Base {}
+final class Derived: Base {}
+final class Other: Base {}
+
+@inline(never)
+func getDerived(_ v: Base) -> Derived {
+  return v as! Derived
+}
+
+@inline(never)
+func getDerivedFromOptional(_ v: Base?) -> Derived {
+  return v as! Derived
+}
+
+CastTrapsTestSuite.test("unconditinal fast class cast") {
+  let c = Other()
+  expectCrashLater()
+  _ = getDerived(c)
+}
+
+CastTrapsTestSuite.test("unconditinal optional fast class cast") {
+  let c = Other()
+  expectCrashLater()
+  _ = getDerivedFromOptional(c)
+}
+
+CastTrapsTestSuite.test("unconditinal optional nil fast class cast") {
+  expectCrashLater()
+  _ = getDerivedFromOptional(nil)
+}
 
 runAllTests()

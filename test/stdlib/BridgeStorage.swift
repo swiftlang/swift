@@ -79,19 +79,7 @@ func expectTagged(_ s: NSString, _ expected: Bool) -> NSString {
   let mask: UInt = 0
 #endif
 
-  var osSupportsTaggedStrings: Bool
-#if os(iOS)
-  // NSTaggedPointerString is enabled starting in iOS 9.0.
-  osSupportsTaggedStrings = isOSAtLeast(9,0)
-#elseif os(tvOS) || os(watchOS)
-  // NSTaggedPointerString is supported in all versions of TVOS and watchOS.
-  osSupportsTaggedStrings = true
-#elseif os(OSX)
-  // NSTaggedPointerString is enabled starting in OS X 10.10.
-  osSupportsTaggedStrings = isOSAtLeast(10,10)
-#endif
-
-  let taggedStringsSupported = osSupportsTaggedStrings && mask != 0
+  let taggedStringsSupported = mask != 0
 
   let tagged = unsafeBitCast(s, to: UInt.self) & mask != 0
 

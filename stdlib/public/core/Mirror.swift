@@ -216,6 +216,9 @@ public struct Mirror {
   }
 }
 
+@available(*, unavailable)
+extension Mirror: Sendable {}
+
 extension Mirror {
   /// Representation of descendant classes that don't override
   /// `customMirror`.
@@ -347,6 +350,9 @@ extension Mirror {
     return Mirror._noSuperclassMirror
   }
 }
+
+@available(*, unavailable)
+extension Mirror.AncestorRepresentation: Sendable {}
 
 /// A type that explicitly supplies its own mirror.
 ///
@@ -532,6 +538,7 @@ extension Mirror {
 
 //===--- General Utilities ------------------------------------------------===//
 
+@_unavailableInEmbedded
 extension String {
   /// Creates a string representing the given value.
   ///

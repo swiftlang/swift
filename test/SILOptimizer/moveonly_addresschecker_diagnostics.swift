@@ -1,12 +1,16 @@
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature MoveOnlyPartialConsumption -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil %s -O -sil-verify-all -verify -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses
+
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_MoveOnlyPartialReinitialization
+// REQUIRES: swift_feature_NoImplicitCopy
 
 //////////////////
 // Declarations //
 //////////////////
 
-public class CopyableKlass {}
+public class MyClass {}
 
-public func borrowVal(_ x: borrowing CopyableKlass) {}
+public func borrowVal(_ x: borrowing MyClass) {}
 public func borrowVal(_ x: borrowing Klass) {}
 public func borrowVal(_ s: borrowing NonTrivialStruct) {}
 public func borrowVal(_ s: borrowing NonTrivialStruct2) {}
@@ -15,18 +19,18 @@ public func borrowVal(_ s: borrowing NonTrivialCopyableStruct2) {}
 public func borrowVal(_ e : borrowing NonTrivialEnum) {}
 public func borrowVal(_ x: borrowing FinalKlass) {}
 public func borrowVal(_ x: borrowing AggStruct) {}
-public func borrowVal(_ x: borrowing AggGenericStruct<CopyableKlass>) {}
+public func borrowVal(_ x: borrowing AggGenericStruct<MyClass>) {}
 public func borrowVal<T>(_ x: borrowing AggGenericStruct<T>) {}
 public func borrowVal(_ x: borrowing EnumTy) {}
 public func borrowVal<T>(_ x: borrowing AddressOnlyGeneric<T>) {}
 public func borrowVal(_ x: borrowing AddressOnlyProtocol) {}
 public func borrowVal<T>(_ x: borrowing T) {}
 
-public func consumeVal(_ x: __owned CopyableKlass) {}
+public func consumeVal(_ x: __owned MyClass) {}
 public func consumeVal(_ x: __owned Klass) {}
 public func consumeVal(_ x: __owned FinalKlass) {}
 public func consumeVal(_ x: __owned AggStruct) {}
-public func consumeVal(_ x: __owned AggGenericStruct<CopyableKlass>) {}
+public func consumeVal(_ x: __owned AggGenericStruct<MyClass>) {}
 public func consumeVal<T>(_ x: __owned AggGenericStruct<T>) {}
 public func consumeVal(_ x: __owned EnumTy) {}
 public func consumeVal(_ x: __owned NonTrivialStruct) {}
@@ -35,8 +39,7 @@ public func consumeVal<T>(_ x: __owned AddressOnlyGeneric<T>) {}
 public func consumeVal(_ x: __owned AddressOnlyProtocol) {}
 public func consumeVal<T>(_ x: __owned T) {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init() {
@@ -45,59 +48,54 @@ public final class Klass {
     }
 }
 
+public final class FinalKlass: ~Copyable {
+    var k: Klass = Klass()
+}
+
 var boolValue: Bool { return true }
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var k = Klass()
-    var copyableK = CopyableKlass()
+    var copyableK = MyClass()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var nonTrivialCopyableStruct = NonTrivialCopyableStruct()
 
-    var computedCopyableK: CopyableKlass { CopyableKlass() }
+    var computedCopyableK: MyClass { MyClass() }
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
-    var copyableKlass = CopyableKlass()
+public struct NonTrivialStruct2: ~Copyable {
+    var copyableKlass = MyClass()
 }
 
 public struct NonTrivialCopyableStruct {
-    var copyableKlass = CopyableKlass()
+    var copyableKlass = MyClass()
     var nonTrivialCopyableStruct2 = NonTrivialCopyableStruct2()
 }
 
 public struct NonTrivialCopyableStruct2 {
-    var copyableKlass = CopyableKlass()
-    var computedCopyableKlass: CopyableKlass { CopyableKlass() }
+    var copyableKlass = MyClass()
+    var computedMyClass: MyClass { MyClass() }
 }
 
-@_moveOnly
-public enum NonTrivialEnum {
+public enum NonTrivialEnum: ~Copyable {
     case first
     case second(Klass)
     case third(NonTrivialStruct)
-    case fourth(CopyableKlass)
+    case fourth(MyClass)
 }
 
-@_moveOnly
-public final class FinalKlass {
-    var k: Klass = Klass()
-}
-
-public final class CopyableKlassWithMoveOnlyField {
+public final class MyClassWithMoveOnlyField {
     var moveOnlyVarStruct = NonTrivialStruct()
     let moveOnlyLetStruct = NonTrivialStruct()
 }
 
 public protocol P {
     static var value: Self { get }
-    var name: CopyableKlass { get }
+    var name: MyClass { get }
     static var value2: any P { get }
 }
 
-@_moveOnly
-public struct AddressOnlyGeneric<T : P> {
+public struct AddressOnlyGeneric<T : P>: ~Copyable {
     var copyable: T
     var moveOnly = NonTrivialStruct()
 
@@ -111,15 +109,14 @@ public struct AddressOnlyGeneric<T : P> {
     }
 }
 
-extension CopyableKlass : P {
+extension MyClass : P {
     public static var value: Self { fatalError() }
-    public static var value2: any P { CopyableKlass() }
-    public var name: CopyableKlass { CopyableKlass() }
+    public static var value2: any P { MyClass() }
+    public var name: MyClass { MyClass() }
 }
 
-@_moveOnly
-public struct AddressOnlyProtocol {
-    var copyable: any P = CopyableKlass.value2
+public struct AddressOnlyProtocol: ~Copyable {
+    var copyable: any P = MyClass.value2
     var moveOnly = NonTrivialStruct()
 }
 
@@ -547,7 +544,7 @@ public func finalClassDoubleConsume() {
 }
 
 public func finalClassDoubleConsumeArg(_ x2: inout FinalKlass) { // expected-error {{'x2' consumed more than once}}
-                                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}    
+                                                                 // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x2) // expected-note {{consumed here}}
                           // expected-note @-1 {{consumed again here}}
@@ -758,14 +755,12 @@ public func finalClassConsumeFieldArg(_ x2: inout FinalKlass) {
 // Aggregate Struct //
 //////////////////////
 
-@_moveOnly
-public struct KlassPair {
+public struct KlassPair: ~Copyable {
     var lhs: Klass = Klass()
     var rhs: Klass = Klass()
 }
 
-@_moveOnly
-public struct AggStruct {
+public struct AggStruct: ~Copyable {
     var lhs: Klass = Klass()
     var center: Int = 5
     var rhs: Klass = Klass()
@@ -1028,8 +1023,7 @@ public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
 // Aggregate Generic Struct //
 //////////////////////////////
 
-@_moveOnly
-public struct AggGenericStruct<T> {
+public struct AggGenericStruct<T>: ~Copyable {
     var lhs: Klass = Klass()
     var rhs: UnsafeRawPointer? = nil
     var pair: KlassPair = KlassPair()
@@ -1085,52 +1079,52 @@ public struct AggGenericStruct<T> {
 }
 
 public func aggGenericStructSimpleChainTest() {
-    var x2 = AggGenericStruct<CopyableKlass>()
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()
+    x2 = AggGenericStruct<MyClass>()
     let y2 = x2
     let k2 = y2
     borrowVal(k2)
 }
 
-public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+public func aggGenericStructSimpleChainTestArg(_ x2: inout AggGenericStruct<MyClass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     let y2 = x2 // expected-note {{consumed here}}
     let k2 = y2
     borrowVal(k2)
 }
 
 public func aggGenericStructSimpleNonConsumingUseTest() {
-    var x2 = AggGenericStruct<CopyableKlass>()
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()
+    x2 = AggGenericStruct<MyClass>()
     borrowVal(x2)
 }
 
-public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructSimpleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<MyClass>) {
     borrowVal(x2)
 }
 
 public func aggGenericStructMultipleNonConsumingUseTest() {
-    var x2 = AggGenericStruct<CopyableKlass>()
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()
+    x2 = AggGenericStruct<MyClass>()
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2)
 }
 
-public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+public func aggGenericStructMultipleNonConsumingUseTestArg(_ x2: inout AggGenericStruct<MyClass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     borrowVal(x2)
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consumed here}}
 }
 
 public func aggGenericStructUseAfterConsume() {
-    var x2 = AggGenericStruct<CopyableKlass>() // expected-error {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>() // expected-error {{'x2' consumed more than once}}
+    x2 = AggGenericStruct<MyClass>()
     borrowVal(x2)
     consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x2) // expected-note {{consumed again here}}
 }
 
-public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<MyClass>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     borrowVal(x2)
@@ -1140,13 +1134,13 @@ public func aggGenericStructUseAfterConsumeArg(_ x2: inout AggGenericStruct<Copy
 }
 
 public func aggGenericStructDoubleConsume() {
-    var x2 = AggGenericStruct<CopyableKlass>()  // expected-error {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()  // expected-error {{'x2' consumed more than once}}
+    x2 = AggGenericStruct<MyClass>()
     consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x2) // expected-note {{consumed again here}}
 }
 
-public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<MyClass>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consumed here}}
@@ -1155,22 +1149,22 @@ public func aggGenericStructDoubleConsumeArg(_ x2: inout AggGenericStruct<Copyab
 }
 
 public func aggGenericStructLoopConsume() {
-    var x2 = AggGenericStruct<CopyableKlass>() // expected-error {{'x2' consumed in a loop}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>() // expected-error {{'x2' consumed in a loop}}
+    x2 = AggGenericStruct<MyClass>()
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
-public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<CopyableKlass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
+public func aggGenericStructLoopConsumeArg(_ x2: inout AggGenericStruct<MyClass>) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
         consumeVal(x2) // expected-note {{consumed here}}
     }
 }
 
 public func aggGenericStructDiamond() {
-    var x2 = AggGenericStruct<CopyableKlass>()
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()
+    x2 = AggGenericStruct<MyClass>()
     if boolValue {
         consumeVal(x2)
     } else {
@@ -1178,7 +1172,7 @@ public func aggGenericStructDiamond() {
     }
 }
 
-public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<MyClass>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     if boolValue {
@@ -1189,9 +1183,9 @@ public func aggGenericStructDiamondArg(_ x2: inout AggGenericStruct<CopyableKlas
 }
 
 public func aggGenericStructDiamondInLoop() {
-    var x2 = AggGenericStruct<CopyableKlass>() // expected-error {{'x2' consumed in a loop}}
+    var x2 = AggGenericStruct<MyClass>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    x2 = AggGenericStruct<MyClass>()
     for _ in 0..<1024 {
       if boolValue {
           consumeVal(x2) // expected-note {{consumed here}}
@@ -1202,7 +1196,7 @@ public func aggGenericStructDiamondInLoop() {
     }
 }
 
-public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<MyClass>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     for _ in 0..<1024 {
@@ -1215,15 +1209,15 @@ public func aggGenericStructDiamondInLoopArg(_ x2: inout AggGenericStruct<Copyab
 }
 
 public func aggGenericStructAccessField() {
-    var x2 = AggGenericStruct<CopyableKlass>()
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()
+    x2 = AggGenericStruct<MyClass>()
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
     }
 }
 
-public func aggGenericStructAccessFieldArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructAccessFieldArg(_ x2: inout AggGenericStruct<MyClass>) {
     borrowVal(x2.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.lhs)
@@ -1231,9 +1225,9 @@ public func aggGenericStructAccessFieldArg(_ x2: inout AggGenericStruct<Copyable
 }
 
 public func aggGenericStructConsumeField() {
-    var x2 = AggGenericStruct<CopyableKlass>() // expected-error {{'x2' consumed in a loop}}
+    var x2 = AggGenericStruct<MyClass>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    x2 = AggGenericStruct<MyClass>()
     consumeVal(x2.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
         consumeVal(x2.lhs) // expected-note {{consumed here}}
@@ -1241,7 +1235,7 @@ public func aggGenericStructConsumeField() {
     }
 }
 
-public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<MyClass>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.lhs) // expected-note {{consumed here}}
@@ -1251,15 +1245,15 @@ public func aggGenericStructConsumeFieldArg(_ x2: inout AggGenericStruct<Copyabl
 }
 
 public func aggGenericStructAccessGrandField() {
-    var x2 = AggGenericStruct<CopyableKlass>()
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>()
+    x2 = AggGenericStruct<MyClass>()
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
     }
 }
 
-public func aggGenericStructAccessGrandFieldArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructAccessGrandFieldArg(_ x2: inout AggGenericStruct<MyClass>) {
     borrowVal(x2.pair.lhs)
     for _ in 0..<1024 {
         borrowVal(x2.pair.lhs)
@@ -1267,9 +1261,9 @@ public func aggGenericStructAccessGrandFieldArg(_ x2: inout AggGenericStruct<Cop
 }
 
 public func aggGenericStructConsumeGrandField() {
-    var x2 = AggGenericStruct<CopyableKlass>() // expected-error {{'x2' consumed in a loop}}
+    var x2 = AggGenericStruct<MyClass>() // expected-error {{'x2' consumed in a loop}}
     // expected-error @-1 {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    x2 = AggGenericStruct<MyClass>()
     consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
         consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
@@ -1278,15 +1272,15 @@ public func aggGenericStructConsumeGrandField() {
 }
 
 public func aggGenericStructConsumeGrandField2() {
-    var x2 = AggGenericStruct<CopyableKlass>() // expected-error {{'x2' consumed more than once}}
-    x2 = AggGenericStruct<CopyableKlass>()
+    var x2 = AggGenericStruct<MyClass>() // expected-error {{'x2' consumed more than once}}
+    x2 = AggGenericStruct<MyClass>()
     consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
     for _ in 0..<1024 {
     }
     consumeVal(x2.pair.lhs) // expected-note {{consumed again here}}
 }
 
-public func aggGenericStructConsumeGrandFieldArg(_ x2: inout AggGenericStruct<CopyableKlass>) {
+public func aggGenericStructConsumeGrandFieldArg(_ x2: inout AggGenericStruct<MyClass>) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{missing reinitialization of inout parameter 'x2' after consume}}
     consumeVal(x2.pair.lhs) // expected-note {{consumed here}}
@@ -1505,8 +1499,7 @@ public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: inout AggGenericStruct
 // Enum Test Cases //
 /////////////////////
 
-@_moveOnly
-public enum EnumTy {
+public enum EnumTy: ~Copyable {
     case klass(Klass)
     case int(Int)
 
@@ -1577,7 +1570,7 @@ public func enumDoubleConsume() {
 
 public func enumDoubleConsumeArg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
-    // expected-error @-2 {{'x2' consumed more than once}} 
+    // expected-error @-2 {{'x2' consumed more than once}}
     consumeVal(x2) // expected-note {{consumed here}}
     consumeVal(x2) // expected-note {{consumed here}}
     // expected-note @-1 {{consumed again here}}
@@ -1620,7 +1613,7 @@ public func enumDiamondArg(_ x2: inout EnumTy) {
 public func enumDiamondInLoop() {
     var x2 = EnumTy.klass(Klass())
     // expected-error @-1 {{'x2' consumed in a loop}}
-    // expected-error @-2 {{'x2' consumed more than once}} 
+    // expected-error @-2 {{'x2' consumed more than once}}
     x2 = EnumTy.klass(Klass())
     for _ in 0..<1024 {
       if boolValue {
@@ -1655,8 +1648,8 @@ public func enumAssignToVar1() {
 
 public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
-    // expected-error @-2 {{'x2' consumed more than once}} 
-                                                            
+    // expected-error @-2 {{'x2' consumed more than once}}
+
     var x3 = x2 // expected-note {{consumed here}}
     x3 = x2 // expected-note {{consumed here}}
     // expected-note @-1 {{consumed again here}}
@@ -1674,7 +1667,7 @@ public func enumAssignToVar2() {
 
 public func enumAssignToVar2Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
-    // expected-error @-2 {{'x2' consumed more than once}} 
+    // expected-error @-2 {{'x2' consumed more than once}}
     var x3 = x2 // expected-note {{consumed here}}
     x3 = x2 // expected-note {{consumed here}}
      // expected-note @-1 {{consumed again here}}
@@ -1690,7 +1683,7 @@ public func enumAssignToVar3() {
 }
 
 public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-                                                            
+
     var x3 = x2 // expected-note {{consumed here}}
     x3 = EnumTy.klass(Klass())
     consumeVal(x3)
@@ -1706,7 +1699,7 @@ public func enumAssignToVar4() {
 
 public func enumAssignToVar4Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
-    // expected-error @-2 {{'x2' consumed more than once}} 
+    // expected-error @-2 {{'x2' consumed more than once}}
     let x3 = x2 // expected-note {{consumed here}}
     consumeVal(x2) // expected-note {{consumed here}}
     // expected-note @-1 {{consumed again here}}
@@ -1731,7 +1724,7 @@ public func enumAssignToVar5Arg(_ x2: inout EnumTy) {
 }
 
 public func enumAssignToVar5Arg2(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-                                                            
+
     var x3 = x2 // expected-note {{consumed here}}
     x3 = EnumTy.klass(Klass())
     consumeVal(x3)
@@ -2542,8 +2535,7 @@ extension AddressOnlyGeneric {
     }
 }
 
-@_moveOnly
-struct AddressOnlyGenericInit<T : P> {
+struct AddressOnlyGenericInit<T : P>: ~Copyable {
     var copyable: T
     var moveOnly: NonTrivialStruct
     var moveOnly2: AddressOnlyGeneric<T>
@@ -3274,7 +3266,7 @@ public func closureVarCaptureClassUseAfterConsume2() {
 }
 
 public func closureVarCaptureClassUseAfterConsumeError() {
-    var x2 = Klass() 
+    var x2 = Klass()
     x2 = Klass()
     var f = {}
     f = {
@@ -3392,7 +3384,7 @@ public func closureLetAndDeferCaptureClassUseAfterConsume3() {
     // expected-error @-1 {{missing reinitialization of closure capture 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}}
     x2 = Klass()
-    let f = { 
+    let f = {
         consumeVal(x2) // expected-note {{consumed here}}
         defer { // expected-note {{used here}}
             borrowVal(x2)
@@ -3927,7 +3919,7 @@ func copyableStructsInMoveOnlyStructNonConsuming() {
     borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.copyableKlass)
 }
 
-func computedCopyableKlassInAMoveOnlyStruct() {
+func computedMyClassInAMoveOnlyStruct() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     borrowVal(a.computedCopyableK)
@@ -3935,7 +3927,7 @@ func computedCopyableKlassInAMoveOnlyStruct() {
 }
 
 // This shouldn't error since we are consuming a copyable type.
-func computedCopyableKlassInAMoveOnlyStruct2() {
+func computedMyClassInAMoveOnlyStruct2() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     borrowVal(a.computedCopyableK)
@@ -3944,7 +3936,7 @@ func computedCopyableKlassInAMoveOnlyStruct2() {
 }
 
 // This shouldn't error since we are working with a copyable type.
-func computedCopyableKlassInAMoveOnlyStruct3() {
+func computedMyClassInAMoveOnlyStruct3() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     borrowVal(a.computedCopyableK)
@@ -3954,7 +3946,7 @@ func computedCopyableKlassInAMoveOnlyStruct3() {
 
 // This used to error, but no longer errors since we are using a true field
 // sensitive model.
-func computedCopyableKlassInAMoveOnlyStruct4() {
+func computedMyClassInAMoveOnlyStruct4() {
     var a = NonTrivialStruct()
     a = NonTrivialStruct()
     borrowVal(a.computedCopyableK)
@@ -3967,7 +3959,7 @@ func computedCopyableStructsInMoveOnlyStructNonConsuming() {
     a = NonTrivialStruct()
     borrowVal(a)
     borrowVal(a.computedCopyableK)
-    borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.computedCopyableKlass)
+    borrowVal(a.nonTrivialCopyableStruct.nonTrivialCopyableStruct2.computedMyClass)
 }
 
 ///////////////////////////
@@ -4054,7 +4046,7 @@ func fieldSensitiveTestReinitEnumMultiBlock1() {
     case .second:
         e = NonTrivialEnum.third(NonTrivialStruct())
     default:
-        e = NonTrivialEnum.fourth(CopyableKlass())
+        e = NonTrivialEnum.fourth(MyClass())
     }
     borrowVal(e)
 }
@@ -4067,7 +4059,7 @@ func fieldSensitiveTestReinitEnumMultiBlock2() {
         case .second:
             e = NonTrivialEnum.third(NonTrivialStruct())
         default:
-            e = NonTrivialEnum.fourth(CopyableKlass())
+            e = NonTrivialEnum.fourth(MyClass())
         }
     } else {
         e = NonTrivialEnum.third(NonTrivialStruct())
@@ -4109,7 +4101,7 @@ func inoutAndConsumingUse(_ k: inout Klass) { // expected-error {{'k' used after
 // Ref Element Addr Tests //
 ////////////////////////////
 
-func copyableKlassWithMoveOnlyFieldBorrowValue(_ x: CopyableKlassWithMoveOnlyField) {
+func copyableKlassWithMoveOnlyFieldBorrowValue(_ x: MyClassWithMoveOnlyField) {
     borrowVal(x.moveOnlyVarStruct)
     borrowVal(x.moveOnlyVarStruct)
     borrowVal(x.moveOnlyVarStruct.nonTrivialStruct2)
@@ -4118,7 +4110,7 @@ func copyableKlassWithMoveOnlyFieldBorrowValue(_ x: CopyableKlassWithMoveOnlyFie
     borrowVal(x.moveOnlyLetStruct.nonTrivialStruct2)
 }
 
-func copyableKlassWithMoveOnlyFieldConsumeValue(_ x: CopyableKlassWithMoveOnlyField) {
+func copyableKlassWithMoveOnlyFieldConsumeValue(_ x: MyClassWithMoveOnlyField) {
     consumeVal(x.moveOnlyVarStruct)
     // expected-error @-1 {{cannot consume noncopyable stored property 'x.moveOnlyVarStruct' of a class}}
     consumeVal(x.moveOnlyVarStruct.nonTrivialStruct2) // expected-error {{cannot consume noncopyable stored property 'x.moveOnlyVarStruct' of a class}}
@@ -4128,7 +4120,7 @@ func copyableKlassWithMoveOnlyFieldConsumeValue(_ x: CopyableKlassWithMoveOnlyFi
     consumeVal(x.moveOnlyLetStruct.nonTrivialStruct2) // expected-error {{cannot consume noncopyable stored property 'x.moveOnlyLetStruct' of a class}}
 }
 
-func copyableKlassWithMoveOnlyFieldAssignValue(_ x: CopyableKlassWithMoveOnlyField) {
+func copyableKlassWithMoveOnlyFieldAssignValue(_ x: MyClassWithMoveOnlyField) {
     x.moveOnlyVarStruct = NonTrivialStruct()
     x.moveOnlyVarStruct = NonTrivialStruct()
 }
@@ -4237,12 +4229,11 @@ func borrowAndConsumeAtSameTimeTest2(x: consuming NonTrivialStruct) { // expecte
 // Yield Test //
 ////////////////
 
-func yieldTest() {  
+func yieldTest() {
   // Make sure we do not crash on this.
-  @_moveOnly
-  struct S {
-    var c = CopyableKlass()
-    var c2: CopyableKlass {
+  struct S: ~Copyable {
+    var c = MyClass()
+    var c2: MyClass {
       _read { yield c }
     }
   }
@@ -4252,8 +4243,7 @@ func yieldTest() {
 // Empty Struct Test //
 ///////////////////////
 
-@_moveOnly
-struct EmptyStruct {
+struct EmptyStruct: ~Copyable {
   var bool: Bool { false }
   func doSomething() {}
   mutating func doSomething2() {}
@@ -4340,8 +4330,7 @@ func testEmptyStruct() {
 
 // Make sure that we handle a struct that recursively holds an empty struct
 // correctly.
-@_moveOnly
-struct StructContainingEmptyStruct {
+struct StructContainingEmptyStruct: ~Copyable {
   var x: EmptyStruct
 }
 
@@ -4391,8 +4380,7 @@ func testStructContainingEmptyStruct() {
 
 // Make sure that we handle a struct that recursively holds an empty struct
 // correctly.
-@_moveOnly
-struct StructContainingTwoEmptyStruct {
+struct StructContainingTwoEmptyStruct: ~Copyable {
   var x: EmptyStruct
   var y: EmptyStruct
 }
@@ -4451,14 +4439,12 @@ func testStructContainingTwoEmptyStruct() {
 // Enum Containing Empty Struct //
 //////////////////////////////////
 
-@_moveOnly
-enum MyEnum2 {
+enum MyEnum2: ~Copyable {
 case first(EmptyStruct)
 case second(String)
 }
 
-@_moveOnly
-enum MyEnum {
+enum MyEnum: ~Copyable {
 case first(EmptyStruct)
 case second(String)
 case third(MyEnum2)
@@ -4561,7 +4547,7 @@ func testMyEnum() {
 // MARK: Setter Tests //
 ////////////////////////
 
-public class NonFinalCopyableKlassWithMoveOnlyField {
+public class NonFinalMyClassWithMoveOnlyField {
     var moveOnlyVarStruct = NonTrivialStruct()
     let moveOnlyLetStruct = NonTrivialStruct()
     var moveOnlyVarProt = AddressOnlyProtocol()
@@ -4573,7 +4559,7 @@ public class NonFinalCopyableKlassWithMoveOnlyField {
 //////////////////////
 
 // For misc tests associated with specific radars.
-func assignableButNotConsumableEndAccessImplicitLifetimeTest(_ x: CopyableKlassWithMoveOnlyField) {
+func assignableButNotConsumableEndAccessImplicitLifetimeTest(_ x: MyClassWithMoveOnlyField) {
     if boolValue {
         x.moveOnlyVarStruct.nonTrivialStruct2 = NonTrivialStruct2()
     }

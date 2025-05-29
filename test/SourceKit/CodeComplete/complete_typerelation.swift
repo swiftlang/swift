@@ -5,10 +5,10 @@ enum MyEnum : MyProto {
 
     static func staticReturnVoid() {}
     static func staticReturnMyEnum() -> MyEnum { return .foo }
-    func intanceReturnVoid() {}
-    func intanceReturnMyEnum() -> MyEnum { return .foo }
+    func instanceReturnVoid() {}
+    func instanceReturnMyEnum() -> MyEnum { return .foo }
     @available(*, deprecated)
-    func intanceReturnVoidDeprecated() {}
+    func instanceReturnVoidDeprecated() {}
 }
 
 func testIdenticalContext() -> MyEnum {

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !os(Linux)
+
 import ArgumentParser
 import SwiftRemoteMirror
 
@@ -44,3 +46,5 @@ internal struct DumpArrays: ParsableCommand {
     }
   }
 }
+
+#endif

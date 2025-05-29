@@ -156,7 +156,7 @@ func twelve() {
   twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(Int, Int) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
-    } catch Twelve.Payload(a...b) {
+    } catch Twelve.Payload(a...b) { // expected-error {{pattern of type 'Twelve' does not conform to expected match type 'Error'}}
     }
   }
 }

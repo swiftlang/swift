@@ -313,7 +313,7 @@ public:
   void flagAsRunning_slow();
 
   /// Flag that this task is now suspended.  This can update the
-  /// priority stored in the job flags if the priority hsa been
+  /// priority stored in the job flags if the priority has been
   /// escalated.  Generally this should be done immediately after
   /// clearing ActiveTask and immediately before enqueuing the task
   /// somewhere.  TODO: record where the task is enqueued if
@@ -570,7 +570,7 @@ public:
   /// \c Executing, then \c waitingTask has been added to the
   /// wait queue and will be scheduled when the future completes. Otherwise,
   /// the future has completed and can be queried.
-  /// The waiting task's async context will be intialized with the parameters if
+  /// The waiting task's async context will be initialized with the parameters if
   /// the current's task state is executing.
   __attribute__((visibility("hidden")))
   FutureFragment::Status waitFuture(AsyncTask *waitingTask,
@@ -600,14 +600,19 @@ private:
   }
 };
 
+enum { NumWords_AsyncTask = 24 };
+
 // The compiler will eventually assume these.
 static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 // Libc hardcodes this offset to extract the TaskID
 static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
               "AsyncTask::Id offset is wrong");
+#pragma clang diagnostic pop
 
 SWIFT_CC(swiftasync)
 inline void Job::runInFullyEstablishedContext() {

@@ -10,16 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Evaluator.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
 
@@ -56,11 +58,10 @@ void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::kind_declname_declared_here,
-                 decl->getDescriptiveKind(), decl->getName());
+  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
 }
 
-llvm::Optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
+std::optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
   auto nominalDecl = std::get<0>(getStorage());
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
@@ -71,7 +72,7 @@ llvm::Optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
     if (protocolDecl->LazySemanticInfo.SuperclassDecl.getInt())
       return protocolDecl->LazySemanticInfo.SuperclassDecl.getPointer();
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
@@ -88,11 +89,11 @@ void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
 // InheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<ArrayRef<ProtocolDecl *>>
+std::optional<ArrayRef<ProtocolDecl *>>
 InheritedProtocolsRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
   if (!proto->areInheritedProtocolsValid())
-    return llvm::None;
+    return std::nullopt;
 
   return proto->InheritedProtocols;
 }
@@ -111,11 +112,34 @@ void InheritedProtocolsRequest::writeDependencySink(
   }
 }
 
-llvm::Optional<ArrayRef<ValueDecl *>>
+//----------------------------------------------------------------------------//
+// AllInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ArrayRef<ProtocolDecl *>>
+AllInheritedProtocolsRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (!proto->areAllInheritedProtocolsValid())
+    return std::nullopt;
+
+  return proto->AllInheritedProtocols;
+}
+
+void AllInheritedProtocolsRequest::cacheResult(ArrayRef<ProtocolDecl *> PDs) const {
+  auto proto = std::get<0>(getStorage());
+  proto->AllInheritedProtocols = PDs;
+  proto->setAllInheritedProtocolsValid();
+}
+
+//----------------------------------------------------------------------------//
+// ProtocolRequirementsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ArrayRef<ValueDecl *>>
 ProtocolRequirementsRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
   if (!proto->areProtocolRequirementsValid())
-    return llvm::None;
+    return std::nullopt;
 
   return proto->ProtocolRequirements;
 }
@@ -130,7 +154,7 @@ void ProtocolRequirementsRequest::cacheResult(ArrayRef<ValueDecl *> PDs) const {
 // Missing designated initializers computation
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool>
+std::optional<bool>
 HasMissingDesignatedInitializersRequest::getCachedResult() const {
   auto classDecl = std::get<0>(getStorage());
   return classDecl->getCachedHasMissingDesignatedInitializers();
@@ -156,6 +180,13 @@ HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
   if (!scope.isPublic())
     return false;
 
+  // Make sure any implicit constructors are synthesized.
+  (void)evaluateOrDefault(
+      evaluator,
+      ResolveImplicitMemberRequest{subject,
+                                   ImplicitMemberAction::ResolveImplicitInit},
+      {});
+
   auto constructors = subject->lookupDirect(DeclBaseName::createConstructor());
   return llvm::any_of(constructors, [&](ValueDecl *decl) {
     auto init = cast<ConstructorDecl>(decl);
@@ -172,7 +203,7 @@ HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
 // Extended nominal computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<NominalTypeDecl *>
+std::optional<NominalTypeDecl *>
 ExtendedNominalRequest::getCachedResult() const {
   // Note: if we fail to compute any nominal declaration, it's considered
   // a cache miss. This allows us to recompute the extended nominal types
@@ -183,7 +214,7 @@ ExtendedNominalRequest::getCachedResult() const {
   // fixed point.
   auto ext = std::get<0>(getStorage());
   if (!ext->hasBeenBound() || !ext->getExtendedNominal())
-    return llvm::None;
+    return std::nullopt;
   return ext->getExtendedNominal();
 }
 
@@ -210,11 +241,11 @@ void ExtendedNominalRequest::writeDependencySink(
 // Destructor computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
+std::optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
   auto *classDecl = std::get<0>(getStorage());
   auto results = classDecl->lookupDirect(DeclBaseName::createDestructor());
   if (results.empty())
-    return llvm::None;
+    return std::nullopt;
 
   return cast<DestructorDecl>(results.front());
 }
@@ -228,7 +259,7 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 // GenericParamListRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<GenericParamList *>
+std::optional<GenericParamList *>
 GenericParamListRequest::getCachedResult() const {
   using GenericParamsState = GenericContext::GenericParamsState;
   auto *decl = std::get<0>(getStorage());
@@ -238,7 +269,7 @@ GenericParamListRequest::getCachedResult() const {
     return decl->GenericParamsAndState.getPointer();
 
   case GenericParamsState::Parsed:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -314,7 +345,7 @@ ArrayRef<FileUnit *> OperatorLookupDescriptor::getFiles() const {
     return module->getFiles();
 
   // Return an ArrayRef pointing to the FileUnit in the union.
-  return llvm::makeArrayRef(*fileOrModule.getAddrOfPtr1());
+  return llvm::ArrayRef(*fileOrModule.getAddrOfPtr1());
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -367,8 +398,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.PD);
   out << " for ";
   out << desc.Ty.getString();
-  out << " in ";
-  simple_display(out, desc.Mod);
 }
 
 //----------------------------------------------------------------------------//
@@ -439,6 +468,28 @@ void UnqualifiedLookupRequest::writeDependencySink(
   track.addTopLevelName(desc.Name.getBaseName());
 }
 
+//----------------------------------------------------------------------------//
+// SPIGroupsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<llvm::ArrayRef<Identifier>> SPIGroupsRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->hasNoSPIGroups())
+    return ArrayRef<Identifier>();
+
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void SPIGroupsRequest::cacheResult(llvm::ArrayRef<Identifier> result) const {
+  auto *decl = std::get<0>(getStorage());
+  if (result.empty()) {
+    const_cast<Decl *>(decl)->setHasNoSPIGroups();
+    return;
+  }
+
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
 // The following clang importer requests have some definitions here to prevent
 // linker errors when building lib syntax parser (which doesn't link with the
 // clang importer).
@@ -487,6 +538,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.name);
   out << " in ";
   simple_display(out, desc.recordDecl);
+  if (desc.recordDecl != desc.inheritingDecl)
+    out << " inherited by ";
+  simple_display(out, desc.inheritingDecl);
 }
 
 SourceLoc
@@ -503,7 +557,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "Finding custom (foreign reference) reference counting operation '"
       << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
                                                               : "release")
-      << "for '" << desc.decl->getNameStr() << "'.\n";
+      << "' for '" << desc.decl->getNameStr() << "'.\n";
 }
 
 SourceLoc
@@ -531,60 +585,57 @@ swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
 // so it doesn't break caching for those immediate requests.
 
 /// Exclude macros in the unqualified lookup descriptor if we need to.
-static UnqualifiedLookupDescriptor excludeMacrosIfNeeded(
+static UnqualifiedLookupDescriptor contextualizeOptions(
     UnqualifiedLookupDescriptor descriptor) {
-  if (descriptor.Options.contains(
-          UnqualifiedLookupFlags::ExcludeMacroExpansions))
-    return descriptor;
+  if (!descriptor.Options.contains(
+          UnqualifiedLookupFlags::ExcludeMacroExpansions)
+      && namelookup::isInMacroArgument(
+                         descriptor.DC->getParentSourceFile(), descriptor.Loc))
+    descriptor.Options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+  if (!descriptor.Options.contains(UnqualifiedLookupFlags::ABIProviding)
+      && namelookup::isInABIAttr(
+                         descriptor.DC->getParentSourceFile(), descriptor.Loc))
+    descriptor.Options |= UnqualifiedLookupFlags::ABIProviding;
 
-  auto isInMacroArgument = namelookup::isInMacroArgument(
-      descriptor.DC->getParentSourceFile(), descriptor.Loc);
-
-  if (!isInMacroArgument)
-    return descriptor;
-
-  descriptor.Options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
   return descriptor;
 }
 
 /// Exclude macros in the direct lookup descriptor if we need to.
-static DirectLookupDescriptor excludeMacrosIfNeeded(
+static DirectLookupDescriptor contextualizeOptions(
     DirectLookupDescriptor descriptor, SourceLoc loc) {
-  if (descriptor.Options.contains(
-          NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions))
-    return descriptor;
-
-  auto isInMacroArgument = namelookup::isInMacroArgument(
-      descriptor.DC->getParentSourceFile(), loc);
-
-  if (!isInMacroArgument)
-    return descriptor;
-
-  descriptor.Options |=
-      NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+  if (!descriptor.Options.contains(
+          NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions)
+      && namelookup::isInMacroArgument(
+                         descriptor.DC->getParentSourceFile(), loc))
+    descriptor.Options |=
+        NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+  if (!descriptor.Options.contains(
+          NominalTypeDecl::LookupDirectFlags::ABIProviding)
+      && namelookup::isInABIAttr(
+                         descriptor.DC->getParentSourceFile(), loc))
+    descriptor.Options |=
+        NominalTypeDecl::LookupDirectFlags::ABIProviding;
 
   return descriptor;
 }
 
 /// Exclude macros in the name lookup options if we need to.
 static NLOptions
-excludeMacrosIfNeeded(const DeclContext *dc, SourceLoc loc,
-                      NLOptions options) {
-  if (options & NL_ExcludeMacroExpansions)
-    return options;
+contextualizeOptions(const DeclContext *dc, SourceLoc loc,
+                     NLOptions options) {
+  if (!(options & NL_ExcludeMacroExpansions)
+      && namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
+    options |= NL_ExcludeMacroExpansions;
+  if (!(options & NL_ABIProviding)
+      && namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
+    options |= NL_ABIProviding;
 
-  auto isInMacroArgument = namelookup::isInMacroArgument(
-      dc->getParentSourceFile(), loc);
-
-  if (!isInMacroArgument)
-    return options;
-
-  return options | NL_ExcludeMacroExpansions;
+  return options;
 }
 
 UnqualifiedLookupRequest::UnqualifiedLookupRequest(
     UnqualifiedLookupDescriptor descriptor
-) : SimpleRequest(excludeMacrosIfNeeded(descriptor)) { }
+) : SimpleRequest(contextualizeOptions(descriptor)) { }
 
 LookupInModuleRequest::LookupInModuleRequest(
       const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
@@ -593,13 +644,13 @@ LookupInModuleRequest::LookupInModuleRequest(
       SourceLoc loc, NLOptions options
  ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
                    moduleScopeContext,
-                   excludeMacrosIfNeeded(moduleOrFile, loc, options)) { }
+                   contextualizeOptions(moduleOrFile, loc, options)) { }
 
 ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(
     const DeclContext *dc, ModuleDecl *module, DeclNameRef name,
     SourceLoc loc, NLOptions options
  ) : SimpleRequest(dc, module, name,
-                   excludeMacrosIfNeeded(dc, loc, options)) { }
+                   contextualizeOptions(dc, loc, options)) { }
 
 QualifiedLookupRequest::QualifiedLookupRequest(
                        const DeclContext *dc,
@@ -607,10 +658,10 @@ QualifiedLookupRequest::QualifiedLookupRequest(
                        DeclNameRef name,
                        SourceLoc loc, NLOptions options
 ) : SimpleRequest(dc, std::move(decls), name,
-                  excludeMacrosIfNeeded(dc, loc, options)) { }
+                  contextualizeOptions(dc, loc, options)) { }
 
 DirectLookupRequest::DirectLookupRequest(DirectLookupDescriptor descriptor, SourceLoc loc)
-    : SimpleRequest(excludeMacrosIfNeeded(descriptor, loc)) { }
+    : SimpleRequest(contextualizeOptions(descriptor, loc)) { }
 
 // Implement the clang importer type zone.
 #define SWIFT_TYPEID_ZONE ClangImporter

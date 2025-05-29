@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target arm64-apple-macosx15.0 -module-name A
+
+import B
+
+public struct AStruct {
+    var y : BStruct
+}

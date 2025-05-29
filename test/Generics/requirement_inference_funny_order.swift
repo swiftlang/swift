@@ -11,15 +11,14 @@ protocol IteratorProtocol {
   func next() -> Element?
 }
 
-// CHECK: requirement_inference_funny_order.(file).LocalArray@
-// CHECK: Generic signature: <Element where Element : P1>
-
 // CHECK: ExtensionDecl line={{[0-9]+}} base=LocalArray
 // CHECK: Generic signature: <Element where Element : P1, Element : P2>
 extension LocalArray where Element : P2 {
   static func ==(lhs: Self, rhs: Self) -> Bool {}
 }
 
+// CHECK: requirement_inference_funny_order.(file).LocalArray@
+// CHECK: Generic signature: <Element where Element : P1>
 struct LocalArray<Element : P1>: IteratorProtocol {
   func next() -> Element? {}
 }

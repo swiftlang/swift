@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
 
 sil_stage canonical
 

@@ -27,6 +27,9 @@ runAllTests()
 #elseif os(WASI)
   import WASILibc
   typealias CGFloat = Double
+#elseif canImport(Android)
+  import Android
+  typealias CGFloat = Double
 #elseif os(Windows)
   import CRT
   #if arch(x86_64) || arch(arm64)
@@ -168,6 +171,27 @@ func test_varArgs6() {
   // CHECK: b 1 1.1 1 2.2 1 4.5 1 1.1 b
 }
 test_varArgs6()
+
+func test_varArgs7() {
+#if canImport(Darwin) && arch(arm64)
+  let canTest = if #available(SwiftStdlib 6.2, *) { true } else { false }
+#else
+  // va_list is more complicated on other targets so that behavior is not the
+  // same, skip the test by doing a fake print of the expected output. Also
+  // skip the test if we're testing against an older runtime without the fix.
+  let canTest = false
+#endif
+
+  if canTest {
+    // Test a workaround for format specifiers and no arguments. We supply eight
+    // words of zeroed memory to give this predictable behavior.
+    my_printf("No parameters: %ld %ld %ld %ld %ld %ld %ld %ld\n")
+  } else {
+    my_printf("No parameters: 0 0 0 0 0 0 0 0\n")
+  }
+  // CHECK: No parameters: 0 0 0 0 0 0 0 0
+}
+test_varArgs7()
 
 
 // CHECK: done.

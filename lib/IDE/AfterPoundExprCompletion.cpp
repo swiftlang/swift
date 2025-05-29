@@ -22,7 +22,6 @@ using namespace swift::constraints;
 using namespace swift::ide;
 
 void AfterPoundExprCompletion::sawSolutionImpl(const constraints::Solution &S) {
-  auto &CS = S.getConstraintSystem();
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
 
   bool IsAsync = isContextAsync(S, DC);
@@ -32,8 +31,8 @@ void AfterPoundExprCompletion::sawSolutionImpl(const constraints::Solution &S) {
     return R.ExpectedTy->isEqual(ExpectedTy);
   };
   if (!llvm::any_of(Results, IsEqual)) {
-    bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-    Results.push_back({ExpectedTy, SingleExprBody, IsAsync});
+    bool IsImpliedResult = isImpliedResult(S, CompletionExpr);
+    Results.push_back({ExpectedTy, IsImpliedResult, IsAsync});
   }
 }
 
@@ -50,8 +49,7 @@ void AfterPoundExprCompletion::collectResults(
   UnifiedTypeContext.setPreferNonVoid(true);
 
   for (auto &Result : Results) {
-    Lookup.setExpectedTypes({Result.ExpectedTy},
-                            Result.IsImplicitSingleExpressionReturn,
+    Lookup.setExpectedTypes({Result.ExpectedTy}, Result.IsImpliedResult,
                             /*expectsNonVoid=*/true);
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addObjCPoundKeywordCompletions(/*needPound=*/false);

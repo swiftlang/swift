@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -emit-verbose-sil -enable-library-evolution | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -emit-verbose-sil -enable-library-evolution | %FileCheck %s
 
 @propertyWrapper
 public struct WrapGod<T> {

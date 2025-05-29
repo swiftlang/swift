@@ -23,14 +23,14 @@ public func eliminate_copy_of_returned_then_consumed_owned_value(arg: __owned An
   // CHECK:       [[ARG_COPY:%[^,]+]] = copy_value [[ARG]]
   let x = consumeAndProduce(arg)
   // CHECK:       [[X:%[^,]+]] = apply {{%[^,]+}}([[ARG_COPY]])
-  // CHECK:       [[MOVE_X:%[^,]+]] = move_value [lexical] [[X]]
+  // CHECK:       [[MOVE_X:%[^,]+]] = move_value [lexical] [var_decl] [[X]]
   // no copy of 'x'
   _ = consumeAndProduce(x)
   // CHECK:       [[RESULT:%[^,]+]] = apply {{%[^,]+}}([[MOVE_X]])
-  // release result
   // release arg
-  // CHECK:       destroy_value [[ARG]]
+  // release result
   // CHECK:       destroy_value [[RESULT]]
+  // CHECK:       destroy_value [[ARG]]
   // CHECK-LABEL: } // end sil function 'eliminate_copy_of_returned_then_consumed_owned_value'
 }
 

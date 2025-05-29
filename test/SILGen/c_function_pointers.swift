@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -verify %s | %FileCheck %s
 
 if true {
   var x = 0 // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}

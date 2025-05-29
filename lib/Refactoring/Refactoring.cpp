@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Refactoring/Refactoring.h"
-#include "LocalRename.h"
 #include "RefactoringActions.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/Parse/Lexer.h"
@@ -49,7 +49,7 @@ collectRefactoringsAtCursor(SourceFile *SF, unsigned Line, unsigned Column,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-  SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().value(), Line, Column);
+  SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID(), Line, Column);
   if (Loc.isInvalid())
     return {};
 
@@ -156,7 +156,8 @@ swift::ide::collectRefactorings(SourceFile *SF, RangeConfig Range,
                                        DiagConsumers);
 
   // No refactorings are available within generated buffers
-  if (SF->Kind == SourceFileKind::MacroExpansion)
+  if (SF->Kind == SourceFileKind::MacroExpansion ||
+      SF->Kind == SourceFileKind::DefaultArgument)
     return {};
 
   // Prepare the tool box.
@@ -210,6 +211,7 @@ case RefactoringKind::KIND: {                                                  \
       return true;                                                             \
   }
 #include "swift/Refactoring/RefactoringKinds.def"
+    case RefactoringKind::LocalRename:
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
     case RefactoringKind::FindLocalRenameRanges:

@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_WRAPPERTYPES_H
 #define SWIFT_SIL_WRAPPERTYPES_H
 
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -59,9 +60,9 @@ struct LoadOperation {
   ///
   /// TODO: Rather than use an optional here, we should include an invalid
   /// representation in LoadOwnershipQualifier.
-  llvm::Optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
-    if (auto *lbi = value.dyn_cast<LoadBorrowInst *>()) {
-      return llvm::None;
+  std::optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
+    if (value.dyn_cast<LoadBorrowInst *>()) {
+      return std::nullopt;
     }
 
     return value.get<LoadInst *>()->getOwnershipQualifier();
@@ -111,6 +112,8 @@ struct ConversionOperation {
 
   static bool isa(SILInstruction *inst) {
     switch (inst->getKind()) {
+    case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+    case SILInstructionKind::MarkUninitializedInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::UpcastInst:
     case SILInstructionKind::AddressToPointerInst:
@@ -135,6 +138,10 @@ struct ConversionOperation {
     case SILInstructionKind::RefToUnownedInst:
     case SILInstructionKind::UnmanagedToRefInst:
     case SILInstructionKind::UnownedToRefInst:
+    case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+    case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+    case SILInstructionKind::DropDeinitInst:
       return true;
     default:
       return false;
@@ -215,12 +222,25 @@ public:
       return sei->getCase(i);
     return value.get<SelectEnumAddrInst *>()->getCase(i);
   }
+
+  std::pair<EnumElementDecl *, Operand *> getCaseOperand(unsigned i) const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseOperand(i);
+    return value.get<SelectEnumAddrInst *>()->getCaseOperand(i);
+  }
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCaseResult(D);
     return value.get<SelectEnumAddrInst *>()->getCaseResult(D);
+  }
+
+  Operand *getCaseResultOperand(EnumElementDecl *D) {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseResultOperand(D);
+    return value.get<SelectEnumAddrInst *>()->getCaseResultOperand(D);
   }
 
   /// If the default refers to exactly one case decl, return it.
@@ -236,6 +256,12 @@ public:
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getDefaultResult();
     return value.get<SelectEnumAddrInst *>()->getDefaultResult();
+  }
+
+  Operand *getDefaultResultOperand() const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getDefaultResultOperand();
+    return value.get<SelectEnumAddrInst *>()->getDefaultResultOperand();
   }
 };
 
@@ -257,18 +283,24 @@ public:
   // ForwardingInstruction.swift mirrors this implementation.
   Operand *getSingleForwardingOperand() const {
     switch (forwardingInst->getKind()) {
-    case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
+    case SILInstructionKind::StructInst: {
+      if (forwardingInst->getNumRealOperands() != 1)
+        return nullptr;
+      return *forwardingInst->getRealOperands().begin();
+    }
     case SILInstructionKind::LinearFunctionInst:
     case SILInstructionKind::DifferentiableFunctionInst:
       return nullptr;
     case SILInstructionKind::MarkDependenceInst:
-      return &forwardingInst->getOperandRef(MarkDependenceInst::Value);
+      return &forwardingInst->getOperandRef(MarkDependenceInst::Dependent);
     case SILInstructionKind::RefToBridgeObjectInst:
       return
         &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);
     case SILInstructionKind::TuplePackExtractInst:
       return &forwardingInst->getOperandRef(TuplePackExtractInst::TupleOperand);
+    case SILInstructionKind::BorrowedFromInst:
+      return &forwardingInst->getOperandRef(0);
     default:
       int numRealOperands = forwardingInst->getNumRealOperands();
       if (numRealOperands == 0) {
@@ -330,6 +362,43 @@ public:
   // operation.
   bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
 };
+
+enum class FixedStorageSemanticsCallKind { None, CheckIndex, GetCount };
+
+struct FixedStorageSemanticsCall {
+  ApplyInst *apply = nullptr;
+  FixedStorageSemanticsCallKind kind = FixedStorageSemanticsCallKind::None;
+
+  FixedStorageSemanticsCall(SILInstruction *input) {
+    auto *applyInst = dyn_cast<ApplyInst>(input);
+    if (!applyInst) {
+      return;
+    }
+    auto *callee = applyInst->getReferencedFunctionOrNull();
+    if (!callee) {
+      return;
+    }
+    for (auto &attr : callee->getSemanticsAttrs()) {
+      if (attr == "fixed_storage.check_index") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::CheckIndex;
+        break;
+      } else if (attr == "fixed_storage.get_count") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::GetCount;
+        break;
+      }
+    }
+  }
+
+  FixedStorageSemanticsCallKind getKind() const { return kind; }
+  explicit operator bool() const { return apply != nullptr; }
+  const ApplyInst *operator->() const { return apply; }
+  ApplyInst *operator->() { return apply; }
+};
+
+bool isFixedStorageSemanticsCallKind(SILFunction *function);
+
 } // end namespace swift
 
 #endif

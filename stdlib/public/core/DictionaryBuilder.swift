@@ -43,6 +43,9 @@ struct _DictionaryBuilder<Key: Hashable, Value> {
   }
 }
 
+@available(*, unavailable)
+extension _DictionaryBuilder: Sendable {}
+
 extension Dictionary {
   /// Creates a new dictionary with the specified capacity, then calls the given
   /// closure to initialize its contents.
@@ -81,7 +84,7 @@ extension Dictionary {
       _ values: UnsafeMutableBufferPointer<Value>
     ) -> Int
   ) {
-    self.init(_native: _NativeDictionary(
+    self.init(_native: unsafe _NativeDictionary(
         _unsafeUninitializedCapacity: capacity,
         allowingDuplicates: allowingDuplicates,
         initializingWith: initializer))
@@ -99,11 +102,22 @@ extension _NativeDictionary {
     ) -> Int
   ) {
     self.init(capacity: capacity)
-    let initializedCount = initializer(
+
+    // If the capacity is 0, then our storage is the empty singleton. Those are
+    // read only, so we shouldn't attempt to write to them.
+    if capacity == 0 {
+      let c = unsafe initializer(
+        UnsafeMutableBufferPointer(start: nil, count: 0), 
+        UnsafeMutableBufferPointer(start: nil, count: 0))
+      _precondition(c == 0)
+      return
+    }
+
+    let initializedCount = unsafe initializer(
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
       UnsafeMutableBufferPointer(start: _values, count: capacity))
     _precondition(initializedCount >= 0 && initializedCount <= capacity)
-    _storage._count = initializedCount
+    unsafe _storage._count = initializedCount
 
     // Hash initialized elements and move each of them into their correct
     // buckets.
@@ -124,7 +138,7 @@ extension _NativeDictionary {
     // invariants.
     var bucket = _HashTable.Bucket(offset: initializedCount - 1)
     while bucket.offset >= 0 {
-      if hashTable._isOccupied(bucket) {
+      if unsafe hashTable._isOccupied(bucket) {
         // We've moved an element here in a previous iteration.
         bucket.offset -= 1
         continue
@@ -132,21 +146,21 @@ extension _NativeDictionary {
       // Find the target bucket for this entry and mark it as in use.
       let target: Bucket
       if _isDebugAssertConfiguration() || allowingDuplicates {
-        let (b, found) = find(_keys[bucket.offset])
+        let (b, found) = unsafe find(_keys[bucket.offset])
         if found {
           _internalInvariant(b != bucket)
           _precondition(allowingDuplicates, "Duplicate keys found")
           // Discard duplicate entry.
-          uncheckedDestroy(at: bucket)
-          _storage._count -= 1
+          unsafe uncheckedDestroy(at: bucket)
+          unsafe _storage._count -= 1
           bucket.offset -= 1
           continue
         }
-        hashTable.insert(b)
+        unsafe hashTable.insert(b)
         target = b
       } else {
-        let hashValue = self.hashValue(for: _keys[bucket.offset])
-        target = hashTable.insertNew(hashValue: hashValue)
+        let hashValue = unsafe self.hashValue(for: _keys[bucket.offset])
+        unsafe target = unsafe hashTable.insertNew(hashValue: hashValue)
       }
 
       if target > bucket {

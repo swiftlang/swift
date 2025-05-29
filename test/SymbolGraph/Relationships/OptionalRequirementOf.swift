@@ -8,12 +8,12 @@
 // RUN: %target-swift-symbolgraph-extract -module-name OptionalRequirementOf -F %t/frameworks -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/OptionalRequirementOf.symbols.json
 
+// CHECK-NOT: "kind": "requirementOf"
+
 // ObjCProto.objcReq -> ObjCProto
-// CHECK-DAG: "kind": "requirementOf",{{[[:space:]]*}}"source": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto(im)swiftReq",{{[[:space:]]*}}"target": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto"
 // CHECK-DAG: "kind": "optionalRequirementOf",{{[[:space:]]*}}"source": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto(im)swiftReq",{{[[:space:]]*}}"target": "c:@M@OptionalRequirementOf@objc(pl)SwiftProto"
 
 // SwiftProto.swiftReq -> SwiftProto
-// CHECK-DAG: "kind": "requirementOf",{{[[:space:]]*}}"source": "c:objc(pl)ObjCProto(im)objcReq",{{[[:space:]]*}}"target": "c:objc(pl)ObjCProto"
 // CHECK-DAG: "kind": "optionalRequirementOf",{{[[:space:]]*}}"source": "c:objc(pl)ObjCProto(im)objcReq",{{[[:space:]]*}}"target": "c:objc(pl)ObjCProto"
 
 //--- reqs.swift
@@ -22,7 +22,7 @@ public protocol SwiftProto {
   @objc optional func swiftReq()
 }
 
-//--- frameworks/OptionalRequirementOf.framework/module.map
+//--- frameworks/OptionalRequirementOf.framework/Modules/module.modulemap
 framework module OptionalRequirementOf {
   header "req.h"
   export *

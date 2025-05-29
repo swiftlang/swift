@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name builtins -enable-builtin-module -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module -disable-availability-checking -O | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -enable-builtin-module -Xllvm -sil-disable-pass=target-constant-folding -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module -target %target-swift-5.9-abi-triple -O | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 
@@ -31,7 +31,7 @@ func weirdPackCountUse1<each T>(_ x: repeat each T) -> Builtin.Word {
 }
 
 struct Pack<each T> {
-// CHECK: define {{.*}} @"$s8builtins4PackV5countBwvgZ"(i64 returned [[PACK_COUNT:%.*]], ptr nocapture readnone %"each T")
+// CHECK: define {{.*}} @"$s8builtins4PackV5countBwvgZ"(i64 returned [[PACK_COUNT:%.*]], ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %"each T")
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i64 [[PACK_COUNT]]
   static var count: Builtin.Word {

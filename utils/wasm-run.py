@@ -24,7 +24,7 @@ class WasmtimeRunner(object):
             subprocess.check_call(command)
 
     def invocation(self, args):
-        command = ["wasmtime", "run"]
+        command = ["wasmkit-cli", "run"]
         envs = collect_wasm_env()
         for key in envs:
             command.append("--env")

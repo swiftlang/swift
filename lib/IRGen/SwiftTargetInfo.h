@@ -108,7 +108,7 @@ public:
   
   /// The value stored in a Builtin.once predicate to indicate that an
   /// initialization has already happened, if known.
-  llvm::Optional<int64_t> OnceDonePredicateValue = llvm::None;
+  std::optional<int64_t> OnceDonePredicateValue = std::nullopt;
 
   /// True if `swift_retain` and `swift_release` are no-ops when passed
   /// "negative" pointer values.

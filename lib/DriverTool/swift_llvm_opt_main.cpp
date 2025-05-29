@@ -56,7 +56,6 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/PluginLoader.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -66,6 +65,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Scalar/LoopPassManager.h"
 
 using namespace swift;
@@ -114,11 +114,11 @@ static llvm::cl::opt<std::string> PassPipeline(
 //                               Helper Methods
 //===----------------------------------------------------------------------===//
 
-static llvm::CodeGenOpt::Level GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
+static llvm::CodeGenOptLevel GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
   // TODO: Is this the right thing to do here?
   if (options.Optimized)
-    return llvm::CodeGenOpt::Default;
-  return llvm::CodeGenOpt::None;
+    return llvm::CodeGenOptLevel::Default;
+  return llvm::CodeGenOptLevel::None;
 }
 
 // Returns the TargetMachine instance or zero if no triple is provided.
@@ -136,8 +136,7 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
 
   return TheTarget->createTargetMachine(
       TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
-      llvm::Optional<llvm::Reloc::Model>(
-          llvm::codegen::getExplicitRelocModel()),
+      std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
       llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
 }
 
@@ -215,7 +214,10 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Opts.OutputKind = IRGenOutputKind::LLVMAssemblyAfterOptimization;
 
     // Then perform the optimizations.
-    performLLVMOptimizations(Opts, M.get(), TM.get(), &Out->os());
+    SourceManager SM;
+    DiagnosticEngine Diags(SM);
+    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(),
+                             &Out->os());
   } else {
     std::string Pipeline = PassPipeline;
     llvm::TargetLibraryInfoImpl TLII(ModuleTriple);
@@ -232,7 +234,6 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
     PrintPassOpts.Verbose = false;
     PrintPassOpts.SkipAnalyses = false;
-    auto &Mod = *M;
     llvm::StandardInstrumentations SI(M->getContext(), false, false, PrintPassOpts);
     SI.registerCallbacks(PIC, &MAM);
 

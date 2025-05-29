@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_SILBITFIELD_H
 #define SWIFT_SIL_SILBITFIELD_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
@@ -30,7 +31,7 @@ template <class Impl, class T> class SILBitfield {
   /// that the bits of that block are not initialized yet.
   /// See also: SILBasicBlock::lastInitializedBitfieldID,
   ///           SILFunction::currentBitfieldID
-  int64_t bitfieldID;
+  uint64_t bitfieldID;
 
   short startBit;
   short endBit;
@@ -55,11 +56,13 @@ public:
       parent(parent),
       function(function) {
     assert(size > 0 && "bit field size must be > 0");
-    assert(endBit <= T::numCustomBits && "too many/large bit fields allocated in function");
-    assert((!parent || bitfieldID > parent->bitfieldID) &&
+    ASSERT(endBit <= T::numCustomBits &&
+           "too many/large bit fields allocated in function");
+    ASSERT((!parent || bitfieldID > parent->bitfieldID) &&
            "BasicBlockBitfield indices are not in order");
+    ASSERT(function->currentBitfieldID < T::maxBitfieldID &&
+           "currentBitfieldID overflow");
     ++function->currentBitfieldID;
-    assert(function->currentBitfieldID != 0 && "currentBitfieldID overflow");
   }
 
   SILBitfield(const SILBitfield &) = delete;
@@ -85,9 +88,6 @@ public:
     unsigned clearMask = mask;
     if (bitfieldID > entity->lastInitializedBitfieldID) {
 
-      if (entity->isMarkedAsDeleted())
-        return;
-
       // The bitfield is not initialized yet in this block.
       // Initialize the bitfield, and also initialize all parent bitfields,
       // which are not initialized, yet. Example:
@@ -111,7 +111,7 @@ public:
   }
 };
 
-/// A set which knowns its size.
+/// A set which knows its size.
 ///
 /// This template adds a size property to a base `Set`.
 template <class Set>

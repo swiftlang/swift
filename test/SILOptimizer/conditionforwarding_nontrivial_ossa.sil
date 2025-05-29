@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -update-borrowed-from -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
 
 import Builtin
 import Swift
@@ -21,6 +21,13 @@ enum FakeOptional<T> {
   case some(T)
 }
 
+enum PrimaryColor : Int {
+  case red = 0
+  case blue = 1
+  case green = 2
+}
+
+sil [ossa] @use_color : $@convention(thin) (PrimaryColor) -> ()
 sil [ossa] @callee : $@convention(thin) () -> ()
 sil [ossa] @use_enum : $@convention(thin) (@guaranteed E) -> ()
 sil [ossa] @use_int : $@convention(thin) (Builtin.Int64) -> ()
@@ -127,6 +134,34 @@ bb4(%17 : @owned $Klass):
 
 bb5(%18 : @owned $Klass):
   destroy_value %18 : $Klass
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @simple_forwarding4 : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = enum $PrimaryColor, #PrimaryColor.red!enumelt
+  br bb3(%2 : $PrimaryColor)
+
+bb2:
+  %3 = enum $PrimaryColor, #PrimaryColor.blue!enumelt
+  br bb3(%3 : $PrimaryColor)
+
+bb3(%14 : $PrimaryColor):
+  switch_enum %14 : $PrimaryColor, case #PrimaryColor.red!enumelt: bb4, default bb5
+
+bb4:
+  br bb6
+
+bb5(%18 : $PrimaryColor):
+  %15 = function_ref @use_color : $@convention(thin) (PrimaryColor) -> ()
+  %16 = apply %15(%18) : $@convention(thin) (PrimaryColor) -> ()
   br bb6
 
 bb6:
@@ -363,3 +398,34 @@ bb6:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @nontrivialenumarg : 
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'nontrivialenumarg'
+sil [ossa] @nontrivialenumarg : $@convention(thin) (@guaranteed Klass) -> @owned Optional<Klass> {
+bb0(%0 : @guaranteed  $Klass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = enum $Optional<Klass>, #Optional.some!enumelt, %0
+  br bb3(%2)
+
+bb2:
+  %3 = enum $Optional<Klass>, #Optional.some!enumelt, %0
+  br bb3(%3)
+
+bb3(%7 : @guaranteed  $Optional<Klass>):
+  switch_enum %7, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
+
+bb4(%9 : @guaranteed  $Klass):
+  apply undef(%7) : $@convention(thin) (@guaranteed Optional<Klass>) -> ()
+  %10 = enum $Optional<Klass>, #Optional.some!enumelt, %9
+  br bb6(%10)
+
+bb5:
+  %12 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb6(%12)
+
+bb6(%14 : @guaranteed  $Optional<Klass>):
+  %15 = copy_value %14
+  return %15
+}

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
 //
 // Enabling specific ARC opts requires an asserts build.
 // REQUIRES: asserts

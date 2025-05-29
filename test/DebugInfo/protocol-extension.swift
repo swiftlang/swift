@@ -9,12 +9,11 @@ public extension P {
   public func f() -> Int32 {
     // CHECK-NEXT: entry:
     // CHECK-NEXT: %[[ALLOCA:.*]] = alloca ptr,
-    // CHECK-NEXT: @llvm.dbg.declare(metadata ptr %[[ALLOCA]],
-    // CHECK-SAME:    metadata ![[SELFMETA:.*]], metadata !DIExpression())
+    // CHECK-NEXT: #dbg_declare(ptr %[[ALLOCA]],
+    // CHECK-SAME:    ![[SELFMETA:.*]], !DIExpression()
     return v
   }
 }
 
-// CHECK: ![[SELFMETA]] = !DILocalVariable(name: "$\CF\84_0_0",
-// CHECK-SAME: type: ![[SELFTY:[0-9]+]], flags: DIFlagArtificial)
-// CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "Self"
+// CHECK-DAG: ![[SELFMETA]] = !DILocalVariable(name: "$\CF\84_0_0", {{.*}}type: ![[SELFTY:[0-9]+]], flags: DIFlagArtificial)
+// CHECK-DAG: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "Self"

@@ -1,4 +1,4 @@
-module ProtocolNamingConflict [extern_c] {
+module ProtocolNamingConflict {
   header "protocol-naming-conflict.h"
   requires objc
 }
@@ -37,4 +37,15 @@ module NSTextCheckingResult {
 
 module MockPOSIX {
   header "POSIX.h"
+}
+
+module ID {
+  header "id.h"
+  requires objc
+  requires cplusplus
+}
+
+module CxxForeignRef {
+  header "cxx-frt.h"
+  requires cplusplus
 }

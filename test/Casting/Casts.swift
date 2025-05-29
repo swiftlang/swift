@@ -981,9 +981,7 @@ CastsTests.test("Recursive AnyHashable") {
 // https://github.com/apple/swift/issues/56987
 #if _runtime(_ObjC)
 CastsTests.test("Do not overuse __SwiftValue")
-.skip(.custom({
-  if #available(SwiftStdlib 5.9, *) { return false } else { return true }
-}, reason: "Requires stdlib from Swift 5.9 or later"))
+.require(.stdlib_5_9)
 .code {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue
@@ -1065,13 +1063,24 @@ CastsTests.test("Don't put AnyHashable inside AnyObject") {
 }
 
 #if _runtime(_ObjC)
-CastsTests.test("__SwiftValue should not be obvious to `is`") {
+// We currently (as of Jan 2024) bridge NSSet to Swift with `x as!
+// Set<NSObject>`, which in turn demands that __SwiftValue successfully cast to
+// NSObject.
+// So this nonsensical behavior can probably never be fixed.
+// (It's nonsense because it implies that every Swift object is derived
+// from NSObject.)  See PR #68952 for an early attempt to change it which
+// had to be reverted.
+CastsTests.test("__SwiftValue should not be obvious to `is`")
+.xfail(.always("Probably can never be fixed"))
+.code {
   struct S {}
   let s = S() as AnyObject
   expectFalse(s is NSObject)
 }
 #endif
 
+// See above for reasons why this might need to remain broken forever,
+// though I do have some hope for it.
 CastsTests.test("type(of:) should look through __SwiftValue")
 .xfail(.always("Known to be broken"))
 .code {

@@ -12,8 +12,8 @@ func foo(a: /*class-Foo*/Foo, b: /*class-Bar*/Bar, c: inout /*class-Bar*/Bar) ->
 	return /*class-Bar*/Bar()
 }
 
-typealias /*alias-FuncType:def*/FuncType2 = (/*class-Foo*/Foo, /*class-Bar*/Bar) -> /*class-Bar*/Bar
-var example: /*alias-FuncType*/FuncType2 = {a, b in x}
+typealias /*alias-FuncType:def*/<base>FuncType</base> = (/*class-Foo*/Foo, /*class-Bar*/Bar) -> /*class-Bar*/Bar
+var example: /*alias-FuncType*/<base>FuncType</base> = {a, b in x}
 
 func bar<X:/*protocol-Proto*/Proto, Y>(a: X, b: Y) {}
 

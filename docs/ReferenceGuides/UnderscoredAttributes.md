@@ -53,7 +53,7 @@ Adding this attribute to a type leads to remarks being emitted for all methods.
 
 ## `@_backDeploy(before: ...)`
 
-The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/apple/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
+The spelling of `@backDeployed(before:)` prior to the acceptance of [SE-0376](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0376-function-back-deployment.md).
 
 ## `@_borrowed`
 
@@ -437,19 +437,19 @@ the export name.
 
 It's the equivalent of clang's `__attribute__((export_name))`.
 
-## `@extern(<language>)`
+## `@_extern(<language>)`
 
 Indicates that a particular declaration should be imported
 from the external environment.
 
-### `@extern(wasm, module: <"moduleName">, name: <"fieldName">)`
+### `@_extern(wasm, module: <"moduleName">, name: <"fieldName">)`
 
 Indicates that a particular declaration should be imported
 through WebAssembly's import interface.
 
 It's the equivalent of clang's `__attribute__((import_module("module"), import_name("field")))`.
 
-### `@extern(c, [, <"cName">])`
+### `@_extern(c, [, <"cName">])`
 
 Indicates that a particular declaration should refer to a
 C declaration with the given name. If the optional "cName"
@@ -462,8 +462,12 @@ C declarations from Swift, while `@_cdecl` is used to define
 Swift functions that can be referenced from C.
 
 Also similar to `@_silgen_name`, but a function declared with
-`@extern(c)` is assumed to use the C ABI, while `@_silgen_name`
+`@_extern(c)` is assumed to use the C ABI, while `@_silgen_name`
 assumes the Swift ABI.
+
+It is always better to refer to C declarations by importing their
+native declarations from a header or module using Swift's C interop
+support when possible.
 
 ## `@_fixed_layout`
 
@@ -591,11 +595,51 @@ class C {
 
 (Note that it is "inherit", not "inherits", unlike below.)
 
-Marks that a `@Sendable async` closure argument should inherit the actor
-context (i.e. what actor it should be run on) based on the declaration site
-of the closure. This is different from the typical behavior, where the closure
-may be runnable anywhere unless its type specifically declares that it will
-run on a specific actor.
+Marks that a `@Sendable async` or `sendable async` closure argument should
+inherit the actor context (i.e. what actor it should be run on) based on the
+declaration site of the closure rather than be non-Sendable. This does not do
+anything if the closure is synchronous.
+
+This works with global actors as expected:
+
+```swift 
+@MainActor
+func test() {
+  Task { /* main actor isolated */ }
+}
+```
+
+However, for the inference to work with instance actors (i.e. `isolated` parameters),
+the closure must capture the isolated parameter explicitly:
+
+```swift 
+func test(actor: isolated (any Actor)) {
+  Task { /* non isolated */ } // !!!
+}
+
+func test(actor: isolated (any Actor)) {
+  Task { // @_inheritActorContext
+    _ = actor // 'actor'-isolated 
+  }
+}
+```
+
+The attribute takes an optional modifier '`always`', which changes this behavior 
+and *always* captures the enclosing isolated context, rather than forcing developers
+to perform the explicit capture themselfes:
+
+```swift
+func test(actor: isolated (any Actor)) {
+  Task.immediate { // @_inheritActorContext(always)
+    // 'actor'-isolated!
+    // (without having to capture 'actor explicitly')
+  }
+}
+```
+
+DISCUSSION: The reason why this does nothing when the closure is synchronous is
+since it does not have the ability to hop to the appropriate executor before it
+is run, so we may create concurrency errors.
 
 ## `@_inheritsConvenienceInitializers`
 
@@ -655,7 +699,7 @@ also work as a generic type constraint.
 Indicates that a protocol is a marker protocol. Marker protocols represent some
 meaningful property at compile-time but have no runtime representation.
 
-For more details, see [](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [SE-0302](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
@@ -726,7 +770,7 @@ func baz() {
 Additionally, if they are of a tuple or struct type, their stored members
 without observers may also be passed inout as non-ephemeral pointers.
 
-For more details, see the educational note on
+For more details, see the diagnostic group 
 [temporary pointer usage](/userdocs/diagnostics/temporary-pointers.md).
 
 ## `@_nonoverride`
@@ -778,6 +822,11 @@ of a header as non-`Sendable` so that you can make spot exceptions with
 `@Sendable`.
 
 ## `@_objcImplementation(CategoryName)`
+
+A pre-stable form of `@implementation`. The main difference between them is that
+many things that are errors with `@implementation` are warnings with
+`@_objcImplementation`, which permitted workarounds for compiler bugs and 
+changes in compiler behavior.
 
 Declares an extension that defines an implementation for the Objective-C
 category `CategoryName` on the class in question, or for the main `@interface`
@@ -841,12 +890,6 @@ Notes:
 
 * We don't currently plan to support ObjC generics.
 
-* Eventually, we want the main `@_objcImplementation` extension to be able to
-  declare stored properties that aren't in the interface. We also want
-  `final` stored properties to be allowed to be resilent Swift types, but
-  it's not clear how to achieve that without boxing them in `__SwiftValue`
-  (which we might do as a stopgap).
-     
 * We should think about ObjC "direct" members, but that would probably
   require a way to spell this in Swift. 
 
@@ -915,6 +958,46 @@ More generally, multiple availabilities can be specified, like so:
 enum Toast { ... }
 ```
 
+## `@_preInverseGenerics`
+
+By default when mangling a generic signature, the presence of a conformance 
+requirement for an invertible protocol, like Copyable and Escapable, is not
+explicitly mangled. Only the _absence_ of those conformance requirements for
+each generic parameter appears in the mangled name.
+
+This attribute changes the way generic signatures are mangled, by ignoring
+even the absences of those conformance requirements for invertible protocols.
+So, the following functions would have the same mangling because of the
+attribute:
+
+```swift
+@_preInverseGenerics
+func foo<T: ~Copyable>(_ t: borrowing T) {}
+
+// In 'bug.swift', the function above without the attribute would be:
+//
+//   $s3bug3fooyyxRi_zlF ---> bug.foo<A where A: ~Swift.Copyable>(A) -> ()
+//
+// With the attribute, the above becomes:
+//
+//   $s3bug3fooyyxlF ---> bug.foo<A>(A) -> ()
+//
+// which is exactly the same symbol for the function below.
+
+func foo<T>(_ t: T) {}
+```
+
+The purpose of this attribute is to aid in adopting noncopyable generics
+(SE-427) in existing libraries without breaking ABI; it is for advanced users
+only.
+
+> **WARNING:** Before applying this attribute, you _must manually verify_ that
+> there never were any implementations of `foo` that contained a copy of `t`, 
+> to ensure correctness. There is no way to prove this by simply inspecting the
+> Swift source code! You actually have to **check the assembly code** in all of
+> your existing libraries containing `foo`, because an older version of the
+> Swift compiler could have decided to insert a copy of `t` as an optimization!
+
 ## `@_private(sourceFile: "FileName.swift")`
 
 Fully bypasses access control, allowing access to private declarations
@@ -956,12 +1039,16 @@ the memory of the annotated type:
   threads, writes don't overlap with reads or writes coming from the same
   thread, and that the pointer is not used after the value is moved or
   consumed.
-- When the value is moved, a bitwise copy of its memory is performed to the new
-  address of the value in its new owner. As currently implemented, raw storage
-  types are not suitable for storing values which are not bitwise-movable, such
-  as nontrivial C++ types, Objective-C weak references, and data structures
-  such as `pthread_mutex_t` which are implemented in C as always requiring a
-  fixed address.
+- By default, when the value is moved a bitwise copy of its memory is performed
+  to the new address of the value in its new owner. This makes it unsuitable to
+  store not bitwise-movable types such as nontrivial C++ types, Objective-C weak
+  references, and data structures such as `pthread_mutex_t` which are
+  implemented in C as always requiring a fixed address. However, you can provide
+  `movesAsLike` to the `like:` version of this attribute to enforce that moving
+  the value will defer its move semantics to the type it's like. This makes it
+  suitable for storing such values that are not bitwise-movable. Note that the
+  raw storage for this variant must always be properly initialized after
+  initialization because foreign moves will assume an initialized state.
 
 Using the `@_rawLayout` attribute will suppress the annotated type from
 being implicitly `Sendable`. If the type is safe to access across threads, it
@@ -983,11 +1070,18 @@ forms are currently accepted:
 
 - `@_rawLayout(size: N, alignment: M)` specifies the type's size and alignment
   in bytes.
-- `@_rawLayout(like: T)` specifies the type's size and alignment should be
-  equal to the type `T`'s.
-- `@_rawLayout(likeArrayOf: T, count: N)` specifies the type's size should be
-  `MemoryLayout<T>.stride * N` and alignment should match `T`'s, like an
-  array of N contiguous elements of `T` in memory.
+- `@_rawLayout(like: T(, movesAsLike))` specifies the type's size and alignment
+  should be equal to the type `T`'s. An optional `movesAsLike` parameter can be
+  passed to guarantee that moving a value of this raw layout type will have the
+  same move semantics as the type it's like. This is important for things like
+  ObjC weak references and non-trivial move constructors in C++.
+- `@_rawLayout(likeArrayOf: T, count: N(, movesAsLike))` specifies the type's
+  size should be `MemoryLayout<T>.stride * N` and alignment should match `T`'s,
+  like an array of N contiguous elements of `T` in memory. An optional
+  `movesAsLike` parameter can be passed to guarantee that moving a value of this
+  raw layout type will have the same move semantics as the type it's like. This
+  is important for things like ObjC weak references and non-trivial move
+  constructors in C++.
 
 A notable difference between `@_rawLayout(like: T)` and
 `@_rawLayout(likeArrayOf: T, count: 1)` is that the latter will pad out the
@@ -1055,12 +1149,46 @@ Darwin) is maintained, unless "raw:" is used, in which case the name provided is
 expected to already be mangled.
 
 Since this has label-like behavior, it may not correspond to any declaration;
-if so, it is assumed that the function/global is implemented in C.
+if so, it is assumed that the function/global is implemented possibly
+in some other language; that implementation however is assumed to use
+the Swift ABI as if it were defined in Swift.
 
-A function defined by `@_silgen_name` is assumed to use the Swift ABI.
+There are very few legitimate uses for this attribute. There are many
+ways to misuse it:
+
+- Don't use `@_silgen_name` to access C functions, since those use the C ABI.
+  Import a header or C module to access C functions.
+- Don't use `@_silgen_name` to export Swift functions to C/ObjC. `@_cdecl` or
+  `@objc` can do that.
+- Don't use `@_silgen_name` to link to `swift_*` symbols from the Swift runtime.
+  Calls to these functions have special semantics to the compiler, and accessing
+  them directly will lead to unpredictable compiler crashes and undefined
+  behavior. Use language features, or if you must, the `Builtin` module, instead.
+- Don't use `@_silgen_name` for dynamic linker discovery. Swift symbols cannot
+  be reliably recovered through C interfaces like `dlsym`. If you want to
+  implement a plugin-style interface, use `Bundle`/`NSBundle` if available, or
+  export your plugin entry points as C entry points using `@_cdecl`.
+  
+Legitimate uses may include:
+
+- Use `@_silgen_name` if you're implementing the Swift runtime.
+- Use `@_silgen_name` if you need to make a change to an ABI-stable
+  declaration's signature that would normally alter its mangled name, but you
+  need to preserve the old mangled name for ABI compatibility. You will need
+  to be careful that the change doesn't materially affect the actual calling
+  convention of the function in an incompatible way.
+- Use `@_silgen_name` if certain declarations need to have predictable symbol
+  names, such as to be easily referenced by linker scripts or other highly
+  customized build environments (and it's OK for those predictable symbols to
+  reference functions with a Swift ABI).
+- Use `@_silgen_name` to interface build products that must be linked
+  together but built completely separately, such that one can't import the other
+  normally. For this to work, the declaration(s) and definition must exactly
+  match, using the exact same definitions of any referenced types or other
+  declarations. The compiler can't help you if you mismatch.
 
 For more details, see the
-[Standard Library Programmer's Manual](https://github.com/apple/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
+[Standard Library Programmer's Manual](https://github.com/swiftlang/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
 
 ## `@_specialize(...)`
 
@@ -1135,7 +1263,7 @@ doing a textual search.
 
 Like `@available`, this attribute indicates a decl is available only as an SPI.
 This implies several behavioral changes comparing to regular `@available`:
-1. Type checker diagnoses when a client accidently exposes such a symbol in library APIs.
+1. Type checker diagnoses when a client accidentally exposes such a symbol in library APIs.
 2. When emitting public interfaces, `@_spi_available` is printed as `@available(platform, unavailable)`.
 3. ClangImporter imports ObjC macros `SPI_AVAILABLE` and `__SPI_AVAILABLE` to this attribute.
 

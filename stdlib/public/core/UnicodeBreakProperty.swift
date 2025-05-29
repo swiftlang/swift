@@ -28,6 +28,7 @@ extension Unicode {
     case v
     case zwj
 
+    @inline(__always)
     init(from scalar: Unicode.Scalar) {
       switch scalar.value {
       // Some fast paths for ascii characters...

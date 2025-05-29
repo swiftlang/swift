@@ -14,6 +14,8 @@ add_swift_target_library(swiftRemoteMirror
                            ${SWIFT_SOURCE_DIR}/include/swift/RemoteInspection/RuntimeHeaders
                          INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
                          SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-                         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
+                         DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}"
                          INSTALL_IN_COMPONENT
-                           swift-remote-mirror)
+                           swift-remote-mirror
+
+                         TARGET_SDKS NOT LINUX_STATIC)

@@ -43,6 +43,13 @@ bool DestructorAnalysis::cacheResult(CanType Type, bool Result) {
   return Result;
 }
 
+static bool isKnownSafeStdlibContainerType(CanType Ty) {
+  return Ty->isArray() ||
+    Ty->is_ArrayBuffer() ||
+    Ty->is_ContiguousArrayBuffer() ||
+    Ty->isDictionary();
+}
+
 bool DestructorAnalysis::isSafeType(CanType Ty) {
   // Don't visit types twice.
   auto CachedRes = Cached.find(Ty);
@@ -68,7 +75,8 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
   //   * or all stored properties are safe types.
   if (auto *Struct = Ty->getStructOrBoundGenericStruct()) {
 
-    if (implementsDestructorSafeContainerProtocol(Struct) &&
+    if ((implementsDestructorSafeContainerProtocol(Struct) ||
+         isKnownSafeStdlibContainerType(Ty)) &&
         areTypeParametersSafe(Ty))
       return cacheResult(Ty, true);
 

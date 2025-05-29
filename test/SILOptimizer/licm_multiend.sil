@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -licm | %FileCheck %s
-// REQUIRES: CPU=x86_64
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -licm | %FileCheck %s
+// REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
 
 sil_stage canonical
@@ -23,32 +23,21 @@ sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 
 // CHECK-LABEL: sil hidden @multi_end_licm : $@convention(thin) () -> () {
-// CHECK: bb2:
-// CHECK: [[GLOBALVAR:%.*]] = global_addr @$s3tmp1xSivp : $*Int
-// CHECK: [[BEGINA:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]] : $*Int
-// CHECK: br [[LOOPH:bb[0-9]+]]({{.*}} : $Builtin.Int64)
-// CHECK: [[LOOPH]]({{.*}} : $Builtin.Int64)
-// CHECK: cond_br {{.*}}, [[LOOPCOND1:bb[0-9]+]], [[LOOPCOND2:bb[0-9]+]]
-// CHECK: [[LOOPCOND1]]:
-// CHECK-NEXT: store
-// CHECK-NEXT: cond_br {{.*}}, [[LOOPEXIT1:bb[0-9]+]], [[LOOPCONT1:bb[0-9]+]]
-// CHECK: [[LOOPEXIT1]]:
-// CHECK-NEXT: end_access [[BEGINA]] : $*Int
-// CHECK-NEXT: br [[LOOPAFTEREXIT:bb[0-9]+]]
-// CHECK: [[LOOPCOND2]]:
-// CHECK-NEXT: struct $Int
-// CHECK-NEXT: store
-// CHECK-NEXT: cond_br {{.*}}, [[LOOPEXIT2:bb[0-9]+]], [[LOOPCONT1]]
-// CHECK: [[LOOPEXIT2]]:
-// CHECK-NEXT: end_access [[BEGINA]] : $*Int
-// CHECK-NEXT: br [[LOOPAFTEREXIT]]
-// CHECK: [[LOOPCONT1]]:
-// CHECK-NEXT: br [[LOOPH]]
-// CHECK: [[LOOPAFTEREXIT]]:
-// CHECK-NEXT: br [[FUNCRET:bb[0-9]+]]
-// CHECK: [[FUNCRET]]:
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK:       bb0:
+// CHECK:         %10 = struct_element_addr %9 : $*Int, #Int._value
+// CHECK:       bb2:
+// CHECK:         load %10
+// CHECK:       bb3({{.*}} : $Builtin.Int64):
+// CHECK:         load
+// CHECK-NOT:     load
+// CHECK-NOT:     store
+// CHECK:       bb5:
+// CHECK-NEXT:    store
+// CHECK-NOT:     store
+// CHECK:       bb7:
+// CHECK-NEXT:    store
+// CHECK-NOT:     store
+// CHECK:       } // end sil function 'multi_end_licm'
 sil hidden @multi_end_licm : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>

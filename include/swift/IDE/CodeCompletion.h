@@ -56,7 +56,7 @@ ArrayRef<T> copyArray(llvm::BumpPtrAllocator &Allocator,
                             ArrayRef<T> Arr) {
   T *Buffer = Allocator.Allocate<T>(Arr.size());
   std::copy(Arr.begin(), Arr.end(), Buffer);
-  return llvm::makeArrayRef(Buffer, Arr.size());
+  return llvm::ArrayRef(Buffer, Arr.size());
 }
 
 bool isDynamicLookup(Type T);

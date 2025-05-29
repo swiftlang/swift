@@ -12,8 +12,8 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 #ifndef SWIFT_RQM_SYMBOL_H
 #define SWIFT_RQM_SYMBOL_H
@@ -117,6 +117,10 @@ public:
     /// generic parameter.
     Shape,
 
+    /// A pack element [element].(each T) where 'each T' is a type
+    /// parameter pack.
+    PackElement,
+
     //////
     ////// "Property-like" symbol kinds:
     //////
@@ -206,6 +210,8 @@ public:
 
   static Symbol forShape(RewriteContext &ctx);
 
+  static Symbol forPackElement(RewriteContext &Ctx);
+
   static Symbol forLayout(LayoutConstraint layout,
                           RewriteContext &ctx);
 
@@ -223,7 +229,7 @@ public:
 
   const ProtocolDecl *getRootProtocol() const;
 
-  llvm::Optional<int> compare(Symbol other, RewriteContext &ctx) const;
+  std::optional<int> compare(Symbol other, RewriteContext &ctx) const;
 
   Symbol withConcreteSubstitutions(llvm::ArrayRef<Term> substitutions,
                                    RewriteContext &ctx) const;
@@ -235,6 +241,8 @@ public:
   Symbol prependPrefixToConcreteSubstitutions(
       const MutableTerm &prefix,
       RewriteContext &ctx) const;
+
+  bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 

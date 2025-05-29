@@ -6,3 +6,14 @@ Functions:
 - Name: div
   Availability: nonswift
   AvailabilityMsg: Use the C standard library function
+Namespaces:
+- Name: std
+  Tags:
+  - Name: basic_string
+    SwiftImportAs: owned
+  - Name: vector
+    SwiftImportAs: owned
+  - Name: span
+    Methods:
+    - Name: data
+      SwiftName: __dataUnsafe()

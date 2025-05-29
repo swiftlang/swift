@@ -61,7 +61,7 @@ extension Unicode.ASCII: Unicode.Encoding {
     }
     else if _fastPath(FromEncoding.self == UTF8.self) {
       let c = _identityCast(content, to: UTF8.EncodedScalar.self)
-      let first = c.first.unsafelyUnwrapped
+      let first = unsafe c.first.unsafelyUnwrapped
       guard (first < 0x80) else { return nil }
       return EncodedScalar(CodeUnit(first))
     }

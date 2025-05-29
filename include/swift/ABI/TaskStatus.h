@@ -20,6 +20,7 @@
 #ifndef SWIFT_ABI_TASKSTATUS_H
 #define SWIFT_ABI_TASKSTATUS_H
 
+#include "swift/Basic/OptionSet.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Executor.h"
@@ -108,7 +109,7 @@ public:
 
 /// A status record which states that a task has a task group.
 ///
-/// A record always is a specific `TaskGroupImpl`.
+/// A record always is an instance of a `TaskGroupBase` subclass.
 ///
 /// This record holds references to all the non-completed children of
 /// the task group.  It may also hold references to completed children
@@ -132,10 +133,13 @@ public:
 /// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
-public:
-  AsyncTask *FirstChild;
+  // FirstChild may be read concurrently to check for the presence of children,
+  // so it needs to be atomic. The pointer is never dereferenced in that case,
+  // so we can universally use memory_order_relaxed on it.
+  std::atomic<AsyncTask *> FirstChild;
   AsyncTask *LastChild;
 
+public:
   TaskGroupTaskStatusRecord()
       : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
         FirstChild(nullptr),
@@ -154,7 +158,9 @@ public:
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy
   /// `isChildTask()`.
-  AsyncTask *getFirstChild() const { return FirstChild; }
+  AsyncTask *getFirstChild() const {
+    return FirstChild.load(std::memory_order_relaxed);
+  }
 
   /// Attach the passed in `child` task to this group.
   void attachChild(AsyncTask *child) {
@@ -164,9 +170,9 @@ public:
     auto oldLastChild = LastChild;
     LastChild = child;
 
-    if (!FirstChild) {
+    if (!getFirstChild()) {
       // This is the first child we ever attach, so store it as FirstChild.
-      FirstChild = child;
+      FirstChild.store(child, std::memory_order_relaxed);
       return;
     }
 
@@ -175,15 +181,18 @@ public:
 
   void detachChild(AsyncTask *child) {
     assert(child && "cannot remove a null child from group");
-    if (FirstChild == child) {
-      FirstChild = getNextChildTask(child);
-      if (FirstChild == nullptr) {
+
+    AsyncTask *prev = getFirstChild();
+
+    if (prev == child) {
+      AsyncTask *next = getNextChildTask(child);
+      FirstChild.store(next, std::memory_order_relaxed);
+      if (next == nullptr) {
         LastChild = nullptr;
       }
       return;
     }
 
-    AsyncTask *prev = FirstChild;
     // Remove the child from the linked list, i.e.:
     //     prev -> afterPrev -> afterChild
     //                 ==
@@ -241,7 +250,9 @@ public:
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
         Function(fn), Argument(arg) {}
 
-  void run() { Function(Argument); }
+  void run() {
+    Function(Argument);
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::CancellationNotification;
@@ -258,7 +269,7 @@ public:
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = void(void *, JobPriority);
+  using FunctionType = SWIFT_CC(swift) void(JobPriority, JobPriority, SWIFT_CONTEXT void *);
 
 private:
   FunctionType *__ptrauth_swift_escalation_notification_function Function;
@@ -267,12 +278,74 @@ private:
 public:
   EscalationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::EscalationNotification),
-        Function(fn), Argument(arg) {}
+        Function(fn), Argument(arg) {
+  }
 
-  void run(JobPriority newPriority) { Function(Argument, newPriority); }
+  void run(JobPriority oldPriority, JobPriority newPriority) {
+    Function(oldPriority, newPriority, Argument);
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::EscalationNotification;
+  }
+};
+
+/// This record signifies that the task has an executor preference.
+/// This preference may be added or removed at runtime, e.g. when multiple
+/// `_withTaskExecutor { ... }` blocks are nested, they add more executor
+/// preferences.
+///
+/// Any number of these preferences may be present at runtime, and the
+/// innermost preference takes priority.
+class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
+private:
+  enum class Flags : uint8_t {
+    /// The executor was retained during this task's creation,
+    /// and therefore must be released when this task completes.
+    ///
+    /// The only tasks which need to manually retain/release the task executor
+    /// are those which cannot structurally guarantee its lifetime. E.g. an async
+    /// let does not need to do so, because it structurally always will end
+    /// before/// we leave the scope in which it was defined -- and such scope
+    /// must have been keeping alive the executor.
+    HasRetainedExecutor = 1 << 0
+  };
+  OptionSet<Flags> flags;
+  const TaskExecutorRef Preferred;
+
+public:
+  TaskExecutorPreferenceStatusRecord(TaskExecutorRef executor, bool retainedExecutor)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
+        Preferred(executor) {
+    if (retainedExecutor) {
+      flags = Flags::HasRetainedExecutor;
+    }
+  }
+
+  TaskExecutorRef getPreferredExecutor() { return Preferred; }
+
+  bool hasRetainedExecutor() const {
+    return flags.contains(Flags::HasRetainedExecutor);
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskExecutorPreference;
+  }
+};
+
+class TaskNameStatusRecord : public TaskStatusRecord {
+private:
+  const char *Name;
+
+public:
+  TaskNameStatusRecord(const char *name)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskName),
+        Name(name) {}
+
+  const char *getName() { return Name; }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskName;
   }
 };
 
@@ -321,7 +394,7 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
     // (potentially intrusively), so that the appropriate escalation effect
     // (which may be different for each type of executor) can happen if a task
     // is escalated while enqueued.
-    ExecutorRef Executor;
+    SerialExecutorRef Executor;
   } DependentOn;
 
   // Enum specifying the type of dependency this task has
@@ -359,7 +432,7 @@ public:
       DependentOn.TaskGroup = taskGroup;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, ExecutorRef executor) :
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, SerialExecutorRef executor) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(EnqueuedOnExecutor), WaitingTask(waitingTask) {
       DependentOn.Executor = executor;
@@ -369,12 +442,13 @@ public:
     return record->getKind() == TaskStatusRecordKind::TaskDependency;
   }
 
-  void updateDependencyToEnqueuedOn(ExecutorRef executor) {
+  void updateDependencyToEnqueuedOn(SerialExecutorRef executor) {
     DependencyKind = EnqueuedOnExecutor;
     DependentOn.Executor = executor;
   }
 
-  void performEscalationAction(JobPriority newPriority);
+  void performEscalationAction(
+      JobPriority oldPriority, JobPriority newPriority);
 };
 
 } // end namespace swift

@@ -248,6 +248,12 @@ module WinSDK [system] {
     export *
   }
 
+  module DDE {
+    header "dde.h"
+    header "ddeml.h"
+    export *
+  }
+
   module DFS {
     header "LMDFS.h"
     header "LM.h"
@@ -285,6 +291,13 @@ module WinSDK [system] {
     }
   }
 
+  module LZ32 {
+    header "LZExpand.h"
+    export *
+
+    link "Lz32.Lib"
+  }
+
   module Multimedia {
     module DigitalVideo {
       header "Digitalv.h"
@@ -317,6 +330,8 @@ module WinSDK [system] {
   }
 
   module Security {
+    header "../shared/sddl.h"
+
     module AuthZ {
       header "AuthZ.h"
       export *
@@ -384,6 +399,11 @@ module WinSDK [system] {
       header "mcx.h"
       export *
     }
+  }
+
+  module OLE {
+    header "ole2.h"
+    export *
   }
 
   module OLE32 {
@@ -466,6 +486,17 @@ module WinSDK [system] {
     header "WinUser.h"
     export *
     link "User32.Lib"
+  }
+
+  module UserEnv {
+    header "UserEnv.h"
+    export *
+    link "UserEnv.Lib"
+  }
+
+  module WER {
+    header "WerApi.h"
+    export *
   }
 
   module WIC {

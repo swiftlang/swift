@@ -65,7 +65,7 @@ class ReabstractionInfo {
   /// A 1-bit means that the argument is a metatype argument. The argument is
   /// dropped and replaced by a `metatype` instruction in the entry block.
   /// Only used if `dropMetatypeArgs` is true.
-  SmallBitVector droppedMetatypeArgs;
+  SmallBitVector droppedArguments;
 
   /// Set to true if the function has a re-abstracted (= converted from
   /// indirect to direct) resilient argument or return type. This can happen if
@@ -84,10 +84,13 @@ class ReabstractionInfo {
   /// specializer.
   bool ConvertIndirectToDirect = true;
 
-  /// If true, drop metatype arguments.
-  /// See `droppedMetatypeArgs`.
-  bool dropMetatypeArgs = false;
-  
+  /// If true, drop unused arguments. Dropping unused arguments is a
+  /// prerequisite before promoting an indirect argument to a direct argument.
+  /// See `droppedArguments`.
+  bool dropUnusedArguments = false;
+
+  bool hasIndirectErrorResult = false;
+
   /// The first NumResults bits in Conversions refer to formal indirect
   /// out-parameters.
   unsigned NumFormalIndirectResults = 0;
@@ -124,8 +127,13 @@ class ReabstractionInfo {
   // callee.
   SubstitutionMap ClonerParamSubMap;
 
-  // Reference to the original generic non-specialized callee function.
+  // Reference to the original generic non-specialized callee function, if available
   SILFunction *Callee = nullptr;
+
+  // The method to specialize. This must be not null if Callee is null.
+  SILDeclRef methodDecl;
+
+  SILModule *M = nullptr;
 
   // The module the specialization is created in.
   ModuleDecl *TargetModule = nullptr;
@@ -149,8 +157,8 @@ class ReabstractionInfo {
   bool isPrespecialization = false;
 
   // Is the generated specialization going to be serialized?
-  IsSerialized_t Serialized = IsNotSerialized;
-  
+  SerializedKind_t Serialized = IsNotSerialized;
+
   enum TypeCategory {
     NotLoadable,
     Loadable,
@@ -185,20 +193,19 @@ private:
   void finishPartialSpecializationPreparation(
       FunctionSignaturePartialSpecializer &FSPS);
 
+  TypeCategory handleReturnAndError(SILResultInfo RI, unsigned argIdx);
+
 public:
-  ReabstractionInfo() {}
+  ReabstractionInfo(SILModule &M) : M(&M) {}
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(ModuleDecl *targetModule,
-                    bool isModuleWholeModule,
+  ReabstractionInfo(ModuleDecl *targetModule, bool isModuleWholeModule,
                     ApplySite Apply, SILFunction *Callee,
-                    SubstitutionMap ParamSubs,
-                    IsSerialized_t Serialized,
-                    bool ConvertIndirectToDirect,
-                    bool dropMetatypeArgs,
+                    SubstitutionMap ParamSubs, SerializedKind_t Serialized,
+                    bool ConvertIndirectToDirect, bool dropUnusedArguments,
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
@@ -208,19 +215,25 @@ public:
                     bool isPrespecialization = false);
 
   ReabstractionInfo(CanSILFunctionType substitutedType,
+                    SILDeclRef methodDecl,
                     SILModule &M) :
     SubstitutedType(substitutedType),
-    isWholeModule(M.isWholeModule()) {}
+    methodDecl(methodDecl),
+    M(&M), isWholeModule(M.isWholeModule()) {}
 
 
   bool isPrespecialized() const { return isPrespecialization; }
 
-  IsSerialized_t isSerialized() const {
-    return Serialized;
-  }
+  bool isSerialized() const { return Serialized == IsSerialized; }
+  SerializedKind_t getSerializedKind() const { return Serialized; }
 
   unsigned param2ArgIndex(unsigned ParamIdx) const  {
-    return ParamIdx + NumFormalIndirectResults;
+    return ParamIdx + NumFormalIndirectResults + (hasIndirectErrorResult ? 1: 0);
+  }
+
+  unsigned indirectErrorIndex() const {
+    assert(hasIndirectErrorResult);
+    return NumFormalIndirectResults;
   }
 
   /// Returns true if the specialized function needs an alternative mangling.
@@ -248,6 +261,10 @@ public:
     return ConvertIndirectToDirect && Conversions.test(ResultIdx);
   }
 
+  bool isErrorResultConverted() const {
+    return ConvertIndirectToDirect && Conversions.test(indirectErrorIndex());
+  }
+
   /// Gets the total number of original function arguments.
   unsigned getNumArguments() const { return Conversions.size(); }
 
@@ -261,15 +278,13 @@ public:
   /// Returns true if there are any conversions from indirect to direct values.
   bool hasConversions() const { return Conversions.any(); }
 
-  /// Returns true if the argument at `ArgIdx` is a dropped metatype argument.
-  /// See `droppedMetatypeArgs`.
-  bool isDroppedMetatypeArg(unsigned ArgIdx) const {
-    return droppedMetatypeArgs.test(ArgIdx);
+  /// Returns true if the argument at `ArgIdx` is a dropped argument.
+  /// See `droppedArguments`.
+  bool isDroppedArgument(unsigned ArgIdx) const {
+    return droppedArguments.test(ArgIdx);
   }
 
-  /// Returns true if there are any dropped metatype arguments.
-  /// See `droppedMetatypeArgs`.
-  bool hasDroppedMetatypeArgs() const { return droppedMetatypeArgs.any(); }
+  const SmallBitVector &getDroppedArgs() const { return droppedArguments; }
 
   /// Remove the arguments of a partial apply, leaving the arguments for the
   /// partial apply result function.
@@ -326,13 +341,10 @@ public:
 
   SILFunction *getNonSpecializedFunction() const { return Callee; }
 
-  /// Map type into a context of the specialized function.
-  Type mapTypeIntoContext(Type type) const;
-
   /// Map SIL type into a context of the specialized function.
   SILType mapTypeIntoContext(SILType type) const;
 
-  SILModule &getModule() const { return Callee->getModule(); }
+  SILModule &getModule() const { return *M; }
 
   /// Returns true if generic specialization is possible.
   bool canBeSpecialized() const;
@@ -410,13 +422,13 @@ bool isKnownPrespecialization(StringRef SpecName);
 
 class TypeReplacements {
 private:
-  llvm::Optional<SILType> resultType;
+  std::optional<SILType> resultType;
   llvm::MapVector<unsigned, CanType> indirectResultTypes;
   llvm::MapVector<unsigned, CanType> paramTypeReplacements;
   llvm::MapVector<unsigned, CanType> yieldTypeReplacements;
 
 public:
-  llvm::Optional<SILType> getResultType() const { return resultType; }
+  std::optional<SILType> getResultType() const { return resultType; }
 
   void setResultType(SILType type) { resultType = type; }
 

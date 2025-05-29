@@ -1,18 +1,23 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-swift-frontend -target %target-future-triple -I %S/Inputs/CTypes -prespecialize-generic-metadata -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-type-layout -enable-autolinking-runtime-compatibility-bytecode-layouts -parse-stdlib -emit-module -emit-module-path=%t/layout_string_witnesses_types.swiftmodule %S/Inputs/layout_string_witnesses_types.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(layout_string_witnesses_types)) -target %target-future-triple -I %S/Inputs/CTypes -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-type-layout -Xfrontend -parse-stdlib -parse-as-library %S/Inputs/layout_string_witnesses_types.swift
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -g -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
+// RUN: %target-swift-frontend -target %target-future-triple -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -target %target-future-triple -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
+// RUN: %target-build-swift -target %target-future-triple -g -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LayoutStringValueWitnesses
+// REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+
+// test disabled until rdar://151476435 is fixed
+// REQUIRES: rdar151476435
 
 import Swift
 import layout_string_witnesses_types
@@ -842,6 +847,26 @@ func testResilientSinglePayloadEnumSimpleTag() {
 
 testResilientSinglePayloadEnumSimpleTag()
 
+func testResilientSinglePayloadEnumSimpleTagMultiExtraTagPayload() {
+    let x = switch getResilientSinglePayloadEnumSimpleMultiExtraTagPayloadEmpty3() {
+    case .nonEmpty: 0
+    case .empty0: 1
+    case .empty1: 2
+    case .empty2: 3
+    case .empty3: 4
+    case .empty4: 5
+    case .empty5: 6
+    case .empty6: 7
+    case .empty7: 8
+    case .empty8: 9
+    }
+
+    // CHECK: Enum case: 4
+    print("Enum case: \(x)")
+}
+
+testResilientSinglePayloadEnumSimpleTagMultiExtraTagPayload()
+
 func testResilientSinglePayloadEnumIndirectTag() {
     let x = switch getResilientSinglePayloadEnumIndirectNonEmpty(SimpleClass(x: 23)) {
     case .nonEmpty: 0
@@ -1132,27 +1157,141 @@ func testArrayAssignWithCopy() {
 
 testArrayAssignWithCopy()
 
+// This is a regression test for rdar://118366415
+func testTupleAlignment() {
+    let ptr = allocateInternalGenericPtr(of: TupleLargeAlignment<TestClass>.self)
+
+    do {
+        let x = TupleLargeAlignment(TestClass())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = TupleLargeAlignment(TestClass())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: TupleLargeAlignment<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testTupleAlignment()
+
+func testWeakRefOptionalNative() {
+    let ptr = allocateInternalGenericPtr(of: TestOptional<WeakNativeWrapper>.self)
+    let ptr2 = allocateInternalGenericPtr(of: TestOptional<WeakNativeWrapper>.self)
+
+    do {
+        let classInstance = SimpleClass(x: 23)
+
+        do {
+            let x = TestOptional.nonEmpty(WeakNativeWrapper(x: classInstance))
+            let y = TestOptional.nonEmpty(WeakNativeWrapper(x: classInstance))
+            testGenericInit(ptr, to: x)
+            testGenericInit(ptr2, to: y)
+        }
+
+        testGenericDestroy(ptr, of: TestOptional<WeakNativeWrapper>.self)
+        testGenericDestroy(ptr2, of: TestOptional<WeakNativeWrapper>.self)
+
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: SimpleClass deinitialized!
+    }
+
+    ptr.deallocate()
+}
+
+testWeakRefOptionalNative()
+
+func testGenericResilientWithUnmanagedAndWeak() {
+    let ptr = allocateInternalGenericPtr(of: GenericResilientWithUnmanagedAndWeak<TestClass>.self)
+
+    do {
+        let x = GenericResilientWithUnmanagedAndWeak<TestClass>(x: TestClass())
+        testGenericInit(ptr, to: x)
+    }
+
+    do {
+        let y = GenericResilientWithUnmanagedAndWeak<TestClass>(x: TestClass())
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: y)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: GenericResilientWithUnmanagedAndWeak<TestClass>.self)
+
+    ptr.deallocate()
+}
+
+testGenericResilientWithUnmanagedAndWeak()
+
+func testNonCopyableGenericStructSimpleClass() {
+    let ptr = UnsafeMutableBufferPointer<NonCopyableGenericStruct<SimpleClass>>.allocate(capacity: 1)
+
+    let x = NonCopyableGenericStruct(x: 23, y: SimpleClass(x: 23))
+    ptr[0] = x
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericArrayDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNonCopyableGenericStructSimpleClass()
+
+func testNonCopyableGenericEnumSimpleClass() {
+    let ptr = UnsafeMutableBufferPointer<NonCopyableGenericEnum<SimpleClass>>.allocate(capacity: 1)
+
+    let x = NonCopyableGenericEnum.x(23, SimpleClass(x: 23))
+    ptr[0] = x
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericArrayDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testNonCopyableGenericEnumSimpleClass()
+
 #if os(macOS)
 
 import Foundation
-
-@objc
-final class ObjcClass: NSObject {
-    deinit {
-        print("ObjcClass deinitialized!")
-    }
-}
 
 func testGenericObjc() {
     let ptr = allocateInternalGenericPtr(of: ObjcClass.self)
 
     do {
-        let x = ObjcClass()
+        let x = ObjcClass(x: 23)
         testGenericInit(ptr, to: x)
     }
 
     do {
-        let y = ObjcClass()
+        let y = ObjcClass(x: 32)
         // CHECK-macosx: Before deinit
         print("Before deinit")
 
@@ -1170,5 +1309,35 @@ func testGenericObjc() {
 }
 
 testGenericObjc()
+
+import Darwin
+
+func testWeakRefOptionalObjc() {
+    let ptr = allocateInternalGenericPtr(of: TestOptional<WeakObjcWrapper>.self)
+    let ptr2 = allocateInternalGenericPtr(of: TestOptional<WeakObjcWrapper>.self)
+
+    do {
+        let classInstance = ObjcClass(x: 23)
+
+        do {
+            let x = TestOptional.nonEmpty(WeakObjcWrapper(x: classInstance))
+            let y = TestOptional.nonEmpty(WeakObjcWrapper(x: classInstance))
+            testGenericInit(ptr, to: x)
+            testGenericInit(ptr2, to: y)
+        }
+
+        testGenericDestroy(ptr, of: TestOptional<WeakObjcWrapper>.self)
+        testGenericDestroy(ptr2, of: TestOptional<WeakObjcWrapper>.self)
+
+        // CHECK-macosx: Before deinit
+        print("Before deinit")
+
+        // CHECK-macosx-NEXT: ObjcClass deinitialized!
+    }
+
+    ptr.deallocate()
+}
+
+testWeakRefOptionalObjc()
 
 #endif

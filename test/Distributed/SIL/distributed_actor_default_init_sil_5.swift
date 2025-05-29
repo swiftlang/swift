@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -Xllvm -sil-print-types -emit-sil -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
@@ -31,13 +31,13 @@ distributed actor MyDistActor {
     self.localOnlyField = SomeClass()
   }
 
-// CHECK: sil hidden @$s14default_deinit11MyDistActorC12system_async4condAC015FakeDistributedE7Systems0iE6SystemV_SbtYacfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @owned MyDistActor) -> @owned MyDistActor {
+// CHECK: sil hidden @$s14default_deinit11MyDistActorC12system_async4condAC015FakeDistributedE7Systems0iE6SystemV_SbtYacfc : $@convention(method) @async (@owned FakeActorSystem, Bool, @sil_isolated @owned MyDistActor) -> @owned MyDistActor {
 // CHECK: bb0([[SYSTEM:%[0-9]+]] : $FakeActorSystem, [[COND:%[0-9]+]] : $Bool, [[SELF:%[0-9]+]] : $MyDistActor):
 // CHECK:   builtin "initializeDefaultActor"([[SELF]] : $MyDistActor)
 // CHECK:   [[SYS_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:   store [[SYSTEM]] to [[SYS_FIELD]] : $*FakeActorSystem
 // CHECK:   [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:   store {{.*}} to [[ID_FIELD]] : $*ActorAddress
+// CHECK:   copy_addr {{.*}} to [init] [[ID_FIELD]] : $*ActorAddress
 // CHECK:   [[RAW_BOOL:%[0-9]+]] = struct_extract [[COND]] : $Bool, #Bool._value
 // CHECK:   cond_br [[RAW_BOOL]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
@@ -51,7 +51,7 @@ distributed actor MyDistActor {
 // CHECK: [[FALSE_BB]]:
 // CHECK:   br [[JOIN]]
 
-// CHECK: [[JOIN]]:
+// CHECK: [[JOIN]]({{.*}} : $Builtin.Int3):
 // CHECK:   cond_br {{%[0-9]+}}, [[PARTIAL_DEINIT:bb[0-9]+]], [[NO_DEINIT:bb[0-9]+]]
 
 // CHECK: [[PARTIAL_DEINIT]]:

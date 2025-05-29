@@ -17,35 +17,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Type.h"
-#include "swift/Basic/TaggedUnion.h"
-#include "swift/SIL/FieldSensitivePrunedLiveness.h"
-#include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
-#include "swift/SIL/OwnershipLiveness.h"
-#include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/ParseTestSpecification.h"
-#include "swift/SIL/PrunedLiveness.h"
-#include "swift/SIL/SILArgumentArrayRef.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/ScopedAddressUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Test.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include <iterator>
-#include <memory>
 
 using namespace swift;
 using namespace swift::test;
@@ -67,6 +43,10 @@ class TestRunner : public SILFunctionTransform {
     DominanceInfo *getDominanceInfo() override {
       auto *dominanceAnalysis = pass->getAnalysis<DominanceAnalysis>();
       return dominanceAnalysis->get(function);
+    }
+    DeadEndBlocks *getDeadEndBlocks() override {
+      auto *deadEndBlocksAnalysis = pass->getAnalysis<DeadEndBlocksAnalysis>();
+      return deadEndBlocksAnalysis->get(function);
     }
     SwiftPassInvocation *getSwiftPassInvocation() override {
       return &swiftPassInvocation;
@@ -98,14 +78,10 @@ void TestRunner::printTestLifetime(bool begin, unsigned testIndex,
 }
 
 void TestRunner::runTest(StringRef name, Arguments &arguments) {
-  auto *test = FunctionTest::get(name);
-  if (!test) {
-    llvm::outs() << "No test named: " << name << "\n";
-    assert(false && "Invalid test name");
-  }
+  FunctionTest test = FunctionTest::get(name);
   auto *function = getFunction();
   FunctionTestDependenciesImpl dependencies(this, function);
-  test->run(*function, arguments, *this, dependencies);
+  test.run(*function, arguments, *this, dependencies);
 }
 
 void TestRunner::run() {
@@ -138,18 +114,10 @@ void TestRunner::run() {
 // Arguments: NONE
 // Dumps:
 // - the function
-static FunctionTest DumpFunctionTest("dump-function",
+static FunctionTest DumpFunctionTest("dump_function",
                                      [](auto &function, auto &, auto &) {
                                        function.print(llvm::outs());
                                      });
-
-// Arguments: NONE
-// Dumps: the index of the self argument of the current function
-static FunctionTest FunctionGetSelfArgumentIndex(
-    "function-get-self-argument-index", [](auto &function, auto &, auto &) {
-      auto index = BridgedFunction{&function}.getSelfArgumentIndex();
-      llvm::outs() << "self argument index = " << index << "\n";
-    });
 
 } // namespace swift::test
 

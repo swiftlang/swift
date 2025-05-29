@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+
 // REQUIRES: executable_test
 
 func curry<T, U, V>(_ f: @escaping (T, U) -> V) -> (T) -> (U) -> V {
@@ -201,4 +202,3 @@ let pt3 = set(_1)(3)((1, 2))
 print(pt3) // CHECK-NEXT: (3, 2)
 let pt4 = view(_2)(("hello", 5))
 print(pt4) // CHECK-NEXT: 5
-

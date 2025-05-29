@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-memaccess-opts -predictable-deadalloc-elim  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
 
 sil_stage raw
 
@@ -146,12 +146,17 @@ bb0(%1 : $Int):
 
   store %1 to [trivial] %0a : $*Int // CHECK: store
 
-  // In an escape region, we should not promote loads.
-  %r = load [trivial] %0a : $*Int // CHECK: load
+  %r = load [trivial] %0a : $*Int
+  // CHECK: return %0
   return %r : $Int
 }
 
 class SomeClass {}
+
+struct SomeClassPair {
+  var x: SomeClass
+  var y: SomeClass
+}
 
 sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 
@@ -211,12 +216,8 @@ bb0(%0 : @owned $ContainsNativeObject):
 // CHECK:   [[f3:%.*]] = struct_extract [[BORROWED_ARG]] : $ComplexStruct, #ComplexStruct.f1
 // CHECK:   [[f3_copy:%.*]] = copy_value [[f3]]
 // CHECK:   end_borrow [[BORROWED_ARG]]
-// CHECK:   [[f3_copy_1:%.*]] = copy_value [[f3_copy]]
-// CHECK:   [[f3_copy_2:%.*]] = copy_value [[f3_copy_1]]
-// CHECK:   [[f2_x_copy_1:%.*]] = copy_value [[f2_x_copy]]
-// CHECK:   [[f2_x_copy_2:%.*]] = copy_value [[f2_x_copy_1]]
 // CHECK:   destroy_value [[ARG]]
-// CHECK:   [[RESULT:%.*]] = tuple ([[f3_copy_2]] : $Builtin.NativeObject, [[f2_x_copy_2]] : $Builtin.NativeObject, [[f1]] : $Builtin.Int32)
+// CHECK:   [[RESULT:%.*]] = tuple ([[f3_copy]] : $Builtin.NativeObject, [[f2_x_copy]] : $Builtin.NativeObject, [[f1]] : $Builtin.Int32)
 // CHECK:   return [[RESULT]]
 // CHECK: } // end sil function 'multiple_level_extract_2'
 sil [ossa] @multiple_level_extract_2 : $@convention(thin) (@owned ComplexStruct) -> (@owned Builtin.NativeObject, @owned Builtin.NativeObject, Builtin.Int32) {
@@ -243,21 +244,24 @@ bb0(%0 : @owned $ComplexStruct):
 var int_global : Int
 
 // CHECK-LABEL: sil [ossa] @promote_alloc_stack
+// CHECK:         [[IL:%.*]] = integer_literal
+// CHECK:         [[I:%.*]] = struct $Int32 ([[IL]] : $Builtin.Int32)
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[E:%.*]] = struct_extract [[I]]
+// CHECK:         return [[E]]
+// CHECK:       } // end sil function 'promote_alloc_stack'
 sil [ossa] @promote_alloc_stack : $@convention(thin) (Int32) -> Builtin.Int32 {
 bb0(%0 : $Int32):
   %5 = integer_literal $Builtin.Int32, 1
-  // CHECK: [[IL:%[0-9]+]] = integer_literal
 
   %18 = struct $Int32 (%5 : $Builtin.Int32)
   %22 = alloc_stack $Int32
 
-  // CHECK-NOT: alloc_stack
 
   store %18 to [trivial] %22 : $*Int32
   %24 = struct_element_addr %22 : $*Int32, #Int32._value
   %25 = load [trivial] %24 : $*Builtin.Int32
   dealloc_stack %22 : $*Int32
-  // CHECK-NEXT: return [[IL]]
   return %25 : $Builtin.Int32
 }
 
@@ -425,39 +429,35 @@ bb0:
 }
 
 // <rdar://problem/17755462> Predictable memory opts removes refcount operation
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @dead_allocation_1
 sil [ossa] @dead_allocation_1 : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 bb0(%0 : @owned $Optional<AnyObject>):
-// CHECK-NOT: alloc_stack
   %1 = alloc_stack $Optional<AnyObject>
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to [init] %2 : $*Optional<AnyObject>
-// CHECK-NOT: copy_addr
   copy_addr %2 to [init] %1 : $*Optional<AnyObject>
   destroy_addr %2 : $*Optional<AnyObject>
   dealloc_stack %2 : $*Optional<AnyObject>
   destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
-// CHECK: destroy_value %0
   %3 = tuple ()
   return %3 : $()
 }
 
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @dead_allocation_2
 sil [ossa] @dead_allocation_2 : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 bb0(%0 : @owned $Optional<AnyObject>):
-// CHECK-NOT: alloc_stack
   %1 = alloc_stack $Optional<AnyObject>
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to [init] %1 : $*Optional<AnyObject>
-// CHECK-NOT: copy_addr
   copy_addr %1 to [init] %2 : $*Optional<AnyObject>
   destroy_addr %2 : $*Optional<AnyObject>
   dealloc_stack %2 : $*Optional<AnyObject>
   destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   %3 = tuple ()
-// CHECK: destroy_value %0
   return %3 : $()
 }
 
@@ -552,32 +552,13 @@ bb3:
 
 // This test makes sure that we insert the tuple_extracts that we need before
 // the store in bb0, not at the load block.
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Builtin.NativeObject {
-// CHECK: bb0([[ARG:%.*]] : @owned $NativeObjectPair):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[LHS1:%.*]] = struct_extract [[BORROWED_ARG]] : $NativeObjectPair, #NativeObjectPair.x
-// CHECK:   [[LHS1_COPY:%.*]] = copy_value [[LHS1]]
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[LHS2:%.*]] = struct_extract [[BORROWED_ARG]] : $NativeObjectPair, #NativeObjectPair.x
-// CHECK:   [[LHS2_COPY:%.*]] = copy_value [[LHS2]]
-// CHECK:   cond_br undef, bb1, bb2
-//
-// CHECK: bb1:
-// CHECK:   destroy_value [[LHS1_COPY]]
-// CHECK:   [[LHS2_COPY_1:%.*]] = copy_value [[LHS2_COPY]]
-// CHECK:   [[LHS2_COPY_2:%.*]] = copy_value [[LHS2_COPY_1]]
-// CHECK:   br bb3([[LHS2_COPY_2]] :
-//
-// CHECK: bb2:
-// CHECK:   destroy_value [[LHS2_COPY]] : $Builtin.NativeObject
-// CHECK:   [[LHS1_COPY_1:%.*]] = copy_value [[LHS1_COPY]]
-// CHECK:   [[LHS1_COPY_2:%.*]] = copy_value [[LHS1_COPY_1]]
-// CHECK:   br bb3([[LHS1_COPY_2]] :
-//
-// CHECK: bb3([[PHI:%.*]] :
-// CHECK:   destroy_value [[ARG]]
-// CHECK:   return [[PHI]]
-// CHECK: } // end sil function 'diamond_test_2'
+// CHECK:       bb1:
+// CHECK:         load [copy]
+// CHECK:       bb2:
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'diamond_test_2'
 sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $NativeObjectPair):
   %1 = alloc_stack $NativeObjectPair
@@ -601,12 +582,14 @@ bb3(%6 : @owned $Builtin.NativeObject):
 }
 
 // We should be able to promote all memory operations here.
+// TODO: this is currently not optimized
 //
 // CHECK-LABEL: sil [ossa] @diamond_test_3 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-// CHECK-NOT: alloc_stack
-// CHECK-NOT: load
-// CHECK-NOT: store
-// CHECK: } // end sil function 'diamond_test_3'
+// CHECK:       bb1:
+// CHECK:         load [copy]
+// CHECK:       bb2:
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'diamond_test_3'
 sil [ossa] @diamond_test_3 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %2 = alloc_stack $NativeObjectPair
@@ -658,11 +641,9 @@ struct NativeObjectTriple {
 // CHECK-NEXT: br bb3([[PAIR_LHS_COPY]] :
 //
 // CHECK: bb3([[PHI:%.*]] : @owned $Builtin.NativeObject):
-// CHECK: [[PHI_COPY_1:%.*]] = copy_value [[PHI]]
-// CHECK: [[PHI_COPY_2:%.*]] = copy_value [[PHI_COPY_1]]
 // CHECK: [[REFORMED:%.*]] = struct $NativeObjectTriple ([[ARG0]] : {{.*}}, [[ARG1]] : {{.*}})
 // CHECK: destroy_value [[REFORMED]]
-// CHECK: return [[PHI_COPY_2]]
+// CHECK: return [[PHI]]
 // CHECK: } // end sil function 'diamond_test_4'
 sil [ossa] @diamond_test_4 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair):
@@ -694,42 +675,12 @@ bb3:
 
 // Make sure that we do the right thing if our definite init value is partially
 // overridden along one path
+// TODO: this is currently not optimized
 //
 // CHECK-LABEL: sil [ossa] @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
-// CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $NativeObjectPair, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[BOX:%.*]] = alloc_stack $NativeObjectTriple
-// CHECK:   br bb1
-//
-// CHECK: bb1:
-// CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
-// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
-// CHECK:   store [[ARG0]] to [init] [[TRIPLE_LHS]]
-// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:   [[BORROWED_TRIPLE_RHS_RHS_VAL:%.*]] = struct_extract [[BORROWED_ARG1]] : $NativeObjectPair, #NativeObjectPair.y
-// CHECK:   [[TRIPLE_RHS_RHS_VAL:%.*]] = copy_value [[BORROWED_TRIPLE_RHS_RHS_VAL]]
-// CHECK:   store [[ARG1]] to [init] [[TRIPLE_RHS]]
-// CHECK:   cond_br undef, bb2, bb3
-//
-// CHECK: bb2:
-// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]]
-// CHECK:   store [[ARG2]] to [assign] [[TRIPLE_RHS_LHS]]
-// CHECK:   br bb4
-//
-// CHECK: bb3:
-// CHECK:   br bb4
-//
-// CHECK: bb4:
-// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]] : $*NativeObjectPair, #NativeObjectPair.x
-// CHECK:   [[TRIPLE_RHS_LHS_VAL:%.*]] = load [copy] [[TRIPLE_RHS_LHS]] : $*Builtin.NativeObject
-// CHECK:   [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK:   [[TRIPLE_RHS_LHS_VAL_BORROW:%.*]] = begin_borrow [[TRIPLE_RHS_LHS_VAL]]
-// CHECK:   [[TRIPLE_RHS_RHS_VAL_COPY_BORROW:%.*]] = begin_borrow [[TRIPLE_RHS_RHS_VAL_COPY]]
-// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL_BORROW]] : {{.*}}, [[TRIPLE_RHS_RHS_VAL_COPY_BORROW]] : {{.*}})
-// CHECK:   [[STRUCT_COPY:%.*]] = copy_value [[STRUCT]]
-// CHECK:   [[STRUCT_COPY_2:%.*]] = copy_value [[STRUCT_COPY]]
-// CHECK:   destroy_addr [[BOX]]
-// CHECK:   return [[STRUCT_COPY_2]]
-// CHECK: } // end sil function 'diamond_test_5'
+// CHECK:       bb4:
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'diamond_test_5'
 sil [ossa] @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair, %arg2 : @owned $Builtin.NativeObject):
   %2 = alloc_stack $NativeObjectTriple
@@ -758,74 +709,11 @@ bb4:
   return %13 : $NativeObjectPair
 }
 
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
-// CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $NativeObjectPair, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[BOX:%.*]] = alloc_stack $NativeObjectTriple
-// CHECK:   cond_br undef, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
-//
-// CHECK: [[TRUE_BB]]:
-// CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
-// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
-// CHECK:   store [[ARG0]] to [init] [[TRIPLE_LHS]]
-// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:   [[BORROWED_TRIPLE_RHS_RHS_VAL:%.*]] = struct_extract [[BORROWED_ARG1]] : $NativeObjectPair, #NativeObjectPair.y
-// CHECK:   [[TRIPLE_RHS_RHS_VAL:%.*]] = copy_value [[BORROWED_TRIPLE_RHS_RHS_VAL]]
-// CHECK:   store [[ARG1]] to [init] [[TRIPLE_RHS]]
-// CHECK:   cond_br undef, [[CRITEDGE_BREAK_BB_1:bb[0-9]+]], [[CRITEDGE_BREAK_BB_2:bb[0-9]+]]
-//
-// CHECK: [[CRITEDGE_BREAK_BB_1]]:
-// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: br [[SUCC_2:bb[0-9]+]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
-//
-// CHECK: [[CRITEDGE_BREAK_BB_2]]:
-// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: br [[SUCC_1:bb[0-9]+]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
-//
-// CHECK: [[FALSE_BB]]:
-// CHECK:   [[TRIPLE_LHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f1
-// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
-// CHECK:   store [[ARG0]] to [init] [[TRIPLE_LHS]]
-// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:   [[BORROWED_TRIPLE_RHS_RHS_VAL:%.*]] = struct_extract [[BORROWED_ARG1]] : $NativeObjectPair, #NativeObjectPair.y
-// CHECK:   [[TRIPLE_RHS_RHS_VAL:%.*]] = copy_value [[BORROWED_TRIPLE_RHS_RHS_VAL]]
-// CHECK:   store [[ARG1]] to [init] [[TRIPLE_RHS]]
-// CHECK:   cond_br undef, [[CRITEDGE_BREAK_BB_1:bb[0-9]+]], [[CRITEDGE_BREAK_BB_2:bb[0-9]+]]
-//
-// CHECK: [[CRITEDGE_BREAK_BB_1]]:
-// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: br [[SUCC_2]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
-//
-// CHECK: [[CRITEDGE_BREAK_BB_2]]:
-// CHECK-NEXT: [[TRIPLE_RHS_RHS_VAL_COPY:%.*]] = copy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: destroy_value [[TRIPLE_RHS_RHS_VAL]]
-// CHECK-NEXT: br [[SUCC_1]]([[TRIPLE_RHS_RHS_VAL_COPY]] :
-//
-// CHECK: [[SUCC_2]]([[PHI1:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
-// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]]
-// CHECK:   store [[ARG2]] to [assign] [[TRIPLE_RHS_LHS]]
-// CHECK:   br [[EXIT_BB:bb[0-9]+]]([[PHI1:%.*]] : $Builtin.NativeObject)
-//
-// CHECK: [[SUCC_1]]([[PHI:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[PHI_COPY:%.*]] = copy_value [[PHI]]
-// CHECK:   br [[EXIT_BB]]([[PHI_COPY]] : {{.*}})
-//
-// CHECK: [[EXIT_BB]]([[PHI:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[TRIPLE_RHS:%.*]] = struct_element_addr [[BOX]] : $*NativeObjectTriple, #NativeObjectTriple.f2
-// CHECK:   [[TRIPLE_RHS_LHS:%.*]] = struct_element_addr [[TRIPLE_RHS]] : $*NativeObjectPair, #NativeObjectPair.x
-// CHECK:   [[TRIPLE_RHS_LHS_VAL:%.*]] = load [copy] [[TRIPLE_RHS_LHS]] : $*Builtin.NativeObject
-// CHECK:   [[PHI_COPY:%.*]] = copy_value [[PHI]]
-// CHECK:   [[TRIPLE_RHS_LHS_VAL_BORROW:%.*]] = begin_borrow [[TRIPLE_RHS_LHS_VAL]]
-// CHECK:   [[PHI_COPY_BORROW:%.*]] = begin_borrow [[PHI_COPY]]
-// CHECK:   [[STRUCT:%.*]] = struct $NativeObjectPair ([[TRIPLE_RHS_LHS_VAL_BORROW]] : {{.*}}, [[PHI_COPY_BORROW]] : {{.*}})
-// CHECK:   [[STRUCT_COPY_1:%.*]] = copy_value [[STRUCT]]
-// CHECK:   [[STRUCT_COPY_2:%.*]] = copy_value [[STRUCT_COPY_1]]
-// CHECK:   destroy_addr [[BOX]]
-// CHECK:   return [[STRUCT_COPY_2]]
-// CHECK: } // end sil function 'diamond_test_6'
+// CHECK:       bb9:
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'diamond_test_6'
 sil [ossa] @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair, %arg2 : @owned $Builtin.NativeObject):
   %2 = alloc_stack $NativeObjectTriple
@@ -1022,9 +910,10 @@ bb0(%0 : @owned $NativeObjectPair, %1 : @owned $Builtin.NativeObject):
 }
 
 // Loop case.
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @promote_with_loop_1 : $@convention(thin) (@owned NativeObjectPair) -> () {
-// CHECK-NOT: load [copy]
-// CHECK: } // end sil function 'promote_with_loop_1'
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'promote_with_loop_1'
 sil [ossa] @promote_with_loop_1 : $@convention(thin) (@owned NativeObjectPair) -> () {
 bb0(%0 : @owned $NativeObjectPair):
   %1 = alloc_stack $NativeObjectPair
@@ -1040,9 +929,10 @@ bb2:
   br bb2
 }
 
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
-// CHECK-NOT: load [copy]
-// CHECK: } // end sil function 'promote_with_loop_2'
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'promote_with_loop_2'
 sil [ossa] @promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
 bb0(%0 : @owned $NativeObjectPair):
   %1 = alloc_stack $NativeObjectPair
@@ -1067,9 +957,13 @@ bb4:
   return %9999 : $()
 }
 
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @two_backedge_loop : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK-NOT: load [copy]
-// CHECK: } // end sil function 'two_backedge_loop'
+// CHECK:       bb3:
+// CHECK:         load [copy]
+// CHECK:       bb4:
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'two_backedge_loop'
 sil [ossa] @two_backedge_loop : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
@@ -1111,14 +1005,13 @@ bb9:
   return %9999 : $()
 }
 
-// Make sure that we can eliminate the allocation and all loads. The key here is
-// that we are verifying that we first eliminate load [copy] and treat the load
-// [take] as part of the destroy_addr optimization.
-//
+// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @two_backedge_loop_with_take : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK-NOT: alloc_stack
-// CHECK-NOT: load
-// CHECK: } // end sil function 'two_backedge_loop_with_take'
+// CHECK:       bb3:
+// CHECK:         load [copy]
+// CHECK:       bb4:
+// CHECK:         load [copy]
+// CHECK:       } // end sil function 'two_backedge_loop_with_take'
 sil [ossa] @two_backedge_loop_with_take : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
@@ -1340,6 +1233,25 @@ bb5:
 bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
   return %8 : $Optional<Builtin.NativeObject>
 }
+
+// CHECK-LABEL: sil [ossa] @dont_promote_load_borrow_with_reborrows :
+// CHECK:         load_borrow
+// CHECK:       } // end sil function 'dont_promote_load_borrow_with_reborrows'
+sil [ossa] @dont_promote_load_borrow_with_reborrows : $@convention(thin) (@owned SomeClass) -> () {
+bb0(%0 : @owned $SomeClass):
+  %1 = alloc_stack $SomeClass
+  store %0 to [init] %1 : $*SomeClass
+  %3 = load_borrow %1 : $*SomeClass
+  br bb1(%3 : $SomeClass)
+
+bb1(%5 : @reborrow $SomeClass):
+  end_borrow %5 : $SomeClass
+  destroy_addr %1 : $*SomeClass
+  dealloc_stack %1 : $*SomeClass
+  %9 = tuple ()
+  return %9 : $()
+}
+
 
 class Foo {}
 struct MyInt {

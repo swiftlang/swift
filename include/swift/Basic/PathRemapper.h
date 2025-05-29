@@ -53,7 +53,7 @@ public:
     // compatibility with Clang (especially because we propagate the flag to
     // ClangImporter as well).
     for (const auto &Mapping : PathMappings)
-      if (Path.startswith(Mapping.first))
+      if (Path.starts_with(Mapping.first))
         return (Twine(Mapping.second) +
                 Path.substr(Mapping.first.size())).str();
     return Path.str();

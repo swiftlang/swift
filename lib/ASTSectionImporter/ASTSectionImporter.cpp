@@ -18,7 +18,7 @@
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "../Serialization/ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "llvm/Support/Debug.h"
@@ -58,8 +58,8 @@ swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
   // headers. Iterate over all AST modules.
   while (!buf.empty()) {
     auto info = serialization::validateSerializedAST(
-        buf, Loader.isRequiredOSSAModules(), /*requiredSDK*/ StringRef(),
-        /*requiresRevisionMatch*/ false);
+        buf, Loader.isRequiredOSSAModules(),
+        /*requiredSDK*/StringRef());
 
     assert(info.name.size() < (2 << 10) && "name failed sanity check");
 

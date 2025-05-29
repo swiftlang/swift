@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Core -clang-header-expose-decls=all-public -emit-clang-header-path %t/core.h
+// RUN: %target-swift-frontend %s -module-name Core -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/core.h
 // RUN: %FileCheck %s < %t/core.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/core.h)
@@ -40,7 +40,7 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 
-// CHECK: static inline const constexpr bool isUsableInGenericContext<void *> = true;
+// CHECK: inline const constexpr bool isUsableInGenericContext<void *> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<void *> {
@@ -50,7 +50,7 @@
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<swift::Int> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<swift::Int> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<swift::Int> {
@@ -60,7 +60,7 @@
 // CHECK-NEXT: };
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<swift::UInt> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<swift::UInt> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<swift::UInt> {

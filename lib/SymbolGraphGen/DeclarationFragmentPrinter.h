@@ -90,7 +90,7 @@ private:
 public:
   DeclarationFragmentPrinter(
       const SymbolGraph *SG, llvm::json::OStream &OS,
-      llvm::Optional<StringRef> Key = llvm::None,
+      std::optional<StringRef> Key = std::nullopt,
       SmallPtrSet<const Decl *, 8> *ReferencedDecls = nullptr)
       : SG(SG), OS(OS), Kind(FragmentKind::None),
         ReferencedDecls(ReferencedDecls), NumFragments(0) {

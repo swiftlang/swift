@@ -58,13 +58,21 @@ namespace swift {
   }
 
   /// Typecheck binding initializer at \p bindingIndex.
-  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
-                               bool leaveClosureBodiesUnchecked);
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+
+  /// Attempt to merge two types for the purposes of completion lookup. In
+  /// general this means preferring a subtype over a supertype, but can also e.g
+  /// prefer an optional over a non-optional. If the two types are incompatible,
+  /// null is returned.
+  Type tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2, DeclContext *dc);
 
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
+
+  /// Check whether \p T1 is a subtype of \p T2.
+  bool isSubtypeOf(Type T1, Type T2, DeclContext *DC);
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
@@ -124,7 +132,7 @@ namespace swift {
 
   /// Return the type of an expression parsed during code completion, or
   /// None on error.
-  llvm::Optional<Type> getTypeOfCompletionContextExpr(
+  std::optional<Type> getTypeOfCompletionContextExpr(
       ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
       Expr *&parsedExpr, ConcreteDeclRef &referencedDecl);
 
@@ -150,8 +158,7 @@ namespace swift {
 
   /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to
   /// \c swift::ide
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                         bool replaceInvalidRefsWithErrors);
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
@@ -162,6 +169,15 @@ namespace swift {
   /// work happened to have synthesized them.
   void
   getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
+
+  /// Get all of the top-level declarations that should be printed as part of
+  /// this module. This may force synthesis of top-level declarations that
+  /// \p getDisplayDeclsForModule would only return if previous
+  /// work happened to have synthesized them.
+  void getTopLevelDeclsForDisplay(
+      ModuleDecl *M, SmallVectorImpl<Decl *> &Results,
+      llvm::function_ref<void(ModuleDecl *, SmallVectorImpl<Decl *> &)>
+          getDisplayDeclsForModule);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -306,7 +322,7 @@ namespace swift {
   void printResultBuilderBuildFunction(NominalTypeDecl *builder,
                                        Type componentType,
                                        ResultBuilderBuildFunction function,
-                                       llvm::Optional<std::string> stubIndent,
+                                       std::optional<std::string> stubIndent,
                                        llvm::raw_ostream &out);
 
   /// Compute the insertion location, indentation string, and component type

@@ -35,8 +35,19 @@ struct Stack<Element> : CollectionLikeSequence {
     BridgedPassContext.Slab.getCapacity() / MemoryLayout<Element>.stride
   }
 
-  private static func bind(_ slab: BridgedPassContext.Slab) -> UnsafeMutablePointer<Element> {
-    return UnsafeMutableRawPointer(slab.data!).bindMemory(to: Element.self, capacity: Stack.slabCapacity)
+  private func allocate(after lastSlab: BridgedPassContext.Slab? = nil) -> BridgedPassContext.Slab {
+    let lastSlab = lastSlab ?? BridgedPassContext.Slab(nil)
+    let newSlab = bridgedContext.allocSlab(lastSlab)
+    UnsafeMutableRawPointer(newSlab.data!).bindMemory(to: Element.self, capacity: Stack.slabCapacity)
+    return newSlab
+  }
+
+  private static func element(in slab: BridgedPassContext.Slab, at index: Int) -> Element {
+    return pointer(in: slab, at: index).pointee
+  }
+
+  private static func pointer(in slab: BridgedPassContext.Slab, at index: Int) -> UnsafeMutablePointer<Element> {
+    return UnsafeMutableRawPointer(slab.data!).assumingMemoryBound(to: Element.self) + index
   }
 
   struct Iterator : IteratorProtocol {
@@ -50,7 +61,7 @@ struct Stack<Element> : CollectionLikeSequence {
       
       guard index < end else { return nil }
     
-      let elem = Stack.bind(slab)[index]
+      let elem = Stack.element(in: slab, at: index)
       index += 1
       
       if index >= end && slab.data != lastSlab.data {
@@ -68,23 +79,23 @@ struct Stack<Element> : CollectionLikeSequence {
   }
 
   var first: Element? {
-    isEmpty ? nil : Stack.bind(firstSlab)[0]
+    isEmpty ? nil : Stack.element(in: firstSlab, at: 0)
   }
 
   var last: Element? {
-    isEmpty ? nil : Stack.bind(lastSlab)[endIndex &- 1]
+    isEmpty ? nil : Stack.element(in: lastSlab, at: endIndex &- 1)
   }
 
   mutating func push(_ element: Element) {
     if endIndex >= Stack.slabCapacity {
-      lastSlab = bridgedContext.allocSlab(lastSlab)
+      lastSlab = allocate(after: lastSlab)
       endIndex = 0
     } else if firstSlab.data == nil {
       assert(endIndex == 0)
-      firstSlab = bridgedContext.allocSlab(lastSlab)
+      firstSlab = allocate()
       lastSlab = firstSlab
     }
-    (Stack.bind(lastSlab) + endIndex).initialize(to: element)
+    Stack.pointer(in: lastSlab, at: endIndex).initialize(to: element)
     endIndex += 1
   }
 
@@ -105,7 +116,7 @@ struct Stack<Element> : CollectionLikeSequence {
     }
     assert(endIndex > 0)
     endIndex -= 1
-    let elem = (Stack.bind(lastSlab) + endIndex).move()
+    let elem = Stack.pointer(in: lastSlab, at: endIndex).move()
     
     if endIndex == 0 {
       if lastSlab.data == firstSlab.data {
@@ -128,4 +139,84 @@ struct Stack<Element> : CollectionLikeSequence {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() { removeAll() }
+}
+
+extension Stack {
+  /// Mark a stack location for future iteration.
+  ///
+  /// TODO: Marker should be ~Escapable.
+  struct Marker {
+    let slab: BridgedPassContext.Slab
+    let index: Int
+  }
+
+  var top: Marker { Marker(slab: lastSlab, index: endIndex) }
+
+  struct Segment : CollectionLikeSequence {
+    let low: Marker
+    let high: Marker
+
+    init(in stack: Stack, low: Marker, high: Marker) {
+      if low.slab.data == nil {
+        assert(low.index == 0, "invalid empty stack marker")
+        // `low == nil` and `high == nil` is a valid empty segment,
+        // even though `assertValid(marker:)` would return false.
+        if high.slab.data != nil {
+          stack.assertValid(marker: high)
+        }
+        self.low = Marker(slab: stack.firstSlab, index: 0)
+        self.high = high
+        return
+      }
+      stack.assertValid(marker: low)
+      stack.assertValid(marker: high)
+      self.low = low
+      self.high = high
+    }
+
+    func makeIterator() -> Stack.Iterator {
+      return Iterator(slab: low.slab, index: low.index,
+                      lastSlab: high.slab, endIndex: high.index)
+    }
+  }
+
+  /// Assert that `marker` is valid based on the current `top`.
+  ///
+  /// This is an assert rather than a query because slabs can reuse
+  /// memory leading to a stale marker that appears valid.
+  func assertValid(marker: Marker) {
+    var currentSlab = lastSlab
+    var currentIndex = endIndex
+    while currentSlab.data != marker.slab.data {
+      assert(currentSlab.data != firstSlab.data, "Invalid stack marker")
+      currentSlab = currentSlab.getPrevious()
+      currentIndex = Stack.slabCapacity
+    }
+    assert(marker.index <= currentIndex, "Invalid stack marker")
+  }
+
+  /// Execute the `body` closure, passing it `self` for further
+  /// mutation of the stack and passing `marker` to mark the stack
+  /// position prior to executing `body`. `marker` must not escape the
+  /// `body` closure.
+  mutating func withMarker<R>(
+    _ body: (inout Stack<Element>, Marker) throws -> R) rethrows -> R {
+    return try body(&self, top)
+  }
+
+  /// Record a stack marker, execute a `body` closure, then execute a
+  /// `handleNewElements` closure with the Segment that contains all
+  /// elements that remain on the stack after being pushed on the
+  /// stack while executing `body`. `body` must push more elements
+  /// than it pops.
+  mutating func withMarker<R>(
+    pushElements body: (inout Stack) throws -> R,
+    withNewElements handleNewElements: ((Segment) -> ())
+  ) rethrows -> R {
+    return try withMarker { (stack: inout Stack<Element>, marker: Marker) in
+      let result = try body(&stack)
+      handleNewElements(Segment(in: stack, low: marker, high: stack.top))
+      return result
+    }
+  }
 }

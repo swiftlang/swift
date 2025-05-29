@@ -105,7 +105,7 @@ private:
       SwiftLangSupport::UIDsFromDeclAttributes(decl->getAttrs());
 
     // check if we should report an implicit @objc attribute
-    if (!decl->getAttrs().getAttribute(DeclAttrKind::DAK_ObjC)) {
+    if (!decl->getAttrs().getAttribute(DeclAttrKind::ObjC)) {
       if (auto *VD = dyn_cast<ValueDecl>(decl)) {
         if (VD->isObjC()) {
             uidAttrs.push_back(SwiftLangSupport::getUIDForObjCAttr());
@@ -224,25 +224,33 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
     // FIXME: These APIs allocate memory on the ASTContext, meaning it may not
     // be freed for a long time.
-    Mod = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
-    // Indexing is not using documentation now, so don't open the module
-    // documentation file.
-    // FIXME: refactor the frontend to provide an easy way to figure out the
-    // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, llvm::None, /*moduleInterfacePath=*/"",
-                                 /*moduleInterfaceSourcePath=*/"",
-                                 std::move(Buf), nullptr, nullptr,
-                                 /*isFramework=*/false);
+    Mod = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx,
+                             [&](ModuleDecl *Mod, auto addFile) {
+      // Indexing is not using documentation now, so don't open the module
+      // documentation file.
+      // FIXME: refactor the frontend to provide an easy way to figure out
+      // the correct filename here.
+      auto FUnit =
+          Loader->loadAST(*Mod, std::nullopt, /*moduleInterfacePath=*/"",
+                          /*moduleInterfaceSourcePath=*/"", std::move(Buf),
+                          nullptr, nullptr,
+                          /*isFramework=*/false);
 
-    // FIXME: Not knowing what went wrong is pretty bad. loadModule() should be
-    // more modular, rather than emitting diagnostics itself.
-    if (!FUnit) {
+      if (!FUnit) {
+        Mod->setFailedToLoad();
+        return;
+      }
+
+      addFile(FUnit);
+      Mod->setHasResolvedImports();
+    });
+
+    // FIXME: Not knowing what went wrong is pretty bad. loadModule()
+    // should be more modular, rather than emitting diagnostics itself.
+    if (Mod->failedToLoad()) {
       IdxConsumer.failed("failed to load module");
       return;
     }
-
-    Mod->addFile(*FUnit);
-    Mod->setHasResolvedImports();
   }
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
@@ -370,11 +378,11 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
 }
 
 static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
-                                       StringRef IndexStorePath,
-                                       StringRef IndexUnitOutputPath,
+                                       IndexStoreOptions IndexOpts,
                                        const CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
-  const auto &Opts = Invocation.getFrontendOptions();
+//  FIXME: Compiler arguments should be the default for setting options, but this is currently broken (see PR #69076)
+//  const auto &Opts = Invocation.getFrontendOptions();
 
   bool isDebugCompilation;
   switch (Invocation.getSILOptions().OptMode) {
@@ -388,14 +396,15 @@ static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
       break;
   }
 
-  (void) index::indexAndRecord(&PrimarySourceFile, IndexUnitOutputPath,
-                               IndexStorePath,
-                               !Opts.IndexIgnoreClangModules,
-                               Opts.IndexSystemModules,
-                               Opts.IndexIgnoreStdlib,
-                               Opts.IndexIncludeLocals,
+  (void) index::indexAndRecord(&PrimarySourceFile,
+                               IndexOpts.IndexUnitOutputPath,
+                               IndexOpts.IndexStorePath,
+                               !IndexOpts.IgnoreClangModules,
+                               IndexOpts.IncludeSystemModules,
+                               IndexOpts.IgnoreStdlib,
+                               IndexOpts.IncludeLocals,
                                isDebugCompilation,
-                               Opts.DisableImplicitModules,
+                               IndexOpts.DisableImplicitModules,
                                Invocation.getTargetTriple(),
                                *Instance.getDependencyTracker(),
                                Invocation.getIRGenOptions().FilePrefixMap);
@@ -425,8 +434,7 @@ void SwiftLangSupport::indexToStore(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
       auto &CI = AstUnit->getCompilerInstance();
-      emitIndexDataForSourceFile(
-          SF, Opts.IndexStorePath, Opts.IndexUnitOutputPath, CI);
+      emitIndexDataForSourceFile(SF, Opts, CI);
       Receiver(RequestResult<IndexStoreInfo>::fromResult(IndexStoreInfo{}));
     }
 

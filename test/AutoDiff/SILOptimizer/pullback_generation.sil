@@ -1,7 +1,7 @@
 // Pullback generation tests written in SIL for features 
 // that may not be directly supported by the Swift frontend
 
-// RUN: %target-sil-opt --differentiation -emit-sorted-sil %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types --differentiation -emit-sorted-sil %s 2>&1 | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Pullback generation - `struct_extract`

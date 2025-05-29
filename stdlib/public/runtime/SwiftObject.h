@@ -35,6 +35,8 @@
 // Real class name: mangled "Swift._SwiftObject"
 #define SwiftObject _TtCs12_SwiftObject
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-root-class"
 #if __has_attribute(objc_root_class)
 __attribute__((__objc_root_class__))
 #endif
@@ -43,6 +45,7 @@ SWIFT_RUNTIME_EXPORT @interface SwiftObject<NSObject> {
   Class isa;
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
+#pragma clang diagnostic pop
 
 - (BOOL)isEqual:(id)object;
 - (NSUInteger)hash;

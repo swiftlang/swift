@@ -269,7 +269,7 @@ class Dinner {}
 
 func microwave() -> Dinner? {
   let d: Dinner? = nil
-  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner?'}}
+  return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner'}}
 }
 
 func microwave() -> Dinner {
@@ -335,7 +335,7 @@ tuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int
 
 var optionalTuple: (Int, Int)?
 var optionalTuple2: (Int64, Int)? = (bignum, 1) 
-var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot convert value of type '(Int64, Int)' to specified type '(UInt64, Int)?'}}
+var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot convert value of type '(Int64, Int)' to specified type '(UInt64, Int)'}}
 
 optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
 // Optional to Optional
@@ -363,7 +363,7 @@ func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> V
 }
 
 func testTupleLabelMismatchKeyPath() {
-  // Very Cursed.
+  // FIXME: The warning should be upgraded to an error for key paths.
   let _: KeyPath<(x: Int, y: Int), Int> = \(a: Int, b: Int).x
   // expected-warning@-1 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
 }

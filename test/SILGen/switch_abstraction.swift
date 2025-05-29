@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name switch_abstraction -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch_abstraction -parse-stdlib %s | %FileCheck %s
 
 struct A {}
 

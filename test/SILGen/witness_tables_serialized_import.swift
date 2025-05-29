@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/witness_tables_serialized.swift -o %t -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module %S/witness_tables_serialized.swift -o %t -enable-library-evolution -package-name Package
 // RUN: %target-swift-emit-silgen -I %t %s | %FileCheck %s
 
 import witness_tables_serialized

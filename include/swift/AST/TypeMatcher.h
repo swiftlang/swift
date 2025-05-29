@@ -111,6 +111,9 @@ private:
     TRIVIAL_CASE(BuiltinIntegerType)
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinVectorType)
+    TRIVIAL_CASE(BuiltinUnboundGenericType)
+    TRIVIAL_CASE(BuiltinFixedArrayType)
+    TRIVIAL_CASE(IntegerType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
 
@@ -307,7 +310,7 @@ private:
         }
       }
 
-      // FIXME: Once OpenedArchetypeType stores substitutions, do something
+      // FIXME: Once ExistentialArchetypeType stores substitutions, do something
       // similar to the above.
 
       if (firstArchetype->isEqual(secondType))
@@ -372,7 +375,8 @@ private:
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
-        if (firstFunc->isSendable() != secondFunc->isSendable())
+        if (!Matcher.asDerived().allowSendableFunctionMismatch() &&
+            firstFunc->isSendable() != secondFunc->isSendable())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
@@ -397,12 +401,10 @@ private:
             return false;
         }
 
-        // If requested, compare the thrown error types.
+        // Compare the thrown error types.
         Type thrownError1 = firstFunc->getEffectiveThrownErrorTypeOrNever();
         Type thrownError2 = secondFunc->getEffectiveThrownErrorTypeOrNever();
-        if (Matcher.asDerived().considerThrownErrorTypes(thrownError1,
-                                                         thrownError2) &&
-            !this->visit(thrownError1->getCanonicalType(),
+        if (!this->visit(thrownError1->getCanonicalType(),
                          thrownError2, thrownError1))
           return false;
 
@@ -553,6 +555,8 @@ private:
 
   bool alwaysMismatchTypeParameters() const { return false; }
 
+  bool allowSendableFunctionMismatch() const { return false; }
+
   void pushPosition(Position pos) {}
   void popPosition(Position pos) {}
 
@@ -566,10 +570,6 @@ public:
   bool match(Type first, Type second) {
     return MatchVisitor(*this).visit(first->getCanonicalType(), second,
                                      first);
-  }
-
-  bool considerThrownErrorTypes(Type errorType1, Type errorType2) const {
-    return false;
   }
 };
 

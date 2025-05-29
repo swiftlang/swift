@@ -17,6 +17,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #elseif os(WASI)
 import WASILibc
 #elseif os(Windows)
@@ -405,7 +407,7 @@ public func spawnChild(_ args: [String])
   childArgs.insert(CommandLine.arguments[0], at: 0)
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
-    if let invocation = String(validatingUTF8: interpreter!) {
+    if let invocation = String(validatingCString: interpreter!) {
       childArgs.insert(invocation, at: 0)
     }
   }

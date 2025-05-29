@@ -40,7 +40,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
 
   internal var core: _NSArrayCore {
     @inline(__always) get {
-      return unsafeBitCast(buffer, to: _NSArrayCore.self)
+      return unsafe unsafeBitCast(buffer, to: _NSArrayCore.self)
     }
   }
 
@@ -51,12 +51,16 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
 
   @usableFromInline
   internal var endIndex: Int {
-    return core.count
+    @_effects(releasenone) get {
+      core.count
+    }
   }
 
   @usableFromInline
   internal subscript(i: Int) -> AnyObject {
-    return core.objectAt(i)
+    @_effects(releasenone) get {
+      core.objectAt(i)
+    }
   }
 
   @usableFromInline
@@ -71,8 +75,8 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     // Look for contiguous storage in the NSArray
     let cocoaStorageBaseAddress = self.contiguousStorage(self.indices)
 
-    if let cocoaStorageBaseAddress = cocoaStorageBaseAddress {
-      return _SliceBuffer(
+    if let cocoaStorageBaseAddress = unsafe cocoaStorageBaseAddress {
+      return unsafe _SliceBuffer(
         owner: self.buffer,
         subscriptBaseAddress: cocoaStorageBaseAddress,
         indices: bounds,
@@ -84,11 +88,11 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
       _uninitializedCount: boundsCount,
       minimumCapacity: 0)
     
-    let base = UnsafeMutableRawPointer(result.firstElementAddress)
+    let base = unsafe UnsafeMutableRawPointer(result.firstElementAddress)
       .assumingMemoryBound(to: AnyObject.self)
       
     for idx in 0..<boundsCount {
-      (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
+      unsafe (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
     }
 
     return _SliceBuffer(_buffer: result, shiftedToStartIndex: bounds.lowerBound)
@@ -115,11 +119,11 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     // subRange.upperBound items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
     // optimized for other cases.
-    let contiguousCount = withUnsafeMutablePointer(to: &enumerationState) {
-      core.countByEnumerating(with: $0, objects: nil, count: 0)
+    let contiguousCount = unsafe withUnsafeMutablePointer(to: &enumerationState) {
+      unsafe core.countByEnumerating(with: $0, objects: nil, count: 0)
     }
 
-    return contiguousCount >= subRange.upperBound
+    return unsafe contiguousCount >= subRange.upperBound
       ? UnsafeMutableRawPointer(enumerationState.itemsPtr!)
           .assumingMemoryBound(to: AnyObject.self)
         + subRange.lowerBound
@@ -131,21 +135,21 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<AnyObject>
   ) -> UnsafeMutablePointer<AnyObject> {
-    return withExtendedLifetime(buffer) {
+    return unsafe withExtendedLifetime(buffer) {
       let nsSubRange = SwiftShims._SwiftNSRange(
         location: bounds.lowerBound,
         length: bounds.upperBound - bounds.lowerBound)
 
       // Copies the references out of the NSArray without retaining them
-      core.getObjects(target, range: nsSubRange)
+      unsafe core.getObjects(target, range: nsSubRange)
 
       // Make another pass to retain the copied objects
-      var result = target
+      var result = unsafe target
       for _ in bounds {
-        result.initialize(to: result.pointee)
-        result += 1
+        unsafe result.initialize(to: result.pointee)
+        unsafe result += 1
       }
-      return result
+      return unsafe result
     }
   }
 
@@ -156,8 +160,12 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     guard buffer.count > 0 else { return (makeIterator(), 0) }
     let start = buffer.baseAddress!
     let c = Swift.min(self.count, buffer.count)
-    _ = _copyContents(subRange: 0 ..< c, initializing: start)
+    _ = unsafe _copyContents(subRange: 0 ..< c, initializing: start)
     return (IndexingIterator(_elements: self, _position: c), c)
   }
 }
+
+@available(*, unavailable)
+extension _CocoaArrayWrapper: Sendable {}
+
 #endif

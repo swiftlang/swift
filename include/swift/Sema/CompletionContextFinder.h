@@ -52,6 +52,18 @@ class CompletionContextFinder : public ASTWalker {
   Expr *InitialExpr = nullptr;
   DeclContext *InitialDC;
 
+  /// Whether we're looking for any viable fallback expression.
+  bool ForFallback = false;
+
+  /// Finder for fallback completion contexts within the outermost non-closure
+  /// context of the code completion expression's direct context.
+  CompletionContextFinder(DeclContext *completionDC)
+    : InitialDC(completionDC), ForFallback(true) {
+    while (auto *ACE = dyn_cast<AbstractClosureExpr>(InitialDC))
+      InitialDC = ACE->getParent();
+    InitialDC->walkContext(*this);
+  }
+
 public:
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
@@ -61,23 +73,15 @@ public:
   CompletionContextFinder(constraints::SyntacticElementTarget target,
                           DeclContext *DC);
 
-  /// Finder for completion contexts within the outermost non-closure context of
-  /// the code completion expression's direct context.
-  CompletionContextFinder(DeclContext *completionDC) : InitialDC(completionDC) {
-    while (auto *ACE = dyn_cast<AbstractClosureExpr>(InitialDC))
-      InitialDC = ACE->getParent();
-    InitialDC->walkContext(*this);
+  static CompletionContextFinder forFallback(DeclContext *DC) {
+    return CompletionContextFinder(DC);
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
 
-  /// Check whether code completion expression is located inside of a
-  /// multi-statement closure.
-  bool locatedInMultiStmtClosure() const {
-    return hasContext(ContextKind::MultiStmtClosure);
-  }
+  PreWalkAction walkToDeclPre(Decl *D) override;
 
   bool locatedInStringInterpolation() const {
     return hasContext(ContextKind::StringInterpolation);
@@ -121,7 +125,7 @@ public:
   /// code completion expression directly but instead add some
   /// of the enclosing context e.g. when completion is an argument
   /// to a call.
-  llvm::Optional<Fallback> getFallbackCompletionExpr() const;
+  std::optional<Fallback> getFallbackCompletionExpr() const;
 
 private:
   bool hasContext(ContextKind kind) const {

@@ -251,6 +251,9 @@ public enum CannotBackDeployEnum {
 @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' must not be used on stored properties}}
 public var cannotBackDeployTopLevelVar = 79
 
+@backDeployed(before: iOS 15.0) // OK, this can only be diagnosed when compiling for iOS
+public var cannotBackDeployTopLevelVarOniOS = 79
+
 @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' attribute cannot be applied to this declaration}}
 extension TopLevelStruct {}
 
@@ -266,13 +269,13 @@ public struct ConformsToTopLevelProtocol: TopLevelProtocol {
 }
 
 @available(SwiftStdlib 5.1, *)
-@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' is unsupported on a var with a 'some' return type}}
+@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' cannot be applied to var 'cannotBackDeployVarWithOpaqueResultType' because it has a 'some' return type}}
 public var cannotBackDeployVarWithOpaqueResultType: some TopLevelProtocol {
   return ConformsToTopLevelProtocol()
 }
 
 @available(SwiftStdlib 5.1, *)
-@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' is unsupported on a global function with a 'some' return type}}
+@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' cannot be applied to global function 'cannotBackDeployFuncWithOpaqueResultType()' because it has a 'some' return type}}
 public func cannotBackDeployFuncWithOpaqueResultType() -> some TopLevelProtocol {
   return ConformsToTopLevelProtocol()
 }
@@ -367,7 +370,11 @@ public func incorrectPlatformCaseFunc() {}
 public func incorrectPlatformSimilarFunc() {}
 
 @backDeployed(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
-public func unknownOSFunc() {}
+public func unknownOSFunc1() {}
+
+@backDeployed(before: macOS 12.0)
+@backDeployed(before: unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
+public func unknownOSFunc2() {}
 
 @backDeployed(before: @) // expected-error {{expected platform in '@backDeployed' attribute}}
 public func badPlatformFunc1() {}
@@ -383,6 +390,9 @@ public func missingVersionFunc2() {}
 
 @backDeployed(before: macOS, iOS) // expected-error 2{{expected version number in '@backDeployed' attribute}}
 public func missingVersionFunc3() {}
+
+@backDeployed(before: macOS 0) // expected-warning {{expected version number in '@backDeployed' attribute; this is an error in the Swift 6 language mode}}
+public func missingVersionFunc4() {}
 
 @backDeployed(before: macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}}
 public func unexpectedSeparatorFunc() {}
@@ -411,7 +421,6 @@ public func missingMacroVersion() {}
 public func unknownMacroMissingVersion() {}
 
 @backDeployed(before: _unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
-// expected-error@-1 {{expected at least one platform version in '@backDeployed' attribute}}
 public func unknownMacroVersioned() {}
 
 @backDeployed(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}

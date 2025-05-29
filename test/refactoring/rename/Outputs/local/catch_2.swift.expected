@@ -37,8 +37,8 @@ func test4(arg: () throws -> Void) {
     try arg()
   } catch let x as Err1 {
     print(x)
-  } catch let xRenamed {
-    print(xRenamed)
+  } catch let <base>x</base> {
+    print(<base>x</base>)
   }
 }
 

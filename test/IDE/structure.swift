@@ -31,22 +31,29 @@ class MyCls : OtherClass {
 // CHECK: }</class>
 }
 
-// CHECK: <struct>struct <name>MyStruc</name> {
+// CHECK: <struct>struct <name>MyStruct</name> {
 // CHECK:   <property>var <name>myVar</name>: <type>Int</type></property>
 // CHECK:   <svar>static var <name>sbar</name> : <type>Int</type> = 0</svar>
 // CHECK:   <sfunc>static func <name>cfoo()</name></sfunc>
 // CHECK: }</struct>
-struct MyStruc {
+struct MyStruct {
   var myVar: Int
   static var sbar : Int = 0
   static func cfoo()
+}
+
+enum MyError: Error {
+  case x
 }
 
 // CHECK: <protocol>protocol <name>MyProt</name> {
 // CHECK:   <ifunc>func <name>foo()</name></ifunc>
 // CHECK:   <ifunc>func <name>foo2()</name> throws</ifunc>
 // CHECK:   <ifunc>func <name>foo3()</name> throws -> <type>Int</type></ifunc>
-// CHECK:   <ifunc>func <name>foo4<<generic-param><name>T</name></generic-param>>()</name> where T: MyProt</ifunc>
+
+// FIXME: The end of the source range needs to be advanced past the ')' here!
+// CHECK:   <ifunc>func <name>foo4()</name> throws(MyError</ifunc>)
+// CHECK:   <ifunc>func <name>foo5<<generic-param><name>T</name></generic-param>>()</name> where T: MyProt</ifunc>
 // CHECK:   <ifunc><name>init()</name></ifunc>
 // CHECK:   <ifunc><name>init(<param><name>a</name>: <type>Int</type></param>)</name> throws</ifunc>
 // CHECK:   <ifunc><name>init<<generic-param><name>T</name></generic-param>>(<param><name>a</name>: <type>T</type></param>)</name> where T: MyProt</ifunc>
@@ -55,17 +62,18 @@ protocol MyProt {
   func foo()
   func foo2() throws
   func foo3() throws -> Int
-  func foo4<T>() where T: MyProt
+  func foo4() throws(MyError)
+  func foo5<T>() where T: MyProt
   init()
   init(a: Int) throws
   init<T>(a: T) where T: MyProt
 }
 
-// CHECK: <extension>extension <name>MyStruc</name> {
+// CHECK: <extension>extension <name>MyStruct</name> {
 // CHECK:   <ifunc>func <name>foo()</name> {
 // CHECK:   }</ifunc>
 // CHECK: }</extension>
-extension MyStruc {
+extension MyStruct {
   func foo() {
   }
 }
@@ -299,8 +307,8 @@ enum FooEnum {
 // CHECK: <enum>enum <name>FooEnum</name> {
   case blah(x: () -> () = {
   // CHECK: <enum-case>case <enum-elem><name>blah(<param><name>x</name>: <type>() -> ()</type> = <closure><brace>{
-    @Tuples func foo(x: MyStruc) {}
-    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruc</type></param>)</name> {}</ffunc>
+    @Tuples func foo(x: MyStruct) {}
+    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruct</type></param>)</name> {}</ffunc>
   })
   // CHECK: }</brace></closure></param>)</name></enum-elem></enum-case>
 }

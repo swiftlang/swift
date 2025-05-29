@@ -9,7 +9,7 @@
 
 Objective-C's "designated initializers pattern seems at first to
 create a great deal of complication.  However, designated initializers
-are simply the only sane response to Objective-C's initialization rules,
+are simply the only sound response to Objective-C's initialization rules,
 which are the root cause of the complication.
 
 This proposal suggests an approach to initialization that avoids the

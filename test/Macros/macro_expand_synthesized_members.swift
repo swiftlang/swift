@@ -112,3 +112,66 @@ struct S2 {
   }
 }
 #endif
+
+@attached(
+  member,
+  names: named(deinit)
+)
+macro addDeinit() = #externalMacro(module: "MacroDefinition", type: "AddDeinit")
+
+@attached(
+  member,
+  names: named(subscript(unchecked:))
+)
+macro addSubscript() = #externalMacro(module: "MacroDefinition", type: "AddSubscript")
+
+@addDeinit
+@addSubscript
+class C2 {
+  init() {
+    print("Created a C2")
+  }
+}
+
+func testC2() {
+  // CHECK: Created a C2
+  let c2 = C2()
+  // CHECK: 17
+  print(c2[unchecked: 17])
+  // CHECK: deinit was called
+}
+testC2()
+
+@attached(member, names: arbitrary)
+macro GenerateStubs() = #externalMacro(module: "MacroDefinition", type: "GenerateStubMemberMacro")
+
+@freestanding(declaration, names: arbitrary)
+macro generateMemberStubs() = #externalMacro(module: "MacroDefinition", type: "GenerateStubsFreestandingMacro")
+
+@freestanding(declaration, names: named(member()))
+macro generateMember() = #externalMacro(module: "MacroDefinition", type: "SingleMemberStubMacro")
+
+@GenerateStubs
+struct NestedMacroExpansion {}
+
+func callNestedExpansionMember() {
+  NestedMacroExpansion.member()
+}
+
+@attached(peer, names: prefixed(`__`)) // introduces `__GenerateStubsForProtocolRequirements
+@attached(extension, names: arbitrary) // introduces `extension GenerateStubsForProtocolRequirements`
+macro GenerateStubsForProtocolRequirements() = #externalMacro(module: "MacroDefinition", type: "GenerateStubsForProtocolRequirementsMacro")
+
+protocol _TestStub {} // used by 'GenerateStubsForProtocolRequirements'
+
+@GenerateStubsForProtocolRequirements
+protocol MacroExpansionRequirements {
+  func hello(name: String) -> String
+}
+// struct __MacroExpansionRequirements: _TestStub where ...
+// extension MacroExpansionRequirements where Self: _TestStub ...
+
+func testWitnessStub() {
+  let stub: any MacroExpansionRequirements = __MacroExpansionRequirements()
+  _ = stub.hello(name: "Caplin")
+}

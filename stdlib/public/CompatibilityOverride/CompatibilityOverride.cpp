@@ -43,7 +43,7 @@ struct OverrideSection {
   
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "CompatibilityOverrideIncludePath.h"
 };
 
 static_assert(std::is_pod<OverrideSection>::value,
@@ -98,6 +98,6 @@ static OverrideSection *getOverrideSectionPtr() {
     Section->name;                                           \
   }
 
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "CompatibilityOverrideIncludePath.h"
 
 #endif // #ifdef SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

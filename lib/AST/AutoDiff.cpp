@@ -17,13 +17,14 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
 AutoDiffDerivativeFunctionKind::AutoDiffDerivativeFunctionKind(
     StringRef string) {
-  llvm::Optional<innerty> result =
-      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
           .Case("jvp", JVP)
           .Case("vjp", VJP);
   assert(result && "Invalid string");
@@ -45,8 +46,8 @@ NormalDifferentiableFunctionTypeComponent::
 
 NormalDifferentiableFunctionTypeComponent::
     NormalDifferentiableFunctionTypeComponent(StringRef string) {
-  llvm::Optional<innerty> result =
-      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
           .Case("original", Original)
           .Case("jvp", JVP)
           .Case("vjp", VJP);
@@ -54,11 +55,11 @@ NormalDifferentiableFunctionTypeComponent::
   rawValue = *result;
 }
 
-llvm::Optional<AutoDiffDerivativeFunctionKind>
+std::optional<AutoDiffDerivativeFunctionKind>
 NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
   switch (rawValue) {
   case Original:
-    return llvm::None;
+    return std::nullopt;
   case JVP:
     return {AutoDiffDerivativeFunctionKind::JVP};
   case VJP:
@@ -69,8 +70,8 @@ NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
 
 LinearDifferentiableFunctionTypeComponent::
     LinearDifferentiableFunctionTypeComponent(StringRef string) {
-  llvm::Optional<innerty> result =
-      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
           .Case("original", Original)
           .Case("transpose", Transpose);
   assert(result && "Invalid string");
@@ -79,8 +80,8 @@ LinearDifferentiableFunctionTypeComponent::
 
 DifferentiabilityWitnessFunctionKind::DifferentiabilityWitnessFunctionKind(
     StringRef string) {
-  llvm::Optional<innerty> result =
-      llvm::StringSwitch<llvm::Optional<innerty>>(string)
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
           .Case("jvp", JVP)
           .Case("vjp", VJP)
           .Case("transpose", Transpose);
@@ -88,7 +89,7 @@ DifferentiabilityWitnessFunctionKind::DifferentiabilityWitnessFunctionKind(
   rawValue = *result;
 }
 
-llvm::Optional<AutoDiffDerivativeFunctionKind>
+std::optional<AutoDiffDerivativeFunctionKind>
 DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   switch (rawValue) {
   case JVP:
@@ -96,9 +97,13 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   case VJP:
     return {AutoDiffDerivativeFunctionKind::VJP};
   case Transpose:
-    return llvm::None;
+    return std::nullopt;
   }
   llvm_unreachable("invalid derivative kind");
+}
+
+void AutoDiffConfig::dump() const {
+  print(llvm::errs());
 }
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
@@ -313,7 +318,7 @@ autodiff::getSemanticResults(SILFunctionType *functionType,
     auto param = functionType->getParameters()[i];
     if (!param.isAutoDiffSemanticResult())
       continue;
-    if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable)
+    if (!param.hasOption(SILParameterInfo::NotDifferentiable))
       originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
   }
 }
@@ -354,27 +359,36 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
   // Require differentiability results to conform to `Differentiable`.
   SmallVector<SILResultInfo, 2> originalResults;
   getSemanticResults(originalFnTy, diffParamIndices, originalResults);
+  unsigned firstSemanticParamResultIdx = originalFnTy->getNumResults();
+  unsigned firstYieldResultIndex = originalFnTy->getNumResults() +
+      originalFnTy->getNumAutoDiffSemanticResultsParameters();
   for (unsigned resultIdx : diffResultIndices->getIndices()) {
     // Handle formal original result.
-    if (resultIdx < originalFnTy->getNumResults()) {
+    if (resultIdx < firstSemanticParamResultIdx) {
       auto resultType = originalResults[resultIdx].getInterfaceType();
       addRequirement(resultType);
-      continue;
+    } else if (resultIdx < firstYieldResultIndex) {
+      // Handle original semantic result parameters.
+      auto resultParamIndex = resultIdx - originalFnTy->getNumResults();
+      auto resultParamIt = std::next(
+        originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+        resultParamIndex);
+      auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+      addRequirement(originalFnTy->getParameters()[paramIndex].getInterfaceType());
+    } else {
+      // Handle formal original yields.
+      assert(originalFnTy->isCoroutine());
+      assert(originalFnTy->getCoroutineKind() == SILCoroutineKind::YieldOnce);
+      auto yieldResultIndex = resultIdx - firstYieldResultIndex;
+      addRequirement(originalFnTy->getYields()[yieldResultIndex].getInterfaceType());
     }
-    // Handle original semantic result parameters.
-    // FIXME: Constraint generic yields when we will start supporting them
-    auto resultParamIndex = resultIdx - originalFnTy->getNumResults();
-    auto resultParamIt = std::next(
-      originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
-      resultParamIndex);
-    auto paramIndex =
-      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
-    addRequirement(originalFnTy->getParameters()[paramIndex].getInterfaceType());
   }
 
   return buildGenericSignature(ctx, derivativeGenSig,
                                /*addedGenericParams*/ {},
-                               std::move(requirements));
+                               std::move(requirements),
+                               /*allowInverses=*/true);
 }
 
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or
@@ -385,7 +399,7 @@ static void parseAutoDiffBuiltinCommonConfig(
     StringRef &operationName, unsigned &arity, bool &throws) {
   // Parse '_arity'.
   constexpr char arityPrefix[] = "_arity";
-  if (operationName.startswith(arityPrefix)) {
+  if (operationName.starts_with(arityPrefix)) {
     operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
     auto arityStr = operationName.take_while(llvm::isDigit);
     operationName = operationName.drop_front(arityStr.size());
@@ -397,7 +411,7 @@ static void parseAutoDiffBuiltinCommonConfig(
   }
   // Parse '_throws'.
   constexpr char throwsPrefix[] = "_throws";
-  if (operationName.startswith(throwsPrefix)) {
+  if (operationName.starts_with(throwsPrefix)) {
     operationName = operationName.drop_front(sizeof(throwsPrefix) - 1);
     throws = true;
   } else {
@@ -409,15 +423,15 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
     StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
     unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyDerivative";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   // Parse 'jvp' or 'vjp'.
   constexpr char jvpPrefix[] = "_jvp";
   constexpr char vjpPrefix[] = "_vjp";
-  if (operationName.startswith(jvpPrefix))
+  if (operationName.starts_with(jvpPrefix))
     kind = AutoDiffDerivativeFunctionKind::JVP;
-  else if (operationName.startswith(vjpPrefix))
+  else if (operationName.starts_with(vjpPrefix))
     kind = AutoDiffDerivativeFunctionKind::VJP;
   operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -427,7 +441,7 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
 bool autodiff::getBuiltinApplyTransposeConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyTranspose";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -438,9 +452,9 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char differentiablePrefix[] = "differentiableFunction";
   constexpr char linearPrefix[] = "linearFunction";
-  if (operationName.startswith(differentiablePrefix))
+  if (operationName.starts_with(differentiablePrefix))
     operationName = operationName.drop_front(sizeof(differentiablePrefix) - 1);
-  else if (operationName.startswith(linearPrefix))
+  else if (operationName.starts_with(linearPrefix))
     operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
   else
     return false;
@@ -581,9 +595,8 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
          "Expected a stored property or a property-wrapped property");
   auto *parentDC = originalField->getDeclContext();
   assert(parentDC->isTypeContext());
-  auto *moduleDecl = originalField->getModuleContext();
   auto parentTan =
-      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl));
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule());
   // Error if parent nominal type does not conform to `Differentiable`.
   if (!parentTan) {
     return TangentPropertyInfo(
@@ -595,17 +608,16 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
         TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty);
   }
   // Error if original property's type does not conform to `Differentiable`.
-  auto originalFieldType = baseType->getTypeOfMember(
-      originalField->getModuleContext(), originalField);
+  auto originalFieldType = baseType->getTypeOfMember(originalField);
   auto originalFieldTan = originalFieldType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(moduleDecl));
+      LookUpConformanceInModule());
   if (!originalFieldTan) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable);
   }
   // Get the parent `TangentVector` type.
   auto parentTanType =
-      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl))
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule())
           ->getType();
   auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
   // Error if parent `TangentVector` is not a struct.
@@ -637,7 +649,7 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   // `TangentVector` type.
   auto originalFieldTanType = originalFieldTan->getType();
   auto tanFieldType =
-      parentTanType->getTypeOfMember(tanField->getModuleContext(), tanField);
+      parentTanType->getTypeOfMember(tanField);
   if (!originalFieldTanType->isEqual(tanFieldType)) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::TangentPropertyWrongType,

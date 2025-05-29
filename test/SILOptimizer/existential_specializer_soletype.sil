@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  -wmo -enable-sil-verify-all -emit-sorted-sil %s -enable-existential-specializer -existential-specializer  -inline -sil-combine -generic-specializer -devirtualizer 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types  -wmo -enable-sil-verify-all -emit-sorted-sil %s -enable-existential-specializer -existential-specializer  -inline -sil-combine -generic-specializer -devirtualizer 2>&1 | %FileCheck %s
 
 // This file tests existential specializer transformation followed by concrete type propagation  and generic specialization leading to a devirtualization of a witness method call.
 
@@ -166,7 +166,7 @@ sil @$s6testProtocolMethod : $@convention(method) <τ_0_0 where τ_0_0 : BasePro
 
 // Verify that the optimization was not performance and that we don't hang as a result.
 // CHECK-LABEL: sil hidden @$s6test1_ConcreteInitExistential : $@convention(method) (@in any SubProtocol) -> () {
-// CHECK: [[E:%.*]] = init_existential_addr %{{.*}} : $*any SubProtocol, $@opened("{{.*}}", any SubProtocol) Self
+// CHECK: [[E:%.*]] = alloc_stack $@opened("{{.*}}", any SubProtocol) Self
 // CHECK: apply %{{.*}}<@opened("{{.*}}", any SubProtocol) Self>([[E]], %{{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : BaseProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK-LABEL: } // end sil function '$s6test1_ConcreteInitExistential'
 sil hidden @$s6test1_ConcreteInitExistential : $@convention(method) (@in SubProtocol) -> () {

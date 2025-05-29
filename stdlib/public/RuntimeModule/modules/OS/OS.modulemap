@@ -1,0 +1,13 @@
+module OS {
+  module Darwin {
+    header "Darwin.h"
+  }
+
+  module Linux {
+    header "Linux.h"
+  }
+
+  module Windows {
+    header "Windows.h"
+  }
+}

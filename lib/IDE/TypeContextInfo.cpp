@@ -43,11 +43,11 @@ public:
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
 
-  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
-                         llvm::Optional<unsigned> yieldIndex) override;
+                         std::optional<unsigned> yieldIndex) override;
 
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
@@ -65,8 +65,7 @@ void ContextInfoCallbacks::completeForEachSequenceBeginning(
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E,
-                                           bool isFirst) {
+void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
@@ -79,7 +78,7 @@ void ContextInfoCallbacks::completeThenStmt(CodeCompletionExpr *E) {
   ParsedExpr = E;
 }
 void ContextInfoCallbacks::completeYieldStmt(
-    CodeCompletionExpr *E, llvm::Optional<unsigned> yieldIndex) {
+    CodeCompletionExpr *E, std::optional<unsigned> yieldIndex) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
@@ -133,21 +132,19 @@ void ContextInfoCallbacks::doneParsing(SourceFile *SrcFile) {
       continue;
 
     T = T->getRValueType();
-    if (T->hasArchetype())
-      T = T->mapTypeOutOfContext();
+
+    auto interfaceTy = T;
+    if (interfaceTy->hasArchetype())
+      interfaceTy = interfaceTy->mapTypeOutOfContext();
 
     // TODO: Do we need '.none' for Optionals?
-    auto objT = T->lookThroughAllOptionalTypes();
-
-    if (auto env = CurDeclContext->getGenericEnvironmentOfContext())
-      objT = env->mapTypeIntoContext(T);
-
-    if (!seenTypes.insert(objT->getCanonicalType()).second)
+    auto objTy = T->lookThroughAllOptionalTypes();
+    if (!seenTypes.insert(objTy->getCanonicalType()).second)
       continue;
 
-    results.emplace_back(T);
+    results.emplace_back(interfaceTy);
     auto &item = results.back();
-    getImplicitMembers(objT, item.ImplicitMembers);
+    getImplicitMembers(objTy, item.ImplicitMembers);
   }
 
   Consumer.handleResults(results);
@@ -161,7 +158,6 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   class LocalConsumer : public VisibleDeclConsumer {
     DeclContext *DC;
-    ModuleDecl *CurModule;
     Type T;
     SmallVectorImpl<ValueDecl *> &Result;
 
@@ -177,7 +173,7 @@ void ContextInfoCallbacks::getImplicitMembers(
       // Static properties which is convertible to 'Self'.
       if (auto *Var = dyn_cast<VarDecl>(VD)) {
         if (Var->isStatic()) {
-          auto declTy = T->getTypeOfMember(CurModule, Var);
+          auto declTy = T->getTypeOfMember(Var);
           if (declTy->isEqual(T) ||
               swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC))
             return true;
@@ -189,7 +185,7 @@ void ContextInfoCallbacks::getImplicitMembers(
 
   public:
     LocalConsumer(DeclContext *DC, Type T, SmallVectorImpl<ValueDecl *> &Result)
-        : DC(DC), CurModule(DC->getParentModule()), T(T), Result(Result) {}
+        : DC(DC), T(T), Result(Result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                    DynamicLookupInfo) override {

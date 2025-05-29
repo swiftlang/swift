@@ -56,6 +56,7 @@
 ///
 ///   bb0:
 ///     %get0 = apply %get<T>() : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+///     cond_br undef, bb1, bb2
 ///
 ///   bb1:
 ///     destroy_value %get0 : $T
@@ -86,6 +87,7 @@
 #define DEBUG_TYPE "address-lowering"
 
 #include "PhiStorageOptimizer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/NodeDatastructures.h"

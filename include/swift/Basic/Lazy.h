@@ -13,8 +13,9 @@
 #ifndef SWIFT_BASIC_LAZY_H
 #define SWIFT_BASIC_LAZY_H
 
-#include <memory>
 #include <functional>
+#include <memory>
+#include <optional>
 
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/type_traits.h"
@@ -33,7 +34,7 @@ namespace swift {
 template <typename T, typename Initializer = std::function<T()>>
 class LazyValue {
   Initializer Init;
-  llvm::Optional<T> Value;
+  std::optional<T> Value;
 
 public:
   LazyValue(Initializer Init) : Init(Init){};

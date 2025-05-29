@@ -41,6 +41,8 @@ class ImplicitModuleInterfaceBuilder {
   DiagnosticEngine *diags;
   InterfaceSubContextDelegate &subASTDelegate;
   const StringRef interfacePath;
+  const StringRef sdkPath;
+  const std::optional<StringRef> sysroot;
   const StringRef moduleName;
   const StringRef moduleCachePath;
   const StringRef prebuiltCachePath;
@@ -84,16 +86,19 @@ private:
 public:
   ImplicitModuleInterfaceBuilder(
       SourceManager &sourceMgr, DiagnosticEngine *diags,
-      InterfaceSubContextDelegate &subASTDelegate, StringRef interfacePath,
-      StringRef moduleName, StringRef moduleCachePath,
-      StringRef backupInterfaceDir, StringRef prebuiltCachePath,
-      StringRef ABIDescriptorPath, bool disableInterfaceFileLock = false,
+      InterfaceSubContextDelegate &subASTDelegate,
+      StringRef interfacePath, StringRef sdkPath,
+      std::optional<StringRef> sysroot, StringRef moduleName,
+      StringRef moduleCachePath, StringRef backupInterfaceDir,
+      StringRef prebuiltCachePath, StringRef ABIDescriptorPath,
+      bool disableInterfaceFileLock = false,
       bool silenceInterfaceDiagnostics = false,
       SourceLoc diagnosticLoc = SourceLoc(),
       DependencyTracker *tracker = nullptr)
       : sourceMgr(sourceMgr), diags(diags), subASTDelegate(subASTDelegate),
-        interfacePath(interfacePath), moduleName(moduleName),
-        moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
+        interfacePath(interfacePath), sdkPath(sdkPath), sysroot(sysroot),
+        moduleName(moduleName), moduleCachePath(moduleCachePath),
+        prebuiltCachePath(prebuiltCachePath),
         backupInterfaceDir(backupInterfaceDir),
         ABIDescriptorPath(ABIDescriptorPath),
         disableInterfaceFileLock(disableInterfaceFileLock),

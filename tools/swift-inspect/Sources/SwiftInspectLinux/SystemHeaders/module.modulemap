@@ -1,0 +1,13 @@
+module LinuxSystemHeaders {
+  header "_auxvec.h"
+  header "_elf.h"
+  header "_errno.h"
+  header "_link.h"
+  header "_mman.h"
+  header "_ptrace.h"
+  header "_signal.h"
+  header "_uio.h"
+  header "_unistd.h"
+  header "_wait.h"
+  export *
+}

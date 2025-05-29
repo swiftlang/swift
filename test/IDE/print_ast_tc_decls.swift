@@ -1431,10 +1431,7 @@ protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
 #elseif false
 #else
 #endif
-// PASS_PRINT_AST: #if
-// PASS_PRINT_AST: #elseif
-// PASS_PRINT_AST: #else
-// PASS_PRINT_AST: #endif
+// PASS_PRINT_AST-NOT: #if
 
 public struct MyPair<A, B> { var a: A, b: B }
 public typealias MyPairI<B> = MyPair<Int, B>

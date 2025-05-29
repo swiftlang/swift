@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLExtras.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -70,7 +71,7 @@ void SILBasicBlock::setDebugName(llvm::StringRef name) {
   getModule().setBasicBlockName(this, name);
 }
 
-llvm::Optional<llvm::StringRef> SILBasicBlock::getDebugName() const {
+std::optional<llvm::StringRef> SILBasicBlock::getDebugName() const {
   return getModule().getBasicBlockName(this);
 }
 
@@ -127,6 +128,29 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->eraseBlock(this);
 }
 
+/// Handle the mechanical aspects of removing an unreachable block.
+void SILBasicBlock::removeDeadBlock() {
+  for (SILArgument *arg : getArguments()) {
+    arg->replaceAllUsesWithUndef();
+    // To appease the ownership verifier, just set to None.
+    arg->setOwnershipKind(OwnershipKind::None);
+  }
+
+  // Instructions in the dead block may be used by other dead blocks.  Replace
+  // any uses of them with undef values.
+  while (!empty()) {
+    // Grab the last instruction in the bb.
+    auto *inst = &back();
+
+    // Replace any still-remaining uses with undef values and erase.
+    inst->replaceAllUsesOfAllResultsWithUndef();
+    inst->eraseFromParent();
+  }
+
+  // Now that the bb is empty, eliminate it.
+  eraseFromParent();
+}
+
 void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
   assert(Other->isEntry() == isEntry() &&
          "Expected to both blocks to be entries or not");
@@ -154,7 +178,7 @@ void SILBasicBlock::moveArgumentList(SILBasicBlock *from) {
 }
 
 SILFunctionArgument *
-SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
+SILBasicBlock::createFunctionArgument(SILType Ty, ValueDecl *D,
                                       bool disableEntryBlockVerification) {
   assert((disableEntryBlockVerification || isEntry()) &&
          "Function Arguments can only be in the entry block");
@@ -168,7 +192,7 @@ SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
 SILFunctionArgument *SILBasicBlock::insertFunctionArgument(unsigned AtArgPos,
                                                            SILType Ty,
                                                            ValueOwnershipKind OwnershipKind,
-                                                           const ValueDecl *D) {
+                                                           ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
   auto *arg = new (getModule()) SILFunctionArgument(Ty, OwnershipKind, D);
   arg->parentBlock = this;
@@ -177,7 +201,7 @@ SILFunctionArgument *SILBasicBlock::insertFunctionArgument(unsigned AtArgPos,
 }
 
 SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
-    unsigned i, SILType Ty, ValueOwnershipKind Kind, const ValueDecl *D) {
+    unsigned i, SILType Ty, ValueOwnershipKind Kind, ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
 
   SILFunction *F = getParent();
@@ -202,7 +226,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 /// ValueDecl D).
 SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
                                                   ValueOwnershipKind Kind,
-                                                  const ValueDecl *D,
+                                                  ValueDecl *D,
                                                   bool isReborrow,
                                                   bool isEscaping) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -226,13 +250,13 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
 }
 
 SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
-    unsigned i, SILType ty, ValueOwnershipKind kind, const ValueDecl *d,
+    unsigned i, SILType ty, ValueOwnershipKind kind, ValueDecl *d,
     bool isReborrow, bool isEscaping) {
   // Put in an undef placeholder before we do the replacement since
   // replacePhiArgument() expects the replaced argument to not have
   // any uses.
   SmallVector<Operand *, 16> operands;
-  SILValue undef = SILUndef::get(ty, *getParent());
+  SILValue undef = SILUndef::get(getParent(), ty);
   SILArgument *arg = getArgument(i);
   while (!arg->use_empty()) {
     Operand *use = *arg->use_begin();
@@ -253,7 +277,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
 
 SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
-                                                 const ValueDecl *D,
+                                                 ValueDecl *D,
                                                  bool isReborrow,
                                                  bool isEscaping) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -265,7 +289,7 @@ SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
 
 SILPhiArgument *SILBasicBlock::insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                                  ValueOwnershipKind Kind,
-                                                 const ValueDecl *D,
+                                                 ValueDecl *D,
                                                  bool isReborrow,
                                                  bool isEscaping) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -335,12 +359,17 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
       for (SILValue result : II.getResults()) {
         result->resetBitfields();
       }
+      for (Operand &op : II.getAllOperands()) {
+        op.resetBitfields();
+      }
       II.asSILNode()->resetBitfields();
     
       II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
       // Special handling for SILDebugVariable.
+      // Fetch incomplete var info to avoid calling setDebugVarScope on
+      // alloc_box, crashing.
       if (auto DVI = DebugVarCarryingInst(&II))
-        if (auto VarInfo = DVI.getVarInfo())
+        if (auto VarInfo = DVI.getVarInfo(false))
           if (VarInfo->Scope)
             DVI.setDebugVarScope(
                 ScopeCloner.getOrCreateClonedScope(VarInfo->Scope));
@@ -441,7 +470,7 @@ bool SILBasicBlock::hasPhi() const {
 
 const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
   for (auto &Inst : *this)
-    if (Inst.isMetaInstruction())
+    if (!Inst.isMetaInstruction())
       return Inst.getDebugScope();
   return begin()->getDebugScope();
 }

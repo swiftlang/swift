@@ -26,6 +26,7 @@
 #endif
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
+
 #if __has_include(<sys/stat.h>)
 #  include <sys/stat.h>
 
@@ -42,11 +43,25 @@
  #include <dlfcn.h>
 #endif
 
+#if __has_include(<mach-o/dyld_priv.h>)
+#include <mach-o/dyld_priv.h>
+#define APPLE_OS_SYSTEM 1
 #else
+#define APPLE_OS_SYSTEM 0
+#endif
+
+#else // defined(_WIN32)
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 #include <psapi.h>
+
+#endif // defined(_WIN32)
+
+#ifdef __linux__
+// Needed for 'readlink'.
+#include <unistd.h>
 #endif
 
 #include <cerrno>
@@ -517,14 +532,29 @@ _swift_tryAuxExePath(const char *name, const char *path, ...)
 void
 _swift_initRuntimePath(void *) {
 #if APPLE_OS_SYSTEM
-  const char *path = dyld_image_path_containing_address(_swift_initRuntimePath);
+  const char *path =
+      dyld_image_path_containing_address((const void *)_swift_initRuntimePath);
 
-  runtimePath = ::strdup(path);
+  // No need to ::strdup() this, as the return value is guaranteed to remain
+  // valid as long as the library is loaded.
+  runtimePath = path;
 #elif SWIFT_STDLIB_HAS_DLADDR
   Dl_info dli;
   int ret = ::dladdr((void *)_swift_initRuntimePath, &dli);
 
   if (!ret) {
+#ifdef __linux__
+    // If we don't find anything, try reading /proc/self/exe as a fallback;
+    // this is needed with Musl when statically linking because in that case
+    // dladdr() does nothing.
+    char pathBuf[4096];
+    ssize_t len = readlink("/proc/self/exe", pathBuf, sizeof(pathBuf));
+    if (len > 0 && len < sizeof(pathBuf)) {
+      runtimePath = ::strdup(pathBuf);
+      return;
+    }
+#endif
+
     swift::fatalError(/* flags = */ 0,
                       "Unable to obtain Swift runtime path\n");
   }

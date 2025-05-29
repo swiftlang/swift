@@ -1,23 +1,27 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library %s -typecheck -emit-objc-header-path %t/accessibility.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -parse-as-library %s -typecheck -verify -emit-objc-header-path %t/accessibility.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility.h
 // RUN: %check-in-clang %t/accessibility.h
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-objc-header-path %t/accessibility-internal.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -verify -emit-objc-header-path %t/accessibility-internal.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-internal.h
 // RUN: %check-in-clang %t/accessibility-internal.h
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -typecheck -import-objc-header %S/../Inputs/empty.h -emit-objc-header-path %t/accessibility-imported-header.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -import-objc-header %S/../Inputs/empty.h -typecheck -verify -emit-objc-header-path %t/accessibility-imported-header.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-imported-header.h
 // RUN: %check-in-clang %t/accessibility-imported-header.h
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -typecheck -DMAIN -emit-objc-header-path %t/accessibility-main.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -DMAIN -typecheck -verify -emit-objc-header-path %t/accessibility-main.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-main.h
 // RUN: %check-in-clang %t/accessibility-main.h
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -typecheck -application-extension -emit-objc-header-path %t/accessibility-appext.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -application-extension -typecheck -verify -emit-objc-header-path %t/accessibility-appext.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-appext.h
 // RUN: %check-in-clang %t/accessibility-appext.h
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -application-extension-library -typecheck -verify -emit-objc-header-path %t/accessibility-appextlib.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility-appextlib.h
+// RUN: %check-in-clang %t/accessibility-appextlib.h
 
 // REQUIRES: objc_interop
 

@@ -19,8 +19,9 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/BridgingUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -41,11 +42,19 @@ SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 }
 
+bool swiftModulesInitialized() {
+  return nodeMetatypesInitialized;
+}
+
 // Does return null if initializeSwiftModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
-  assert((!nodeMetatypesInitialized || metatype) &&
-        "no metatype for bridged SIL node");
+  if (nodeMetatypesInitialized && !metatype) {
+    ABORT([&](auto &out) {
+      out << "Instruction " << getSILInstructionName((SILInstructionKind)kind)
+          << " not registered";
+    });
+  }
   return metatype;
 }
 
@@ -54,24 +63,11 @@ SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
 //===----------------------------------------------------------------------===//
 
 static llvm::StringMap<SILNodeKind> valueNamesToKind;
-static llvm::SmallPtrSet<SwiftMetatype, 4> unimplementedTypes;
-
-// Utility to fill in a metatype of an "unimplemented" class for a whole range
-// of class types.
-static void setUnimplementedRange(SwiftMetatype metatype,
-                                  SILNodeKind from, SILNodeKind to) {
-  unimplementedTypes.insert(metatype);
-  for (unsigned kind = (unsigned)from; kind <= (unsigned)to; ++kind) {
-    assert((!nodeMetatypes[kind] || unimplementedTypes.count(metatype)) &&
-           "unimplemented nodes must be registered first");
-    nodeMetatypes[kind] = metatype;
-  }
-}
 
 /// Registers the metatype of a swift SIL class.
 /// Called by initializeSwiftModules().
 void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metatype) {
-  StringRef className = bridgedClassName.get();
+  StringRef className = bridgedClassName.unbridged();
   nodeMetatypesInitialized = true;
 
   // Handle the important non Node classes.
@@ -87,20 +83,6 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
     nodeMetatypes[(unsigned)SILNodeKind::SILFunctionArgument] = metatype;
     return;
   }
-
-  // Pre-populate the "unimplemented" ranges of metatypes.
-  // If a specific class is not implemented in Swift yet, it bridges to an
-  // "unimplemented" class. This ensures that optimizations handle _all_ kind of
-  // instructions gracefully, without the need to define the not-yet-used
-  // classes in Swift.
-#define VALUE_RANGE(ID) SILNodeKind::First_##ID, SILNodeKind::Last_##ID
-  if (className == "UnimplementedRefCountingInst")
-    return setUnimplementedRange(metatype, VALUE_RANGE(RefCountingInst));
-  if (className == "UnimplementedSingleValueInst")
-    return setUnimplementedRange(metatype, VALUE_RANGE(SingleValueInstruction));
-  if (className == "UnimplementedInstruction")
-    return setUnimplementedRange(metatype, VALUE_RANGE(SILInstruction));
-#undef VALUE_RANGE
 
   if (valueNamesToKind.empty()) {
 #define VALUE(ID, PARENT) \
@@ -123,16 +105,18 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
     prefixedName = std::string("SIL") + std::string(className);
     iter = valueNamesToKind.find(prefixedName);
     if (iter == valueNamesToKind.end()) {
-      llvm::errs() << "Unknown bridged node class " << className << '\n';
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unknown bridged node class " << className;
+      });
     }
     className = prefixedName;
   }
   SILNodeKind kind = iter->second;
   SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
-  if (existingTy && !unimplementedTypes.count(existingTy)) {
-    llvm::errs() << "Double registration of class " << className << '\n';
-    abort();
+  if (existingTy) {
+    ABORT([&](auto &out) {
+      out << "Double registration of class " << className;
+    });
   }
   nodeMetatypes[(unsigned)kind] = metatype;
 }
@@ -142,7 +126,8 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
 //===----------------------------------------------------------------------===//
 
 void registerFunctionTest(BridgedStringRef name, void *nativeSwiftInvocation) {
-  new swift::test::FunctionTest(name.get(), nativeSwiftInvocation);
+  swift::test::FunctionTest::createNativeSwiftFunctionTest(
+      name.unbridged(), nativeSwiftInvocation);
 }
 
 bool BridgedTestArguments::hasUntaken() const {
@@ -182,19 +167,6 @@ BridgedFunction BridgedTestArguments::takeFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                SILType
-//===----------------------------------------------------------------------===//
-
-static_assert((int)BridgedType::MetatypeRepresentation::Thin == (int)swift::MetatypeRepresentation::Thin);
-static_assert((int)BridgedType::MetatypeRepresentation::Thick == (int)swift::MetatypeRepresentation::Thick);
-static_assert((int)BridgedType::MetatypeRepresentation::ObjC == (int)swift::MetatypeRepresentation::ObjC);
-
-static_assert((int)BridgedType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
-static_assert((int)BridgedType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
-static_assert((int)BridgedType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
-
-
-//===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 
@@ -208,17 +180,66 @@ static_assert((int)BridgedFunction::EffectsKind::Custom == (int)swift::EffectsKi
 static_assert((int)BridgedFunction::PerformanceConstraints::None == (int)swift::PerformanceConstraints::None);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoAllocation == (int)swift::PerformanceConstraints::NoAllocation);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoLocks == (int)swift::PerformanceConstraints::NoLocks);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoRuntime == (int)swift::PerformanceConstraints::NoRuntime);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoExistentials == (int)swift::PerformanceConstraints::NoExistentials);
+static_assert((int)BridgedFunction::PerformanceConstraints::NoObjCBridging == (int)swift::PerformanceConstraints::NoObjCBridging);
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
+
+static_assert((int)BridgedFunction::ThunkKind::IsNotThunk == (int)swift::IsNotThunk);
+static_assert((int)BridgedFunction::ThunkKind::IsThunk == (int)swift::IsThunk);
+static_assert((int)BridgedFunction::ThunkKind::IsReabstractionThunk == (int)swift::IsReabstractionThunk);
+static_assert((int)BridgedFunction::ThunkKind::IsSignatureOptimizedThunk == (int)swift::IsSignatureOptimizedThunk);
 
 BridgedOwnedString BridgedFunction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   getFunction()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
+}
+
+BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubstitutions,
+                                                               BridgedCanType selfType) const {
+  swift::SILFunction *f = getFunction();
+  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
+
+  if (!genericSig || genericSig->areAllParamsConcrete())
+    return swift::SubstitutionMap();
+
+  SubstitutionMap contextSubs = contextSubstitutions.unbridged();
+  if (selfType.unbridged() &&
+      contextSubs.getGenericSignature().getGenericParams().size() + 1 == genericSig.getGenericParams().size()) {
+
+    // If this is a default witness methods (`selfType` != nil) it has generic self type. In this case
+    // the generic self parameter is at depth 0 and the actual generic parameters of the substitution map
+    // are at depth + 1, e.g:
+    // ```
+    //     @convention(witness_method: P) <τ_0_0><τ_1_0 where τ_0_0 : GenClass<τ_1_0>.T>
+    //                                       ^      ^
+    //                                    self      params of substitution map at depth + 1
+    // ```
+    return swift::SubstitutionMap::get(genericSig,
+      [&](SubstitutableType *type) -> Type {
+        GenericTypeParamType *genericParam = cast<GenericTypeParamType>(type);
+        // The self type is τ_0_0
+        if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+          return selfType.unbridged();
+
+        // Lookup the substitution map types at depth - 1.
+        auto *depthMinus1Param = GenericTypeParamType::getType(genericParam->getDepth() - 1,
+                                                               genericParam->getIndex(),
+                                                               genericParam->getASTContext());
+        return swift::QuerySubstitutionMap{contextSubs}(depthMinus1Param);
+      },
+      swift::LookUpConformanceInModule());
+
+  }
+  return swift::SubstitutionMap::get(genericSig,
+                                     swift::QuerySubstitutionMap{contextSubs},
+                                     swift::LookUpConformanceInModule());
 }
 
 //===----------------------------------------------------------------------===//
@@ -228,9 +249,9 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
 BridgedOwnedString BridgedBasicBlock::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  get()->print(os);
+  unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -242,7 +263,7 @@ BridgedOwnedString BridgedValue::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getSILValue()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedValue::Kind BridgedValue::getKind() const {
@@ -266,6 +287,9 @@ ArrayRef<SILValue> BridgedValueArray::getValues(SmallVectorImpl<SILValue> &stora
   return storage;
 }
 
+bool BridgedValue::findPointerEscape() const {
+  return swift::findPointerEscape(getSILValue());
+}
 
 //===----------------------------------------------------------------------===//
 //                                SILArgument
@@ -284,6 +308,30 @@ static_assert((int)BridgedArgumentConvention::Pack_Inout == (int)swift::SILArgum
 static_assert((int)BridgedArgumentConvention::Pack_Guaranteed == (int)swift::SILArgumentConvention::Pack_Guaranteed);
 static_assert((int)BridgedArgumentConvention::Pack_Out == (int)swift::SILArgumentConvention::Pack_Out);
 
+//===----------------------------------------------------------------------===//
+//                                Linkage
+//===----------------------------------------------------------------------===//
+
+static_assert((int)BridgedLinkage::Public == (int)swift::SILLinkage::Public);
+static_assert((int)BridgedLinkage::PublicNonABI == (int)swift::SILLinkage::PublicNonABI);
+static_assert((int)BridgedLinkage::Package == (int)swift::SILLinkage::Package);
+static_assert((int)BridgedLinkage::PackageNonABI == (int)swift::SILLinkage::PackageNonABI);
+static_assert((int)BridgedLinkage::Hidden == (int)swift::SILLinkage::Hidden);
+static_assert((int)BridgedLinkage::Shared == (int)swift::SILLinkage::Shared);
+static_assert((int)BridgedLinkage::Private == (int)swift::SILLinkage::Private);
+static_assert((int)BridgedLinkage::PublicExternal == (int)swift::SILLinkage::PublicExternal);
+static_assert((int)BridgedLinkage::PackageExternal == (int)swift::SILLinkage::PackageExternal);
+static_assert((int)BridgedLinkage::HiddenExternal == (int)swift::SILLinkage::HiddenExternal);
+
+//===----------------------------------------------------------------------===//
+//                                Operand
+//===----------------------------------------------------------------------===//
+
+void BridgedOperand::changeOwnership(BridgedValue::Ownership from, BridgedValue::Ownership to) const {
+  swift::ForwardingOperand forwardingOp(op);
+  assert(forwardingOp);
+  forwardingOp.replaceOwnershipKind(BridgedValue::unbridge(from), BridgedValue::unbridge(to));
+}
 
 //===----------------------------------------------------------------------===//
 //                            SILGlobalVariable
@@ -294,7 +342,7 @@ BridgedOwnedString BridgedGlobalVar::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getGlobal()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedGlobalVar::canBeInitializedStatically() const {
@@ -314,42 +362,70 @@ bool BridgedGlobalVar::mustBeInitializedStatically() const {
   return global->mustBeInitializedStatically();
 }
 
+bool BridgedGlobalVar::isConstValue() const {
+  SILGlobalVariable *global = getGlobal();
+  if (const auto &decl = global->getDecl())
+    return decl->isConstValue();
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                            SILDeclRef
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedDeclRef::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().print(os);
+  return BridgedOwnedString(str);
+}
+
 //===----------------------------------------------------------------------===//
 //                            SILVTable
 //===----------------------------------------------------------------------===//
+
+static_assert(sizeof(BridgedVTableEntry) >= sizeof(swift::SILVTableEntry),
+              "BridgedVTableEntry has wrong size");
+
+static_assert((int)BridgedVTableEntry::Kind::Normal == (int)swift::SILVTableEntry::Normal);
+static_assert((int)BridgedVTableEntry::Kind::Inherited == (int)swift::SILVTableEntry::Inherited);
+static_assert((int)BridgedVTableEntry::Kind::Override == (int)swift::SILVTableEntry::Override);
 
 BridgedOwnedString BridgedVTable::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   vTable->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedVTableEntry::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  entry->print(os);
+  unbridged().print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
 //                    SILVWitnessTable, SILDefaultWitnessTable
 //===----------------------------------------------------------------------===//
 
-static_assert((int)BridgedWitnessTableEntry::Kind::Invalid == (int)swift::SILWitnessTable::WitnessKind::Invalid);
-static_assert((int)BridgedWitnessTableEntry::Kind::Method == (int)swift::SILWitnessTable::WitnessKind::Method);
-static_assert((int)BridgedWitnessTableEntry::Kind::AssociatedType == (int)swift::SILWitnessTable::WitnessKind::AssociatedType);
-static_assert((int)BridgedWitnessTableEntry::Kind::AssociatedTypeProtocol == (int)swift::SILWitnessTable::WitnessKind::AssociatedTypeProtocol);
-static_assert((int)BridgedWitnessTableEntry::Kind::BaseProtocol == (int)swift::SILWitnessTable::WitnessKind::BaseProtocol);
+static_assert(sizeof(BridgedWitnessTableEntry) >= sizeof(swift::SILWitnessTable::Entry),
+              "BridgedWitnessTableEntry has wrong size");
+
+static_assert((int)BridgedWitnessTableEntry::Kind::invalid == (int)swift::SILWitnessTable::WitnessKind::Invalid);
+static_assert((int)BridgedWitnessTableEntry::Kind::method == (int)swift::SILWitnessTable::WitnessKind::Method);
+static_assert((int)BridgedWitnessTableEntry::Kind::associatedType == (int)swift::SILWitnessTable::WitnessKind::AssociatedType);
+static_assert((int)BridgedWitnessTableEntry::Kind::associatedConformance == (int)swift::SILWitnessTable::WitnessKind::AssociatedConformance);
+static_assert((int)BridgedWitnessTableEntry::Kind::baseProtocol == (int)swift::SILWitnessTable::WitnessKind::BaseProtocol);
 
 BridgedOwnedString BridgedWitnessTableEntry::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  getEntry()->print(os, /*verbose=*/ false, PrintOptions::printSIL());
+  unbridged().print(os, /*verbose=*/ false, PrintOptions::printSIL());
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedWitnessTable::getDebugDescription() const {
@@ -357,7 +433,7 @@ BridgedOwnedString BridgedWitnessTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   table->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
@@ -365,16 +441,8 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   table->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
-
-//===----------------------------------------------------------------------===//
-//                               SubstitutionMap
-//===----------------------------------------------------------------------===//
-
-static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
-              "BridgedSubstitutionMap has wrong size");
-
 
 //===----------------------------------------------------------------------===//
 //                               SILDebugLocation
@@ -398,7 +466,7 @@ BridgedOwnedString BridgedLocation::getDebugDescription() const {
     }
   }
 #endif
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -411,46 +479,66 @@ static_assert((int)BridgedMemoryBehavior::MayWrite == (int)swift::MemoryBehavior
 static_assert((int)BridgedMemoryBehavior::MayReadWrite == (int)swift::MemoryBehavior::MayReadWrite);
 static_assert((int)BridgedMemoryBehavior::MayHaveSideEffects == (int)swift::MemoryBehavior::MayHaveSideEffects);
 
-static_assert((int)BridgedInstruction::AccessKind::Init == (int)swift::SILAccessKind::Init);
-static_assert((int)BridgedInstruction::AccessKind::Read == (int)swift::SILAccessKind::Read);
-static_assert((int)BridgedInstruction::AccessKind::Modify == (int)swift::SILAccessKind::Modify);
-static_assert((int)BridgedInstruction::AccessKind::Deinit == (int)swift::SILAccessKind::Deinit);
-
 BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  get()->print(os);
+  unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(get());
+  return ::mayAccessPointer(unbridged());
 }
 
 bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(get());
+  return ::mayLoadWeakOrUnowned(unbridged());
 }
 
-bool BridgedInstruction::maySynchronizeNotConsideringSideEffects() const {
-  return ::maySynchronizeNotConsideringSideEffects(get());
+bool BridgedInstruction::maySynchronize() const {
+  return ::maySynchronize(unbridged());
 }
 
 bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
-  return ::mayBeDeinitBarrierNotConsideringSideEffects(get());
+  return ::mayBeDeinitBarrierNotConsideringSideEffects(unbridged());
 }
 
 //===----------------------------------------------------------------------===//
-//                               BridgedNominalTypeDecl
+//                               BridgedBuilder
 //===----------------------------------------------------------------------===//
 
-bool BridgedNominalTypeDecl::isStructWithUnreferenceableStorage() const {
-  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl)) {
-    return structDecl->hasUnreferenceableStorage();
+static llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16>
+convertCases(SILType enumTy, const void * _Nullable enumCases, SwiftInt numEnumCases) {
+  using BridgedCase = const std::pair<SwiftInt, BridgedBasicBlock>;
+  llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
+                                    (unsigned)numEnumCases);
+  llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
+  swift::EnumDecl *enumDecl = enumTy.getEnumOrBoundGenericEnum();
+  for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
+    mappedElements[elemWithIndex.index()] = elemWithIndex.value();
   }
-  return false;
+  llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16> convertedCases;
+  for (auto c : cases) {
+    assert(mappedElements.count(c.first) && "wrong enum element index");
+    convertedCases.push_back({mappedElements[c.first], c.second.unbridged()});
+  }
+  return convertedCases;
 }
 
-void writeCharToStderr(int c) {
-  putc(c, stderr);
+BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
+                                        const void * _Nullable enumCases, SwiftInt numEnumCases) const {
+  return {unbridged().createSwitchEnum(regularLoc(),
+                                       enumVal.getSILValue(),
+                                       defaultBlock.unbridged(),
+                                       convertCases(enumVal.getSILValue()->getType(), enumCases, numEnumCases))};
+}
+
+BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAddr,
+                                                            OptionalBridgedBasicBlock defaultBlock,
+                                                            const void * _Nullable enumCases,
+                                                            SwiftInt numEnumCases) const {
+  return {unbridged().createSwitchEnumAddr(regularLoc(),
+                                           enumAddr.getSILValue(),
+                                           defaultBlock.unbridged(),
+                                           convertCases(enumAddr.getSILValue()->getType(), enumCases, numEnumCases))};
 }

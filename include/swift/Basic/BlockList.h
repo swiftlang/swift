@@ -23,6 +23,8 @@
 
 namespace swift {
 
+class SourceManager;
+
 enum class BlockListAction: uint8_t {
   Undefined = 0,
 #define BLOCKLIST_ACTION(NAME) NAME,
@@ -41,7 +43,7 @@ public:
   void addConfigureFilePath(StringRef path);
   bool hasBlockListAction(StringRef key, BlockListKeyKind keyKind,
                           BlockListAction action);
-  BlockListStore();
+  BlockListStore(SourceManager &SM);
   ~BlockListStore();
 private:
   Implementation &Impl;

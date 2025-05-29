@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-sil-verify-all %s -compute-side-effects -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -compute-side-effects -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-LOG <%t/log
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
 // REQUIRES: asserts
 
 // REQUIRES: swift_in_compiler
@@ -470,3 +470,130 @@ bb0:
 // TODO:
 // Check that the inlining heuristic takes into account the possibility
 // of performing a devirtualization after inlining.
+
+// Test of inlining functions with many parameters
+
+// CHECK-LABEL: sil @testManyParams : $@convention(thin) (Float,
+// CHECK-NOT: apply
+// CHECK: return
+// CHECK: end sil function 'testManyParams'
+
+sil @manyParamsCallee1 : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float, %4 : $Float, %5 : $Float, %6 : $Float, %7 : $Float, %8 : $Float, %9 : $Float, %10 : $Float, %11 : $Float, %12 : $Float, %13 : $Float, %14 : $Float, %15 : $Float, %16 : $Float, %17 : $Float, %18 : $Float):
+  %19 = struct_extract %10 : $Float, #Float._value // user: %21
+  %20 = struct_extract %0 : $Float, #Float._value // users: %65, %67, %60, %53, %55, %23, %21
+  %21 = builtin "fmul_FPIEEE32"(%19 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %27, %25
+  %22 = struct_extract %11 : $Float, #Float._value // user: %23
+  %23 = builtin "fmul_FPIEEE32"(%22 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %28
+  %24 = struct_extract %8 : $Float, #Float._value // user: %25
+  %25 = builtin "fmul_FPIEEE32"(%24 : $Builtin.FPIEEE32, %21 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %29
+  %26 = struct_extract %9 : $Float, #Float._value // user: %27
+  %27 = builtin "fmul_FPIEEE32"(%26 : $Builtin.FPIEEE32, %21 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %28
+  %28 = builtin "fadd_FPIEEE32"(%27 : $Builtin.FPIEEE32, %23 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %50
+  %29 = builtin "fneg_FPIEEE32"(%25 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %31
+  %30 = struct_extract %18 : $Float, #Float._value // user: %31
+  %31 = builtin "fdiv_FPIEEE32"(%29 : $Builtin.FPIEEE32, %30 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %34, %32
+  %33 = struct_extract %17 : $Float, #Float._value // user: %34
+  %34 = builtin "fdiv_FPIEEE32"(%31 : $Builtin.FPIEEE32, %33 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %36
+  %35 = struct_extract %16 : $Float, #Float._value // user: %36
+  %36 = builtin "fmul_FPIEEE32"(%35 : $Builtin.FPIEEE32, %34 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %43, %37
+  %38 = struct_extract %14 : $Float, #Float._value // users: %41, %41
+  %39 = struct_extract %15 : $Float, #Float._value // user: %40
+  %40 = builtin "fneg_FPIEEE32"(%39 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %42
+  %41 = builtin "fmul_FPIEEE32"(%38 : $Builtin.FPIEEE32, %38 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %42
+  %42 = builtin "fdiv_FPIEEE32"(%40 : $Builtin.FPIEEE32, %41 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %43
+  %43 = builtin "fmul_FPIEEE32"(%42 : $Builtin.FPIEEE32, %36 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %46, %44
+  %45 = struct_extract %13 : $Float, #Float._value // user: %46
+  %46 = builtin "fdiv_FPIEEE32"(%43 : $Builtin.FPIEEE32, %45 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %48
+  %47 = struct_extract %12 : $Float, #Float._value // user: %48
+  %48 = builtin "fmul_FPIEEE32"(%47 : $Builtin.FPIEEE32, %46 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %49, %50
+  %50 = builtin "fadd_FPIEEE32"(%48 : $Builtin.FPIEEE32, %28 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %51, %63
+  %52 = struct_extract %6 : $Float, #Float._value // user: %53
+  %53 = builtin "fmul_FPIEEE32"(%52 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %57
+  %54 = struct_extract %7 : $Float, #Float._value // user: %55
+  %55 = builtin "fmul_FPIEEE32"(%54 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %58
+  %56 = struct_extract %5 : $Float, #Float._value // user: %57
+  %57 = builtin "fmul_FPIEEE32"(%56 : $Builtin.FPIEEE32, %53 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %58
+  %58 = builtin "fadd_FPIEEE32"(%57 : $Builtin.FPIEEE32, %55 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %61
+  %59 = struct_extract %4 : $Float, #Float._value // user: %60
+  %60 = builtin "fmul_FPIEEE32"(%59 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %61
+  %61 = builtin "fadd_FPIEEE32"(%60 : $Builtin.FPIEEE32, %58 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %62, %63
+  %63 = builtin "fadd_FPIEEE32"(%61 : $Builtin.FPIEEE32, %50 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %75
+  %64 = struct_extract %2 : $Float, #Float._value // user: %65
+  %65 = builtin "fmul_FPIEEE32"(%64 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %69
+  %66 = struct_extract %3 : $Float, #Float._value // user: %67
+  %67 = builtin "fmul_FPIEEE32"(%66 : $Builtin.FPIEEE32, %20 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %70
+  %68 = struct_extract %1 : $Float, #Float._value // user: %69
+  %69 = builtin "fmul_FPIEEE32"(%68 : $Builtin.FPIEEE32, %65 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %70
+  %70 = builtin "fadd_FPIEEE32"(%69 : $Builtin.FPIEEE32, %67 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %73
+  %71 = integer_literal $Builtin.Int64, 0         // user: %72
+  %72 = builtin "sitofp_Int64_FPIEEE32"(%71 : $Builtin.Int64) : $Builtin.FPIEEE32 // user: %73
+  %73 = builtin "fadd_FPIEEE32"(%72 : $Builtin.FPIEEE32, %70 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %74, %75
+  %75 = builtin "fadd_FPIEEE32"(%73 : $Builtin.FPIEEE32, %63 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %76
+  %76 = struct $Float (%75 : $Builtin.FPIEEE32)   // users: %78, %77
+  return %76 : $Float                             // id: %78
+}
+
+sil @manyParamsCallee2 : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float, %4 : $Float, %5 : $Float, %6 : $Float, %7 : $Float, %8 : $Float, %9 : $Float, %10 : $Float, %11 : $Float, %12 : $Float, %13 : $Float, %14 : $Float, %15 : $Float, %16 : $Float, %17 : $Float, %18 : $Float, %19 : $Float, %20 : $Float, %21 : $Float, %22 : $Float, %23 : $Float, %24 : $Float, %25 : $Float, %26 : $Float):
+  %27 = function_ref @manyParamsCallee1 : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Float
+  %28 = apply %27(%0, %2, %3, %4, %6, %8, %9, %10, %11, %12, %13, %14, %15, %17, %19, %20, %21, %23, %25) : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Float
+  return %28 : $Float
+}
+
+sil @testManyParams : $@convention(thin) (Float, Builtin.FPIEEE32, Builtin.FPIEEE32, Builtin.FPIEEE32) -> (Float, Float) {
+bb0(%0 : $Float, %1 : @closureCapture $Builtin.FPIEEE32, %2 : @closureCapture $Builtin.FPIEEE32, %3 : @closureCapture $Builtin.FPIEEE32):
+  %4 = struct $Float (%3 : $Builtin.FPIEEE32)
+  %5 = struct $Float (%2 : $Builtin.FPIEEE32)
+  %11 = float_literal $Builtin.FPIEEE32, 0x47C35000 // 1.0E+5 // user: %12
+  %12 = builtin "fneg_FPIEEE32"(%11 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %15, %13
+  %13 = struct $Float (%12 : $Builtin.FPIEEE32)   // user: %67
+  %14 = struct_extract %0 : $Float, #Float._value // users: %60, %58, %34, %23, %21, %19, %17, %15
+  %15 = builtin "fmul_FPIEEE32"(%12 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %17, %16
+  %16 = struct $Float (%15 : $Builtin.FPIEEE32)   // user: %67
+  %17 = builtin "fmul_FPIEEE32"(%15 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %25
+  %19 = builtin "fmul_FPIEEE32"(%2 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %20
+  %20 = builtin "fadd_FPIEEE32"(%1 : $Builtin.FPIEEE32, %19 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %24
+  %21 = builtin "fmul_FPIEEE32"(%3 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %23, %22
+  %22 = struct $Float (%21 : $Builtin.FPIEEE32)   // user: %67
+  %23 = builtin "fmul_FPIEEE32"(%21 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %24
+  %24 = builtin "fadd_FPIEEE32"(%20 : $Builtin.FPIEEE32, %23 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %25
+  %25 = builtin "fadd_FPIEEE32"(%17 : $Builtin.FPIEEE32, %24 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %61
+  %28 = float_literal $Builtin.FPIEEE32, 0x3C9C0EBF // 0.0190500002 // users: %50, %34, %29
+  %29 = struct $Float (%28 : $Builtin.FPIEEE32)   // users: %67, %67, %30
+  %31 = float_literal $Builtin.FPIEEE32, 0x425AA3D7 // 54.6599998 // users: %48, %32
+  %32 = struct $Float (%31 : $Builtin.FPIEEE32)   // users: %67, %33
+  %34 = builtin "fmul_FPIEEE32"(%14 : $Builtin.FPIEEE32, %28 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %38, %35
+  %35 = struct $Float (%34 : $Builtin.FPIEEE32)   // user: %67
+  %36 = float_literal $Builtin.FPIEEE32, 0x34883033 // 2.53670436E-7 // users: %38, %37
+  %37 = struct $Float (%36 : $Builtin.FPIEEE32)   // user: %67
+  %38 = builtin "fdiv_FPIEEE32"(%34 : $Builtin.FPIEEE32, %36 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %43, %39
+  %40 = float_literal $Builtin.FPIEEE32, 0x42800000 // 64 // users: %45, %41
+  %41 = struct $Float (%40 : $Builtin.FPIEEE32)   // user: %67
+  %42 = float_literal $Builtin.FPIEEE32, 0x3C23D70A // 0.00999999977 // user: %43
+  %43 = builtin "fadd_FPIEEE32"(%38 : $Builtin.FPIEEE32, %42 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %45, %44
+  %44 = struct $Float (%43 : $Builtin.FPIEEE32)   // user: %67
+  %45 = builtin "fdiv_FPIEEE32"(%40 : $Builtin.FPIEEE32, %43 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %48, %46
+  %46 = struct $Float (%45 : $Builtin.FPIEEE32)   // users: %67, %47
+  %48 = builtin "fmul_FPIEEE32"(%45 : $Builtin.FPIEEE32, %31 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %50, %49
+  %49 = struct $Float (%48 : $Builtin.FPIEEE32)   // user: %67
+  %50 = builtin "fdiv_FPIEEE32"(%48 : $Builtin.FPIEEE32, %28 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %55, %51
+  %51 = struct $Float (%50 : $Builtin.FPIEEE32)   // users: %67, %52
+  %53 = float_literal $Builtin.FPIEEE32, 0x3929844A // 1.61663775E-4 // users: %55, %54
+  %54 = struct $Float (%53 : $Builtin.FPIEEE32)   // user: %67
+  %55 = builtin "fdiv_FPIEEE32"(%50 : $Builtin.FPIEEE32, %53 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %56
+  %56 = builtin "fneg_FPIEEE32"(%55 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %58, %57
+  %57 = struct $Float (%56 : $Builtin.FPIEEE32)   // user: %67
+  %58 = builtin "fmul_FPIEEE32"(%56 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // users: %60, %59
+  %59 = struct $Float (%58 : $Builtin.FPIEEE32)   // user: %67
+  %60 = builtin "fmul_FPIEEE32"(%58 : $Builtin.FPIEEE32, %14 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %61
+  %61 = builtin "fadd_FPIEEE32"(%25 : $Builtin.FPIEEE32, %60 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32 // user: %62
+  %62 = struct $Float (%61 : $Builtin.FPIEEE32)   // user: %69
+  %63 = integer_literal $Builtin.Int64, 1         // user: %64
+  %64 = builtin "sitofp_Int64_FPIEEE32"(%63 : $Builtin.Int64) : $Builtin.FPIEEE32
+  %65 = struct $Float (%64 : $Builtin.FPIEEE32)
+  %66 = function_ref @manyParamsCallee2 : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Float
+  %67 = apply %66(%65, %0, %13, %0, %16, %0, %5, %0, %4, %0, %22, %0, %57, %0, %59, %29, %0, %37, %35, %44, %41, %32, %46, %29, %49, %54, %51) : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float, Float) -> Float // users: %69, %68
+  %69 = tuple (%62 : $Float, %67 : $Float)        // user: %70
+  return %69 : $(Float, Float)                    // id: %70
+}

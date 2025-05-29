@@ -751,3 +751,10 @@ do {
     _ = a is String // OK
   }
 }
+
+// rdar://115603144 - casting `any Sendable` to a collection warns about cast failure although the cast could succeed at runtime
+func test_existential_sendable_cast(v: any Sendable) {
+  let _ = v as! [Any] // Ok
+  let _ = v as! [String: Any] // Ok
+  let _ = v as! Set<Int> // Ok
+}

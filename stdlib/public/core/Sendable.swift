@@ -10,7 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type whose values can safely be passed across concurrency domains by copying.
+/// A type `T` whose metatype `T.Type` is `Sendable`.
+@_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }
+
+/// A thread-safe type whose values can be shared across arbitrary concurrent
+/// contexts without introducing a risk of data races. Values of the type may
+/// have no shared mutable state, or they may protect that state with a lock or
+/// by forcing it to only be accessed from a specific actor.
 ///
 /// You can safely pass values of a sendable type
 /// from one concurrency domain to another ---
@@ -129,7 +135,8 @@
 /// ### Sendable Metatypes
 ///
 /// Metatypes such as `Int.Type` implicitly conform to the `Sendable` protocol.
-@_marker public protocol Sendable { }
+@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable { }
+
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,
 /// but which disables some safety checking at the conformance site.
@@ -138,11 +145,14 @@
 ///
 ///     struct MyStructure: @unchecked Sendable { ... }
 @available(*, deprecated, message: "Use @unchecked Sendable instead")
+@available(swift, obsoleted: 6.0, message: "Use @unchecked Sendable instead")
 @_marker public protocol UnsafeSendable: Sendable { }
 
 // Historical names
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias ConcurrentValue = Sendable
 
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias UnsafeConcurrentValue = UnsafeSendable

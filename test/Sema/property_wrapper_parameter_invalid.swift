@@ -77,6 +77,7 @@ struct Wrapper<T> { // expected-note 3 {{type declared here}}
     self.wrappedValue = projectedValue.value
   }
 
+  // expected-note@+1 {{property 'wrappedValue' is not '@usableFromInline' or public}}
   var wrappedValue: T
   var projectedValue: Projection<T> { Projection(value: wrappedValue) }
 }
@@ -127,6 +128,7 @@ enum E {
 // expected-error@+1 {{function cannot be declared public because its parameter uses an internal API wrapper type}}
 public func f1(@Wrapper value: Int) {}
 
+// expected-error@+4 {{property 'wrappedValue' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+3 {{generic struct 'Wrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
@@ -155,6 +157,7 @@ public struct PublicWrapper<T> {
 // expected-note@+2 2 {{generic struct 'PackageWrapper' is not '@usableFromInline' or public}}
 @propertyWrapper
 package struct PackageWrapper<T> { // expected-note 3 {{type declared here}}
+  // expected-note@+1 2 {{property 'wrappedValue' is not '@usableFromInline' or public}}
   package var wrappedValue: T
 
   // expected-note@+1 2 {{initializer 'init(wrappedValue:)' is not '@usableFromInline' or public}}
@@ -164,6 +167,7 @@ package struct PackageWrapper<T> { // expected-note 3 {{type declared here}}
 // expected-note@+2 2 {{generic struct 'InternalWrapper' is not '@usableFromInline' or public}}
 @propertyWrapper
 struct InternalWrapper<T> { // expected-note 3 {{type declared here}}
+  // expected-note@+1 2 {{property 'wrappedValue' is not '@usableFromInline' or public}}
   var wrappedValue: T
 
   // expected-note@+1 2 {{initializer 'init(wrappedValue:)' is not '@usableFromInline' or public}}
@@ -200,20 +204,24 @@ public func testComposition2pkg(@PackageWrapper @PublicWrapper value: Int) {}
 // Okay because `PackageWrapper` is implementation-detail.
 @usableFromInline func testComposition4pkg(@PackageWrapper @PublicWrapper value: Int) {}
 
+// expected-error@+4 {{property 'wrappedValue' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+3 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition5(@PublicWrapper @InternalWrapper value: Int) {}
 
+// expected-error@+3 {{property 'wrappedValue' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+2 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition6(@InternalWrapper @PublicWrapper value: Int) {}
 
+// expected-error@+4 {{property 'wrappedValue' is package and cannot be referenced from an '@inlinable' function}}
 // expected-error@+3 {{generic struct 'PackageWrapper' is package and cannot be referenced from an '@inlinable' function}}
 // expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is package and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition5pkg(@PublicWrapper @PackageWrapper value: Int) {}
 
+// expected-error@+3 {{property 'wrappedValue' is package and cannot be referenced from an '@inlinable' function}}
 // expected-error@+2 {{generic struct 'PackageWrapper' is package and cannot be referenced from an '@inlinable' function}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is package and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition6pkg(@PackageWrapper @PublicWrapper value: Int) {}
@@ -262,12 +270,12 @@ struct ProjectionWrapper<Value> {
 
 func testInvalidWrapperInference() {
   struct S<V> {
-    static func test(_ keyPath: KeyPath<V, String>) {} // expected-note {{'test' declared here}}
+    static func test(_ keyPath: KeyPath<V, String>) {} // expected-note 2 {{'test' declared here}}
   }
 
   // expected-error@+1 {{trailing closure passed to parameter of type 'KeyPath<Int, String>' that does not accept a closure}}
   S<Int>.test { $value in }
-  // expected-error@+1 {{cannot convert value of type '(_) -> ()' to expected argument type 'KeyPath<Int, String>'}}
+  // expected-error@+1 {{closure passed to parameter of type 'KeyPath<Int, String>' that does not accept a closure}}
   S<Int>.test({ $value in })
 
   func testGenericClosure<T>(_ closure: T) {}
@@ -278,4 +286,16 @@ func testInvalidWrapperInference() {
   func testExtraParameter(_ closure: () -> Void) {}
   // expected-error@+1 {{contextual closure type '() -> Void' expects 0 arguments, but 1 was used in closure body}}
   testExtraParameter { $value in }
+}
+
+// rdar://116522161 - failed to produce a diagnostic on invalid projection use
+func testInvalidProjectionInAmbiguousContext() {
+  func test<T>(_: [T], _: (T) -> Void) {}
+
+  func ambiguous() -> Int { 42 }
+  func ambiguous() -> String { "" }
+
+  test([42]) { $v in // expected-error {{inferred projection type 'Int' is not a property wrapper}}
+    ambiguous()
+  }
 }

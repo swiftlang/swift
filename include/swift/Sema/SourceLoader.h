@@ -59,9 +59,10 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
-  virtual bool canImportModule(ImportPath::Module named,
-                               ModuleVersionInfo *versionInfo,
-                               bool isTestableDependencyLookup = false) override;
+  virtual bool
+  canImportModule(ImportPath::Module named, SourceLoc loc,
+                  ModuleVersionInfo *versionInfo,
+                  bool isTestableDependencyLookup = false) override;
 
   /// Import a module with the given module path.
   ///
@@ -98,12 +99,11 @@ public:
   }
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper,
+                        llvm::PrefixMapper *mapper,
                         bool isTestableImport) override;
 };
 }

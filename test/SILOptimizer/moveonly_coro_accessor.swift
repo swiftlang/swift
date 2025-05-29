@@ -1,9 +1,8 @@
-// RUN: %target-swift-emit-sil -module-name test -sil-verify-all -verify %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name test -sil-verify-all -verify %s | %FileCheck %s --enable-var-scope
 
 @inline(never) func someFunction() {}
 
-@_moveOnly
-public struct File {
+public struct File: ~Copyable {
   var x = 0
   var associatedFiles: ListOfFiles = ListOfFiles()
 
@@ -38,7 +37,7 @@ public class ListOfFiles {
 // ListOfFiles.file.setter
 // CHECK-LABEL: sil [transparent] @$s4test11ListOfFilesC4fileAA4FileVvs : $@convention(method) (@owned File, @guaranteed ListOfFiles) -> () {
 // CHECK:  bb0([[NEW_VAL:%.*]] : $File, [[SELF:%.*]] : $ListOfFiles):
-// CHECK:    [[NEW_VAL_STACK:%.*]] = alloc_stack $File, let, name "value", argno 1, implicit
+// CHECK:    [[NEW_VAL_STACK:%.*]] = alloc_stack $File, let, name "value", argno 1
 // CHECK:    store [[NEW_VAL]] to [[NEW_VAL_STACK]] : $*File
 // CHECK:    [[NEW_VAL_RELOADED:%.*]] = load [[NEW_VAL_STACK]] : $*File
 // >> destroy the element currently in the field

@@ -10,10 +10,12 @@ add_swift_host_library(swiftFrontend STATIC
   CompileJobCacheResult.cpp
   CompilerInvocation.cpp
   DependencyVerifier.cpp
+  DiagnosticHelper.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
+  MakeStyleDependencies.cpp
   ModuleInterfaceBuilder.cpp
   ModuleInterfaceLoader.cpp
   ModuleInterfaceSupport.cpp
@@ -37,11 +39,15 @@ target_link_libraries(swiftFrontend PRIVATE
   swiftSerialization
   swiftSymbolGraphGen)
 
-set_swift_llvm_is_available(swiftFrontend)
-
 if (SWIFT_BUILD_SWIFT_SYNTAX)
-  target_compile_definitions(swiftFrontend
+  target_link_libraries(swiftFrontend
     PRIVATE
-    SWIFT_BUILD_SWIFT_SYNTAX
-    )
+    swiftASTGen
+  )
+
+  add_dependencies(swiftFrontend
+    swiftASTGen
+  )
 endif()
+
+set_swift_llvm_is_available(swiftFrontend)

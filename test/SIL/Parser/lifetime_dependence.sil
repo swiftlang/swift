@@ -1,0 +1,81 @@
+// RUN: %target-sil-opt %s \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct BufferView : ~Escapable {
+  @_hasStorage let ptr: UnsafeRawBufferPointer { get }
+  @lifetime(borrow ptr) @inlinable init(_ ptr: UnsafeRawBufferPointer) 
+  @lifetime(borrow a) init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) 
+}
+
+@lifetime(borrow x) 
+func derive(_ x: borrowing BufferView) -> BufferView
+
+@lifetime(copy x)
+func consumeAndCreate(_ x: consuming BufferView) -> BufferView
+
+sil hidden [unsafe_nonescapable_result] @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView {
+bb0(%0 : $UnsafeRawBufferPointer, %1 : $@thin BufferView.Type):
+  %2 = alloc_stack [var_decl] $BufferView, var, name "self"
+  debug_value %0 : $UnsafeRawBufferPointer, let, name "ptr", argno 1 
+  %4 = begin_access [modify] [static] %2 : $*BufferView 
+  %5 = struct_element_addr %4 : $*BufferView, #BufferView.ptr 
+  store %0 to %5 : $*UnsafeRawBufferPointer       
+  end_access %4 : $*BufferView                    
+  %8 = struct $BufferView (%0 : $UnsafeRawBufferPointer) 
+  destroy_addr %2 : $*BufferView                  
+  dealloc_stack %2 : $*BufferView                 
+  return %8 : $BufferView                         
+} 
+
+// CHECK-LABEL: sil hidden @bufferviewtest2 : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> @lifetime(borrow 1) @owned BufferView {
+sil hidden @bufferviewtest2 : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> @lifetime(borrow 1) @owned BufferView {
+bb0(%0 : $UnsafeRawBufferPointer, %1 : @noImplicitCopy $Array<Int>, %2 : $@thin BufferView.Type):
+  %3 = alloc_stack [var_decl] $BufferView, var, name "self"
+  %6 = begin_access [modify] [static] %3 : $*BufferView 
+  %7 = struct_element_addr %6 : $*BufferView, #BufferView.ptr 
+  store %0 to %7 : $*UnsafeRawBufferPointer       
+  end_access %6 : $*BufferView                    
+  %10 = struct $BufferView (%0 : $UnsafeRawBufferPointer) 
+  destroy_addr %3 : $*BufferView                  
+  dealloc_stack %3 : $*BufferView                 
+  return %10 : $BufferView                        
+} 
+
+// CHECK-LABEL: sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> @lifetime(borrow 0) @owned BufferView {
+sil hidden @derive : $@convention(thin) (@guaranteed BufferView) -> @lifetime(borrow 0) @owned BufferView {
+bb0(%0 : @noImplicitCopy $BufferView):
+  %2 = metatype $@thin BufferView.Type            
+  %3 = struct_extract %0 : $BufferView, #BufferView.ptr 
+  %4 = function_ref @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView 
+  %5 = apply %4(%3, %2) : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView 
+  return %5 : $BufferView                         
+} 
+
+// CHECK-LABEL: sil hidden @consumeAndCreate : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0) @owned BufferView {
+sil hidden @consumeAndCreate : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0) @owned BufferView {
+bb0(%0 : @noImplicitCopy @_eagerMove $BufferView):
+  %1 = alloc_stack [var_decl] [moveable_value_debuginfo] $BufferView, var, name "x" 
+  %2 = struct_extract %0 : $BufferView, #BufferView.ptr 
+  %3 = struct_extract %2 : $UnsafeRawBufferPointer, #UnsafeRawBufferPointer._position 
+  %4 = struct_extract %0 : $BufferView, #BufferView.ptr 
+  %5 = struct_extract %4 : $UnsafeRawBufferPointer, #UnsafeRawBufferPointer._end 
+  store %0 to %1 : $*BufferView                   
+  %7 = metatype $@thin BufferView.Type            
+  %8 = begin_access [read] [static] %1 : $*BufferView 
+  %9 = struct $UnsafeRawBufferPointer (%3 : $Optional<UnsafeRawPointer>, %5 : $Optional<UnsafeRawPointer>) 
+  end_access %8 : $*BufferView                    
+  %11 = function_ref @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView 
+  %12 = apply %11(%9, %7) : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView 
+  destroy_addr %1 : $*BufferView                  
+  dealloc_stack %1 : $*BufferView                 
+  return %12 : $BufferView                        
+} 
+

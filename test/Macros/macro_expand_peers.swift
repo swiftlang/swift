@@ -9,7 +9,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DTEST_DIAGNOSTICS
 
 // Check with the imported macro library vs. the local declaration of the macro.
-// RUN: %target-swift-frontend -enable-experimental-feature ExtensionMacros -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking -DIMPORT_MACRO_LIBRARY -I %t -DTEST_DIAGNOSTICS
 
@@ -39,10 +39,17 @@ macro declareVarValuePeer() = #externalMacro(module: "MacroDefinition", type: "V
 macro addCompletionHandlerArbitrarily(_: Int) = #externalMacro(module: "MacroDefinition", type: "AddCompletionHandler")
 
 struct S {
+#if IMPORT_MACRO_LIBRARY
+  @macro_library.addCompletionHandler // test module qualified macro lookup
+  func f(a: Int, for b: String, _ value: Double) async -> String {
+    return b
+  }
+#else
   @addCompletionHandler
   func f(a: Int, for b: String, _ value: Double) async -> String {
     return b
   }
+#endif
 
   // CHECK-DUMP: @__swiftmacro_18macro_expand_peers1SV1f20addCompletionHandlerfMp_.swift
   // CHECK-DUMP: func f(a: Int, for b: String, _ value: Double, completionHandler: @escaping (String) -> Void) {
@@ -249,4 +256,79 @@ func fDeprecated(a: Int, for b: String, _ value: Double) async -> String {
   return b
 }
 
+#endif
+
+protocol MyType {
+  associatedtype Value
+  associatedtype Entity
+}
+
+@attached(peer, names: named(bar))
+macro Wrapper<Value>(
+    get: (Value.Entity) async throws -> Value.Value
+) = #externalMacro(module: "MacroDefinition", type: "WrapperMacro")
+where Value: MyType
+
+@attached(peer)
+macro _AddPeer() = #externalMacro(module: "MacroDefinition", type: "WrapperMacro")
+
+@attached(memberAttribute)
+public macro AddMemberPeers() = #externalMacro(module: "MacroDefinition", type: "AddMemberPeersMacro")
+
+struct Thing: MyType {
+  typealias Entity = [Int]
+  typealias Value = Int
+}
+
+@AddMemberPeers
+struct Test {
+    @Wrapper<Thing>(
+        get: { p1 in
+            p1.count // Error: Cannot find 'p1' in scope
+        }
+    )
+    var doesNotWork: Thing
+}
+
+// Ensure that we don't crash when using closures within attached macros.
+struct Trait {
+  init(_: () -> Void) {}
+}
+
+@attached(peer) macro trait(_ trait: Trait) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
+
+@trait(Trait {})
+func closureInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+func closuresInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+var closuresInPeerMacroOnVariableCrash: Int = 0
+
+// Test that macros can't be used in @abi
+
+#if swift(>=5.3) && TEST_DIAGNOSTICS
+struct ABIAttrWithAttachedMacro {
+  // expected-error@+1 {{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
+  @abi(@addCompletionHandler func fn1() async)
+  @addCompletionHandler func fn1() async {}
+  // From diagnostics in the expansion:
+  // expected-note@-2 3{{in expansion of macro 'addCompletionHandler' on instance method 'fn1()' here}}
+  // expected-note@-4 {{'fn1()' previously declared here}}
+
+  // expected-error@+1 {{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
+  @abi(@addCompletionHandler func fn2() async)
+  func fn2() async {}
+
+  @abi(func fn3() async)
+  @addCompletionHandler func fn3() async {}
+  // From diagnostics in the expansion:
+  // expected-note@-2 2{{in expansion of macro 'addCompletionHandler' on instance method 'fn3()' here}}
+  // expected-note@-4 {{'fn3()' previously declared here}}
+}
 #endif

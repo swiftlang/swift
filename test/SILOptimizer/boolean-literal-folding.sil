@@ -1,0 +1,143 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -boolean-literal-folding | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil public_external [_semantics "bool.literal_init"] @bool_literal_init : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+sil public_external @no_bool_literal_init : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+sil public_external [_semantics "bool.literal_init"] @wrong_bool_literal_init : $@convention(thin) () -> Bool
+
+// CHECK-LABEL: sil [ossa] @replace_true :
+// CHECK:         struct_extract
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    br bb2
+// CHECK-NOT:   bb3
+// CHECK:       } // end sil function 'replace_true'
+sil [ossa] @replace_true : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  %1 = metatype $@thin Bool.Type
+  %2 = function_ref @bool_literal_init : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %3 = apply %2(%0, %1) : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %4 = struct_extract %3 : $Bool, #Bool._value
+  cond_br %4, bb1, bb2
+bb1:
+  debug_step
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_false :
+// CHECK:         struct_extract
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb2
+// CHECK-NOT:   bb3
+// CHECK:       } // end sil function 'replace_false'
+sil [ossa] @replace_false : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %1 = metatype $@thin Bool.Type
+  %2 = function_ref @bool_literal_init : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %3 = apply %2(%0, %1) : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %4 = struct_extract %3 : $Bool, #Bool._value
+  cond_br %4, bb1, bb2
+bb1:
+  debug_step
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_non_literal :
+// CHECK:         cond_br %0, bb1, bb2
+// CHECK:       bb1:
+// CHECK:       } // end sil function 'dont_replace_non_literal'
+sil [ossa] @dont_replace_non_literal : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_non_init_func :
+// CHECK:         [[B:%.*]] = struct_extract
+// CHECK:         cond_br [[B]], bb1, bb2
+// CHECK:       bb1:
+// CHECK:       } // end sil function 'dont_replace_non_init_func'
+sil [ossa] @dont_replace_non_init_func : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  %1 = metatype $@thin Bool.Type
+  %2 = function_ref @no_bool_literal_init : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %3 = apply %2(%0, %1) : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %4 = struct_extract %3 : $Bool, #Bool._value
+  cond_br %4, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_wrong_init_func :
+// CHECK:         [[B:%.*]] = struct_extract
+// CHECK:         cond_br [[B]], bb1, bb2
+// CHECK:       bb1:
+// CHECK:       } // end sil function 'dont_replace_wrong_init_func'
+sil [ossa] @dont_replace_wrong_init_func : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @wrong_bool_literal_init : $@convention(thin) () -> Bool
+  %3 = apply %2() : $@convention(thin) () -> Bool
+  %4 = struct_extract %3 : $Bool, #Bool._value
+  cond_br %4, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_non_literal_init :
+// CHECK:         [[B:%.*]] = struct_extract
+// CHECK:         cond_br [[B]], bb1, bb2
+// CHECK:       bb1:
+// CHECK:       } // end sil function 'dont_replace_non_literal_init'
+sil [ossa] @dont_replace_non_literal_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = metatype $@thin Bool.Type
+  %2 = function_ref @bool_literal_init : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %3 = apply %2(%0, %1) : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
+  %4 = struct_extract %3 : $Bool, #Bool._value
+  cond_br %4, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+

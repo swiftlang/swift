@@ -14,6 +14,8 @@
 
 import Swift
 
+#if !$Embedded
+
 extension _Deque: Encodable where Element: Encodable {
   /// Encodes the elements of this deque into the given encoder in an unkeyed
   /// container.
@@ -50,3 +52,5 @@ extension _Deque: Decodable where Element: Decodable {
     }
   }
 }
+
+#endif

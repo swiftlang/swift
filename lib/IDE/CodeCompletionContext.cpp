@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionCache.h"
 
@@ -116,8 +117,8 @@ static MutableArrayRef<CodeCompletionResult *> copyCodeCompletionResults(
     targetSink.Results.push_back(contextualResult);
   }
 
-  return llvm::makeMutableArrayRef(targetSink.Results.data() + startSize,
-                                   targetSink.Results.size() - startSize);
+  return llvm::MutableArrayRef(targetSink.Results.data() + startSize,
+                               targetSink.Results.size() - startSize);
 }
 
 void CodeCompletionContext::addResultsFromModules(
@@ -133,7 +134,7 @@ void CodeCompletionContext::addResultsFromModules(
   for (auto &R : RequestedModules) {
     // FIXME(thread-safety): lock the whole AST context.  We might load a
     // module.
-    llvm::Optional<CodeCompletionCache::ValueRefCntPtr> V = Cache.get(R.Key);
+    std::optional<CodeCompletionCache::ValueRefCntPtr> V = Cache.get(R.Key);
     if (!V.has_value()) {
       // No cached results found. Fill the cache.
       V = Cache.createValue();
@@ -142,7 +143,6 @@ void CodeCompletionContext::addResultsFromModules(
       CodeCompletionResultSink Sink;
       Sink.annotateResult = getAnnotateResult();
       Sink.addInitsToTopLevel = getAddInitsToTopLevel();
-      Sink.enableCallPatternHeuristics = getCallPatternHeuristics();
       Sink.includeObjectLiterals = includeObjectLiterals();
       Sink.addCallWithNoDefaultArgs = addCallWithNoDefaultArgs();
       Sink.setProduceContextFreeResults((*V)->USRTypeArena);

@@ -16,7 +16,7 @@ import Foundation
     // CHECK: %[[T0:.+]] = call swiftcc { ptr, ptr } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{32|64}} 1, ptr @"$sSiN")
     // CHECK-NEXT: %[[T1:.+]] = extractvalue { ptr, ptr } %[[T0]], 0
     // CHECK-NEXT: %[[T2:.+]] = extractvalue { ptr, ptr } %[[T0]], 1
-    // CHECK-NEXT: %._value = getelementptr inbounds %TSi, ptr %[[T2]], i32 0, i32 0
+    // CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr %[[T2]], i32 0, i32 0
     // CHECK:      %[[T7:.+]] = call swiftcc ptr @"$ss27_finalizeUninitializedArrayySayxGABnlF"(ptr %[[T1]], ptr @"$sSiN")
     // CHECK:      %[[T4:.+]] = call swiftcc ptr @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(ptr %[[T7]], ptr @"$sSiN")
     // CHECK-NEXT: store ptr %[[T4]]
@@ -24,13 +24,14 @@ import Foundation
     // CHECK-NEXT: call void @llvm.objc.release(ptr %[[T4]])
     // CHECK-NEXT: ret ptr %[[T4]]
     let arr = [1] as CFArray
-    return Unmanaged.passUnretained(arr) 
-  } 
+    return Unmanaged.passUnretained(arr)
+  }
 }
 
 // CHECK: %[[T0:.+]] = call swiftcc ptr @"$s25unmanaged_objc_throw_func1CC22returnUnmanagedCFArrays0F0VySo0G3RefaGyKF"
 // CHECK-NEXT: %[[T2:.+]] = load ptr, ptr %swifterror, align {{[0-9]+}}
 // CHECK-NEXT: %[[T3:.+]] = icmp ne ptr %[[T2]], null
+// CHECK-NEXT: ptrtoint ptr %[[T2]] to i
 // CHECK-NEXT: br i1 %[[T3]], label %[[L1:.+]], label %[[L2:.+]]
 
 // CHECK: [[L2]]:                                     ; preds = %entry

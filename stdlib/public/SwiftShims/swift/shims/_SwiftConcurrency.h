@@ -30,11 +30,4 @@ typedef struct _SwiftContext {
 } // namespace swift
 #endif
 
-#ifdef __cplusplus
-extern "C" [[noreturn]]
-#endif
-void exit(int);
-
-#define EXIT_SUCCESS 0
-
 #endif // SWIFT_CONCURRENCY_H

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -swift-version 5 -enable-objc-interop -typecheck %s 2>&1 | %FileCheck %s --strict-whitespace
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -swift-version 5 -enable-objc-interop -typecheck %s -diagnostic-style llvm 2>&1 | %FileCheck %s --strict-whitespace
 
 // REQUIRES: objc_interop
 
@@ -60,12 +60,12 @@ s.c = 5
 // CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex c;
 // CHECK-NEXT:   ^
-// CHECK-NEXT: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
-// CHECK-NEXT:     public var a: Int32
-// CHECK-NEXT:                ^
-// CHECK-NEXT: ctypes.PartialImport:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
-// CHECK-NEXT:     public var b: Int32
-// CHECK-NEXT:                ^
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'a'?
+// CHECK-NEXT:     int a;
+// CHECK-NEXT:         ^
+// CHECK-NEXT: ctypes.h:{{[0-9]+}}:{{[0-9]+}}: note: did you mean 'b'?
+// CHECK-NEXT:     int b;
+// CHECK-NEXT:         ^
 
 // CHECK-NOT: note
 // CHECK-NOT: warning

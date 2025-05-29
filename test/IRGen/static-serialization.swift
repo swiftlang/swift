@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift-target-frontend -static -emit-module -emit-module-path %t/StaticLibrary.swiftmodule -module-name StaticLibrary -DSTATIC_LIBRARY %s
-// RUN: %swift-target-frontend -I%t -S %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend -static -emit-module -emit-module-path %t/StaticLibrary.swiftmodule -module-name StaticLibrary -DSTATIC_LIBRARY %s
+// RUN: %target-swift-frontend -I%t -S %s -emit-ir -o - | %FileCheck %s
 
 #if STATIC_LIBRARY
 public final class S {

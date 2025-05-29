@@ -1,8 +1,8 @@
 // REQUIRES: maccatalyst_support
 
 // RUN: %empty-directory(%t.mod)
-// RUN: %swift -emit-module -target x86_64-apple-ios13.1-macabi -o %t.mod/availability.swiftmodule %s -parse-as-library -emit-module-doc-path %t.mod/availability.swiftdoc
-// RUN: %sourcekitd-test -req=doc-info -module availability -- -target x86_64-apple-ios13.1-macabi -I %t.mod | %FileCheck %s
+// RUN: %swift -emit-module -target %target-cpu-apple-ios13.1-macabi -o %t.mod/availability.swiftmodule %s -parse-as-library -emit-module-doc-path %t.mod/availability.swiftdoc
+// RUN: %sourcekitd-test -req=doc-info -module availability -- -target %target-cpu-apple-ios13.1-macabi -I %t.mod | %FileCheck %s
 
 @available(macCatalyst, deprecated: 20.0)
 public func deprecatedInFutureVersion_catalyst() {}

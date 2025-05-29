@@ -184,3 +184,20 @@ class A {
   @IBAction @objc func foo(a: Int) {}
   #endif
 }
+
+func testPostfixIfConfig() {
+  foo
+  #if FLAG1
+    .flag1
+    #if FLAG2
+      .flag2
+    #elseif FLAG3
+      .flag3
+    #else
+      .else1
+    #endif
+    .flag1Tail
+  #else
+    .else2
+  #endif
+}

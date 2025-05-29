@@ -1,0 +1,482 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=begin_borrow | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class B {}
+class C : B {
+  @_hasStorage let i: Int
+}
+
+struct S1 {
+  @_hasStorage let c: C
+}
+
+struct S2 {
+  @_hasStorage let c1: C
+  @_hasStorage let c2: C
+}
+
+struct S3 {
+  @_hasStorage let i: Int
+  @_hasStorage let ci: (Int, C)
+}
+
+sil @takeC : $@convention(thin) (@guaranteed C) -> ()
+sil @takeOwnedC : $@convention(thin) (@owned C) -> ()
+sil @takeS1 : $@convention(thin) (@guaranteed S1) -> ()
+sil @takeS2 : $@convention(thin) (@guaranteed S2) -> ()
+sil @simple_func : $@convention(thin) () -> ()
+sil @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @replace_simple :
+// CHECK-NOT:     begin_borrow
+// CHECK:         apply %1(%0)
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'replace_simple'
+sil [ossa] @replace_simple : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_single_forward :
+// CHECK:         %1 = struct $S1 (%0 : $C)
+// CHECK:         apply %2(%1)
+// CHECK-NEXT:    destroy_value %1
+// CHECK:       } // end sil function 'replace_with_single_forward'
+sil [ossa] @replace_with_single_forward : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = struct $S1(%1 : $C)
+  %3 = function_ref @takeS1 : $@convention(thin) (@guaranteed S1) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed S1) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_double_forward :
+// CHECK:         %1 = struct $S1 (%0 : $C)
+// CHECK-NEXT:    %2 = destructure_struct %1
+// CHECK:         apply %3(%2)
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'replace_with_double_forward'
+sil [ossa] @replace_with_double_forward : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = struct $S1(%1 : $C)
+  %3 = struct_extract %2 : $S1, #S1.c
+  %4 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_destructure :
+// CHECK:         (%1, %2) = destructure_struct %0
+// CHECK-NEXT:    (%3, %4) = destructure_tuple %2
+// CHECK:         apply %5(%4)
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       } // end sil function 'replace_with_destructure'
+sil [ossa] @replace_with_destructure : $@convention(thin) (@owned S3) -> () {
+bb0(%0 : @owned $S3):
+  %1 = begin_borrow %0 : $S3
+  %2 = struct_extract %1 : $S3, #S3.ci
+  %3 = tuple_extract %2 : $(Int, C), 1
+  %4 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $S3
+  destroy_value %0: $S3
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_copy :
+// CHECK:         %1 = copy_value %0
+// CHECK:         apply %2(%1)
+// CHECK:       } // end sil function 'replace_with_copy'
+sil [ossa] @replace_with_copy : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = copy_value %1 : $C
+  %3 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned C) -> ()
+  end_borrow %1 : $C
+  return %0 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_copy_of_forward :
+// CHECK:         %1 = copy_value %0
+// CHECK:         %2 = destructure_struct %1
+// CHECK:         apply %3(%2)
+// CHECK:       } // end sil function 'replace_with_copy_of_forward'
+sil [ossa] @replace_with_copy_of_forward : $@convention(thin) (@owned S1) -> @owned S1 {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0 : $S1
+  %2 = struct_extract %1 : $S1, #S1.c
+  %3 = copy_value %2 : $C
+  %4 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned C) -> ()
+  end_borrow %1 : $S1
+  return %0 : $S1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_guaranteed_op :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_guaranteed_op'
+sil [ossa] @dont_replace_guaranteed_op : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = begin_borrow %0 : $C
+  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_lexical :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_lexical'
+sil [ossa] @dont_replace_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow [lexical] %0 : $C
+  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// FIXME: re-enable this test when the [pointer_escape] flag is implemented.
+//
+// HECK-LABEL: sil [ossa] @dont_replace_pointer_escape :
+// HECK:         begin_borrow
+// HECK:       } // end sil function 'dont_replace_pointer_escape'
+sil [ossa] @dont_replace_pointer_escape : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow [pointer_escape] %0 : $C
+  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_with_multiple_uses :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_with_multiple_uses'
+sil [ossa] @dont_replace_with_multiple_uses : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = struct $S1(%1 : $C)
+  %3 = function_ref @takeS1 : $@convention(thin) (@guaranteed S1) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed S1) -> ()
+  %5 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_with_multiple_forwarding_ops :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_with_multiple_forwarding_ops'
+sil [ossa] @dont_replace_with_multiple_forwarding_ops : $@convention(thin) (@owned C, @guaranteed C) -> () {
+bb0(%0 : @owned $C, %1 : @guaranteed $C):
+  %2 = begin_borrow %0 : $C
+  %3 = struct $S2(%2 : $C, %1 : $C)
+  %4 = function_ref @takeS2 : $@convention(thin) (@guaranteed S2) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed S2) -> ()
+  end_borrow %2 : $C
+  destroy_value %0: $C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_struct_extract :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_struct_extract'
+sil [ossa] @dont_replace_struct_extract : $@convention(thin) (@owned S2) -> () {
+bb0(%0 : @owned $S2):
+  %1 = begin_borrow %0 : $S2
+  %2 = struct_extract %1 : $S2, #S2.c1
+  %3 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $S2
+  destroy_value %0: $S2
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash_on_bridge_object_to_word :
+// CHECK:       bb0(%0 : @owned $Builtin.BridgeObject):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_crash_on_bridge_object_to_word'
+sil [ossa] @dont_crash_on_bridge_object_to_word : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = begin_borrow %0 : $Builtin.BridgeObject
+  %2 = bridge_object_to_word %1 : $Builtin.BridgeObject to $Builtin.Word
+  end_borrow %1 : $Builtin.BridgeObject
+  destroy_value %0: $Builtin.BridgeObject
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_tuple_extract :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_tuple_extract'
+sil [ossa] @dont_replace_tuple_extract : $@convention(thin) (@owned (C, C)) -> () {
+bb0(%0 : @owned $(C, C)):
+  %1 = begin_borrow %0 : $(C, C)
+  %2 = tuple_extract %1 : $(C, C), 1
+  %3 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $(C, C)
+  destroy_value %0: $(C, C)
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_non_convertible_op :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_non_convertible_op'
+sil [ossa] @dont_replace_non_convertible_op : $@convention(thin) (@owned C) -> Int {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = ref_element_addr %1 : $C, #C.i
+  %3 = load [trivial] %2 : $*Int
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @replace_with_complex_cfg :
+// CHECK:         %1 = struct $S1 (%0 : $C)
+// CHECK:         apply %{{[0-9]*}}(%1)
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'replace_with_complex_cfg'
+sil [ossa] @replace_with_complex_cfg : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = struct $S1(%1 : $C)
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %1 : $C
+  br bb3
+bb2:
+  %3 = function_ref @takeS1 : $@convention(thin) (@guaranteed S1) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed S1) -> ()
+  end_borrow %1 : $C
+  br bb3
+bb3:
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_forward_in_different_bb :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_forward_in_different_bb'
+sil [ossa] @dont_replace_forward_in_different_bb : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %1 : $C
+  br bb3
+bb2:
+  %2 = struct $S1(%1 : $C)
+  %3 = function_ref @takeS1 : $@convention(thin) (@guaranteed S1) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed S1) -> ()
+  end_borrow %1 : $C
+  br bb3
+bb3:
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_with_other_uses_than_destroy :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_with_other_uses_than_destroy'
+sil [ossa] @dont_replace_with_other_uses_than_destroy : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  %5 = apply %2(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0: $C
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_copy_with_other_uses :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_copy_with_other_uses'
+sil [ossa] @dont_replace_copy_with_other_uses : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = copy_value %1 : $C
+  %3 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned C) -> ()
+  %5 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  return %0 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_copy_in_different_bb :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_copy_in_different_bb'
+sil [ossa] @dont_replace_copy_in_different_bb : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %1 : $C
+  br bb3
+bb2:
+  %2 = copy_value %1 : $C
+  %3 = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned C) -> ()
+  end_borrow %1 : $C
+  br bb3
+bb3:
+  return %0 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_destroys_of_original_with_destroys_of_nondominating_forward : {{.*}} {
+// CHECK:         begin_borrow 
+// CHECK-LABEL: } // end sil function 'dont_replace_destroys_of_original_with_destroys_of_nondominating_forward'
+sil [ossa] @dont_replace_destroys_of_original_with_destroys_of_nondominating_forward : $@convention(thin) (@owned C) -> () {
+bb0(%21 : @owned $C):
+  cond_br undef, bb3, bb6
+
+bb3:
+  %39 = begin_borrow %21 : $C
+  %40 = upcast %39 : $C to $B
+  apply undef(%40) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %39 : $C
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_value %21 : $C
+  br bb7
+
+bb5:
+  destroy_value %21 : $C
+  br bb7
+
+bb6:
+  destroy_value %21 : $C
+  br bb7
+
+bb7:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_replace_destroys_of_original_with_destroys_of_dominating_forward : {{.*}} {
+// CHECK-NOT:     begin_borrow
+// CHECK-LABEL: } // end sil function 'do_replace_destroys_of_original_with_destroys_of_dominating_forward'
+sil [ossa] @do_replace_destroys_of_original_with_destroys_of_dominating_forward : $@convention(thin) (@owned C) -> () {
+bb0(%21 : @owned $C):
+  %39 = begin_borrow %21 : $C
+  %40 = upcast %39 : $C to $B
+  apply undef(%40) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %39 : $C
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_value %21 : $C
+  br bb7
+
+bb5:
+  destroy_value %21 : $C
+  br bb7
+
+bb7:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_replace_destroys_of_original_with_destroy_in_same_block : {{.*}} {
+// CHECK-NOT:     begin_borrow
+// CHECK-LABEL: } // end sil function 'do_replace_destroys_of_original_with_destroy_in_same_block'
+sil [ossa] @do_replace_destroys_of_original_with_destroy_in_same_block : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = begin_borrow %0 : $C
+  %5 = upcast %4 : $C to $B
+  apply undef(%5) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4 : $C
+  destroy_value %0 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_borrow_of_thin_function :
+// CHECK:         %1 = thin_to_thick_function
+// CHECK-NOT:     begin_borrow
+// CHECK:         %3 = apply %2(%1)
+// CHECK:         %4 = apply %1()
+// CHECK-LABEL: } // end sil function 'remove_borrow_of_thin_function'
+sil [ossa] @remove_borrow_of_thin_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @simple_func : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> ()
+  %2 = begin_borrow %1
+  %3 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %5 = apply %2(): $@callee_guaranteed () -> ()
+  end_borrow %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_borrow_of_thin_function :
+// CHECK:         thin_to_thick_function
+// CHECK-NEXT:    begin_borrow
+// CHECK-LABEL: } // end sil function 'dont_remove_borrow_of_thin_function'
+sil [ossa] @dont_remove_borrow_of_thin_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @simple_func : $@convention(thin) () -> ()
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> ()
+  %2 = begin_borrow %1
+  %3 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %5 = apply %2(): $@callee_guaranteed () -> ()
+  br bb1(%2)
+bb1(%7 : @reborrow $@callee_guaranteed () -> ()):
+  %8 = borrowed %7 from ()
+  end_borrow %8
+  %r = tuple ()
+  return %r
+}
+

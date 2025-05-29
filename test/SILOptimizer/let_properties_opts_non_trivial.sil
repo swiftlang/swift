@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -let-properties-opt -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -let-properties-opt -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 

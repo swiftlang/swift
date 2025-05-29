@@ -26,6 +26,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
@@ -38,7 +39,6 @@
 #include "swift/IRGen/TBDGen.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -51,9 +51,9 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/HashingOutputBackend.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/TargetParser/Host.h"
 
 #include <memory>
 
@@ -102,6 +102,8 @@ class CompilerInvocation {
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
+  CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   llvm::MemoryBuffer *IDEInspectionTargetBuffer = nullptr;
 
   /// The offset that IDEInspection wants to further examine in offset of bytes
@@ -114,11 +116,16 @@ class CompilerInvocation {
 public:
   CompilerInvocation();
 
-  /// Initializes the compiler invocation for the list of arguments.
+  /// Initializes the compiler invocation and diagnostic engine for the list of
+  /// arguments.
   ///
   /// All parsing should be additive, i.e. options should not be reset to their
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
+  ///
+  /// As a side-effect of parsing, the diagnostic engine will be configured with
+  /// the options specified by the parsed arguments. This ensures that the
+  /// arguments can effect the behavior of diagnostics emitted during parsing.
   ///
   /// Any configuration files loaded as a result of parsing arguments will be
   /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
@@ -154,9 +161,12 @@ public:
   /// Serialize the command line arguments for emitting them
   /// to DWARF or CodeView and inject SDKPath if necessary.
   static void buildDebugFlags(std::string &Output,
-                              const ArrayRef<const char*> &Args,
+                              const llvm::opt::ArgList &Args,
                               StringRef SDKPath,
                               StringRef ResourceDir);
+
+  /// Configures the diagnostic engine for the invocation's options.
+  void setUpDiagnosticEngine(DiagnosticEngine &diags);
 
   void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
@@ -166,7 +176,7 @@ public:
   }
 
   bool requiresCAS() const {
-    return FrontendOpts.EnableCaching || FrontendOpts.UseCASBackend;
+    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend;
   }
 
   void setClangModuleCachePath(StringRef Path) {
@@ -185,7 +195,8 @@ public:
     return ClangImporterOpts.ClangScannerModuleCachePath;
   }
 
-  void setImportSearchPaths(const std::vector<std::string> &Paths) {
+  void setImportSearchPaths(
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
@@ -194,21 +205,25 @@ public:
     SearchPathOpts.DeserializedPathRecoverer = obfuscator;
   }
 
-  ArrayRef<std::string> getImportSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
-             const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
-  ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.getFrameworkSearchPaths();
   }
 
   void setVFSOverlays(const std::vector<std::string> &Overlays) {
     SearchPathOpts.VFSOverlayFiles = Overlays;
+  }
+
+  void setSysRoot(StringRef SysRoot) {
+    SearchPathOpts.setSysRoot(SysRoot);
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
@@ -219,8 +234,8 @@ public:
     return ClangImporterOpts.ExtraArgs;
   }
 
-  void addLinkLibrary(StringRef name, LibraryKind kind) {
-    IRGenOpts.LinkLibraries.push_back({name, kind});
+  void addLinkLibrary(StringRef name, LibraryKind kind, bool isStaticLibrary) {
+    IRGenOpts.LinkLibraries.emplace_back(name, kind, isStaticLibrary);
   }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
@@ -231,11 +246,13 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
+
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
   computePrebuiltCachePath(StringRef RuntimeResourcePath, llvm::Triple target,
-                           llvm::Optional<llvm::VersionTuple> sdkVer);
+                           std::optional<llvm::VersionTuple> sdkVer);
 
   /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
   /// the default value of <resource-dir>/<platform>/prebuilt-modules.
@@ -245,6 +262,16 @@ public:
 
   /// If we haven't explicitly passed -blocklist-paths, set it to the default value.
   void setDefaultBlocklistsIfNecessary();
+
+  /// If we haven't explicitly passed '-in-process-plugin-server-path', infer
+  /// it as a default value.
+  ///
+  /// FIXME: Remove this after all the clients start sending it.
+  void setDefaultInProcessPluginServerPathIfNecessary();
+
+  /// Determine which C++ stdlib should be used for this compilation, and which
+  /// C++ stdlib is the default for the specified target.
+  void computeCXXStdlibOptions();
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
@@ -273,6 +300,9 @@ public:
 
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
+
+  CASOptions &getCASOptions() { return CASOpts; }
+  const CASOptions &getCASOptions() const { return CASOpts; }
 
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
@@ -309,6 +339,11 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
+
+  SerializationOptions &getSerializationOptions() { return SerializationOpts; }
+  const SerializationOptions &getSerializationOptions() const {
+    return SerializationOpts;
+  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;
@@ -394,9 +429,8 @@ public:
   /// imported.
   bool shouldImportSwiftStringProcessing() const;
 
-  /// Whether the Swift Backtracing support library should be implicitly
-  /// imported.
-  bool shouldImportSwiftBacktracing() const;
+  /// Whether the CXX module should be implicitly imported.
+  bool shouldImportCxx() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -432,6 +466,7 @@ public:
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
   std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
+  std::string getPackageModuleInterfaceOutputPathForWholeModule() const;
 
   /// APIDescriptorPath only makes sense in whole module compilation mode,
   /// so return the APIDescriptorPath when in that mode and fail an assert
@@ -466,7 +501,7 @@ class CompilerInstance {
   /// the file buffer provided by CAS needs to outlive the SourceMgr.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
-  llvm::Optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+  std::optional<llvm::cas::ObjectRef> CompileJobBaseKey;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -565,7 +600,7 @@ public:
   std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
     return CAS;
   }
-  llvm::Optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
+  std::optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
     return CompileJobBaseKey;
   }
   CachingDiagnosticsProcessor *getCachingDiagnosticsProcessor() const {
@@ -644,13 +679,8 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
 
-  /// Verify that if an implicit import of the `Backtracing` module if
-  /// expected, it can actually be imported. Emit a warning, otherwise.
-  void verifyImplicitBacktracingImport();
-
-  /// Whether the Swift Backtracing support library can be imported
-  /// i.e. if it can be found.
-  bool canImportSwiftBacktracing() const;
+  /// Whether the Cxx library can be imported
+  bool canImportCxx() const;
 
   /// Whether the CxxShim library can be imported
   /// i.e. if it can be found.
@@ -683,6 +713,10 @@ public:
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
 
+  /// The fast setup function for cache replay.
+  bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
+                      ArrayRef<const char *> Args = {});
+
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
   /// If a IDE inspection buffer has been set, returns the corresponding source
@@ -713,34 +747,33 @@ private:
   /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();
 
-  llvm::Optional<unsigned> setUpIDEInspectionTargetBuffer();
+  std::optional<unsigned> setUpIDEInspectionTargetBuffer();
 
   /// Find a buffer for a given input file and ensure it is recorded in
   /// SourceMgr, PartialModules, or InputSourceCodeBufferIDs as appropriate.
   /// Return the buffer ID if it is not already compiled, or None if so.
   /// Set failed on failure.
 
-  llvm::Optional<unsigned> getRecordedBufferID(const InputFile &input,
-                                               const bool shouldRecover,
-                                               bool &failed);
+  std::optional<unsigned> getRecordedBufferID(const InputFile &input,
+                                              const bool shouldRecover,
+                                              bool &failed);
 
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.
   /// On failure, return a null pointer for the first element of the returned
   /// pair.
-  llvm::Optional<ModuleBuffers>
-  getInputBuffersIfPresent(const InputFile &input);
+  std::optional<ModuleBuffers> getInputBuffersIfPresent(const InputFile &input);
 
   /// Try to open the module doc file corresponding to the input parameter.
   /// Return None for error, nullptr if no such file exists, or the buffer if
   /// one was found.
-  llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>
+  std::optional<std::unique_ptr<llvm::MemoryBuffer>>
   openModuleDoc(const InputFile &input);
 
   /// Try to open the module source info file corresponding to the input parameter.
   /// Return None for error, nullptr if no such file exists, or the buffer if
   /// one was found.
-  llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>
+  std::optional<std::unique_ptr<llvm::MemoryBuffer>>
   openModuleSourceInfo(const InputFile &input);
 
 public:
@@ -762,7 +795,7 @@ private:
   /// Creates a new source file for the main module.
   SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
                                             SourceFileKind FileKind,
-                                            llvm::Optional<unsigned> BufferID,
+                                            unsigned BufferID,
                                             bool isMainBuffer = false) const;
 
   /// Creates all the files to be added to the main module, appending them to

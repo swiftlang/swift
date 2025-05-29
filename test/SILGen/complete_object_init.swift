@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 struct X { }
 
@@ -7,7 +7,7 @@ class A {
 // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick A.Type):
 // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var A }
 // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var A }
-// CHECK:   [[UNINIT_SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[UNINIT_SELF]]
+// CHECK:   [[UNINIT_SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[UNINIT_SELF]]
 // CHECK:   [[PB:%.*]] = project_box [[UNINIT_SELF_LIFETIME]]
 // CHECK:   [[INIT:%[0-9]+]] = class_method [[SELF_META]] : $@thick A.Type, #A.init!allocator
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT]]({{%[^,]*}}, [[SELF_META]])

@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/hidden)

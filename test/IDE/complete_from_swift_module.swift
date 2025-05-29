@@ -53,8 +53,8 @@
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
 // FIXME: %FileCheck %s -check-prefix=TOP_LEVEL_1_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=AMBIGOUS_RESULT_BUILER > %t.compl.txt
-// RUN: %FileCheck %s -check-prefix=AMBIGOUS_RESULT_BUILER < %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=AMBIGUOUS_RESULT_BUILER > %t.compl.txt
+// RUN: %FileCheck %s -check-prefix=AMBIGUOUS_RESULT_BUILER < %t.compl.txt
 
 // ERROR_COMMON: found code completion token
 
@@ -134,15 +134,15 @@ struct Foo: Swift.Array.#^STDLIB_TYPE_QUALIFIED_NESTED^# {}
 
 struct Bar: Swift.#^STDLIB_TYPE_QUALIFIED^# {}
 // STDLIB_TYPE_QUALIFIED-NOT: Decl[Module]
-// STDLIB_TYPE_QUALIFIED: Decl[Struct]/OtherModule[Swift]/IsSystem: AnyCollection[#AnyCollection#]; name=AnyCollection
+// STDLIB_TYPE_QUALIFIED: Decl[Struct]/OtherModule[Swift]/IsSystem: AnyCollection[#AnyCollection<Element>#]; name=AnyCollection
 // STDLIB_TYPE_QUALIFIED-NOT: Decl[Module]
 
 func foo() -> foo_swift_module.#^MODULE_TYPE_QUALIFIED^# {}
 // MODULE_TYPE_QUALIFIED: Decl[Protocol]/OtherModule[foo_swift_module]: BarProtocol[#BarProtocol#]; name=BarProtocol
 // MODULE_TYPE_QUALIFIED: Decl[Enum]/OtherModule[foo_swift_module]: MyQuickLookObject[#MyQuickLookObject#]; name=MyQuickLookObject
-// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct1[#BarGenericSwiftStruct1#]; name=BarGenericSwiftStruct1
+// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct1[#BarGenericSwiftStruct1<T>#]; name=BarGenericSwiftStruct1
 // MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: FooSwiftStruct[#FooSwiftStruct#]; name=FooSwiftStruct
-// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct2[#BarGenericSwiftStruct2#]; name=BarGenericSwiftStruct2
+// MODULE_TYPE_QUALIFIED: Decl[Struct]/OtherModule[foo_swift_module]: BarGenericSwiftStruct2[#BarGenericSwiftStruct2<T, U>#]; name=BarGenericSwiftStruct2
 
 // rdar://92048610
 func testAmbiguousResultBuilder() {
@@ -158,11 +158,11 @@ func testAmbiguousResultBuilder() {
 
   func test() {
     Foo {
-      #^AMBIGOUS_RESULT_BUILER^#
+      #^AMBIGUOUS_RESULT_BUILER^#
     }
     // Results should only contain globalVar once
-    // AMBIGOUS_RESULT_BUILER-NOT: globalVar
-    // AMBIGOUS_RESULT_BUILER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]/TypeRelation[Convertible]: globalVar[#Int#]; name=globalVar
-    // AMBIGOUS_RESULT_BUILER-NOT: globalVar
+    // AMBIGUOUS_RESULT_BUILER-NOT: globalVar
+    // AMBIGUOUS_RESULT_BUILER-DAG: Decl[GlobalVar]/OtherModule[foo_swift_module]/TypeRelation[Convertible]: globalVar[#Int#]; name=globalVar
+    // AMBIGUOUS_RESULT_BUILER-NOT: globalVar
   }
 }

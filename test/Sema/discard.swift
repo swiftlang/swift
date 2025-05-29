@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature MoveOnlyEnumDeinits
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 // Typechecking for the discard statement.
 
 func discard() -> Int {}
@@ -39,7 +41,7 @@ struct S {
 
 enum E: Error { case err }
 
-@_moveOnly struct File {
+struct File: ~Copyable {
   let fd: Int
 
   init() throws {
@@ -116,7 +118,7 @@ enum E: Error { case err }
   }
 }
 
-@_moveOnly enum FileWrapper {
+enum FileWrapper: ~Copyable {
   case valid(File)
   case invalid(File)
   case nothing

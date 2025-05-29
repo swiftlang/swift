@@ -20,7 +20,7 @@
 // CHECK-SAME:   i32 {{[0-9]+}}, 
 // CHECK-SAME:   $s4main5ValueOwug
 // CHECK-SAME:   $s4main5ValueOwup
-// CHECK-SAME    ptr {{[^@]*}}@"$s4main5ValueOwui{{[^,]*}}
+// CHECK-SAME:   ptr {{[^@]*}}@"$s4main5ValueOwui
 // CHECK-SAME: }, align [[ALIGNMENT]]
 // CHECK: @"$s4main5ValueOyS4iGMf" = linkonce_odr hidden constant <{ 
 // CHECK-SAME:   ptr, 

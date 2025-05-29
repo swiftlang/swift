@@ -25,6 +25,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include <algorithm>
 #include <vector>
 #include "PropertyMap.h"
@@ -65,18 +66,18 @@ static void recordRelation(Term key,
   const auto &lhsRule = system.getRule(lhsRuleID);
   auto lhsProperty = lhsRule.getLHS().back();
 
-  assert(key.size() >= lhsRule.getRHS().size());
+  ASSERT(key.size() >= lhsRule.getRHS().size());
 
-  assert((lhsProperty.getKind() == Symbol::Kind::Layout &&
-          rhsProperty.getKind() == Symbol::Kind::Layout) ||
-         (lhsProperty.getKind() == Symbol::Kind::Superclass &&
-          rhsProperty.getKind() == Symbol::Kind::Superclass) ||
-         (lhsProperty.getKind() == Symbol::Kind::Superclass &&
-          rhsProperty.getKind() == Symbol::Kind::Layout) ||
-         (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
-          rhsProperty.getKind() == Symbol::Kind::Superclass) ||
-         (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
-          rhsProperty.getKind() == Symbol::Kind::Layout));
+  CONDITIONAL_ASSERT((lhsProperty.getKind() == Symbol::Kind::Layout &&
+                      rhsProperty.getKind() == Symbol::Kind::Layout) ||
+                     (lhsProperty.getKind() == Symbol::Kind::Superclass &&
+                      rhsProperty.getKind() == Symbol::Kind::Superclass) ||
+                     (lhsProperty.getKind() == Symbol::Kind::Superclass &&
+                      rhsProperty.getKind() == Symbol::Kind::Layout) ||
+                     (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
+                      rhsProperty.getKind() == Symbol::Kind::Superclass) ||
+                     (lhsProperty.getKind() == Symbol::Kind::ConcreteType &&
+                      rhsProperty.getKind() == Symbol::Kind::Layout));
 
   if (debug) {
     llvm::dbgs() << "%% Recording relation: ";
@@ -119,18 +120,23 @@ static void recordRelation(Term key,
 }
 
 /// Given two property rules that conflict because no concrete type
-/// can satisfy both, mark one or both rules conflicting.
-///
-/// The right hand side of one rule must be a suffix of the other
-/// (in which case the longer of the two rules is conflicting) or
-/// the right hand sides are equal (in which case both will be
-/// conflicting).
+/// can satisfy both, record the conflict. If both have the same kind,
+/// mark one or the other as conflicting, but not both.
 void RewriteSystem::recordConflict(unsigned existingRuleID,
                                    unsigned newRuleID) {
-  ConflictingRules.emplace_back(existingRuleID, newRuleID);
-
   auto &existingRule = getRule(existingRuleID);
   auto &newRule = getRule(newRuleID);
+
+  // FIXME: Property map construction shouldn't have to consider imported rules
+  // at all. We need to import the property map from each protocol component,
+  // just like we import rules.
+  if (!isInMinimizationDomain(newRule.getLHS().getRootProtocol()) &&
+      !isInMinimizationDomain(existingRule.getLHS().getRootProtocol())) {
+    return;
+  }
+
+  // Record the conflict for purposes of diagnostics.
+  ConflictingRules.emplace_back(existingRuleID, newRuleID);
 
   if (Debug.contains(DebugFlags::ConflictingRules)) {
     llvm::dbgs() << "Conflicting rules:\n";
@@ -138,17 +144,27 @@ void RewriteSystem::recordConflict(unsigned existingRuleID,
     llvm::dbgs() << "- " << newRule << "\n";
   }
 
-  // The identity conformance rule ([P].[P] => [P]) will conflict with
-  // a concrete type requirement in an invalid protocol declaration
-  // where 'Self' is constrained to a type that does not conform to
-  // the protocol. This rule is permanent, so don't mark it as
-  // conflicting in this case.
-  if (!existingRule.isIdentityConformanceRule() &&
-      existingRule.getRHS().size() >= newRule.getRHS().size())
-    existingRule.markConflicting();
-  if (!newRule.isIdentityConformanceRule() &&
-      newRule.getRHS().size() >= existingRule.getRHS().size())
-    newRule.markConflicting();
+  if (existingRule.getLHS().back().getKind() ==
+      newRule.getLHS().back().getKind()) {
+    CONDITIONAL_ASSERT(!existingRule.isIdentityConformanceRule() &&
+                       !newRule.isIdentityConformanceRule());
+
+    // While we don't promise canonical minimization with conflicts,
+    // it's not really a big deal to spit out a generic signature with
+    // conflicts, as long as we diagnosed an error _somewhere_.
+    //
+    // However, the requirement lowering doesn't like to see two
+    // conflicting rules of the same kind, so we rule that out by
+    // marking the shorter rule as the conflict. Otherwise, we just
+    // leave both rules in place.
+    if (existingRule.getRHS().size() > newRule.getRHS().size() ||
+        (existingRule.getRHS().size() == newRule.getRHS().size() &&
+         existingRuleID < newRuleID)) {
+      existingRule.markConflicting();
+    } else {
+      newRule.markConflicting();
+    }
+  }
 }
 
 void PropertyMap::addConformanceProperty(
@@ -173,12 +189,18 @@ void PropertyMap::addLayoutProperty(
   }
 
   // Otherwise, compute the intersection.
-  assert(props->LayoutRule.has_value());
+  ASSERT(props->LayoutRule.has_value());
   auto mergedLayout = props->Layout.merge(property.getLayoutConstraint());
 
   // If the intersection is invalid, we have a conflict.
   if (!mergedLayout->isKnownLayout()) {
     System.recordConflict(*props->LayoutRule, ruleID);
+
+    // Replace the old layout. Since recordConflict() marks the older rule,
+    // this ensures that if we process multiple conflicting layout
+    // requirements, all but the final one will be marked conflicting.
+    props->Layout = newLayout;
+    props->LayoutRule = ruleID;
     return;
   }
 
@@ -199,9 +221,7 @@ void PropertyMap::addLayoutProperty(
 
     props->LayoutRule = ruleID;
   } else {
-    llvm::errs() << "Arbitrary intersection of layout requirements is "
-                 << "supported yet\n";
-    abort();
+    ABORT("Arbitrary intersection of layout requirements isn't supported yet");
   }
 }
 
@@ -220,7 +240,8 @@ void PropertyMap::recordSuperclassRelation(Term key,
                                            unsigned superclassRuleID,
                                            const ClassDecl *otherClass) {
   auto derivedType = superclassType.getConcreteType();
-  assert(otherClass->isSuperclassOf(derivedType->getClassOrBoundGenericClass()));
+  CONDITIONAL_ASSERT(otherClass->isSuperclassOf(
+      derivedType->getClassOrBoundGenericClass()));
 
   auto baseType = derivedType->getSuperclassForDecl(otherClass)
       ->getCanonicalType();
@@ -264,7 +285,7 @@ void PropertyMap::addSuperclassProperty(
 
   const auto *superclassDecl = property.getConcreteType()
       ->getClassOrBoundGenericClass();
-  assert(superclassDecl != nullptr);
+  ASSERT(superclassDecl != nullptr);
 
   if (checkRuleOnce(ruleID)) {
     // A rule (T.[superclass: C] => T) induces a rule (T.[layout: L] => T),
@@ -288,11 +309,11 @@ void PropertyMap::addSuperclassProperty(
 
     props->SuperclassDecl = superclassDecl;
 
-    assert(props->Superclasses.empty());
+    ASSERT(props->Superclasses.empty());
     auto &req = props->Superclasses[superclassDecl];
 
-    assert(!req.SuperclassType.has_value());
-    assert(req.SuperclassRules.empty());
+    ASSERT(!req.SuperclassType.has_value());
+    ASSERT(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
     req.SuperclassRules.emplace_back(property, ruleID);
@@ -305,7 +326,7 @@ void PropertyMap::addSuperclassProperty(
   }
 
   // Otherwise, we compare it against the existing superclass requirement.
-  assert(!props->Superclasses.empty());
+  ASSERT(!props->Superclasses.empty());
 
   if (superclassDecl == props->SuperclassDecl) {
     if (debug) {
@@ -315,8 +336,8 @@ void PropertyMap::addSuperclassProperty(
     // Perform concrete type unification at this level of the class
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
-    assert(req.SuperclassType.has_value());
-    assert(!req.SuperclassRules.empty());
+    ASSERT(req.SuperclassType.has_value());
+    ASSERT(!req.SuperclassRules.empty());
 
     unifyConcreteTypes(key, req.SuperclassType, req.SuperclassRules,
                        property, ruleID);
@@ -362,8 +383,8 @@ void PropertyMap::addSuperclassProperty(
     // Record the new rule at the more specific level of the class
     // hierarchy.
     auto &req = props->Superclasses[superclassDecl];
-    assert(!req.SuperclassType.has_value());
-    assert(req.SuperclassRules.empty());
+    ASSERT(!req.SuperclassType.has_value());
+    ASSERT(req.SuperclassRules.empty());
 
     req.SuperclassType = property;
     req.SuperclassRules.emplace_back(property, ruleID);
@@ -396,7 +417,7 @@ void PropertyMap::unifyConcreteTypes(Term key,
   auto &lhsRule = System.getRule(lhsRuleID);
   auto &rhsRule = System.getRule(rhsRuleID);
 
-  assert(rhsRule.getRHS() == key);
+  ASSERT(rhsRule.getRHS() == key);
 
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
@@ -405,8 +426,8 @@ void PropertyMap::unifyConcreteTypes(Term key,
                  << " with " << rhsProperty << "\n";
   }
 
-  llvm::Optional<unsigned> lhsDifferenceID;
-  llvm::Optional<unsigned> rhsDifferenceID;
+  std::optional<unsigned> lhsDifferenceID;
+  std::optional<unsigned> rhsDifferenceID;
 
   bool conflict = System.computeTypeDifference(key,
                                                lhsProperty,
@@ -430,10 +451,10 @@ void PropertyMap::unifyConcreteTypes(Term key,
   if (lhsDifferenceID && rhsDifferenceID) {
     const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
     const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
-    assert(lhsDifference.RHS == rhsDifference.RHS);
+    ASSERT(lhsDifference.RHS == rhsDifference.RHS);
 
     auto newProperty = lhsDifference.RHS;
-    assert(newProperty == rhsDifference.RHS);
+    ASSERT(newProperty == rhsDifference.RHS);
 
     MutableTerm rhsTerm(key);
     MutableTerm lhsTerm(key);
@@ -465,11 +486,11 @@ void PropertyMap::unifyConcreteTypes(Term key,
 
   // Handle the case where RHS == (LHS ∧ RHS) by processing LHS -> (LHS ∧ RHS).
   if (lhsDifferenceID) {
-    assert(!rhsDifferenceID);
+    ASSERT(!rhsDifferenceID);
 
     const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
-    assert(lhsProperty == lhsDifference.LHS);
-    assert(rhsProperty == lhsDifference.RHS);
+    ASSERT(lhsProperty == lhsDifference.LHS);
+    ASSERT(rhsProperty == lhsDifference.RHS);
 
     // Build a rewrite path (T.[RHS] => T).
     RewritePath path;
@@ -486,11 +507,11 @@ void PropertyMap::unifyConcreteTypes(Term key,
 
   // Handle the case where LHS == (LHS ∧ RHS) by processing RHS -> (LHS ∧ RHS).
   if (rhsDifferenceID) {
-    assert(!lhsDifferenceID);
+    ASSERT(!lhsDifferenceID);
 
     const auto &rhsDifference = System.getTypeDifference(*rhsDifferenceID);
-    assert(rhsProperty == rhsDifference.LHS);
-    assert(lhsProperty == rhsDifference.RHS);
+    ASSERT(rhsProperty == rhsDifference.LHS);
+    ASSERT(lhsProperty == rhsDifference.RHS);
 
     // Build a rewrite path (T.[LHS] => T).
     RewritePath path;
@@ -511,7 +532,7 @@ void PropertyMap::unifyConcreteTypes(Term key,
     return;
   }
 
-  assert(lhsProperty == rhsProperty);
+  ASSERT(lhsProperty == rhsProperty);
 
   if (lhsRuleID != rhsRuleID) {
     // If the rules are different but the concrete types are identical, then
@@ -543,7 +564,7 @@ void PropertyMap::unifyConcreteTypes(Term key,
 ///
 /// Used by addSuperclassProperty() and addConcreteTypeProperty().
 void PropertyMap::unifyConcreteTypes(
-    Term key, llvm::Optional<Symbol> &bestProperty,
+    Term key, std::optional<Symbol> &bestProperty,
     llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
     Symbol property, unsigned ruleID) {
   // Unify this rule with all other concrete type rules we've seen so far,
@@ -563,8 +584,8 @@ void PropertyMap::unifyConcreteTypes(
   }
 
   // Otherwise, compute the meet with the existing best property.
-  llvm::Optional<unsigned> lhsDifferenceID;
-  llvm::Optional<unsigned> rhsDifferenceID;
+  std::optional<unsigned> lhsDifferenceID;
+  std::optional<unsigned> rhsDifferenceID;
 
   bool conflict = System.computeTypeDifference(key,
                                                *bestProperty, property,
@@ -578,7 +599,7 @@ void PropertyMap::unifyConcreteTypes(
   } else if (rhsDifferenceID) {
     bestProperty = System.getTypeDifference(*rhsDifferenceID).RHS;
   } else {
-    assert(*bestProperty == property);
+    ASSERT(*bestProperty == property);
   }
 }
 
@@ -616,8 +637,8 @@ void PropertyMap::addConcreteTypeProperty(
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
     Term key, Symbol property, unsigned ruleID) {
-  assert(property.isProperty());
-  assert(*System.getRule(ruleID).isPropertyRule() == property);
+  CONDITIONAL_ASSERT(property.isProperty());
+  CONDITIONAL_ASSERT(*System.getRule(ruleID).isPropertyRule() == property);
 
   switch (property.getKind()) {
   case Symbol::Kind::Protocol:
@@ -646,6 +667,7 @@ void PropertyMap::addProperty(
   case Symbol::Kind::GenericParam:
   case Symbol::Kind::AssociatedType:
   case Symbol::Kind::Shape:
+  case Symbol::Kind::PackElement:
     break;
   }
 

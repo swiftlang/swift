@@ -29,13 +29,13 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
-#include "llvm/ADT/Optional.h"
 #include <algorithm>
+#include <optional>
 
 namespace swift {
 
 class ClassDecl;
-enum IsSerialized_t : unsigned char;
+enum SerializedKind_t : uint8_t;
 class SILFunction;
 class SILModule;
 
@@ -115,34 +115,35 @@ private:
   /// The ClassDecl mapped to this VTable.
   ClassDecl *Class;
 
+  /// The class type if this is a specialized vtable, otherwise null.
   SILType classType;
 
   /// Whether or not this vtable is serialized, which allows
   /// devirtualization from another module.
-  bool Serialized : 1;
+  unsigned SerializedKind : 2;
 
   /// The number of SILVTables entries.
   unsigned NumEntries : 31;
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.
-  SILVTable(ClassDecl *c, SILType classType, IsSerialized_t serialized,
+  SILVTable(ClassDecl *c, SILType classType, SerializedKind_t serialized,
             ArrayRef<Entry> entries);
 
- public:
+public:
   ~SILVTable();
 
   /// Create a new SILVTable with the given method-to-implementation mapping.
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.
   static SILVTable *create(SILModule &M, ClassDecl *Class, SILType classType,
-                           IsSerialized_t Serialized,
+                           SerializedKind_t Serialized,
                            ArrayRef<Entry> Entries);
 
   /// Create a new SILVTable with the given method-to-implementation mapping.
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.
   static SILVTable *create(SILModule &M, ClassDecl *Class,
-                           IsSerialized_t Serialized,
+                           SerializedKind_t Serialized,
                            ArrayRef<Entry> Entries);
 
   /// Return the class that the vtable represents.
@@ -154,13 +155,21 @@ private:
   SILType getClassType() const { return classType; }
 
   /// Returns true if this vtable is going to be (or was) serialized.
-  IsSerialized_t isSerialized() const {
-    return Serialized ? IsSerialized : IsNotSerialized;
+  bool isSerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized;
   }
 
+  bool isAnySerialized() const {
+    return SerializedKind_t(SerializedKind) == IsSerialized ||
+           SerializedKind_t(SerializedKind) == IsSerializedForPackage;
+  }
+
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(SerializedKind);
+  }
   /// Sets the serialized flag.
-  void setSerialized(IsSerialized_t serialized) {
-    Serialized = (serialized ? 1 : 0);
+  void setSerializedKind(SerializedKind_t serializedKind) {
+    SerializedKind = serializedKind;
   }
 
   /// Return all of the method entries.
@@ -178,7 +187,7 @@ private:
   void updateVTableCache(const Entry &entry);
 
   /// Look up the implementation function for the given method.
-  llvm::Optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
+  std::optional<Entry> getEntry(SILModule &M, SILDeclRef method) const;
 
   /// Removes entries from the vtable.
   /// \p predicate Returns true if the passed entry should be removed.
@@ -195,6 +204,8 @@ private:
         });
     NumEntries = std::distance(Entries.begin(), end);
   }
+
+  void replaceEntries(ArrayRef<Entry> newEntries);
 
   /// Verify that the vtable is well-formed for the given class.
   void verify(const SILModule &M) const;

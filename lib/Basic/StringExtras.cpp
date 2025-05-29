@@ -15,10 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -27,6 +27,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <optional>
 
 using namespace swift;
 using namespace camel_case;
@@ -69,7 +70,7 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
 #include "PartsOfSpeech.def"
 
   // Identify gerunds, which always end in "ing".
-  if (word.endswith("ing") && word.size() > 4) {
+  if (word.ends_with("ing") && word.size() > 4) {
     StringRef possibleVerb = word.drop_back(3);
 
     // If what remains is a verb, we have a gerund.
@@ -382,9 +383,9 @@ size_t camel_case::findWord(StringRef string, StringRef word) {
 }
 
 /// Skip a type suffix that can be dropped.
-static llvm::Optional<StringRef> skipTypeSuffix(StringRef typeName) {
+static std::optional<StringRef> skipTypeSuffix(StringRef typeName) {
   if (typeName.empty())
-    return llvm::None;
+    return std::nullopt;
 
   auto lastWord = camel_case::getLastWord(typeName);
 
@@ -417,10 +418,10 @@ static llvm::Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   }
 
   // _t.
-  if (typeName.size() > 2 && typeName.endswith("_t")) {
+  if (typeName.size() > 2 && typeName.ends_with("_t")) {
     return typeName.drop_back(2);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Match a word within a name to a word within a type.
@@ -555,7 +556,7 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
     if (firstWord == "By") {
       StringRef nextWord = camel_case::getFirstWord(
                              newName.substr(firstWord.size()));
-      if (nextWord.endswith("ing")) {
+      if (nextWord.ends_with("ing")) {
         return newName.substr(firstWord.size());
       }
     }
@@ -757,7 +758,7 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
   typeName.CollectionElement = StringRef();
 
   auto nameWords = camel_case::getWords(name);
-  llvm::Optional<llvm::iterator_range<WordIterator>> matchingRange;
+  std::optional<llvm::iterator_range<WordIterator>> matchingRange;
 
   // Search backwards for the type name, whether anchored at the end or not.
   for (auto nameReverseIter = nameWords.rbegin();
@@ -1253,8 +1254,8 @@ bool swift::omitNeedlessWords(
     StringRef firstParamName, OmissionTypeName givenResultType,
     OmissionTypeName contextType, ArrayRef<OmissionTypeName> paramTypes,
     bool returnsSelf, bool isProperty, const InheritedNameSet *allPropertyNames,
-    llvm::Optional<unsigned> completionHandlerIndex,
-    llvm::Optional<StringRef> completionHandlerName,
+    std::optional<unsigned> completionHandlerIndex,
+    std::optional<StringRef> completionHandlerName,
     StringScratchSpace &scratch) {
   bool anyChanges = false;
   OmissionTypeName resultType = returnsSelf ? contextType : givenResultType;
@@ -1402,33 +1403,33 @@ bool swift::omitNeedlessWords(
   return lowercaseAcronymsForReturn();
 }
 
-llvm::Optional<StringRef>
+std::optional<StringRef>
 swift::stripWithCompletionHandlerSuffix(StringRef name) {
-  if (name.endswith("WithCompletionHandler")) {
+  if (name.ends_with("WithCompletionHandler")) {
     return name.drop_back(strlen("WithCompletionHandler"));
   }
 
-  if (name.endswith("WithCompletion")) {
+  if (name.ends_with("WithCompletion")) {
     return name.drop_back(strlen("WithCompletion"));
   }
 
-  if (name.endswith("WithCompletionBlock")) {
+  if (name.ends_with("WithCompletionBlock")) {
     return name.drop_back(strlen("WithCompletionBlock"));
   }
 
-  if (name.endswith("WithBlock")) {
+  if (name.ends_with("WithBlock")) {
     return name.drop_back(strlen("WithBlock"));
   }
 
-  if (name.endswith("WithReplyTo")) {
+  if (name.ends_with("WithReplyTo")) {
     return name.drop_back(strlen("WithReplyTo"));
   }
 
-  if (name.endswith("WithReply")) {
+  if (name.ends_with("WithReply")) {
     return name.drop_back(strlen("WithReply"));
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void swift::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {

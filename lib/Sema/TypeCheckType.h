@@ -17,21 +17,19 @@
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
 #include "swift/AST/Type.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeResolutionStage.h"
-#include "swift/Basic/LangOptions.h"
-#include "llvm/ADT/None.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
 
 class ASTContext;
+class AvailabilityContext;
+class QualifiedIdentTypeRepr;
 class TypeRepr;
-class IdentTypeRepr;
 class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
 class SILTypeResolutionContext;
-class GenericIdentTypeRepr;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -83,8 +81,12 @@ enum class TypeResolutionFlags : uint16_t {
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
 
-  /// Whether this resolution happens under an explicit ownership specifier.
-  HasOwnership = 1 << 13,
+  /// Whether to suppress warnings about conversions from and bindings of type
+  /// Never
+  SilenceNeverWarnings = 1 << 13,
+
+  /// Whether the immediate context has an @escaping attribute.
+  DirectEscaping = 1 << 14,
 };
 
 /// Type resolution contexts that require special handling.
@@ -104,6 +106,11 @@ enum class TypeResolverContext : uint8_t {
   /// arguments.
   VariadicGenericArgument,
 
+  /// Whether we are checking generic arguments of a bound generic type with
+  /// value parameters. We use the ValueMatchVisitor to ensure that all value
+  /// parameters line up with integer types or other value parameters.
+  ValueGenericArgument,
+
   /// Whether we are checking a tuple element type.
   TupleElement,
 
@@ -116,7 +123,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the parameter list of a subscript.
   SubscriptDecl,
 
-  /// Whether we are checking the parameter list of a closure.
+  /// Whether we are checking the parameter list or result of a closure.
   ClosureExpr,
 
   /// Whether we are in the input type of a function, or under one level of
@@ -200,6 +207,12 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is a custom attribute.
   CustomAttr,
+
+  /// Whether this is the argument of an inverted constraint (~).
+  Inverted,
+
+  /// Whether this is inside a @_rawLayout attribute.
+  RawLayoutAttr,
 };
 
 /// Options that determine how type resolution should work.
@@ -234,7 +247,8 @@ public:
   TypeResolutionOptions(Context context) : base(context), context(context),
       flags(unsigned(TypeResolutionFlags::Direct)) {}
   // Helper forwarding constructors:
-  TypeResolutionOptions(llvm::NoneType) : TypeResolutionOptions(Context::None){}
+  TypeResolutionOptions(std::nullopt_t)
+      : TypeResolutionOptions(Context::None) {}
 
   /// Test the current type resolution base context.
   bool hasBase(Context context) const { return base == context; }
@@ -250,9 +264,10 @@ public:
   /// Set the current type resolution context.
   void setContext(Context newContext) {
     context = newContext;
-    flags &= ~unsigned(TypeResolutionFlags::Direct);
+    flags &= ~(unsigned(TypeResolutionFlags::Direct) |
+               unsigned(TypeResolutionFlags::DirectEscaping));
   }
-  void setContext(llvm::NoneType) { setContext(Context::None); }
+  void setContext(std::nullopt_t) { setContext(Context::None); }
 
   /// Get the current flags.
   TypeResolutionFlags getFlags() const { return TypeResolutionFlags(flags); }
@@ -263,7 +278,6 @@ public:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
-    case Context::PatternBindingDecl:
     case Context::EditorPlaceholderExpr:
     case Context::ClosureExpr:
       return true;
@@ -294,6 +308,10 @@ public:
     case Context::GenericParameterInherited:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
+    case Context::Inverted:
+    case Context::ValueGenericArgument:
+    case Context::PatternBindingDecl:
+    case Context::RawLayoutAttr:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -312,6 +330,7 @@ public:
     case Context::GenericRequirement:
     case Context::ExistentialConstraint:
     case Context::MetatypeBase:
+    case Context::Inverted:
       return false;
     case Context::None:
     case Context::ScalarGenericArgument:
@@ -337,6 +356,8 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return true;
     }
   }
@@ -349,6 +370,7 @@ public:
     case Context::PackElement:
     case Context::TupleElement:
     case Context::VariadicGenericArgument:
+    case Context::Inverted:
       return true;
     case Context::None:
     case Context::PatternBindingDecl:
@@ -378,6 +400,53 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in a generic argument list.
+  bool isGenericArgument() const {
+    switch (context) {
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
+    case Context::ValueGenericArgument:
+      return true;
+
+    case Context::None:
+    case Context::Inherited:
+    case Context::FunctionInput:
+    case Context::PackElement:
+    case Context::TupleElement:
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::MacroDecl:
+    case Context::EnumPatternPayload:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+    case Context::Inverted:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -421,6 +490,9 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::Inverted:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -472,7 +544,7 @@ public:
   /// Strip the contextual options from the given type resolution options.
   inline TypeResolutionOptions withoutContext(bool preserveSIL = false) const {
     auto copy = *this;
-    copy.setContext(llvm::None);
+    copy.setContext(std::nullopt);
     // FIXME: Move SILType to TypeResolverContext.
     if (!preserveSIL) copy -= TypeResolutionFlags::SILType;
     return copy;
@@ -620,7 +692,7 @@ public:
   /// name.
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
-                                  IdentTypeRepr *repr) const;
+                                  QualifiedIdentTypeRepr *repr) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
@@ -662,12 +734,18 @@ public:
                                     ArrayRef<Type> genericArgs) const;
 };
 
-void diagnoseInvalidGenericArguments(SourceLoc loc,
-                                     ValueDecl *decl,
-                                     unsigned argCount,
-                                     unsigned paramCount,
+void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
+                                     unsigned argCount, unsigned paramCount,
                                      bool hasParameterPack,
-                                     GenericIdentTypeRepr *generic);
+                                     SourceRange angleBrackets);
+
+/// \param repr the repr for the type of the parameter.
+/// \param ty the non-error resolved type of the repr.
+/// \param ownership the ownership kind of the parameter
+/// \returns true iff a diagnostic was emitted and the \c repr was invalidated.
+bool diagnoseMissingOwnership(ParamSpecifier ownership,
+                              TypeRepr *repr, Type ty,
+                              const TypeResolution &resolution);
 
 } // end namespace swift
 

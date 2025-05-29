@@ -1,17 +1,25 @@
 source.edit.kind.active:
-  2:20-2:24 "p"
+  2:20-2:24 source.refactoring.range.kind.basename
+  2:39-2:40 source.refactoring.range.kind.decl-argument-label arg-index=0
+  2:40-2:42 source.refactoring.range.kind.parameter-and-whitespace arg-index=0
 source.edit.kind.active:
-  32:24-32:28 "p"
+  32:24-32:28 source.refactoring.range.kind.basename
+  32:48-32:48 source.refactoring.range.kind.call-argument-combined arg-index=0
 source.edit.kind.active:
-  17:29-17:33 "p"
+  17:29-17:33 source.refactoring.range.kind.basename
+  18:23-18:24 source.refactoring.range.kind.decl-argument-label arg-index=0
+  18:24-18:26 source.refactoring.range.kind.parameter-and-whitespace arg-index=0
 source.edit.kind.active:
-  5:20-5:24 "p"
-  6:23-6:24 "b"
+  5:20-5:24 source.refactoring.range.kind.basename
+  6:23-6:24 source.refactoring.range.kind.decl-argument-label arg-index=0
+  6:24-6:24 source.refactoring.range.kind.parameter-and-whitespace arg-index=0
 source.edit.kind.active:
-  33:24-33:28 "p"
-  33:48-33:49 "b"
+  33:24-33:28 source.refactoring.range.kind.basename
+  33:48-33:49 source.refactoring.range.kind.call-argument-label arg-index=0
+  33:49-33:51 source.refactoring.range.kind.call-argument-colon arg-index=0
 source.edit.kind.active:
-  7:15-7:16 "b"
+  7:15-7:16 source.refactoring.range.kind.basename
 source.edit.kind.active:
-  21:29-21:33 "p"
-  21:48-21:49 "b"
+  21:29-21:33 source.refactoring.range.kind.basename
+  21:48-21:49 source.refactoring.range.kind.decl-argument-label arg-index=0
+  21:49-21:51 source.refactoring.range.kind.parameter-and-whitespace arg-index=0

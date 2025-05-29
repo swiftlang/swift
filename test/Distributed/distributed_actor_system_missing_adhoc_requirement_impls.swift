@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -6,12 +6,13 @@
 
 import Distributed
 
-struct MissingRemoteCall: DistributedActorSystem {
-  // expected-error@-1{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
-
-  // expected-error@-4{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+struct MissingRemoteCall: DistributedActorSystem { 
+  // expected-error@-1 {{type 'MissingRemoteCall' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
+  // expected-error@-5{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-6{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -41,12 +42,13 @@ struct MissingRemoteCall: DistributedActorSystem {
   }
 }
 
-struct RemoteCallMutating: DistributedActorSystem {
-  // expected-error@-1{{struct 'RemoteCallMutating' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
-
-  // expected-error@-4{{struct 'RemoteCallMutating' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+struct RemoteCallMutating: DistributedActorSystem { 
+  // expected-error@-1 {{type 'RemoteCallMutating' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'RemoteCallMutating' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
+  // expected-error@-5{{struct 'RemoteCallMutating' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-6{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -72,6 +74,7 @@ struct RemoteCallMutating: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
+  // expected-note@+1 {{candidate is marked 'mutating' but protocol does not allow it}}
   mutating func remoteCall<Act, Err, Res>(
       on actor: Act,
       target: RemoteCallTarget,
@@ -86,6 +89,7 @@ struct RemoteCallMutating: DistributedActorSystem {
     fatalError("NOT IMPLEMENTED \(#function)")
   }
 
+  // expected-note@+1 {{candidate is marked 'mutating' but protocol does not allow it}}
   mutating func remoteCallVoid<Act, Err>(
       on actor: Act,
       target: RemoteCallTarget,
@@ -102,12 +106,13 @@ struct RemoteCallMutating: DistributedActorSystem {
   }
 }
 
-struct MissingRemoteCall_missingInout_on_encoder: DistributedActorSystem {
-  // expected-error@-1{{struct 'MissingRemoteCall_missingInout_on_encoder' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
-
-  // expected-error@-4{{struct 'MissingRemoteCall_missingInout_on_encoder' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+struct MissingRemoteCall_missingInout_on_encoder: DistributedActorSystem { 
+  // expected-error@-1 {{type 'MissingRemoteCall_missingInout_on_encoder' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'MissingRemoteCall_missingInout_on_encoder' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
+  // expected-error@-5{{struct 'MissingRemoteCall_missingInout_on_encoder' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-6{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -133,6 +138,7 @@ struct MissingRemoteCall_missingInout_on_encoder: DistributedActorSystem {
   func resignID(_ id: ActorID) {
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: MissingRemoteCall_missingInout_on_encoder.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: FakeInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res')}}
   func remoteCall<Act, Err, Res>(
       on actor: Act,
       target: RemoteCallTarget,
@@ -147,6 +153,7 @@ struct MissingRemoteCall_missingInout_on_encoder: DistributedActorSystem {
     fatalError("NOT IMPLEMENTED \(#function)")
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err> (on: Act, target: RemoteCallTarget, invocation: MissingRemoteCall_missingInout_on_encoder.InvocationEncoder, throwing: Err.Type) async throws -> ()' (aka '<Act, Err> (on: Act, target: RemoteCallTarget, invocation: FakeInvocationEncoder, throwing: Err.Type) async throws -> ()')}}
   func remoteCallVoid<Act, Err>(
       on actor: Act,
       target: RemoteCallTarget,
@@ -165,6 +172,7 @@ struct MissingRemoteCall_missingInout_on_encoder: DistributedActorSystem {
 
 struct MissingRemoteCall_missing_makeInvocationEncoder: DistributedActorSystem {
   // expected-error@-1{{type 'MissingRemoteCall_missing_makeInvocationEncoder' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -219,12 +227,13 @@ struct MissingRemoteCall_missing_makeInvocationEncoder: DistributedActorSystem {
   // func makeInvocationEncoder() -> InvocationEncoder {} // MISSING
 }
 
-struct Error_wrongReturn: DistributedActorSystem {
-  // expected-error@-1{{struct 'Error_wrongReturn' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
-
-  // expected-error@-4{{struct 'Error_wrongReturn' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+struct Error_wrongReturn: DistributedActorSystem { 
+  // expected-error@-1{{type 'Error_wrongReturn' does not conform to protocol 'DistributedActorSystem'}}
+  //expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'Error_wrongReturn' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
+  // expected-error@-5{{struct 'Error_wrongReturn' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-6{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -253,6 +262,7 @@ struct Error_wrongReturn: DistributedActorSystem {
   func makeInvocationEncoder() -> InvocationEncoder {
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout Error_wrongReturn.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> String' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout FakeInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> String')}}
   public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -267,6 +277,7 @@ struct Error_wrongReturn: DistributedActorSystem {
     throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout Error_wrongReturn.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> ()' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout FakeInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> ()')}}
   public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -281,6 +292,7 @@ struct Error_wrongReturn: DistributedActorSystem {
     throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err> (on: Act, target: RemoteCallTarget, invocation: inout Error_wrongReturn.InvocationEncoder, throwing: Err.Type) throws -> String' (aka '<Act, Err> (on: Act, target: RemoteCallTarget, invocation: inout FakeInvocationEncoder, throwing: Err.Type) throws -> String')}}
   public func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -294,12 +306,13 @@ struct Error_wrongReturn: DistributedActorSystem {
   }
 }
 
-struct BadRemoteCall_param: DistributedActorSystem {
-  // expected-error@-1{{struct 'BadRemoteCall_param' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
-
-  // expected-error@-4{{struct 'BadRemoteCall_param' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+struct BadRemoteCall_param: DistributedActorSystem { 
+  // expected-error@-1{{type 'BadRemoteCall_param' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'BadRemoteCall_param' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
+  // expected-error@-5{{struct 'BadRemoteCall_param' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-6{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -375,7 +388,9 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
   public func makeInvocationEncoder() -> InvocationEncoder {
   }
 
-  // expected-error@+1{{method 'remoteCall(on:target:invocation:throwing:returning:)' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedActorSystem'}}
+  // expected-error@+3{{method 'remoteCall(on:target:invocation:throwing:returning:)' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedActorSystem'}}
+  // expected-error@+2 {{method 'remoteCall(on:target:invocation:throwing:returning:)' must be declared public because it matches a requirement in public protocol 'DistributedActorSystem'}}
+  // expected-note@+1 {{mark the instance method as 'public' to satisfy the requirement}}
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -390,7 +405,9 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
     throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 
-  // expected-error@+1{{method 'remoteCallVoid(on:target:invocation:throwing:)' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedActorSystem'}}
+  // expected-error@+3{{method 'remoteCallVoid(on:target:invocation:throwing:)' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedActorSystem'}}
+  // expected-error@+2 {{method 'remoteCallVoid(on:target:invocation:throwing:)' must be declared public because it matches a requirement in public protocol 'DistributedActorSystem'}}
+  // expected-note@+1 {{mark the instance method as 'public' to satisfy the requirement}}
   func remoteCallVoid<Act, Err>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -404,9 +421,11 @@ public struct BadRemoteCall_notPublic: DistributedActorSystem {
   }
 }
 
-public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
-  // expected-error@-1{{struct 'BadRemoteCall_badResultConformance' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
+public struct BadRemoteCall_badResultConformance: DistributedActorSystem { 
+  // expected-error@-1{{type 'BadRemoteCall_badResultConformance' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'BadRemoteCall_badResultConformance' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
 
   public typealias ActorID = ActorAddress
   public typealias InvocationDecoder = PublicFakeInvocationDecoder
@@ -431,6 +450,7 @@ public struct BadRemoteCall_badResultConformance: DistributedActorSystem {
   public func makeInvocationEncoder() -> InvocationEncoder {
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout BadRemoteCall_badResultConformance.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout PublicFakeInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res')}}
   public func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -511,9 +531,11 @@ struct BadRemoteCall_largeSerializationRequirement: DistributedActorSystem {
   }
 }
 
-struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: DistributedActorSystem {
-  // expected-error@-1{{struct 'BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
+struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: DistributedActorSystem { 
+  // expected-error@-1{{type 'BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition' does not conform to protocol 'DistributedActorSystem'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition' is missing witness for protocol requirement 'remoteCall'}}
+  // expected-note@-4{{add stubs for conformance}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = LargeSerializationReqFakeInvocationDecoder
@@ -538,6 +560,7 @@ struct BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition: Distr
   func makeInvocationEncoder() -> InvocationEncoder {
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout BadRemoteCall_largeSerializationRequirementSlightlyOffInDefinition.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout LargeSerializationReqFakeInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res')}}
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -667,9 +690,11 @@ public struct PublicFakeInvocationEncoder: DistributedTargetInvocationEncoder {
   public mutating func doneRecording() throws {}
 }
 
-struct FakeInvocationEncoder_missing_recordArgument: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordArgument' is missing witness for protocol requirement 'recordArgument'}}
-  //expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordArgument' with signature:}}
+struct FakeInvocationEncoder_missing_recordArgument: DistributedTargetInvocationEncoder { 
+  //expected-error@-1{{type 'FakeInvocationEncoder_missing_recordArgument' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_missing_recordArgument' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -679,21 +704,26 @@ struct FakeInvocationEncoder_missing_recordArgument: DistributedTargetInvocation
   mutating func doneRecording() throws {}
 }
 
-struct FakeInvocationEncoder_missing_recordArgument2: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordArgument2' is missing witness for protocol requirement 'recordArgument'}}
-  //expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordArgument' with signature:}}
+struct FakeInvocationEncoder_missing_recordArgument2: DistributedTargetInvocationEncoder { 
+  //expected-error@-1{{type 'FakeInvocationEncoder_missing_recordArgument2' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_missing_recordArgument2' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  // expected-note@+1 {{candidate has non-matching type '<Argument> (Argument) throws -> ()'}}
   mutating func recordArgument<Argument: SomeProtocol>(_ argument: Argument) throws {} // BAD
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
 }
 
-struct FakeInvocationEncoder_missing_recordReturnType: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_missing_recordReturnType' is missing witness for protocol requirement 'recordReturnType'}}
-  //expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordReturnType' with signature:}}
+struct FakeInvocationEncoder_missing_recordReturnType: DistributedTargetInvocationEncoder { 
+  //expected-error@-1{{type 'FakeInvocationEncoder_missing_recordReturnType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_missing_recordReturnType' is missing witness for protocol requirement 'recordReturnType'}}
+  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -705,6 +735,7 @@ struct FakeInvocationEncoder_missing_recordReturnType: DistributedTargetInvocati
 
 struct FakeInvocationEncoder_missing_recordErrorType: DistributedTargetInvocationEncoder {
   //expected-error@-1{{type 'FakeInvocationEncoder_missing_recordErrorType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -714,39 +745,48 @@ struct FakeInvocationEncoder_missing_recordErrorType: DistributedTargetInvocatio
   mutating func doneRecording() throws {}
 }
 
-struct FakeInvocationEncoder_recordArgument_wrongType: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_recordArgument_wrongType' is missing witness for protocol requirement 'recordArgument'}}
-  //expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordArgument' with signature:}}
+struct FakeInvocationEncoder_recordArgument_wrongType: DistributedTargetInvocationEncoder { 
+  //expected-error@-1{{type 'FakeInvocationEncoder_recordArgument_wrongType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_recordArgument_wrongType' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: String, other: Argument) throws {} // BAD
+  // expected-note@+1 {{candidate has non-matching type '<Argument> (Argument.Type) throws -> ()'}}
   mutating func recordArgument<Argument: SerializationRequirement>(_ argument: Argument.Type) throws {} // BAD
   mutating func recordArgument<Argument: SerializationRequirement>(badName: Argument) throws {} // BAD
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
 }
-struct FakeInvocationEncoder_recordArgument_missingMutating: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_recordArgument_missingMutating' is missing witness for protocol requirement 'recordArgument'}}
-  //expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordArgument' with signature:}}
+struct FakeInvocationEncoder_recordArgument_missingMutating: DistributedTargetInvocationEncoder { 
+  //expected-error@-1{{type 'FakeInvocationEncoder_recordArgument_missingMutating' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_recordArgument_missingMutating' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  // expected-note@+1 {{candidate has non-matching type '<Value> (RemoteCallArgument<Value>) throws -> ()'}}
   func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
   mutating func doneRecording() throws {}
 }
 
-struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvocationEncoder {
-  //expected-error@-1{{struct 'FakeInvocationEncoder_recordResultType_wrongType' is missing witness for protocol requirement 'recordReturnType'}}
-  //expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordReturnType' with signature:}}
+struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvocationEncoder { 
+  //expected-error@-1 {{type 'FakeInvocationEncoder_recordResultType_wrongType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_recordResultType_wrongType' is missing witness for protocol requirement 'recordReturnType'}}
+  //expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
   mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
   mutating func recordReturnType<R: SerializationRequirement>(s: String, _ resultType: R.Type) throws {} // BAD
+  // expected-note@+1 {{candidate has non-matching type '<R> (R.Type) throws -> ()'}}
   mutating func recordReturnType<R: SomeProtocol>(_ resultType: R.Type) throws {} // BAD
   mutating func recordReturnType<R: SerializationRequirement>(badName: R.Type) throws {} // BAD
   mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
@@ -755,6 +795,7 @@ struct FakeInvocationEncoder_recordResultType_wrongType: DistributedTargetInvoca
 
 struct FakeInvocationEncoder_recordErrorType_wrongType: DistributedTargetInvocationEncoder {
   //expected-error@-1{{type 'FakeInvocationEncoder_recordErrorType_wrongType' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
@@ -808,6 +849,8 @@ public final class PublicFakeInvocationDecoder_badNotPublic: DistributedTargetIn
   public func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
   func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument { fatalError() }
   // expected-error@-1{{method 'decodeNextArgument()' must be as accessible as its enclosing type because it matches a requirement in protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-error@-2{{method 'decodeNextArgument()' must be declared public because it matches a requirement in public protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-note@-3 {{mark the instance method as 'public' to satisfy the requirement}}
   func decodeReturnType() throws -> Any.Type? { nil }
   // expected-error@-1{{method 'decodeReturnType()' must be declared public because it matches a requirement in public protocol 'DistributedTargetInvocationDecoder'}}
   // expected-note@-2{{mark the instance method as 'public' to satisfy the requirement}}
@@ -816,12 +859,15 @@ public final class PublicFakeInvocationDecoder_badNotPublic: DistributedTargetIn
   // expected-note@-2{{mark the instance method as 'public' to satisfy the requirement}}
 }
 
-final class PublicFakeInvocationDecoder_badBadProtoRequirement: DistributedTargetInvocationDecoder {
-  // expected-error@-1{{class 'PublicFakeInvocationDecoder_badBadProtoRequirement' is missing witness for protocol requirement 'decodeNextArgument'}}
-  // expected-note@-2{{protocol 'DistributedTargetInvocationDecoder' requires function 'decodeNextArgument' with signature:}}
+final class PublicFakeInvocationDecoder_badBadProtoRequirement: DistributedTargetInvocationDecoder { 
+  // expected-error@-1{{type 'PublicFakeInvocationDecoder_badBadProtoRequirement' does not conform to protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{class 'PublicFakeInvocationDecoder_badBadProtoRequirement' is missing witness for protocol requirement 'decodeNextArgument'}}
+  // expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  // expected-note@+1 {{candidate has non-matching type '<Argument> () throws -> Argument'}}
   func decodeNextArgument<Argument: SomeProtocol>() throws -> Argument { fatalError() }
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
@@ -868,9 +914,11 @@ struct LargeSerializationReqFakeInvocationResultHandler: DistributedTargetInvoca
   }
 }
 
-struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandler {
-  // expected-error@-1{{struct 'BadResultHandler_missingOnReturn' is missing witness for protocol requirement 'onReturn'}}
-  // expected-note@-2{{protocol 'DistributedTargetInvocationResultHandler' requires function 'onReturn' with signature:}}
+struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandler { 
+  // expected-error@-1{{type 'BadResultHandler_missingOnReturn' does not conform to protocol 'DistributedTargetInvocationResultHandler'}}
+  // expected-note@-2{{add stubs for conformance}}{{84-84=\nfunc onReturn<Success: SerializationRequirement>(value: Success) async throws {\n    <#code#>\n\}\n}}
+  // expected-error@-3{{struct 'BadResultHandler_missingOnReturn' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   // func onReturn<Res: SerializationRequirement>(value: Res) async throws {} // MISSING
@@ -880,7 +928,7 @@ struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandle
 
 struct BadResultHandler_missingRequirement: DistributedTargetInvocationResultHandler {
   // expected-error@-1{{struct 'BadResultHandler_missingRequirement' is missing witness for protocol requirement 'onReturn'}}
-  // expected-note@-2{{protocol 'DistributedTargetInvocationResultHandler' requires function 'onReturn' with signature:}}
+  // expected-note@-2{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
   func onReturn<Success>(value: Success) async throws {} // MISSING : Codable
@@ -888,11 +936,14 @@ struct BadResultHandler_missingRequirement: DistributedTargetInvocationResultHan
   func onThrow<Err: Error>(error: Err) async throws {}
 }
 
-struct BadResultHandler_mutatingButShouldNotBe: DistributedTargetInvocationResultHandler {
-  // expected-error@-1{{struct 'BadResultHandler_mutatingButShouldNotBe' is missing witness for protocol requirement 'onReturn'}}
-  // expected-note@-2{{protocol 'DistributedTargetInvocationResultHandler' requires function 'onReturn' with signature:}}
+struct BadResultHandler_mutatingButShouldNotBe: DistributedTargetInvocationResultHandler { 
+  // expected-error@-1 {{type 'BadResultHandler_mutatingButShouldNotBe' does not conform to protocol 'DistributedTargetInvocationResultHandler'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'BadResultHandler_mutatingButShouldNotBe' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-4{{add stubs for conformance}}
   typealias SerializationRequirement = Codable
 
+  // expected-note@+1 {{candidate is marked 'mutating' but protocol does not allow it}}
   mutating func onReturn<Success: Codable>(value: Success) async throws {} // WRONG: can't be mutating
   func onReturnVoid() async throws {}
   func onThrow<Err: Error>(error: Err) async throws {}

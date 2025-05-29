@@ -28,6 +28,8 @@
 
 namespace swift {
 
+class SILPassManager;
+
 /// Returns true if this value requires OSSA cleanups.
 inline bool requiresOSSACleanup(SILValue v) {
   return v->getFunction()->hasOwnership() &&
@@ -157,7 +159,7 @@ public:
 /// "ownership fixup" utilities. Please do not put actual methods on this, it is
 /// meant to be composed with.
 struct OwnershipFixupContext {
-  llvm::Optional<InstModCallbacks> inlineCallbacks;
+  std::optional<InstModCallbacks> inlineCallbacks;
   InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
 
@@ -277,6 +279,8 @@ public:
     return ctx->extraAddressFixupInfo.base;
   }
 
+  bool mayIntroduceUnoptimizableCopies();
+
   /// Perform OSSA fixup on newValue and return a fixed-up value based that can
   /// be used to replace all uses of oldValue.
   ///
@@ -306,6 +310,11 @@ private:
 /// Whether the provided uses lie within the current liveness of the
 /// specified lexical value.
 bool areUsesWithinLexicalValueLifetime(SILValue, ArrayRef<Operand *>);
+
+/// Whether the provided uses lie within the current liveness of the
+/// specified value.
+bool areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                DeadEndBlocks *deBlocks);
 
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
 /// a single use of a value with another value with a different ownership. We
@@ -354,6 +363,18 @@ bool extendStoreBorrow(StoreBorrowInst *sbi,
                        SmallVectorImpl<Operand *> &newUses,
                        DeadEndBlocks *deadEndBlocks,
                        InstModCallbacks callbacks = InstModCallbacks());
+
+/// Updates the reborrow flags and the borrowed-from instructions for all
+/// guaranteed phis in function `f`.
+void updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f);
+
+/// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
+void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+/// Replaces phis with the unique incoming values if all incoming values are the same.
+void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+bool hasOwnershipOperandsOrResults(SILInstruction *inst);
 
 } // namespace swift
 

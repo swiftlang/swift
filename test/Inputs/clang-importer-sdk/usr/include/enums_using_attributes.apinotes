@@ -4,3 +4,11 @@ Tags:
   EnumKind: none
 - Name: UnknownOptionsThanksToAPINotes
   EnumKind: none
+- Name: SystemEvent
+  SwiftName: Event
+  EnumExtensibility: open
+Enumerators:
+- Name: kEventInit
+  SwiftName: init
+- Name: kEventReset
+  SwiftName: reset

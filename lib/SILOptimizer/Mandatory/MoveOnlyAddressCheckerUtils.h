@@ -17,6 +17,9 @@
 
 namespace swift {
 
+class PostOrderAnalysis;
+class DeadEndBlocksAnalysis;
+
 namespace siloptimizer {
 
 class DiagnosticEmitter;
@@ -26,7 +29,7 @@ class DiagnosticEmitter;
 /// NOTE: To see if we emitted a diagnostic, use \p
 /// diagnosticEmitter.getDiagnosticCount().
 void searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-    SILFunction *fn,
+    SILFunction *fn, PostOrderAnalysis *poa,
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
@@ -37,11 +40,13 @@ struct MoveOnlyAddressChecker {
   borrowtodestructure::IntervalMapAllocator &allocator;
   DominanceInfo *domTree;
   PostOrderAnalysis *poa;
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
 
   /// \returns true if we changed the IR. To see if we emitted a diagnostic, use
   /// \p diagnosticEmitter.getDiagnosticCount().
   bool check(llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
                  &moveIntroducersToProcess);
+  bool completeLifetimes();
 };
 
 } // namespace siloptimizer

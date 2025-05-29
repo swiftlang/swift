@@ -1,6 +1,7 @@
 target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementSelection.cpp
   AccessMarkerElimination.cpp
+  AlwaysEmitConformanceMetadataPreservation.cpp
   AddressLowering.cpp
   CapturePromotion.cpp
   ClosureLifetimeFixup.cpp
@@ -8,11 +9,11 @@ target_sources(swiftSILOptimizer PRIVATE
   ConsumeOperatorCopyableValuesChecker.cpp
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
+  DiagnoseUnnecessaryPreconcurrencyImports.cpp
   DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
-  DiagnoseInfiniteRecursion.cpp
   DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseLifetimeIssues.cpp
   DiagnoseStaticExclusivity.cpp
@@ -42,9 +43,13 @@ target_sources(swiftSILOptimizer PRIVATE
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
   ReferenceBindingTransform.cpp
+  ThunkLowering.cpp
   SendNonSendable.cpp
+  LowerTupleAddrConstructor.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
+  RegionAnalysisInvalidationTransform.cpp
+  DiagnosticDeadFunctionElimination.cpp
   OwnershipModelEliminator.cpp)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -whole-module-optimization -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -whole-module-optimization -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 public class C {
   public func f() {}

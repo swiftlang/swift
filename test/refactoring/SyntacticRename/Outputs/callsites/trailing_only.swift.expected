@@ -27,9 +27,9 @@ func /*trailing:def*/withTrailingClosure(x: Int, y: () -> Int) {}
 /*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
 /*trailing:call*/withTrailingClosure(x: 1, y: 2) { return 1}
 
-func /*trailing-only:def*/betterName(b: () -> ()) {}
-/*trailing-only:call*/betterName(b: {})
-/*trailing-only:call*/betterName {}
+func /*trailing-only:def*/<base>trailingOnly</base>(<arglabel index=0>a</arglabel><param index=0></param>: () -> ()) {}
+/*trailing-only:call*/<base>trailingOnly</base>(<callarg index=0>a</callarg><callcolon index=0>: </callcolon>{})
+/*trailing-only:call*/<base>trailingOnly</base> {}
 
 
 func /*varargs:def*/withVarargs(x: Int..., y: Int, _: Int) {}

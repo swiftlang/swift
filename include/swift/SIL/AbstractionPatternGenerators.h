@@ -67,7 +67,7 @@ class FunctionParamGenerator {
   /// pattern type.
   AbstractionPattern origParamType = AbstractionPattern::getInvalid();
 
-  /// Load the informaton for the current orig parameter into the
+  /// Load the information for the current orig parameter into the
   /// fields above for it.
   void loadParameter() {
     origParamType = origFunctionType.getFunctionParamType(origParamIndex);
@@ -215,7 +215,7 @@ class TupleElementGenerator {
   /// A scratch element that is used for vanishing tuple types.
   mutable TupleTypeElt scratchSubstElt;
 
-  /// Load the informaton for the current orig element into the
+  /// Load the information for the current orig element into the
   /// fields above for it.
   void loadElement() {
     origEltType = origTupleType.getTupleElementType(origEltIndex);
@@ -371,7 +371,7 @@ class PackElementGenerator {
   /// pattern type.
   AbstractionPattern origEltType = AbstractionPattern::getInvalid();
 
-  /// Load the informaton for the current orig element into the
+  /// Load the information for the current orig element into the
   /// fields above for it.
   void loadElement() {
     origEltType = origPackType.getPackElementType(origEltIndex);

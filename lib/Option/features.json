@@ -35,6 +35,18 @@
     },
     {
       "name": "const-extract-complete-metadata"
+    },
+    {
+      "name": "ld-path-driver-option"
+    },
+    {
+      "name": "compilation-caching"
+    },
+    {
+       "name": "emit-package-module-interface-path"
+    },
+    {
+       "name": "experimental-package-interface-load"
     }
   ]
 }

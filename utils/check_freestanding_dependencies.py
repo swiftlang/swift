@@ -94,7 +94,7 @@ print("libswiftCore.a dependencies:")
 print("\n".join(sorted(deps)))
 print("")
 
-# for sanity checking that we are getting a valid symbol list
+# for soundness checking that we are getting a valid symbol list
 required_dependencies = ["_malloc", "_free"]
 
 fail = False

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -parse-as-library -emit-library -emit-module-path %t/LimitedAvailOpaque.swiftmodule -module-name LimitedAvailOpaque %S/Inputs/opaque_with_limited_availability.swift -o %t/%target-library-name(LimitedAvailOpaque)
 // RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 -lLimitedAvailOpaque -module-name main -I %t -L %t %s -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: OS=macosx && (CPU=x86_64 || CPU=arm64)
 // REQUIRES: executable_test
@@ -39,7 +39,7 @@ public struct Test {
   }
 }
 
-let result = LimitedAvailOpaque.test()
+let result = LimitedAvailOpaque.testAvailableQueryWithUniversalResult()
 result.hello()
 // CHECK: Hello from Empty
 
@@ -47,10 +47,14 @@ Test().sayHello()
 // CHECK: Hello from Empty
 // CHECK: Hello from Tuple
 
-let conditionalR = LimitedAvailOpaque.test_return_from_conditional()
+let conditionalR = LimitedAvailOpaque.testAvailableQueryWithLimitedResult()
 conditionalR.hello()
 // CHECK: Hello from Named
 
-let unavailableTest = LimitedAvailOpaque.testUnavailable()
+let unavailableTest = LimitedAvailOpaque.testUnavailableQueryWithLimitedResult()
 unavailableTest.hello()
 // CHECK: Hello from Tuple
+
+let inactiveTest = LimitedAvailOpaque.testInactiveAvailableQuery()
+inactiveTest.hello()
+// CHECK: Hello from Empty

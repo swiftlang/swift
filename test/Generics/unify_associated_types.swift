@@ -27,6 +27,6 @@ struct MergeTest<G : P1a & P2a> {}
 // CHECK: - τ_0_0.[P1a:T].[P2:X] => τ_0_0.[P1a:T].[P1:X]
 // CHECK: }
 // CHECK: Property map: {
-// CHECK:   τ_0_0 => { conforms_to: [P1a P2a] }
-// CHECK:   τ_0_0.[P1a:T] => { conforms_to: [P1 P2] }
+// CHECK:   τ_0_0 => { conforms_to: [P1a P2a Copyable Escapable] }
+// CHECK:   τ_0_0.[P1a:T] => { conforms_to: [P1 Copyable Escapable P2] }
 // CHECK: }

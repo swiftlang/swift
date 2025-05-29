@@ -16,12 +16,11 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 namespace ide {
@@ -354,7 +353,7 @@ public:
   }
 
   StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
-  llvm::Optional<unsigned>
+  std::optional<unsigned>
   getFirstTextChunkIndex(bool includeLeadingPunctuation = false) const;
 
   /// Print a debug representation of the code completion string to \p OS.

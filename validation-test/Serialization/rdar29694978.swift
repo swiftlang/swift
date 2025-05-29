@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -import-objc-header %S/Inputs/rdar29694978.h -emit-module -o %t/Library.swiftmodule
+// FIXME: Crashes with PCH (https://github.com/swiftlang/swift/issues/76641)
+// RUN: %target-build-swift %s -disable-bridging-pch -import-objc-header %S/Inputs/rdar29694978.h -emit-module -o %t/Library.swiftmodule
 // RUN: %target-swift-ide-test -print-module -module-to-print=Library -source-filename=x -I %S/Inputs/ -I %t | %FileCheck %s
 
 // REQUIRES: objc_interop

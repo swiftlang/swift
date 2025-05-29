@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -O %s -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-build-swift -O %s -module-name=test -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
@@ -10,6 +10,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
 #else

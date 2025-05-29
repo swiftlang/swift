@@ -3,7 +3,7 @@
 class G<T> {}
 
 protocol P1 { // expected-error {{cannot build rewrite system for protocol; concrete nesting limit exceeded}}
-// expected-note@-1 {{failed rewrite rule is [P1:A].[concrete: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P1].A>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => [P1:A]}}
+// expected-note@-1 {{failed rewrite rule is [P1:A].[concrete: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P1].A>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => [P1:A]}}
   associatedtype A where A == G<B>
   associatedtype B where B == G<A>
 }

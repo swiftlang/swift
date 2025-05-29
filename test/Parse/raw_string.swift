@@ -77,7 +77,7 @@ _ = ##"""
 /// passes again.
 /// See https://github.com/apple/swift/issues/51192.
 _ = #"​"​"#
-// CHECK: "\xE2\x80\x8B\"\xE2\x80\x8B"
+// CHECK: "​\"​"
 
 _ = #""""#
 // CHECK: "\"\""

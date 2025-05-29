@@ -33,9 +33,10 @@
 #include "ForeignClassMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 using namespace swift;
 using namespace irgen;
@@ -44,10 +45,10 @@ namespace {
 
 template <class Impl, template <class> class Base>
 class LayoutScanner : public Base<Impl> {
-  llvm::Optional<Size> AddressPoint;
+  std::optional<Size> AddressPoint;
 
 protected:
-  llvm::Optional<Size> DynamicOffsetBase;
+  std::optional<Size> DynamicOffsetBase;
 
   template <class... As>
   LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}
@@ -277,9 +278,26 @@ llvm::Value *irgen::emitArgumentPackShapeRef(IRGenFunction &IGF,
                                       IGF.IGM.SizeTy);
 }
 
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the value for the nth argument metadata.
+/// The type must have generic arguments.
+llvm::Value *irgen::emitValueGenericRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *decl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isValue());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.SizeTy);
+}
+
 Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               NominalTypeDecl *decl) {
+  assert(!isa<ClassDecl>(decl)
+            || !cast<ClassDecl>(decl)->getObjCImplementationDecl()
+                && "objcImpl classes don't have a field offset vector");
+
   auto &layout = IGF.IGM.getMetadataLayout(decl);
   auto offset = [&]() {
     if (isa<ClassDecl>(decl)) {

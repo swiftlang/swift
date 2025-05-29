@@ -2,8 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift | %FileCheck %s
-// RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify
 
 // REQUIRES: objc_interop
 
@@ -409,9 +409,9 @@ func objcMethodDispatchFromOtherFile() {
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.objcProp!setter :
   c.objcProp = x
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter :
-  let y = c[objc: 0]
+  let y = c[objc: 0 as AnyObject]
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter :
-  c[objc: 0] = y
+  c[objc: 0 as AnyObject] = y
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7dynamic0A27MethodDispatchFromOtherFileyyF : $@convention(thin) () -> ()

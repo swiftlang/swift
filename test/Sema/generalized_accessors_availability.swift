@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.50 -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx50 -typecheck -verify %s
 
 // REQUIRES: OS=macosx
 
@@ -8,14 +8,14 @@ struct SetterConditionallyAvailable<T> {
     var wrappedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.51, *)
+        @available(macOS 51, *)
         set { fatalError() }
     }
 
     var projectedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.51, *)
+        @available(macOS 51, *)
         set { fatalError() }
     }
 }
@@ -25,14 +25,14 @@ struct ModifyConditionallyAvailable<T> {
     var wrappedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.51, *)
+        @available(macOS 51, *)
         _modify { fatalError() }
     }
 
     var projectedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.51, *)
+        @available(macOS 51, *)
         _modify { fatalError() }
     }
 }
@@ -42,14 +42,14 @@ struct SetterMoreAvailable<T> {
     var wrappedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.49, *)
+        @available(macOS 49, *)
         set { fatalError() }
     }
 
     var projectedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.49, *)
+        @available(macOS 49, *)
         set { fatalError() }
     }
 }
@@ -59,14 +59,14 @@ struct ModifyMoreAvailable<T> {
     var wrappedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.49, *)
+        @available(macOS 49, *)
         _modify { fatalError() }
     }
 
     var projectedValue: T {
         get { fatalError() }
 
-        @available(macOS 10.49, *)
+        @available(macOS 49, *)
         _modify { fatalError() }
     }
 }
@@ -75,7 +75,7 @@ struct Butt {
     var modify_conditionally_available: Int {
         get { fatalError() }
 
-        @available(macOS 10.51, *)
+        @available(macOS 51, *)
         _modify { fatalError() }
     }
 
@@ -93,17 +93,17 @@ struct Butt {
 }
 
 func butt(x: inout Butt) { // expected-note * {{}}
-    x.modify_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
-    x.wrapped_setter_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
-    x.wrapped_modify_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
-    x.$wrapped_setter_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
-    x.$wrapped_modify_conditionally_available = 0 // expected-error {{only available in macOS 10.51 or newer}} expected-note{{}}
+    x.modify_conditionally_available = 0 // expected-error {{only available in macOS 51 or newer}} expected-note{{}}
+    x.wrapped_setter_conditionally_available = 0 // expected-error {{only available in macOS 51 or newer}} expected-note{{}}
+    x.wrapped_modify_conditionally_available = 0 // expected-error {{only available in macOS 51 or newer}} expected-note{{}}
+    x.$wrapped_setter_conditionally_available = 0 // expected-error {{only available in macOS 51 or newer}} expected-note{{}}
+    x.$wrapped_modify_conditionally_available = 0 // expected-error {{only available in macOS 51 or newer}} expected-note{{}}
     x.wrapped_setter_more_available = 0
     x.wrapped_modify_more_available = 0
     x.$wrapped_setter_more_available = 0
     x.$wrapped_modify_more_available = 0
 
-    if #available(macOS 10.51, *) {
+    if #available(macOS 51, *) {
         x.modify_conditionally_available = 0
         x.wrapped_setter_conditionally_available = 0
         x.wrapped_modify_conditionally_available = 0
@@ -132,7 +132,7 @@ func testButtNested(x: inout Butt.Nested) { // expected-error {{'Nested' is unav
 }
 
 @available(iOS, unavailable)
-@_spi_available(macOS, introduced: 10.51)
+@_spi_available(macOS, introduced: 51)
 extension Butt {
   struct NestedInSPIAvailableExtension {
     @available(macOS, unavailable)
@@ -143,12 +143,12 @@ extension Butt {
   }
 }
 
-@available(macOS, introduced: 10.51)
+@available(macOS, introduced: 51)
 func testButtNested(x: inout Butt.NestedInSPIAvailableExtension) {
   x.unavailable = 0 // expected-error {{is unavailable in macOS}}
 }
 
-@available(macOS 11.0, *)
+@available(macOS 51.0, *)
 struct LessAvailable {
   @SetterConditionallyAvailable
   var wrapped_setter_more_available: Int
@@ -167,18 +167,18 @@ struct LessAvailable {
   }
 }
 
-func testInferredAvailability(x: inout LessAvailable) { // expected-error {{'LessAvailable' is only available in macOS 11.0 or newer}} expected-note*{{}}
-  x.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
-  x.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
-  x.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
-  x.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+func testInferredAvailability(x: inout LessAvailable) { // expected-error {{'LessAvailable' is only available in macOS 51.0 or newer}} expected-note*{{}}
+  x.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
 
-  x.nested.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
-  x.nested.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
-  x.nested.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
-  x.nested.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.nested.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.nested.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.nested.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.nested.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
 
-  if #available(macOS 11.0, *) {
+  if #available(macOS 51.0, *) {
     x.wrapped_setter_more_available = 0
     x.wrapped_modify_more_available = 0
     x.$wrapped_setter_more_available = 0

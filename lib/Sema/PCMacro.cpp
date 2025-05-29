@@ -56,6 +56,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::instrumenter_support;
@@ -142,10 +143,10 @@ public:
     transformStmtCondition(SC, IS->getStartLoc());
     IS->setCond(SC); // FIXME: is setting required?..
 
-    if (Stmt *TS = IS->getThenStmt()) {
-      Stmt *NTS = transformStmt(TS);
+    if (auto *TS = IS->getThenStmt()) {
+      auto *NTS = transformStmt(TS);
       if (NTS != TS) {
-        IS->setThenStmt(NTS);
+        IS->setThenStmt(cast<BraceStmt>(NTS));
       }
     }
 
@@ -336,9 +337,14 @@ public:
     if (D->isImplicit())
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (BraceStmt *B = FD->getBody()) {
+      if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
+
+        // Use FD's DeclContext as TypeCheckDC for transforms in func body
+        // then swap back TypeCheckDC at end of scope.
+        llvm::SaveAndRestore<DeclContext *> localDC(TypeCheckDC, FD);
         BraceStmt *NB = transformBraceStmt(B, PL);
+
         // Since it would look strange going straight to the first line in a
         // function body, we throw in a before/after pointing at the function
         // decl at the start of the transformed body
@@ -401,8 +407,7 @@ public:
                                          : DeclNameLoc(),
                 true, // implicit
                 AccessSemantics::Ordinary, RS->getResult()->getType());
-            ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(), DRE,
-                                                       true); // implicit
+            ReturnStmt *NRS = ReturnStmt::createImplicit(Context, DRE);
             Added<Stmt *> LogBefore =
                 buildLoggerCall(LogBeforeName, RS->getSourceRange());
             Added<Stmt *> LogAfter =
@@ -688,7 +693,7 @@ void swift::performPCMacro(SourceFile &SF) {
           if (FD->getBody()) {
             Instrumenter I(ctx, FD, TmpNameIndex);
             I.transformDecl(FD);
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -701,7 +706,7 @@ void swift::performPCMacro(SourceFile &SF) {
               TypeChecker::checkTopLevelEffects(TLCD);
               TypeChecker::contextualizeTopLevelCode(TLCD);
             }
-            return Action::SkipChildren();
+            return Action::SkipNode();
           }
         }
       }

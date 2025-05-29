@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import BasicBridging
-import CxxStdlib
 
 /// The assert function to be used in the compiler.
 ///
@@ -22,26 +21,50 @@ import CxxStdlib
 ///   case for `precondition`.
 @_transparent
 public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
-                   file: StaticString = #fileID, line: UInt = #line) {
-  if !condition {
-    fatalError(message(), file: file, line: line)
-  }
+                   file: StaticString = #fileID, line: UInt = #line, function: StaticString = #function) {
+  precondition(condition, message(), file: file, line: line, function: function)
 }
 
 /// The assert function (without a message) to be used in the compiler.
 ///
 /// Unforuntately it's not possible to just add a default argument to `message` in the
 /// other `assert` function. We need to defined this overload.
+/// TODO: For some reason the compiler is not happy when adding a `function` argument.
 @_transparent
 public func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt = #line) {
-  if !condition {
-    fatalError("", file: file, line: line)
+  precondition(condition, "", file: file, line: line, function: "")
+}
+
+/// The assert function to be used in the compiler.
+///
+/// This overrides the standard Swift precondition and forwards an assertion failure
+/// to the assertion-handling in the C++ code base.
+@_transparent
+public func precondition(_ condition: Bool, _ message: @autoclosure () -> String,
+                         file: StaticString = #fileID, line: UInt = #line, function: StaticString = #function) {
+  if !_fastPath(condition) {
+    let msg = message()
+    msg.withCString { msgStr in
+      file.withUTF8Buffer { fileBytes in
+        function.withUTF8Buffer { functionBytes in
+          assertFail(msgStr, fileBytes.baseAddress!, line, functionBytes.baseAddress!)
+        }
+      }
+    }
   }
 }
 
 //===----------------------------------------------------------------------===//
 //                            Debugging Utilities
 //===----------------------------------------------------------------------===//
+
+public func debugLog(prefix: Bool = true, _ message: @autoclosure () -> String) {
+  let formatted = (prefix ? "### " : "") + message()
+  formatted._withBridgedStringRef { ref in
+    Bridged_dbgs().write(ref)
+  }
+  Bridged_dbgs().newLine()
+}
 
 /// Let's lldb's `po` command not print any "internal" properties of the conforming type.
 ///
@@ -52,50 +75,50 @@ public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
-public var standardError = CFileStream(fp: stderr)
-
-public struct CFileStream: TextOutputStream {
-  var fp: UnsafeMutablePointer<FILE>
-
-  public func write(_ string: String) {
-    fputs(string, fp)
-  }
-
-  public func flush() {
-    fflush(fp)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, NoReflectionChildren {
-  let _bridged: BridgedStringRef
+public struct StringRef : CustomStringConvertible, NoReflectionChildren, ExpressibleByStringLiteral {
+  public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
+
+  public init(stringLiteral: StaticString) {
+    self._bridged = BridgedStringRef(data: stringLiteral.utf8Start, count: stringLiteral.utf8CodeUnitCount)
+  }
 
   public var string: String { String(_bridged)  }
   public var description: String { string }
 
   public var count: Int {
-    Int(_bridged.size())
+    _bridged.count
   }
 
   public subscript(index: Int) -> UInt8 {
-    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.uintData(), count: count)
+    let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: count)
     return buffer[index]
   }
 
+  public func startsWith(_ prefix: StaticString) -> Bool {
+    return prefix.withUTF8Buffer { (prefixBuffer: UnsafeBufferPointer<UInt8>) in
+      if count < prefixBuffer.count {
+        return false
+      }
+      let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: prefixBuffer.count)
+      return buffer.elementsEqual(prefixBuffer, by: ==)
+    }
+  }
+
   public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.uintData(), count: lhs.count)
-    let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.uintData(), count: rhs.count)
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
+    let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)
     if lhsBuffer.count != rhsBuffer.count { return false }
     return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
   }
 
   public static func ==(lhs: StringRef, rhs: StaticString) -> Bool {
-    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.uintData(), count: lhs.count)
+    let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     return rhs.withUTF8Buffer { (rhsBuffer: UnsafeBufferPointer<UInt8>) in
       if lhsBuffer.count != rhsBuffer.count { return false }
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
@@ -116,17 +139,17 @@ extension String {
   public func _withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
     var str = self
     return str.withUTF8 { buffer in
-      return c(BridgedStringRef(buffer.baseAddress, buffer.count))
+      return c(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
   }
 
   public init(_ s: BridgedStringRef) {
-    let buffer = UnsafeBufferPointer<UInt8>(start: s.uintData(), count: Int(s.size()))
+    let buffer = UnsafeBufferPointer<UInt8>(start: s.data, count: s.count)
     self.init(decoding: buffer, as: UTF8.self)
   }
 
   public init(taking s: BridgedOwnedString) {
-    let buffer = UnsafeBufferPointer<UInt8>(start: s.uintData(), count: s.size())
+    let buffer = UnsafeBufferPointer<UInt8>(start: s.data, count: s.count)
     self.init(decoding: buffer, as: UTF8.self)
     s.destroy()
   }
@@ -135,7 +158,7 @@ extension String {
 extension Array {
   public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
     return withUnsafeBytes { buf in
-      return c(BridgedArrayRef(data: buf.baseAddress!, numElements: count))
+      return c(BridgedArrayRef(data: buf.baseAddress!, count: count))
     }
   }
 }
@@ -164,8 +187,26 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
 
 extension BridgedArrayRef {
   public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    let start = data?.bindMemory(to: ty, capacity: numElements);
-    let buffer = UnsafeBufferPointer(start: start, count: numElements);
+    let start = data?.assumingMemoryBound(to: ty)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Sequence Utilities
+//===----------------------------------------------------------------------===//
+
+/// RandomAccessCollection which bridges to some C++ array.
+///
+/// It fixes the default reflection for bridged random access collections, which usually have a
+/// `bridged` stored property.
+/// Conforming to this protocol displays the "real" children  not just `bridged`.
+public protocol BridgedRandomAccessCollection : RandomAccessCollection, CustomReflectable {
+}
+
+extension BridgedRandomAccessCollection {
+  public var customMirror: Mirror {
+    Mirror(self, children: self.map { (label: nil, value: $0 as Any) })
   }
 }

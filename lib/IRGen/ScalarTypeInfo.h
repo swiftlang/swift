@@ -280,6 +280,7 @@ protected:
                                           IsTriviallyDestroyable,
                                           IsCopyable,
                                           IsFixedSize,
+                                          IsABIAccessible,
                                           ::std::forward<T>(args)...) {}
 
   const Derived &asDerived() const {

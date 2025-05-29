@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name existential_erasure %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name existential_erasure %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self

@@ -21,8 +21,10 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/FileTypes.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -36,12 +38,19 @@ createCompileJobBaseCacheKey(llvm::cas::ObjectStore &CAS,
                              ArrayRef<const char *> Args);
 
 /// Compute CompileJobKey for the compiler outputs. The key for the output
-/// is computed from the base key for the compilation, the output kind and the
-/// input file path that is associated with this specific output.
+/// is computed from the base key for the compilation and the input file index
+/// which is the index for the input among all the input files (not just the
+/// output producing inputs).
 llvm::Expected<llvm::cas::ObjectRef>
 createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
                                   llvm::cas::ObjectRef BaseKey,
-                                  StringRef ProducingInput);
+                                  unsigned InputIndex);
+
+/// Print the CompileJobKey for debugging purpose.
+llvm::Error printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
+                                    llvm::cas::ObjectRef Key,
+                                    llvm::raw_ostream &os);
+
 } // namespace swift
 
 #endif

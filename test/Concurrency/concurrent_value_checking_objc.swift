@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
@@ -18,7 +17,7 @@ final class B: NSObject, Sendable {
 class C { } // expected-note{{class 'C' does not conform to the 'Sendable' protocol}}
 
 final class D: NSObject, Sendable {
-  let c: C = C() // expected-warning{{stored property 'c' of 'Sendable'-conforming class 'D' has non-sendable type 'C'}}
+  let c: C = C() // expected-warning{{stored property 'c' of 'Sendable'-conforming class 'D' has non-Sendable type 'C'}}
 }
 
 

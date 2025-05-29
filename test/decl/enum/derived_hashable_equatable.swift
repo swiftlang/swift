@@ -8,14 +8,14 @@ enum Simple: Hashable {
   case b
 
   // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: Simple, _ b: Simple) -> Bool {
-  // CHECK-NEXT:     private var index_a: Int
+  // CHECK-NEXT:     var index_a: Int
   // CHECK-NEXT:     switch a {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_a = 0
   // CHECK-NEXT:     case .b:
   // CHECK-NEXT:       index_a = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     private var index_b: Int
+  // CHECK-NEXT:     var index_b: Int
   // CHECK-NEXT:     switch b {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_b = 0
@@ -26,7 +26,7 @@ enum Simple: Hashable {
   // CHECK-NEXT:   }
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:     private var discriminator: Int
+  // CHECK-NEXT:     var discriminator: Int
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       discriminator = 0
@@ -52,6 +52,25 @@ enum HasAssociatedValues: Hashable {
   // CHECK:        case c
   case c
 
+  // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasAssociatedValues, _ b: HasAssociatedValues) -> Bool {
+  // CHECK-NEXT:     switch (a, b) {
+  // CHECK-NEXT:     case (.a(let l0), .a(let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     case (.b(let l0), .b(let r0)):
+  // CHECK-NEXT:       guard l0 == r0 else {
+  // CHECK-NEXT:         return false
+  // CHECK-NEXT:       }
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     case (.c, .c):
+  // CHECK-NEXT:       return true
+  // CHECK-NEXT:     default:
+  // CHECK-NEXT:       return false
+  // CHECK-NEXT:     }
+  // CHECK-NEXT:   }
+
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a(let a0):
@@ -62,25 +81,6 @@ enum HasAssociatedValues: Hashable {
   // CHECK-NEXT:       hasher.combine(a0)
   // CHECK-NEXT:     case .c:
   // CHECK-NEXT:       hasher.combine(2)
-  // CHECK-NEXT:     }
-  // CHECK-NEXT:   }
-
-  // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasAssociatedValues, _ b: HasAssociatedValues) -> Bool {
-  // CHECK-NEXT:     switch (a, b) {
-  // CHECK-NEXT:     case (.a(let l0), .a(let r0)):
-  // CHECK-NEXT:       guard l0  r0 else {
-  // CHECK-NEXT:         return false
-  // CHECK-NEXT:       }
-  // CHECK-NEXT:       return true
-  // CHECK-NEXT:     case (.b(let l0), .b(let r0)):
-  // CHECK-NEXT:       guard l0  r0 else {
-  // CHECK-NEXT:         return false
-  // CHECK-NEXT:       }
-  // CHECK-NEXT:       return true
-  // CHECK-NEXT:     case (.c, .c):
-  // CHECK-NEXT:       return true
-  // CHECK-NEXT:     default:
-  // CHECK-NEXT:       return false
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
 
@@ -101,30 +101,30 @@ enum HasUnavailableElement: Hashable {
   case b
 
   // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasUnavailableElement, _ b: HasUnavailableElement) -> Bool {
-  // CHECK-NEXT:    private var index_a: Int
+  // CHECK-NEXT:    var index_a: Int
   // CHECK-NEXT:    switch a {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_a = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
-  // CHECK-NEXT:    private var index_b: Int
+  // CHECK-NEXT:    var index_b: Int
   // CHECK-NEXT:    switch b {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      index_b = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_a == index_b
   // CHECK-NEXT:  }
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:    private var discriminator: Int
+  // CHECK-NEXT:    var discriminator: Int
   // CHECK-NEXT:    switch self {
   // CHECK-NEXT:    case .a:
   // CHECK-NEXT:      discriminator = 0
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:    hasher.combine(discriminator)
   // CHECK-NEXT:  }
@@ -145,27 +145,28 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   @available(*, unavailable)
   case b(String)
 
+  // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasAssociatedValuesAndUnavailableElement, _ b: HasAssociatedValuesAndUnavailableElement) -> Bool {
+  // CHECK-NEXT:    switch (a, b) {
+  // CHECK-NEXT:    case (.a(let l0), .a(let r0)):
+  // CHECK-NEXT:      guard l0 == r0 else {
+  // CHECK-NEXT:        return false
+  // CHECK-NEXT:      }
+  // CHECK-NEXT:      return true
+  // CHECK-NEXT:    case (.b, .b):
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
+  // CHECK-NEXT:    default:
+  // CHECK-NEXT:      return false
+  // CHECK-NEXT:    }
+  // CHECK-NEXT:  }
+
+
   // CHECK:       internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:    switch self {
   // CHECK-NEXT:    case .a(let a0):
   // CHECK-NEXT:      hasher.combine(0)
   // CHECK-NEXT:      hasher.combine(a0)
   // CHECK-NEXT:    case .b:
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
-  // CHECK-NEXT:    }
-  // CHECK-NEXT:  }
-
-  // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: HasAssociatedValuesAndUnavailableElement, _ b: HasAssociatedValuesAndUnavailableElement) -> Bool {
-  // CHECK-NEXT:    switch (a, b) {
-  // CHECK-NEXT:    case (.a(let l0), .a(let r0)):
-  // CHECK-NEXT:      guard l0  r0 else {
-  // CHECK-NEXT:        return false
-  // CHECK-NEXT:      }
-  // CHECK-NEXT:      return true
-  // CHECK-NEXT:    case (.b, .b):
-  // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
-  // CHECK-NEXT:    default:
-  // CHECK-NEXT:      return false
+  // CHECK-NEXT:      _diagnoseUnavailableCodeReached{{.*}}()
   // CHECK-NEXT:    }
   // CHECK-NEXT:  }
 
@@ -185,14 +186,14 @@ enum UnavailableEnum: Hashable {
   case b
 
   // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: UnavailableEnum, _ b: UnavailableEnum) -> Bool {
-  // CHECK-NEXT:     private var index_a: Int
+  // CHECK-NEXT:     var index_a: Int
   // CHECK-NEXT:     switch a {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_a = 0
   // CHECK-NEXT:     case .b:
   // CHECK-NEXT:       index_a = 1
   // CHECK-NEXT:     }
-  // CHECK-NEXT:     private var index_b: Int
+  // CHECK-NEXT:     var index_b: Int
   // CHECK-NEXT:     switch b {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       index_b = 0
@@ -203,7 +204,7 @@ enum UnavailableEnum: Hashable {
   // CHECK-NEXT:   }
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
-  // CHECK-NEXT:     private var discriminator: Int
+  // CHECK-NEXT:     var discriminator: Int
   // CHECK-NEXT:     switch self {
   // CHECK-NEXT:     case .a:
   // CHECK-NEXT:       discriminator = 0

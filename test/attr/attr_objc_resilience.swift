@@ -1,9 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift -enable-library-evolution
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module-path %t/resilient_objc_class.swiftmodule %S/../Inputs/resilient_objc_class.swift -I %t -enable-library-evolution
-// RUN: %target-swift-frontend -typecheck -verify %s -I %t
+// RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -emit-module-path %t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift -enable-library-evolution
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-pre-stable-abi-triple -emit-module-path %t/resilient_objc_class.swiftmodule %S/../Inputs/resilient_objc_class.swift -I %t -enable-library-evolution
+// RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -typecheck -verify %s -I %t
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=xros
 
 import Foundation
 import resilient_objc_class

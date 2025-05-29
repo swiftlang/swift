@@ -133,6 +133,10 @@ namespace swift {
       return PM->continueWithNextSubpassRun(forInst, F, this);
     }
 
+    bool continueWithNextSubpassRun(SILValue forValue) {
+      return PM->continueWithNextSubpassRun(forValue, F, this);
+    }
+
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
     }

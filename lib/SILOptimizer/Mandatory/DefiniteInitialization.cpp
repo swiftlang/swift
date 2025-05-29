@@ -15,8 +15,10 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/AST/SemanticAttrs.h"
@@ -100,8 +102,8 @@ enum class DIKind : uint8_t { No, Yes, Partial };
 } // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
-static llvm::Optional<DIKind> mergeKinds(llvm::Optional<DIKind> OK1,
-                                         llvm::Optional<DIKind> OK2) {
+static std::optional<DIKind> mergeKinds(std::optional<DIKind> OK1,
+                                        std::optional<DIKind> OK2) {
   // If OK1 is unset, ignore it.
   if (!OK1.has_value())
     return OK2;
@@ -158,10 +160,10 @@ namespace {
       return getConditional(Elt).value();
     }
 
-    llvm::Optional<DIKind> getConditional(unsigned Elt) const {
+    std::optional<DIKind> getConditional(unsigned Elt) const {
       bool V1 = Data[Elt*2], V2 = Data[Elt*2+1];
       if (V1 == V2)
-        return V1 ? llvm::Optional<DIKind>(llvm::None) : DIKind::No;
+        return V1 ? std::optional<DIKind>(std::nullopt) : DIKind::No;
       return V2 ? DIKind::Yes : DIKind::Partial;
     }
 
@@ -173,7 +175,7 @@ namespace {
       }
     }
 
-    void set(unsigned Elt, llvm::Optional<DIKind> K) {
+    void set(unsigned Elt, std::optional<DIKind> K) {
       if (!K.has_value())
         Data[Elt*2] = true, Data[Elt*2+1] = true;
       else
@@ -229,7 +231,7 @@ namespace {
     void dump(llvm::raw_ostream &OS) const {
       OS << '(';
       for (unsigned i = 0, e = size(); i != e; ++i) {
-        if (llvm::Optional<DIKind> Elt = getConditional(i)) {
+        if (std::optional<DIKind> Elt = getConditional(i)) {
           switch (Elt.value()) {
             case DIKind::No:      OS << 'n'; break;
             case DIKind::Yes:     OS << 'y'; break;
@@ -275,11 +277,11 @@ namespace {
 
     /// Keep track of blocks where the contents of the self box are stored to
     /// as a result of a successful self.init or super.init call.
-    llvm::Optional<DIKind> LocalSelfInitialized;
+    std::optional<DIKind> LocalSelfInitialized;
 
     /// The live out information of the block. This is the LocalSelfInitialized
     /// plus the information merged-in from the predecessor blocks.
-    llvm::Optional<DIKind> OutSelfInitialized;
+    std::optional<DIKind> OutSelfInitialized;
 
     LiveOutBlockState() { init(0); }
 
@@ -288,8 +290,8 @@ namespace {
       isInWorkList = false;
       LocalAvailability.init(NumElements);
       OutAvailability.init(NumElements);
-      LocalSelfInitialized = llvm::None;
-      OutSelfInitialized = llvm::None;
+      LocalSelfInitialized = std::nullopt;
+      OutSelfInitialized = std::nullopt;
     }
 
     /// Sets all unknown elements to not-available.
@@ -310,10 +312,10 @@ namespace {
     /// \param result Out parameter
     ///
     /// \return True if the result was different from the live-out
-    bool transferAvailability(const llvm::Optional<DIKind> pred,
-                              const llvm::Optional<DIKind> out,
-                              const llvm::Optional<DIKind> local,
-                              llvm::Optional<DIKind> &result) {
+    bool transferAvailability(const std::optional<DIKind> pred,
+                              const std::optional<DIKind> out,
+                              const std::optional<DIKind> local,
+                              std::optional<DIKind> &result) {
       if (local.has_value()) {
         // A local availability overrides the incoming value.
         result = local;
@@ -332,7 +334,7 @@ namespace {
     bool mergeFromPred(const LiveOutBlockState &Pred) {
       bool changed = false;
       for (unsigned i = 0, e = OutAvailability.size(); i != e; ++i) {
-        llvm::Optional<DIKind> result;
+        std::optional<DIKind> result;
         if (transferAvailability(Pred.OutAvailability.getConditional(i),
                                  OutAvailability.getConditional(i),
                                  LocalAvailability.getConditional(i),
@@ -342,7 +344,7 @@ namespace {
         }
       }
 
-      llvm::Optional<DIKind> result;
+      std::optional<DIKind> result;
       if (transferAvailability(Pred.OutSelfInitialized,
                                OutSelfInitialized,
                                LocalSelfInitialized,
@@ -491,6 +493,7 @@ namespace {
     void handleTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
+    void handleFlowSensitiveActorIsolationUse(const DIMemoryUse &Use);
 
     bool diagnoseReturnWithoutInitializingStoredProperties(
         const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use);
@@ -527,7 +530,7 @@ namespace {
     void computePredsLiveOut(SILBasicBlock *BB);
     void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
     void getOutSelfInitialized(SILBasicBlock *BB,
-                               llvm::Optional<DIKind> &Result);
+                               std::optional<DIKind> &Result);
 
     bool shouldEmitError(const SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
@@ -565,6 +568,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::LoadForTypeOfSelf:
     case DIUseKind::TypeOfSelf:
     case DIUseKind::Escape:
+    case DIUseKind::FlowSensitiveSelfIsolation:
       continue;
     case DIUseKind::Assign:
     case DIUseKind::Set:
@@ -721,8 +725,13 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     std::string Name;
     auto *Decl = TheMemory.getPathStringToElement(i, Name);
     SILLocation Loc = Use.Inst->getLoc();
+    auto propertyInitIsolation = ActorIsolation::forUnspecified();
 
     if (Decl) {
+      if (auto *var = dyn_cast<VarDecl>(Decl)) {
+        propertyInitIsolation = var->getInitializerIsolation();
+      }
+
       // If we found a non-implicit declaration, use its source location.
       if (!Decl->isImplicit())
         Loc = SILLocation(Decl);
@@ -737,8 +746,17 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
       }
     }
 
-    diagnose(Module, Loc, diag::stored_property_not_initialized,
-             StringRef(Name));
+    if (propertyInitIsolation.isGlobalActor()) {
+      auto *init =
+          dyn_cast<ConstructorDecl>(F.getDeclContext()->getAsDecl());
+      diagnose(Module, Loc, diag::isolated_property_initializer,
+               StringRef(Name), propertyInitIsolation,
+               getActorIsolation(init));
+    } else {
+      diagnose(Module, Loc, diag::stored_property_not_initialized,
+               StringRef(Name));
+    }
+
     emittedNote = true;
   }
 
@@ -1044,9 +1062,13 @@ void LifetimeChecker::injectActorHops() {
   case ActorIsolation::ActorInstance:
     break;
 
+  case ActorIsolation::Erased:
+    llvm_unreachable("constructor cannot have erased isolation");
+
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::GlobalActorUnsafe:
+  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
     return;
   }
@@ -1156,6 +1178,10 @@ void LifetimeChecker::doIt() {
 
     case DIUseKind::BadExplicitStore:
       diagnoseBadExplicitStore(Inst);
+      break;
+
+    case DIUseKind::FlowSensitiveSelfIsolation:
+      handleFlowSensitiveActorIsolationUse(Use);
       break;
     }
   }
@@ -1339,6 +1365,103 @@ void LifetimeChecker::handleTypeOfSelfUse(DIMemoryUse &Use) {
     // Clear the Inst pointer just to be sure to avoid use-after-free.
     Use.Inst = nullptr;
   }
+}
+
+void LifetimeChecker::handleFlowSensitiveActorIsolationUse(
+    const DIMemoryUse &Use) {
+  bool IsSuperInitComplete, FailedSelfUse;
+
+  ASTContext &ctx = F.getASTContext();
+  auto builtinInst = cast<BuiltinInst>(Use.Inst);
+  auto builtinKind = builtinInst->getBuiltinKind();
+  assert(builtinKind == BuiltinValueKind::FlowSensitiveSelfIsolation ||
+         builtinKind == BuiltinValueKind::FlowSensitiveDistributedSelfIsolation);
+  bool isDistributed =
+    (*builtinKind == BuiltinValueKind::FlowSensitiveDistributedSelfIsolation);
+
+  SILBuilderWithScope B(builtinInst);
+  SILValue replacement;
+  SILType optExistentialType = builtinInst->getType();
+  SILLocation loc = builtinInst->getLoc();
+  if (isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    // 'self' is initialized, so replace this builtin with the appropriate
+    // operation to produce `any Actor`.
+
+    auto conformance = builtinInst->getSubstitutions().getConformances()[0];
+
+    // The path for distributed actors below does a call that wants a
+    // borrowed argument. The path for normal actors directly does an
+    // existential erasure, which needs an owned value.
+    bool wantOwnedActor = !isDistributed;
+
+    // Compute the actor reference.  In delegating initializers, the argument
+    // to the builtin will be a projection from the box; otherwise it's a
+    // direct actor reference.
+    SILValue actor = [&]() -> SILValue {
+      SILValue builtinArg = builtinInst->getArguments()[0];
+      if (builtinArg->getType().isAddress()) {
+        if (wantOwnedActor) {
+          return B.createLoad(loc, builtinArg, LoadOwnershipQualifier::Copy);
+        } else {
+          return B.createLoadBorrow(loc, builtinArg);
+        }
+      } else {
+        if (wantOwnedActor) {
+          return B.createCopyValue(loc, builtinArg);
+        } else {
+          return B.createBeginBorrow(loc, builtinArg);
+        }
+      }
+    }();
+
+    SILValue anyActorValue;
+    if (!isDistributed) {
+      assert(wantOwnedActor);
+
+      // Inject 'self' into 'any Actor'.
+      ProtocolConformanceRef conformances[1] = { conformance };
+      SILType existentialType = optExistentialType.getOptionalObjectType();
+      anyActorValue = B.createInitExistentialRef(
+          loc, existentialType, actor->getType().getASTType(), actor,
+          ctx.AllocateCopy(conformances));
+    } else {
+      // Dig out the getter for asLocalActor.
+      auto asLocalActorDecl = getDistributedActorAsLocalActorComputedProperty(
+          F.getDeclContext()->getParentModule());
+      auto asLocalActorGetter = asLocalActorDecl->getAccessor(AccessorKind::Get);
+      SILDeclRef asLocalActorRef = SILDeclRef(
+          asLocalActorGetter, SILDeclRef::Kind::Func);
+      SILFunction *asLocalActorFunc = F.getModule()
+          .lookUpFunction(asLocalActorRef);
+      SILValue asLocalActorValue = B.createFunctionRef(loc, asLocalActorFunc);
+
+      // Call asLocalActor. It produces an 'any Actor'.
+      anyActorValue = B.createApply(
+          loc,
+          asLocalActorValue,
+          SubstitutionMap::get(asLocalActorGetter->getGenericSignature(),
+                               { actor->getType().getASTType() },
+                               { conformance }),
+                               { actor });
+
+      assert(!wantOwnedActor);
+
+      // End the load_borrow or begin_borrow we did above.
+      B.createEndBorrow(loc, actor);
+    }
+
+    // Then, wrap it in an optional.
+    replacement = B.createEnum(
+        loc, anyActorValue, ctx.getOptionalSomeDecl(), optExistentialType);
+  } else {
+    // 'self' is not initialized yet, so use 'nil'.
+    replacement = B.createEnum(
+        loc, SILValue(), ctx.getOptionalNoneDecl(), optExistentialType);
+  }
+
+  // Introduce the replacement.
+  InstModCallbacks callbacks;
+  replaceAllUsesAndErase(builtinInst, replacement, callbacks);
 }
 
 void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
@@ -1611,8 +1734,13 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       return;
     }
 
-    auto diagID = diag::variable_inout_before_initialized;
-    
+    // A self argument implicitly passed as an inout parameter is diagnosed as
+    // "used before initialized", because "passed by reference" might be a
+    // confusing diagnostic in this context.
+    auto diagID = (Use.Kind == DIUseKind::InOutSelfArgument)
+                      ? diag::variable_used_before_initialized
+                      : diag::variable_inout_before_initialized;
+
     if (isa<AddressToPointerInst>(Use.Inst))
       diagID = diag::variable_addrtaken_before_initialized;
 
@@ -1677,11 +1805,14 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       bool isMutator = [&] {
         switch (accessor->getAccessorKind()) {
         case AccessorKind::Get:
+        case AccessorKind::DistributedGet:
         case AccessorKind::Read:
+        case AccessorKind::Read2:
         case AccessorKind::Address:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
+        case AccessorKind::Modify2:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
@@ -2528,6 +2659,30 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     return;
   }
 
+  if (auto *TACI = dyn_cast<TupleAddrConstructorInst>(Inst)) {
+    assert(!TACI->isInitializationOfDest() &&
+           "should not modify copy_addr that already knows it is initialized");
+    TACI->setIsInitializationOfDest(InitKind);
+    if (InitKind == IsInitialization)
+      setStaticInitAccess(TACI->getDest());
+
+    // If we had an initialization and had an assignable_but_not_consumable
+    // noncopyable type, convert it to be an initable_but_not_consumable so that
+    // we do not consume an uninitialized value.
+    if (InitKind == IsInitialization) {
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+              stripAccessMarkers(TACI->getDest()))) {
+        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
+                                        CheckKind::AssignableButNotConsumable) {
+          mmci->setCheckKind(MarkUnresolvedNonCopyableValueInst::CheckKind::
+                                 InitableButNotConsumable);
+        }
+      }
+    }
+
+    return;
+  }
+
   // Ignore non-stores for SelfInits.
   assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }
@@ -2579,7 +2734,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   // If we see an alloc_box as the pointer, then we're deallocating a 'box' for
   // self. Make sure that the box gets deallocated (not released) since the
   // pointer it contains will be manually cleaned up.
-  auto *MUI = dyn_cast<MarkUninitializedInst>(Release->getOperand(0));
+  auto *MUI = dyn_cast<MarkUninitializedInst>(Pointer);
 
   if (MUI && isa<AllocBoxInst>(MUI->getOperand())) {
     Pointer = MUI->getSingleUserOfType<ProjectBoxInst>();
@@ -2591,6 +2746,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   if (!consumed) {
     if (Pointer->getType().isAddress())
       Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
+
+    // Cast back down from an upcast.
+    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
+      Pointer =
+          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
+    }
 
     auto MetatypeTy = CanMetatypeType::get(TheMemory.getASTType(),
                                            MetatypeRepresentation::Thick);
@@ -3003,7 +3164,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 ///
 ///    %box = alloc_box
 ///    %mark_uninit = mark_uninitialized %box
-///    %lifetime = begin_borrow [lexical] %mark_uninit
+///    %lifetime = begin_borrow [var_decl] %mark_uninit
 ///    %proj_box = project_box %lifetime
 ///
 /// We are replacing a
@@ -3023,7 +3184,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// Consequently, it's not sufficient to just replace the destroy_value
 /// %mark_uninit with a destroy_addr %proj_box (or to replace it with a diamond
 /// where one branch has that destroy_addr) because the destroy_addr is a use
-/// of %proj_box which must be within the lexical lifetime of the box.
+/// of %proj_box which must be within the var_decl lifetime of the box.
 ///
 /// On the other side, we are hemmed in by the fact that the end_borrow must
 /// precede the dealloc_box which will be created in the diamond.  So we
@@ -3059,12 +3220,12 @@ static bool adjustAllocBoxEndBorrow(SILInstruction *previous,
   if (!pbi)
     return false;
 
-  // This fixup only applies if we're destroying a project_box of the lexical
+  // This fixup only applies if we're destroying a project_box of the var_decl
   // lifetime of an alloc_box.
   auto *lifetime = dyn_cast<BeginBorrowInst>(pbi->getOperand());
   if (!lifetime)
     return false;
-  assert(lifetime->isLexical());
+  assert(lifetime->isFromVarDecl());
   assert(isa<AllocBoxInst>(
       cast<MarkUninitializedInst>(lifetime->getOperand())->getOperand()));
 
@@ -3456,7 +3617,7 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
 }
 
 void LifetimeChecker::getOutSelfInitialized(SILBasicBlock *BB,
-                                            llvm::Optional<DIKind> &Result) {
+                                            std::optional<DIKind> &Result) {
   computePredsLiveOut(BB);
 
   for (auto *Pred : BB->getPredecessorBlocks())
@@ -3628,7 +3789,7 @@ getSelfInitializedAtInst(SILInstruction *Inst) {
   if (BlockInfo.LocalSelfInitialized.has_value())
     return *BlockInfo.LocalSelfInitialized;
 
-  llvm::Optional<DIKind> Result;
+  std::optional<DIKind> Result;
   getOutSelfInitialized(InstBB, Result);
 
   // If the result wasn't computed, we must be analyzing code within
@@ -3713,6 +3874,9 @@ static void processMemoryObject(MarkUninitializedInst *I,
 /// properly set and transform the code as required for flow-sensitive
 /// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
+  FrontendStatsTracer StatsTracer(Fn.getModule().getASTContext().Stats,
+                                  "definite-init", &Fn);
+
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                           <<  Fn.getName() << "\n");
   bool Changed = false;

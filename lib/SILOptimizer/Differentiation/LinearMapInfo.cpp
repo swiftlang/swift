@@ -16,12 +16,14 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
 
 namespace swift {
@@ -40,7 +42,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   for (auto paramType : sig.getGenericParams()) {
     auto *clonedParam = GenericTypeParamDecl::createImplicit(
         dc, paramType->getName(), paramType->getDepth(), paramType->getIndex(),
-        paramType->isParameterPack());
+        paramType->getParamKind());
     clonedParam->setDeclContext(dc);
     clonedParams.push_back(clonedParam);
   }
@@ -76,7 +78,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto &astCtx = original->getASTContext();
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(astCtx);
   auto config = this->config.withGenericSignature(genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,
@@ -143,7 +145,9 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
       decl->setInterfaceType(astCtx.TheRawPointerType);
     } else { // Otherwise the payload is the linear map tuple.
       auto *linearMapStructTy = getLinearMapTupleType(predBB);
-      assert(linearMapStructTy && "must have linear map struct type for predecessor BB");
+      // Do not create entries for unreachable predecessors
+      if (!linearMapStructTy)
+        continue;
       auto canLinearMapStructTy = linearMapStructTy->getCanonicalType();
       decl->setInterfaceType(
           canLinearMapStructTy->hasArchetype()
@@ -167,11 +171,11 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
 }
 
 
-Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
+Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
-  collectMinimalIndicesForFunctionCall(ai, config, activityInfo, allResults,
+  collectMinimalIndicesForFunctionCall(fai, config, activityInfo, allResults,
                                        activeParamIndices, activeResultIndices);
 
   // Check if there are any active results or arguments. If not, skip
@@ -181,12 +185,12 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   });
   bool hasActiveSemanticResultArgument = false;
   bool hasActiveArguments = false;
-  auto numIndirectResults = ai->getNumIndirectResults();
-  for (auto argIdx : range(ai->getSubstCalleeConv().getNumParameters())) {
-    auto arg = ai->getArgumentsWithoutIndirectResults()[argIdx];
+  auto numIndirectResults = fai.getNumIndirectSILResults();
+  for (auto argIdx : range(fai.getSubstCalleeConv().getNumParameters())) {
+    auto arg = fai.getArgumentsWithoutIndirectResults()[argIdx];
     if (activityInfo.isActive(arg, config)) {
       hasActiveArguments = true;
-      auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
+      auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(
           numIndirectResults + argIdx);
       if (paramInfo.isAutoDiffSemanticResult())
         hasActiveSemanticResultArgument = true;
@@ -202,7 +206,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   //   parameters from the function type.
   // - Otherwise, use the active parameters.
   IndexSubset *parameters;
-  auto origFnSubstTy = ai->getSubstCalleeType();
+  auto origFnSubstTy = fai.getSubstCalleeType();
   auto remappedOrigFnSubstTy =
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
           .castTo<SILFunctionType>()
@@ -212,7 +216,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   } else {
     parameters = IndexSubset::get(
         original->getASTContext(),
-        ai->getArgumentsWithoutIndirectResults().size(), activeParamIndices);
+        fai.getArgumentsWithoutIndirectResults().size(), activeParamIndices);
   }
   // Compute differentiability results.
   auto *results = IndexSubset::get(original->getASTContext(),
@@ -222,8 +226,8 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
   AutoDiffConfig applyConfig(parameters, results);
 
   // Check for non-differentiable original function type.
-  auto checkNondifferentiableOriginalFunctionType = [&](CanSILFunctionType
-                                                            origFnTy) {
+  auto checkNondifferentiableOriginalFunctionType =
+    [&](CanSILFunctionType origFnTy) {
     // Check non-differentiable arguments.
     for (auto paramIndex : applyConfig.parameterIndices->getIndices()) {
       auto remappedParamType =
@@ -232,12 +236,22 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
         return true;
     }
     // Check non-differentiable results.
+    unsigned firstSemanticParamResultIdx = origFnTy->getNumResults();
+    unsigned firstYieldResultIndex = origFnTy->getNumResults() +
+      origFnTy->getNumAutoDiffSemanticResultsParameters();
     for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
       SILType remappedResultType;
-      if (resultIndex >= origFnTy->getNumResults()) {
-        auto semanticResultArgIdx = resultIndex - origFnTy->getNumResults();
+      if (resultIndex >= firstYieldResultIndex) {
+        auto yieldResultIdx = resultIndex - firstYieldResultIndex;
+        const auto& yield = origFnTy->getYields()[yieldResultIdx];
+        // We do not have a good way to differentiate direct yields
+        if (!yield.isAutoDiffSemanticResult())
+          return true;
+        remappedResultType = yield.getSILStorageInterfaceType();
+      } else if (resultIndex >= firstSemanticParamResultIdx) {
+        auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
         auto semanticResultArg =
-            *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+            *std::next(fai.getAutoDiffSemanticResultArguments().begin(),
                        semanticResultArgIdx);
         remappedResultType = semanticResultArg->getType();
       } else {
@@ -257,12 +271,10 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, ApplyInst *ai) {
       remappedOrigFnSubstTy
           ->getAutoDiffDerivativeFunctionType(
               parameters, results, derivativeFnKind, context.getTypeConverter(),
-              LookUpConformanceInModule(
-                  derivative->getModule().getSwiftModule()))
+              LookUpConformanceInModule())
           ->getUnsubstitutedType(original->getModule());
 
-  auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();
-  auto linearMapSILType = derivativeFnResultTypes;
+  auto linearMapSILType = derivativeFnType->getAllResultsInterfaceType();
   if (auto tupleType = linearMapSILType.getAs<TupleType>()) {
     linearMapSILType = SILType::getPrimitiveObjectType(
         tupleType.getElementType(tupleType->getElements().size() - 1));
@@ -364,21 +376,27 @@ void LinearMapInfo::generateDifferentiationDataStructures(
       // special-case pullback generation. Linear map tuples should be empty.
     } else {
       for (auto &inst : *origBB) {
-        if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
-          // Add linear map field to struct for active `apply` instructions.
+        if (auto *ai = dyn_cast<ApplyInst>(&inst))
           // Skip array literal intrinsic applications since array literal
           // initialization is linear and handled separately.
-          if (!shouldDifferentiateApplySite(ai) ||
-              ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
+          if (ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC) ||
+              ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
             continue;
-          if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
-            continue;
-          LLVM_DEBUG(getADDebugStream()
-                     << "Adding linear map tuple field for " << *ai);
-          if (Type linearMapType = getLinearMapType(context, ai)) {
-            linearMapIndexMap.insert({ai, linearTupleTypes.size()});
-            linearTupleTypes.emplace_back(linearMapType);
-          }
+
+        if (!isa<FullApplySite>(&inst))
+          continue;
+
+        FullApplySite fai(&inst);
+        // Add linear map field to struct for active apply sites instructions.
+        if (!shouldDifferentiateApplySite(fai))
+          continue;
+
+        LLVM_DEBUG(getADDebugStream()
+                   << "Adding linear map tuple field for " << inst);
+        if (Type linearMapType = getLinearMapType(context, fai)) {
+          LLVM_DEBUG(getADDebugStream() << "Computed type: " << linearMapType << '\n');
+          linearMapIndexMap.insert({fai, linearTupleTypes.size()});
+          linearTupleTypes.emplace_back(linearMapType);
         }
       }
     }
@@ -511,12 +529,18 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // Should differentiate any allocation instruction that has an active result.
   if ((isa<AllocationInst>(inst) && hasActiveResults))
     return true;
+  // Should differentiate end_apply if the corresponding begin_apply is
+  // differentiable
+  if (auto *eai = dyn_cast<EndApplyInst>(inst))
+    return shouldDifferentiateApplySite(eai->getBeginApply());
   if (hasActiveOperands) {
     // Should differentiate any instruction that performs reference counting,
     // lifetime ending, access ending, or destroying on an active operand.
     if (isa<RefCountingInst>(inst) || isa<EndAccessInst>(inst) ||
         isa<EndBorrowInst>(inst) || isa<DeallocationInst>(inst) ||
-        isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst))
+        isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst) ||
+        isa<AbortApplyInst>(inst) ||
+        isa<YieldInst>(inst))
       return true;
   }
 

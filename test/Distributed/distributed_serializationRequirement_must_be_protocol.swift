@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -16,10 +16,11 @@ final class SomeEnum: Sendable {}
 final class System: DistributedActorSystem {
   // ignore those since they all fail with the SerializationRequirement being invalid:
   // expected-error@-2{{type 'System' does not conform to protocol 'DistributedActorSystem'}}
-  // expected-note@-3{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid'}}
+  // expected-note@-3{{add stubs for conformance}}
   // expected-error@-4{{class 'System' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
+  // expected-note@-5{{add stubs for conformance}}
   // expected-error@-6{{class 'System' is missing witness for protocol requirement 'remoteCallVoid'}}
+  // expected-note@-7{{add stubs for conformance}}
   typealias ActorID = String
   typealias InvocationEncoder = ClassInvocationEncoder
   typealias InvocationDecoder = ClassInvocationDecoder
@@ -53,6 +54,7 @@ final class System: DistributedActorSystem {
     fatalError()
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout System.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout ClassInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res') [with ResultHandler = <<error type>>]}}
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -80,30 +82,35 @@ final class System: DistributedActorSystem {
   }
 }
 
-struct ClassInvocationEncoder: DistributedTargetInvocationEncoder {
-  // expected-error@-1{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordArgument'}}
-  // expected-note@-2{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordArgument' with signature:}}
-  // expected-error@-3{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordReturnType'}}
-  // expected-note@-4{{protocol 'DistributedTargetInvocationEncoder' requires function 'recordReturnType' with signature:}}
+struct ClassInvocationEncoder: DistributedTargetInvocationEncoder { // expected-error {{type 'ClassInvocationEncoder' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  // expected-note@-1{{add stubs for conformance}}
+  // expected-error@-2{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordArgument'}}
+  // expected-note@-3{{add stubs for conformance}}
+  // expected-error@-4{{struct 'ClassInvocationEncoder' is missing witness for protocol requirement 'recordReturnType'}}
+  // expected-note@-5{{add stubs for conformance}}
   typealias SerializationRequirement = SomeClazz
 
   public mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  // expected-note@+1 {{candidate has non-matching type '<Value> (RemoteCallArgument<Value>) throws -> ()'}}
   public mutating func recordArgument<Value: SerializationRequirement>(
     _ argument: RemoteCallArgument<Value>) throws {}
   public mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  // expected-note@+1 {{candidate has non-matching type '<R> (R.Type) throws -> ()'}}
   public mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
   public mutating func doneRecording() throws {}
 }
 
-final class ClassInvocationDecoder: DistributedTargetInvocationDecoder {
-  // expected-error@-1{{class 'ClassInvocationDecoder' is missing witness for protocol requirement 'decodeNextArgument'}}
-  // expected-note@-2{{protocol 'DistributedTargetInvocationDecoder' requires function 'decodeNextArgument'}}
+final class ClassInvocationDecoder: DistributedTargetInvocationDecoder { // expected-error {{type 'ClassInvocationDecoder' does not conform to protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-note@-1{{add stubs for conformance}}
+  // expected-error@-2{{class 'ClassInvocationDecoder' is missing witness for protocol requirement 'decodeNextArgument'}}
+  // expected-note@-3{{add stubs for conformance}}
   typealias SerializationRequirement = SomeClazz
 
   public func decodeGenericSubstitutions() throws -> [Any.Type] {
     fatalError()
   }
 
+  // expected-note@+1 {{candidate has non-matching type '<Argument> () throws -> Argument'}}
   public func decodeNextArgument<Argument: SerializationRequirement>() throws -> Argument {
     fatalError()
   }

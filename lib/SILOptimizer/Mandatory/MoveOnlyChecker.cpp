@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -78,13 +79,13 @@ struct MoveOnlyChecker {
   SILFunction *fn;
   DominanceInfo *domTree;
   PostOrderAnalysis *poa;
+  DeadEndBlocksAnalysis *deba;
   bool madeChange = false;
   borrowtodestructure::IntervalMapAllocator allocator;
 
   MoveOnlyChecker(SILFunction *fn, DominanceInfo *domTree,
-                  PostOrderAnalysis *poa)
-      : diagnosticEmitter(fn), fn(fn), domTree(domTree), poa(poa) {
-  }
+                  PostOrderAnalysis *poa, DeadEndBlocksAnalysis *deba)
+      : diagnosticEmitter(fn), fn(fn), domTree(domTree), poa(poa), deba(deba) {}
 
   void checkObjects();
   void completeObjectLifetimes(ArrayRef<MarkUnresolvedNonCopyableValueInst *>);
@@ -114,14 +115,15 @@ void MoveOnlyChecker::checkObjects() {
 
   completeObjectLifetimes(moveIntroducersToProcess.getArrayRef());
 
-  MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, poa, allocator};
+  MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, deba, poa,
+                                allocator};
   madeChange |= checker.check(moveIntroducersToProcess);
 }
 
 void MoveOnlyChecker::completeObjectLifetimes(
     ArrayRef<MarkUnresolvedNonCopyableValueInst *> insts) {
-// TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup.
-  OSSALifetimeCompletion completion(fn, domTree);
+  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup.
+  OSSALifetimeCompletion completion(fn, domTree, *deba->get(fn));
 
   // Collect all values derived from each mark_unresolved_non_copyable_value
   // instruction via ownership instructions and phis.
@@ -161,19 +163,27 @@ void MoveOnlyChecker::completeObjectLifetimes(
   for (auto *block : poa->get(fn)->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
+        if (llvm::any_of(result->getUsers(),
+                         [](auto *user) { return isa<BranchInst>(user); })) {
+          continue;
+        }
         if (!transitiveValues.isVisited(result))
           continue;
-        if (completion.completeOSSALifetime(result) ==
+        if (completion.completeOSSALifetime(
+                result, OSSALifetimeCompletion::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           madeChange = true;
         }
       }
     }
     for (SILArgument *arg : block->getArguments()) {
-      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
+      if (arg->isReborrow()) {
+        continue;
+      }
       if (!transitiveValues.isVisited(arg))
         continue;
-      if (completion.completeOSSALifetime(arg) ==
+      if (completion.completeOSSALifetime(
+              arg, OSSALifetimeCompletion::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         madeChange = true;
       }
@@ -186,7 +196,7 @@ void MoveOnlyChecker::checkAddresses() {
   llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
   searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
-      fn, moveIntroducersToProcess, diagnosticEmitter);
+      fn, poa, moveIntroducersToProcess, diagnosticEmitter);
 
   LLVM_DEBUG(
       llvm::dbgs()
@@ -200,8 +210,9 @@ void MoveOnlyChecker::checkAddresses() {
     return;
   }
 
-  MoveOnlyAddressChecker checker{fn, diagnosticEmitter, allocator, domTree,
-                                 poa};
+  MoveOnlyAddressChecker checker{
+      fn, diagnosticEmitter, allocator, domTree, poa, deba};
+  madeChange |= checker.completeLifetimes();
   madeChange |= checker.check(moveIntroducersToProcess);
 }
 
@@ -211,13 +222,25 @@ void MoveOnlyChecker::checkAddresses() {
 
 namespace {
 
+static bool canonicalizeLoadBorrows(SILFunction *F) {
+  bool changed = false;
+  for (auto &block : *F) {
+    for (auto &inst : block) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(&inst)) {
+        if (lbi->isUnchecked()) {
+          changed = true;
+          lbi->setUnchecked(false);
+        }
+      }
+    }
+  }
+  
+  return changed;
+}
+
 class MoveOnlyCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!fn->getASTContext().supportsMoveOnlyTypes())
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
@@ -226,69 +249,23 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    // If an earlier pass asked us to eliminate the function body if it's
-    // unused, and the function is in fact unused, do that now.
-    if (fn->hasSemanticsAttr(semantics::MOVEONLY_DELETE_IF_UNUSED)) {
-      if (fn->getRefCount() == 0
-          && !isPossiblyUsedExternally(fn->getLinkage(),
-                                       fn->getModule().isWholeModule())) {
-        LLVM_DEBUG(llvm::dbgs() << "===> Deleting unused function " << fn->getName() << "'s body that was marked for deletion\n");
-        // Remove all non-entry blocks.
-        auto entryBB = fn->begin();
-        auto nextBB = std::next(entryBB);
-        
-        while (nextBB != fn->end()) {
-          auto thisBB = nextBB;
-          ++nextBB;
-          thisBB->eraseFromParent();
-        }
-        
-        // Rewrite the entry block to only contain an unreachable.
-        auto loc = entryBB->begin()->getLoc();
-        entryBB->eraseAllInstructions(fn->getModule());
-        {
-          SILBuilder b(&*entryBB);
-          b.createUnreachable(loc);
-        }
-        
-        // If the function has shared linkage, reduce this version to private
-        // linkage, because we don't want the deleted-body form to win in any
-        // ODR shootouts.
-        if (fn->getLinkage() == SILLinkage::Shared) {
-          fn->setLinkage(SILLinkage::Private);
-        }
-        
-        invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-        return;
-      }
-      // If the function wasn't unused, let it continue into diagnostics.
-      // This would come up if a closure function somehow was used in different
-      // functions with different escape analysis results. This shouldn't really
-      // be possible, and we should try harder to make it impossible, but if
-      // it does happen now, the least bad thing to do is to proceed with
-      // move checking. This will either succeed and make sure the original
-      // function contains valid SIL, or raise errors relating to the use
-      // of the captures in an escaping way, which is the right thing to do
-      // if they are in fact escapable.
-      LLVM_DEBUG(llvm::dbgs() << "===> Function " << fn->getName()
-                              << " was marked to be deleted, but has uses. Continuing with move checking\n");
-      
-    }
-
     // If an earlier pass told use to not emit diagnostics for this function,
     // clean up any copies, invalidate the analysis, and return early.
     if (fn->hasSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS)) {
-      if (cleanupNonCopyableCopiesAfterEmittingDiagnostic(getFunction()))
+      bool didChange = canonicalizeLoadBorrows(fn);
+      didChange |= cleanupNonCopyableCopiesAfterEmittingDiagnostic(getFunction());
+      if (didChange) {
         invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      }
       return;
     }
 
     LLVM_DEBUG(llvm::dbgs()
                << "===> MoveOnly Checker. Visiting: " << fn->getName() << '\n');
 
-    MoveOnlyChecker checker(
-        fn, getAnalysis<DominanceAnalysis>()->get(fn),
-        getAnalysis<PostOrderAnalysis>());
+    MoveOnlyChecker checker(fn, getAnalysis<DominanceAnalysis>()->get(fn),
+                            getAnalysis<PostOrderAnalysis>(),
+                            getAnalysis<DeadEndBlocksAnalysis>());
 
     checker.checkObjects();
     checker.checkAddresses();
@@ -301,6 +278,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
       emitCheckerMissedCopyOfNonCopyableTypeErrors(fn,
                                                    checker.diagnosticEmitter);
     }
+
+    // Remaining borrows
+    // should be correctly immutable. We can canonicalize any remaining
+    // `load_borrow [unchecked]` instructions.
+    checker.madeChange |= canonicalizeLoadBorrows(fn);
 
     checker.madeChange |=
         cleanupNonCopyableCopiesAfterEmittingDiagnostic(fn);

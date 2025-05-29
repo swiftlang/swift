@@ -19,13 +19,15 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_IMPL_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_IMPL_H
 
-#include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -33,8 +35,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //                                BridgedAliasAnalysis
 //===----------------------------------------------------------------------===//
 
-BridgedMemoryBehavior BridgedAliasAnalysis::getMemBehavior(BridgedInstruction inst, BridgedValue addr) const {
-  return (BridgedMemoryBehavior)aa->computeMemoryBehavior(inst.get(), addr.getSILValue());
+bool BridgedAliasAnalysis::unused(BridgedValue address1, BridgedValue address2) const {
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -44,16 +46,24 @@ BridgedMemoryBehavior BridgedAliasAnalysis::getMemBehavior(BridgedInstruction in
 static_assert(sizeof(BridgedCalleeAnalysis::CalleeList) >= sizeof(swift::CalleeList),
               "BridgedCalleeAnalysis::CalleeList has wrong size");
 
+BridgedCalleeAnalysis::CalleeList::CalleeList(swift::CalleeList list) {
+  *reinterpret_cast<swift::CalleeList *>(&storage) = list;
+}
+
+swift::CalleeList BridgedCalleeAnalysis::CalleeList::unbridged() const {
+  return *reinterpret_cast<const swift::CalleeList *>(&storage);
+}
+
 bool BridgedCalleeAnalysis::CalleeList::isIncomplete() const {
-  return get().isIncomplete();
+  return unbridged().isIncomplete();
 }
 
 SwiftInt BridgedCalleeAnalysis::CalleeList::getCount() const {
-  return get().getCount();
+  return unbridged().getCount();
 }
 
 BridgedFunction BridgedCalleeAnalysis::CalleeList::getCallee(SwiftInt index) const {
-  return {get().get((unsigned)index)};
+  return {unbridged().get((unsigned)index)};
 }
 
 //===----------------------------------------------------------------------===//
@@ -61,7 +71,7 @@ BridgedFunction BridgedCalleeAnalysis::CalleeList::getCallee(SwiftInt index) con
 //===----------------------------------------------------------------------===//
 
 bool BridgedDeadEndBlocksAnalysis::isDeadEnd(BridgedBasicBlock block) const {
-  return deb->isDeadEnd(block.get());
+  return deb->isDeadEnd(block.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -69,11 +79,11 @@ bool BridgedDeadEndBlocksAnalysis::isDeadEnd(BridgedBasicBlock block) const {
 //===----------------------------------------------------------------------===//
 
 bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
-  return di->dominates(dominating.get(), dominated.get());
+  return di->dominates(dominating.unbridged(), dominated.unbridged());
 }
 
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
-  return pdi->dominates(dominating.get(), dominated.get());
+  return pdi->dominates(dominating.unbridged(), dominated.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -81,15 +91,15 @@ bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasi
 //===----------------------------------------------------------------------===//
 
 bool BridgedBasicBlockSet::contains(BridgedBasicBlock block) const {
-  return set->contains(block.get());
+  return set->contains(block.unbridged());
 }
 
 bool BridgedBasicBlockSet::insert(BridgedBasicBlock block) const {
-  return set->insert(block.get());
+  return set->insert(block.unbridged());
 }
 
 void BridgedBasicBlockSet::erase(BridgedBasicBlock block) const {
-  set->erase(block.get());
+  set->erase(block.unbridged());
 }
 
 BridgedFunction BridgedBasicBlockSet::getFunction() const {
@@ -113,18 +123,38 @@ void BridgedNodeSet::eraseValue(BridgedValue value) const {
 }
 
 bool BridgedNodeSet::containsInstruction(BridgedInstruction inst) const {
-  return set->contains(inst.get()->asSILNode());
+  return set->contains(inst.unbridged()->asSILNode());
 }
 
 bool BridgedNodeSet::insertInstruction(BridgedInstruction inst) const {
-  return set->insert(inst.get()->asSILNode());
+  return set->insert(inst.unbridged()->asSILNode());
 }
 
 void BridgedNodeSet::eraseInstruction(BridgedInstruction inst) const {
-  set->erase(inst.get()->asSILNode());
+  set->erase(inst.unbridged()->asSILNode());
 }
 
 BridgedFunction BridgedNodeSet::getFunction() const {
+  return {set->getFunction()};
+}
+
+//===----------------------------------------------------------------------===//
+//                            BridgedOperandSet
+//===----------------------------------------------------------------------===//
+
+bool BridgedOperandSet::contains(BridgedOperand operand) const {
+  return set->contains(operand.op);
+}
+
+bool BridgedOperandSet::insert(BridgedOperand operand) const {
+  return set->insert(operand.op);
+}
+
+void BridgedOperandSet::erase(BridgedOperand operand) const {
+  set->erase(operand.op);
+}
+
+BridgedFunction BridgedOperandSet::getFunction() const {
   return {set->getFunction()};
 }
 
@@ -136,12 +166,30 @@ BridgedChangeNotificationHandler BridgedPassContext::asNotificationHandler() con
   return {invocation};
 }
 
+void BridgedPassContext::notifyDependencyOnBodyOf(BridgedFunction otherFunction) const {
+  // Currently `otherFunction` is ignored. We could design a more accurate dependency system
+  // in the pass manager, which considers the actual function. But it's probaboly not worth the effort.
+  invocation->getPassManager()->setDependingOnCalleeBodies();
+}
+
 BridgedPassContext::SILStage BridgedPassContext::getSILStage() const {
   return (SILStage)invocation->getPassManager()->getModule()->getStage();
 }
 
 bool BridgedPassContext::hadError() const {
   return invocation->getPassManager()->getModule()->getASTContext().hadError();
+}
+
+bool BridgedPassContext::moduleIsSerialized() const {
+  return invocation->getPassManager()->getModule()->isSerialized();
+}
+
+bool BridgedPassContext::moduleHasLoweredAddresses() const {
+  return invocation->getPassManager()->getModule()->useLoweredAddresses();
+}
+
+bool BridgedPassContext::isTransforming(BridgedFunction function) const {
+  return invocation->getFunction() == function.getFunction();
 }
 
 BridgedAliasAnalysis BridgedPassContext::getAliasAnalysis() const {
@@ -167,43 +215,64 @@ BridgedPostDomTree BridgedPassContext::getPostDomTree() const {
   return {pda->get(invocation->getFunction())};
 }
 
-BridgedNominalTypeDecl BridgedPassContext::getSwiftArrayDecl() const {
+BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->getASTContext().getArrayDecl()};
+}
+
+BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->getASTContext().getMutableSpanDecl()};
 }
 
 // AST
 
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-BridgedDiagEngine BridgedPassContext::getDiagnosticEngine() const {
+BridgedDiagnosticEngine BridgedPassContext::getDiagnosticEngine() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {&mod->getASTContext().Diags};
 }
 
 // SIL modifications
 
-BridgedBasicBlock BridgedPassContext::splitBlock(BridgedInstruction bridgedInst) const {
-  auto *block = bridgedInst.get()->getParent();
-  return {block->split(bridgedInst.get()->getIterator())};
+BridgedBasicBlock BridgedPassContext::splitBlockBefore(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(bridgedInst.unbridged()->getIterator())};
 }
 
-void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
-  invocation->eraseInstruction(inst.get());
+BridgedBasicBlock BridgedPassContext::splitBlockAfter(BridgedInstruction bridgedInst) const {
+  auto *block = bridgedInst.unbridged()->getParent();
+  return {block->split(std::next(bridgedInst.unbridged()->getIterator()))};
+}
+
+BridgedBasicBlock BridgedPassContext::createBlockAfter(BridgedBasicBlock bridgedBlock) const {
+  swift::SILBasicBlock *block = bridgedBlock.unbridged();
+  return {block->getParent()->createBasicBlockAfter(block)};
+}
+
+BridgedBasicBlock BridgedPassContext::appendBlock(BridgedFunction bridgedFunction) const {
+  return {bridgedFunction.getFunction()->createBasicBlock()};
+}
+
+void BridgedPassContext::eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const {
+  invocation->eraseInstruction(inst.unbridged(), salvageDebugInfo);
 }
 
 void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {
-  block.get()->eraseFromParent();
+  block.unbridged()->eraseFromParent();
+}
+
+void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
 }
 
 BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
-  return {swift::SILUndef::get(type.get(), *invocation->getFunction())};
+  return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
 }
 
-bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) {
-  return swift::optimizeMemoryAccesses(f.getFunction());
-}
-bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) {
-  return swift::eliminateDeadAllocations(f.getFunction());
+bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
+  return swift::eliminateDeadAllocations(f.getFunction(),
+                                         this->getDomTree().di);
 }
 
 BridgedBasicBlockSet BridgedPassContext::allocBasicBlockSet() const {
@@ -220,6 +289,14 @@ BridgedNodeSet BridgedPassContext::allocNodeSet() const {
 
 void BridgedPassContext::freeNodeSet(BridgedNodeSet set) const {
   invocation->freeNodeSet(set.set);
+}
+
+BridgedOperandSet BridgedPassContext::allocOperandSet() const {
+  return {invocation->allocOperandSet()};
+}
+
+void BridgedPassContext::freeOperandSet(BridgedOperandSet set) const {
+  invocation->freeOperandSet(set.set);
 }
 
 void BridgedPassContext::notifyInvalidatedStackNesting() const {
@@ -293,10 +370,12 @@ OptionalBridgedGlobalVar BridgedPassContext::getNextGlobalInModule(BridgedGlobal
   return {&*nextIter};
 }
 
-BridgedPassContext::VTableArray BridgedPassContext::getVTables() const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  auto vTables = mod->getVTables();
-  return {vTables.data(), (SwiftInt)vTables.size()};
+SwiftInt BridgedPassContext::getNumVTables() const {
+  return (SwiftInt)(invocation->getPassManager()->getModule()->getVTables().size());
+}
+
+BridgedVTable BridgedPassContext::getVTable(SwiftInt index) const {
+  return {invocation->getPassManager()->getModule()->getVTables()[index]};
 }
 
 OptionalBridgedWitnessTable BridgedPassContext::getFirstWitnessTableInModule() const {
@@ -330,11 +409,76 @@ getNextDefaultWitnessTableInModule(BridgedDefaultWitnessTable table) {
   return {&*nextIter};
 }
 
+OptionalBridgedFunction BridgedPassContext::lookupFunction(BridgedStringRef name) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpFunction(name.unbridged())};
+}
+
 OptionalBridgedFunction BridgedPassContext::loadFunction(BridgedStringRef name, bool loadCalleesRecursively) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return {mod->loadFunction(name.get(),
-                            loadCalleesRecursively ? swift::SILModule::LinkingMode::LinkAll
-                                                   : swift::SILModule::LinkingMode::LinkNormal)};
+  return {mod->loadFunction(name.unbridged(),
+                            loadCalleesRecursively
+                                ? swift::SILModule::LinkingMode::LinkAll
+                                : swift::SILModule::LinkingMode::LinkNormal)};
+}
+
+OptionalBridgedVTable BridgedPassContext::lookupVTable(BridgedDeclObj classDecl) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpVTable(classDecl.getAs<swift::ClassDecl>())};
+}
+
+OptionalBridgedVTable BridgedPassContext::lookupSpecializedVTable(BridgedType classType) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpSpecializedVTable(classType.unbridged())};
+}
+
+BridgedConformance BridgedPassContext::getSpecializedConformance(
+                                                     BridgedConformance genericConformance,
+                                                     BridgedASTType type,
+                                                     BridgedSubstitutionMap substitutions) const {
+  auto &ctxt = invocation->getPassManager()->getModule()->getASTContext();
+  auto *genConf = llvm::cast<swift::NormalProtocolConformance>(genericConformance.unbridged().getConcrete());
+  auto *c = ctxt.getSpecializedConformance(type.unbridged(), genConf, substitutions.unbridged());
+  return swift::ProtocolConformanceRef(c);
+}
+
+OptionalBridgedWitnessTable BridgedPassContext::lookupWitnessTable(BridgedConformance conformance) const {
+  swift::ProtocolConformanceRef ref = conformance.unbridged();
+  if (!ref.isConcrete()) {
+    return {nullptr};
+  }
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpWitnessTable(ref.getConcrete())};
+}
+
+BridgedWitnessTable BridgedPassContext::createSpecializedWitnessTable(BridgedLinkage linkage,
+                                                           bool serialized,
+                                                           BridgedConformance conformance,
+                                                           BridgedArrayRef bridgedEntries) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  llvm::SmallVector<swift::SILWitnessTable::Entry, 8> entries;
+  for (const BridgedWitnessTableEntry &e : bridgedEntries.unbridged<BridgedWitnessTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  return {swift::SILWitnessTable::create(*mod, (swift::SILLinkage)linkage,
+                                         serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                         conformance.unbridged().getConcrete(),
+                                         entries, {}, /*specialized=*/true)};
+}
+
+BridgedVTable BridgedPassContext::createSpecializedVTable(BridgedType classType,
+                                                          bool serialized,
+                                                          BridgedArrayRef bridgedEntries) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  llvm::SmallVector<swift::SILVTableEntry, 8> entries;
+  for (const BridgedVTableEntry &e : bridgedEntries.unbridged<BridgedVTableEntry>()) {
+    entries.push_back(e.unbridged());
+  }
+  swift::SILType classTy = classType.unbridged();
+  return {swift::SILVTable::create(*mod,
+                                   classTy.getClassOrBoundGenericClass(), classTy,
+                                   serialized ? swift::IsSerialized : swift::IsNotSerialized,
+                                   entries)};
 }
 
 void BridgedPassContext::loadFunction(BridgedFunction function, bool loadCalleesRecursively) const {
@@ -345,10 +489,18 @@ void BridgedPassContext::loadFunction(BridgedFunction function, bool loadCallees
 }
 
 BridgedSubstitutionMap BridgedPassContext::getContextSubstitutionMap(BridgedType type) const {
-  swift::SILType ty = type.get();
-  auto *ntd = ty.getASTType()->getAnyNominal();
-  auto *mod = invocation->getPassManager()->getModule()->getSwiftModule();
-  return ty.getASTType()->getContextSubstitutionMap(mod, ntd);
+  swift::SILType ty = type.unbridged();
+  return ty.getASTType()->getContextSubstitutionMap();
+}
+
+BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
+  auto &ctxt = invocation->getPassManager()->getModule()->getASTContext();
+  return swift::SILType::getBuiltinIntegerType(bitWidth, ctxt);
+}
+
+bool BridgedPassContext::calleesAreStaticallyKnowable(BridgedDeclRef method) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return swift::calleesAreStaticallyKnowable(*mod, method.unbridged());
 }
 
 void BridgedPassContext::beginTransformFunction(BridgedFunction function) const {
@@ -361,23 +513,44 @@ void BridgedPassContext::endTransformFunction() const {
 
 bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction inst) const {
   swift::SILPassManager *pm = invocation->getPassManager();
-  return pm->continueWithNextSubpassRun(inst.get(), invocation->getFunction(), invocation->getTransform());
+  return pm->continueWithNextSubpassRun(
+      inst.unbridged(), invocation->getFunction(), invocation->getTransform());
 }
 
-void BridgedPassContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
-  invocation->initializeSSAUpdater(type.get(), BridgedValue::castToOwnership(ownership));
+BridgedPassContext BridgedPassContext::initializeNestedPassContext(BridgedFunction newFunction) const {
+  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) }; 
+}
+
+void BridgedPassContext::deinitializedNestedPassContext() const {
+  invocation->deinitializeNestedSwiftPassInvocation();
+}
+
+void BridgedPassContext::SSAUpdater_initialize(
+    BridgedFunction function, BridgedType type,
+    BridgedValue::Ownership ownership) const {
+  invocation->initializeSSAUpdater(function.getFunction(), type.unbridged(),
+                                   BridgedValue::unbridge(ownership));
+}
+
+void BridgedPassContext::addFunctionToPassManagerWorklist(
+    BridgedFunction newFunction, BridgedFunction oldFunction) const {
+  swift::SILPassManager *pm = invocation->getPassManager();
+  pm->addFunctionToWorklist(newFunction.getFunction(),
+                            oldFunction.getFunction());
 }
 
 void BridgedPassContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
-  invocation->getSSAUpdater()->addAvailableValue(block.get(), value.getSILValue());
+  invocation->getSSAUpdater()->addAvailableValue(block.unbridged(),
+                                                 value.getSILValue());
 }
 
 BridgedValue BridgedPassContext::SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
-  return {invocation->getSSAUpdater()->getValueAtEndOfBlock(block.get())};
+  return {invocation->getSSAUpdater()->getValueAtEndOfBlock(block.unbridged())};
 }
 
 BridgedValue BridgedPassContext::SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
-  return {invocation->getSSAUpdater()->getValueInMiddleOfBlock(block.get())};
+  return {
+      invocation->getSSAUpdater()->getValueInMiddleOfBlock(block.unbridged())};
 }
 
 bool BridgedPassContext::enableStackProtection() const {
@@ -385,9 +558,14 @@ bool BridgedPassContext::enableStackProtection() const {
   return mod->getOptions().EnableStackProtection;
 }
 
-bool BridgedPassContext::enableEmbeddedSwift() const {
+bool BridgedPassContext::enableMergeableTraps() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return mod->getASTContext().LangOpts.hasFeature(swift::Feature::Embedded);
+  return mod->getOptions().MergeableTraps;
+}
+
+bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getASTContext().LangOpts.hasFeature(swift::Feature(feature));
 }
 
 bool BridgedPassContext::enableMoveInoutStackProtection() const {
@@ -395,9 +573,38 @@ bool BridgedPassContext::enableMoveInoutStackProtection() const {
   return mod->getOptions().EnableMoveInoutStackProtection;
 }
 
+bool BridgedPassContext::useAggressiveReg2MemForCodeSize() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().UseAggressiveReg2MemForCodeSize;
+}
+
 BridgedPassContext::AssertConfiguration BridgedPassContext::getAssertConfiguration() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return (AssertConfiguration)mod->getOptions().AssertConfig;
+}
+
+bool BridgedPassContext::shouldExpand(BridgedType ty) const {
+  swift::SILModule &mod = *invocation->getPassManager()->getModule();
+  return swift::shouldExpand(mod, ty.unbridged());
+}
+
+BridgedDeclObj BridgedPassContext::getCurrentModuleContext() const {
+  return {invocation->getPassManager()->getModule()->getSwiftModule()};
+}
+
+bool BridgedPassContext::enableWMORequiredDiagnostics() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().EnableWMORequiredDiagnostics;
+}
+
+bool BridgedPassContext::noAllocations() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().NoAllocations;
+}
+
+bool BridgedPassContext::enableAddressDependencies() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().EnableAddressDependencies;
 }
 
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);

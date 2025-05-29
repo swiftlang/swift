@@ -13,6 +13,7 @@
 #include "swift/SwiftRemoteMirror/Platform.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 #include <iostream>
+#include <variant>
 
 #define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
 extern "C" {
@@ -36,28 +37,38 @@ using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
 
-#if SWIFT_OBJC_INTEROP
-using Runtime = External<WithObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
-#else
-using Runtime = External<NoObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
-#endif
-using NativeReflectionContext = swift::reflection::ReflectionContext<Runtime>;
+using RuntimeWithObjCInterop =
+    External<WithObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
+using RuntimeNoObjCInterop =
+    External<NoObjCInterop<RuntimeTarget<sizeof(uintptr_t)>>>;
+
+using ReflectionContextWithObjCInterop =
+    swift::reflection::ReflectionContext<RuntimeWithObjCInterop>;
+using ReflectionContextNoObjCInterop =
+    swift::reflection::ReflectionContext<RuntimeNoObjCInterop>;
 
 struct SwiftReflectionContext {
-  NativeReflectionContext *nativeContext;
+  using ContextVariant =
+      std::variant<std::unique_ptr<ReflectionContextWithObjCInterop>,
+                   std::unique_ptr<ReflectionContextNoObjCInterop>>;
+
+  ContextVariant context;
   std::vector<std::function<void()>> freeFuncs;
   std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
 
   std::function<void(void)> freeTemporaryAllocation = [] {};
 
-  SwiftReflectionContext(MemoryReaderImpl impl) {
+  SwiftReflectionContext(bool objCInteropIsEnabled, MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
-    nativeContext = new NativeReflectionContext(Reader);
+    if (objCInteropIsEnabled) {
+      context = std::make_unique<ReflectionContextWithObjCInterop>(Reader);
+    } else {
+      context = std::make_unique<ReflectionContextNoObjCInterop>(Reader);
+    }
   }
 
   ~SwiftReflectionContext() {
     freeTemporaryAllocation();
-    delete nativeContext;
     for (auto f : freeFuncs)
       f();
   }
@@ -88,8 +99,14 @@ struct SwiftReflectionContext {
     };
     return obj;
   }
-};
 
+  // Call fn with a pointer to context.
+  template <typename Fn>
+  auto withContext(const Fn &fn) {
+    return std::visit([&](auto &&context) { return fn(context.get()); },
+                      this->context);
+  }
+};
 
 uint16_t
 swift_reflection_getSupportedMetadataVersion() {
@@ -163,6 +180,7 @@ swift_reflection_createReflectionContext(void *ReaderContext,
   auto *DataLayout = PointerSize == 4 ? minimalDataLayoutQueryFunction<4>
                                       : minimalDataLayoutQueryFunction<8>;
   MemoryReaderImpl ReaderImpl {
+    PointerSize,
     ReaderContext,
     DataLayout,
     Free,
@@ -171,7 +189,7 @@ swift_reflection_createReflectionContext(void *ReaderContext,
     GetSymbolAddress
   };
 
-  return new SwiftReflectionContext(ReaderImpl);
+  return new SwiftReflectionContext(SWIFT_OBJC_INTEROP, ReaderImpl);
 }
 
 SwiftReflectionContextRef
@@ -181,7 +199,9 @@ swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
                                     ReadBytesFunction ReadBytes,
                                     GetStringLengthFunction GetStringLength,
                                     GetSymbolAddressFunction GetSymbolAddress) {
+  uint8_t PointerSize = sizeof(uintptr_t);
   MemoryReaderImpl ReaderImpl {
+    PointerSize,
     ReaderContext,
     DataLayout,
     Free,
@@ -190,7 +210,16 @@ swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
     GetSymbolAddress
   };
 
-  return new SwiftReflectionContext(ReaderImpl);
+  // If the client implements DLQ_GetObjCInteropIsEnabled, use that value.
+  // If they don't, use this platform's default.
+  bool dataLayoutSaysObjCInteropIsEnabled = true;
+  if (DataLayout(ReaderContext, DLQ_GetObjCInteropIsEnabled, nullptr,
+                 (void *)&dataLayoutSaysObjCInteropIsEnabled)) {
+    return new SwiftReflectionContext(dataLayoutSaysObjCInteropIsEnabled,
+                                      ReaderImpl);
+  } else {
+    return new SwiftReflectionContext(SWIFT_OBJC_INTEROP, ReaderImpl);
+  }
 }
 
 void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef ContextRef) {
@@ -224,137 +253,157 @@ ReflectionSection<Iterator> reflectionSectionFromLocalAndRemote(
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
-  auto Context = ContextRef->nativeContext;
+  ContextRef->withContext([&](auto *Context) {
+    // The `offset` fields must be zero.
+    if (Info.field.offset != 0
+        || Info.associated_types.offset != 0
+        || Info.builtin_types.offset != 0
+        || Info.capture.offset != 0
+        || Info.type_references.offset != 0
+        || Info.reflection_strings.offset != 0) {
+      std::cerr << "reserved field in swift_reflection_info_t is not zero\n";
+      abort();
+    }
 
-  // The `offset` fields must be zero.
-  if (Info.field.offset != 0
-      || Info.associated_types.offset != 0
-      || Info.builtin_types.offset != 0
-      || Info.capture.offset != 0
-      || Info.type_references.offset != 0
-      || Info.reflection_strings.offset != 0) {
-    std::cerr << "reserved field in swift_reflection_info_t is not zero\n";
-    abort();
-  }
+    ReflectionInfo ContextInfo{
+        sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
+        sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
+        sectionFromInfo<BuiltinTypeDescriptorIterator>(Info,
+                                                       Info.builtin_types),
+        sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+        sectionFromInfo<const void *>(Info, Info.type_references),
+        sectionFromInfo<const void *>(Info, Info.reflection_strings),
+        ReflectionSection<const void *>(nullptr, 0),
+        ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0),
+        {}};
 
-  ReflectionInfo ContextInfo{
-      sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
-      sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
-      sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
-      sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
-      sectionFromInfo<const void *>(Info, Info.type_references),
-      sectionFromInfo<const void *>(Info, Info.reflection_strings),
-      ReflectionSection<const void *>(nullptr, 0),
-      ReflectionSection<MultiPayloadEnumDescriptorIterator>(0, 0),
-      {}};
-
-  Context->addReflectionInfo(ContextInfo);
+    Context->addReflectionInfo(ContextInfo);
+  });
 }
 
 void swift_reflection_addReflectionMappingInfo(
     SwiftReflectionContextRef ContextRef,
     swift_reflection_mapping_info_t Info) {
-  auto Context = ContextRef->nativeContext;
+  return ContextRef->withContext([&](auto *Context) {
+    ReflectionInfo ContextInfo{
+        reflectionSectionFromLocalAndRemote<FieldDescriptorIterator>(
+            Info.field),
+        reflectionSectionFromLocalAndRemote<AssociatedTypeIterator>(
+            Info.associated_types),
+        reflectionSectionFromLocalAndRemote<BuiltinTypeDescriptorIterator>(
+            Info.builtin_types),
+        reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
+            Info.capture),
+        reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
+        reflectionSectionFromLocalAndRemote<const void *>(
+            Info.reflection_strings),
+        ReflectionSection<const void *>(nullptr, 0),
+        MultiPayloadEnumSection(0, 0),
+        {}};
 
-  ReflectionInfo ContextInfo{
-      reflectionSectionFromLocalAndRemote<FieldDescriptorIterator>(Info.field),
-      reflectionSectionFromLocalAndRemote<AssociatedTypeIterator>(
-          Info.associated_types),
-      reflectionSectionFromLocalAndRemote<BuiltinTypeDescriptorIterator>(
-          Info.builtin_types),
-      reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
-          Info.capture),
-      reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
-      reflectionSectionFromLocalAndRemote<const void *>(
-          Info.reflection_strings),
-      ReflectionSection<const void *>(nullptr, 0),
-      MultiPayloadEnumSection(0, 0),
-      {}};
-
-  Context->addReflectionInfo(ContextInfo);
+    Context->addReflectionInfo(ContextInfo);
+  });
 }
 
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
-  auto Context = ContextRef->nativeContext;
-  return Context->addImage(RemoteAddress(imageStart)).has_value();
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->addImage(RemoteAddress(imageStart)).has_value();
+  });
 }
 
 int
 swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
                              uintptr_t *outIsaMask) {
-  auto Context = ContextRef->nativeContext;
-  auto isaMask = Context->readIsaMask();
-  if (isaMask) {
-    *outIsaMask = *isaMask;
-    return true;
-  }
-  *outIsaMask = 0;
-  return false;
+  return ContextRef->withContext([&](auto *Context) {
+    auto isaMask = Context->readIsaMask();
+    if (isaMask) {
+      *outIsaMask = *isaMask;
+      return true;
+    }
+    *outIsaMask = 0;
+    return false;
+  });
 }
 
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata) {
-  auto Context = ContextRef->nativeContext;
-  auto TR = Context->readTypeFromMetadata(Metadata);
-  return reinterpret_cast<swift_typeref_t>(TR);
+  return ContextRef->withContext([&](auto *Context) {
+    auto TR = Context->readTypeFromMetadata(Metadata);
+    return reinterpret_cast<swift_typeref_t>(TR);
+  });
 }
 
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
-  auto Context = ContextRef->nativeContext;
-  return Context->ownsObject(RemoteAddress(Object));
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->ownsObject(RemoteAddress(Object));
+  });
 }
 
 int
 swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
-  auto Context = ContextRef->nativeContext;
-  return Context->ownsAddress(RemoteAddress(Address));
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->ownsAddress(RemoteAddress(Address));
+  });
+}
+
+int
+swift_reflection_ownsAddressStrict(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->ownsAddress(RemoteAddress(Address), false);
+  });
 }
 
 uintptr_t
 swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
                                    uintptr_t Object) {
-  auto Context = ContextRef->nativeContext;
-  auto MetadataAddress = Context->readMetadataFromInstance(Object);
-  if (!MetadataAddress)
-    return 0;
-  return *MetadataAddress;
+  return ContextRef->withContext([&](auto *Context) -> uintptr_t {
+    auto MetadataAddress = Context->readMetadataFromInstance(Object);
+    if (!MetadataAddress)
+      return 0;
+    return *MetadataAddress;
+  });
 }
 
 swift_reflection_ptr_t
 swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
                                                swift_reflection_ptr_t MetadataAddress) {
-  auto Context = ContextRef->nativeContext;
-  return Context->nominalTypeDescriptorFromMetadata(MetadataAddress);
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->nominalTypeDescriptorFromMetadata(MetadataAddress);
+  });
 }
 
 int swift_reflection_metadataIsActor(SwiftReflectionContextRef ContextRef,
                                      swift_reflection_ptr_t Metadata) {
-  auto Context = ContextRef->nativeContext;
-  return Context->metadataIsActor(Metadata);
+  return ContextRef->withContext(
+      [&](auto *Context) { return Context->metadataIsActor(Metadata); });
 }
 
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
-  auto Context = ContextRef->nativeContext;
-  auto MetadataAddress = Context->readMetadataFromInstance(Object);
-  if (!MetadataAddress)
-    return 0;
-  auto TR = Context->readTypeFromMetadata(*MetadataAddress);
-  return reinterpret_cast<swift_typeref_t>(TR);
+  return ContextRef->withContext(
+      [&](auto *Context) -> swift_typeref_t {
+        auto MetadataAddress = Context->readMetadataFromInstance(Object);
+        if (!MetadataAddress)
+          return 0;
+        auto TR = Context->readTypeFromMetadata(*MetadataAddress);
+        return reinterpret_cast<swift_typeref_t>(TR);
+      });
 }
 
 swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
-  auto Context = ContextRef->nativeContext;
-  auto TR = Context->readTypeFromMangledName(MangledTypeName, Length).getType();
-  return reinterpret_cast<swift_typeref_t>(TR);
+  return ContextRef->withContext([&](auto *Context) {
+    auto TR =
+        Context->readTypeFromMangledName(MangledTypeName, Length).getType();
+    return reinterpret_cast<swift_typeref_t>(TR);
+  });
 }
 
 char *
@@ -367,16 +416,37 @@ swift_reflection_copyDemangledNameForTypeRef(
   return strdup(Name.c_str());
 }
 
+char *
+swift_reflection_copyNameForTypeRef(SwiftReflectionContextRef ContextRef,
+                                    swift_typeref_t OpaqueTypeRef,
+                                    bool mangled) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  Demangle::Demangler Dem;
+  if (mangled) {
+    auto Mangling = mangleNode(TR->getDemangling(Dem), Mangle::ManglingFlavor::Default);
+    if (Mangling.isSuccess()) {
+      return strdup(Mangling.result().c_str());
+    }
+  }
+  else {
+    auto Name = nodeToString(TR->getDemangling(Dem));
+    return strdup(Name.c_str());
+  }
+  return nullptr;
+}
+
 SWIFT_REMOTE_MIRROR_LINKAGE
 char *
 swift_reflection_copyDemangledNameForProtocolDescriptor(
   SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto) {
-  auto Context = ContextRef->nativeContext;
+  return ContextRef->withContext([&](auto *Context) {
 
-  Demangle::Demangler Dem;
-  auto Demangling = Context->readDemanglingForContextDescriptor(Proto, Dem);
-  auto Name = nodeToString(Demangling);
-  return strdup(Name.c_str());
+    Demangle::Demangler Dem;
+    auto Demangling = Context->readDemanglingForContextDescriptor(Proto, Dem);
+    auto Name = nodeToString(Demangling);
+    return strdup(Name.c_str());
+  });
 }
 
 swift_typeref_t
@@ -459,6 +529,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
 #include "swift/AST/ReferenceStorage.def"
     }
   }
+
+  case TypeInfoKind::Array: {
+    return SWIFT_ARRAY;
+  }
   }
 
   swift_unreachable("Unhandled TypeInfoKind in switch");
@@ -518,32 +592,30 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   };
 }
 
+template <typename ReflectionContext>
 static swift_layout_kind_t convertAllocationChunkKind(
-    NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind Kind) {
+    typename ReflectionContext::AsyncTaskAllocationChunk::ChunkKind Kind) {
   switch (Kind) {
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::Unknown:
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::Unknown:
     return SWIFT_UNKNOWN;
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::NonPointer:
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::NonPointer:
     return SWIFT_BUILTIN;
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::RawPointer:
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::RawPointer:
     return SWIFT_RAW_POINTER;
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
-      StrongReference:
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::StrongReference:
     return SWIFT_STRONG_REFERENCE;
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
-      UnownedReference:
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::UnownedReference:
     return SWIFT_UNOWNED_REFERENCE;
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
-      WeakReference:
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::WeakReference:
     return SWIFT_WEAK_REFERENCE;
-  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+  case ReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
       UnmanagedReference:
     return SWIFT_UNMANAGED_REFERENCE;
   }
 }
 
 static const char *returnableCString(SwiftReflectionContextRef ContextRef,
-                                      llvm::Optional<std::string> String) {
+                                     std::optional<std::string> String) {
   if (String) {
     auto *TmpStr = ContextRef->allocateTemporaryObject<std::string>();
     *TmpStr = *String;
@@ -555,54 +627,60 @@ static const char *returnableCString(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
-  auto Context = ContextRef->nativeContext;
-  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR, nullptr);
-  return convertTypeInfo(TI);
+  return ContextRef->withContext([&](auto *Context) {
+    auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+    auto TI = Context->getTypeInfo(TR, nullptr);
+    return convertTypeInfo(TI);
+  });
 }
 
 swift_childinfo_t
 swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef,
                                 unsigned Index) {
-  auto Context = ContextRef->nativeContext;
-  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto *TI = Context->getTypeInfo(TR, nullptr);
-  return convertChild(TI, Index);
+  return ContextRef->withContext([&](auto *Context) {
+    auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+    auto *TI = Context->getTypeInfo(TR, nullptr);
+    return convertChild(TI, Index);
+  });
 }
 
 swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
-  auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
-  return convertTypeInfo(TI);
+  return ContextRef->withContext([&](auto *Context) {
+    auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
+    return convertTypeInfo(TI);
+  });
 }
 
 swift_childinfo_t
 swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
-  auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
-  return convertChild(TI, Index);
+  return ContextRef->withContext([&](auto *Context) {
+    auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
+    return convertChild(TI, Index);
+  });
 }
 
 swift_typeinfo_t
 swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object) {
-  auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
-  return convertTypeInfo(TI);
+  return ContextRef->withContext([&](auto *Context) {
+    auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
+    return convertTypeInfo(TI);
+  });
 }
 
 swift_childinfo_t
 swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object,
                                  unsigned Index) {
-  auto Context = ContextRef->nativeContext;
-  auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
-  return convertChild(TI, Index);
+  return ContextRef->withContext([&](auto *Context) {
+    auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
+    return convertChild(TI, Index);
+  });
 }
 
 int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
@@ -610,21 +688,22 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         swift_addr_t *StartOfInstanceData) {
-  auto Context = ContextRef->nativeContext;
-  auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
-  auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
-  const TypeRef *InstanceTR = nullptr;
-  RemoteAddress RemoteStartOfInstanceData(nullptr);
-  auto Success = Context->projectExistential(
-      RemoteExistentialAddress, ExistentialTR, &InstanceTR,
-      &RemoteStartOfInstanceData, nullptr);
+  return ContextRef->withContext([&](auto *Context) {
+    auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
+    auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+    const TypeRef *InstanceTR = nullptr;
+    RemoteAddress RemoteStartOfInstanceData(nullptr);
+    auto Success = Context->projectExistential(
+        RemoteExistentialAddress, ExistentialTR, &InstanceTR,
+        &RemoteStartOfInstanceData, nullptr);
 
-  if (Success) {
-    *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(InstanceTR);
-    *StartOfInstanceData = RemoteStartOfInstanceData.getAddressData();
-  }
+    if (Success) {
+      *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(InstanceTR);
+      *StartOfInstanceData = RemoteStartOfInstanceData.getAddressData();
+    }
 
-  return Success;
+    return Success;
+  });
 }
 
 int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef ContextRef,
@@ -632,36 +711,40 @@ int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef 
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         swift_addr_t *StartOfInstanceData) {
-  auto Context = ContextRef->nativeContext;
-  auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
-  auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
-  auto Pair = Context->projectExistentialAndUnwrapClass(
-      RemoteExistentialAddress, *ExistentialTR);
-  if (!Pair.has_value())
-    return false;
-  *InstanceTypeRef = reinterpret_cast<swift_typeref_t>(std::get<const TypeRef *>(*Pair));
-  *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getAddressData();
+  return ContextRef->withContext([&](auto *Context) {
+    auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
+    auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
+    auto Pair = Context->projectExistentialAndUnwrapClass(
+        RemoteExistentialAddress, *ExistentialTR);
+    if (!Pair.has_value())
+      return false;
+    *InstanceTypeRef =
+        reinterpret_cast<swift_typeref_t>(std::get<const TypeRef *>(*Pair));
+    *StartOfInstanceData = std::get<RemoteAddress>(*Pair).getAddressData();
 
-  return true;
+    return true;
+  });
 }
+
 int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       swift_addr_t EnumAddress,
                                       swift_typeref_t EnumTypeRef,
                                       int *CaseIndex) {
-  auto Context = ContextRef->nativeContext;
-  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
-  auto RemoteEnumAddress = RemoteAddress(EnumAddress);
-  if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex,
-                                 nullptr)) {
-    return false;
-  }
-  auto TI = Context->getTypeInfo(EnumTR, nullptr);
-  auto *RecordTI = dyn_cast<EnumTypeInfo>(TI);
-  assert(RecordTI != nullptr);
-  if (static_cast<size_t>(*CaseIndex) >= RecordTI->getNumCases()) {
-    return false;
-  }
-  return true;
+  return ContextRef->withContext([&](auto *Context) {
+    auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+    auto RemoteEnumAddress = RemoteAddress(EnumAddress);
+    if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex,
+                                   nullptr)) {
+      return false;
+    }
+    auto TI = Context->getTypeInfo(EnumTR, nullptr);
+    auto *RecordTI = dyn_cast<EnumTypeInfo>(TI);
+    assert(RecordTI != nullptr);
+    if (static_cast<size_t>(*CaseIndex) >= RecordTI->getNumCases()) {
+      return false;
+    }
+    return true;
+  });
 }
 
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
@@ -675,54 +758,58 @@ void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
                                          swift_typeref_t OpaqueTypeRef) {
-  auto Context = ContextRef->nativeContext;
-  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
-  auto TI = Context->getTypeInfo(TR, nullptr);
-  if (TI == nullptr) {
-    std::cout << "<null type info>\n";
-  } else {
-    TI->dump(std::cout);
-    Demangle::Demangler Dem;
-    auto Mangling = mangleNode(TR->getDemangling(Dem));
-    std::string MangledName;
-    if (Mangling.isSuccess()) {
-      MangledName = Mangling.result();
-      std::cout << "Mangled name: " << MANGLING_PREFIX_STR << MangledName
-                << "\n";
+  ContextRef->withContext([&](auto *Context) {
+    auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+    auto TI = Context->getTypeInfo(TR, nullptr);
+    if (TI == nullptr) {
+      std::cout << "<null type info>\n";
     } else {
-      MangledName = "<failed to mangle name>";
-      std::cout << "Failed to get mangled name: Node " << Mangling.error().node
-                << " error " << Mangling.error().code << ":"
-                << Mangling.error().line << "\n";
-    }
+      TI->dump(std::cout);
+      Demangle::Demangler Dem;
+      auto Mangling = mangleNode(TR->getDemangling(Dem), Mangle::ManglingFlavor::Default);
+      std::string MangledName;
+      if (Mangling.isSuccess()) {
+        MangledName = Mangling.result();
+        std::cout << "Mangled name: " << MANGLING_PREFIX_STR << MangledName
+                  << "\n";
+      } else {
+        MangledName = "<failed to mangle name>";
+        std::cout 
+          << "Failed to get mangled name: Node " << Mangling.error().node
+          << " error " << Mangling.error().code << ":"
+          << Mangling.error().line << "\n";
+      }
 
-    char *DemangledName =
-        swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
-    std::cout << "Demangled name: " << DemangledName << "\n";
-    free(DemangledName);
-  }
+      char *DemangledName =
+          swift_reflection_copyNameForTypeRef(ContextRef, OpaqueTypeRef, false);
+      std::cout << "Demangled name: " << DemangledName << "\n";
+      free(DemangledName);
+    }
+  });
 }
 
 void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Metadata) {
-  auto Context = ContextRef->nativeContext;
-  auto TI = Context->getMetadataTypeInfo(Metadata, nullptr);
-  if (TI == nullptr) {
-    std::cout << "<null type info>\n";
-  } else {
-    TI->dump(std::cout);
-  }
+  ContextRef->withContext([&](auto *Context) {
+    auto TI = Context->getMetadataTypeInfo(Metadata, nullptr);
+    if (TI == nullptr) {
+      std::cout << "<null type info>\n";
+    } else {
+      TI->dump(std::cout);
+    }
+  });
 }
 
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object) {
-  auto Context = ContextRef->nativeContext;
-  auto TI = Context->getInstanceTypeInfo(Object, nullptr);
-  if (TI == nullptr) {
-    std::cout << "<null type info>\n";
-  } else {
-    TI->dump(std::cout);
-  }
+  ContextRef->withContext([&](auto *Context) {
+    auto TI = Context->getInstanceTypeInfo(Object, nullptr);
+    if (TI == nullptr) {
+      std::cout << "<null type info>\n";
+    } else {
+      TI->dump(std::cout);
+    }
+  });
 }
 
 size_t swift_reflection_demangle(const char *MangledName, size_t Length,
@@ -742,11 +829,12 @@ const char *swift_reflection_iterateConformanceCache(
                swift_reflection_ptr_t Proto,
                void *ContextPtr),
   void *ContextPtr) {
-  auto Context = ContextRef->nativeContext;
-  auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
-    Call(Type, Proto, ContextPtr);
+  return ContextRef->withContext([&](auto *Context) {
+    auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
+      Call(Type, Proto, ContextPtr);
+    });
+    return returnableCString(ContextRef, Error);
   });
-  return returnableCString(ContextRef, Error);
 }
 
 const char *swift_reflection_iterateMetadataAllocations(
@@ -754,216 +842,237 @@ const char *swift_reflection_iterateMetadataAllocations(
   void (*Call)(swift_metadata_allocation_t Allocation,
                void *ContextPtr),
   void *ContextPtr) {
-  auto Context = ContextRef->nativeContext;
-  auto Error = Context->iterateMetadataAllocations([&](auto Allocation) {
-    swift_metadata_allocation CAllocation;
-    CAllocation.Tag = Allocation.Tag;
-    CAllocation.Ptr = Allocation.Ptr;
-    CAllocation.Size = Allocation.Size;
-    Call(CAllocation, ContextPtr);
+  return ContextRef->withContext([&](auto *Context) {
+    auto Error = Context->iterateMetadataAllocations([&](auto Allocation) {
+      swift_metadata_allocation CAllocation;
+      CAllocation.Tag = Allocation.Tag;
+      CAllocation.Ptr = Allocation.Ptr;
+      CAllocation.Size = Allocation.Size;
+      Call(CAllocation, ContextPtr);
+    });
+    return returnableCString(ContextRef, Error);
   });
-  return returnableCString(ContextRef, Error);
+}
+
+// Convert Allocation to a MetadataAllocation<Runtime>, where <Runtime> is
+// the same as the <Runtime> template of Context.
+//
+// Accepting the Context parameter is a workaround for templated lambda callers
+// not having direct access to <Runtime>. The Swift project doesn't compile
+// with a new enough C++ version to use explicitly-templated lambdas, so we
+// need some other method of extracting <Runtime>.
+template <typename Runtime>
+static MetadataAllocation<Runtime> convertMetadataAllocation(
+    const swift::reflection::ReflectionContext<Runtime> *Context,
+    const swift_metadata_allocation_t &Allocation) {
+  (void)Context;
+
+  MetadataAllocation<Runtime> ConvertedAllocation;
+  ConvertedAllocation.Tag = Allocation.Tag;
+  ConvertedAllocation.Ptr = Allocation.Ptr;
+  ConvertedAllocation.Size = Allocation.Size;
+  return ConvertedAllocation;
 }
 
 swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   SwiftReflectionContextRef ContextRef,
   swift_metadata_allocation_t Allocation) {
-  auto Context = ContextRef->nativeContext;
-  MetadataAllocation<Runtime> NativeAllocation;
-  NativeAllocation.Tag = Allocation.Tag;
-  NativeAllocation.Ptr = Allocation.Ptr;
-  NativeAllocation.Size = Allocation.Size;
-  return Context->allocationMetadataPointer(NativeAllocation);
+  return ContextRef->withContext([&](auto *Context) {
+    auto ConvertedAllocation = convertMetadataAllocation(Context, Allocation);
+    return Context->allocationMetadataPointer(ConvertedAllocation);
+  });
 }
 
 const char *swift_reflection_metadataAllocationTagName(
     SwiftReflectionContextRef ContextRef, swift_metadata_allocation_tag_t Tag) {
-  auto Context = ContextRef->nativeContext;
-  auto Result = Context->metadataAllocationTagName(Tag);
-  return returnableCString(ContextRef, Result);
+  return ContextRef->withContext([&](auto *Context) {
+    auto Result = Context->metadataAllocationTagName(Tag);
+    return returnableCString(ContextRef, Result);
+  });
 }
 
 int swift_reflection_metadataAllocationCacheNode(
     SwiftReflectionContextRef ContextRef,
     swift_metadata_allocation_t Allocation,
     swift_metadata_cache_node_t *OutNode) {
-  auto Context = ContextRef->nativeContext;
-  MetadataAllocation<Runtime> ConvertedAllocation;
-  ConvertedAllocation.Tag = Allocation.Tag;
-  ConvertedAllocation.Ptr = Allocation.Ptr;
-  ConvertedAllocation.Size = Allocation.Size;
+  return ContextRef->withContext([&](auto *Context) {
+    auto ConvertedAllocation = convertMetadataAllocation(Context, Allocation);
 
-  auto Result = Context->metadataAllocationCacheNode(ConvertedAllocation);
-  if (!Result)
-    return 0;
+    auto Result = Context->metadataAllocationCacheNode(ConvertedAllocation);
+    if (!Result)
+      return 0;
 
-  OutNode->Left = Result->Left;
-  OutNode->Right = Result->Right;
-  return 1;
+    OutNode->Left = Result->Left;
+    OutNode->Right = Result->Right;
+    return 1;
+  });
 }
 
 const char *swift_reflection_iterateMetadataAllocationBacktraces(
     SwiftReflectionContextRef ContextRef,
     swift_metadataAllocationBacktraceIterator Call, void *ContextPtr) {
-  auto Context = ContextRef->nativeContext;
-  auto Error = Context->iterateMetadataAllocationBacktraces(
-      [&](auto AllocationPtr, auto Count, auto Ptrs) {
-        // Ptrs is an array of StoredPointer, but the callback expects an array
-        // of swift_reflection_ptr_t. Those may are not always the same type.
-        // (For example, swift_reflection_ptr_t can be 64-bit on 32-bit systems,
-        // while StoredPointer is always the pointer size of the target system.)
-        // Convert the array to an array of swift_reflection_ptr_t.
-        std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
-                                                          &Ptrs[Count]};
-        Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
-      });
-  return returnableCString(ContextRef, Error);
+  return ContextRef->withContext([&](auto *Context) {
+    auto Error = Context->iterateMetadataAllocationBacktraces(
+        [&](auto AllocationPtr, auto Count, auto Ptrs) {
+          // Ptrs is an array of StoredPointer, but the callback expects an
+          // array of swift_reflection_ptr_t. Those may are not always the same
+          // type. (For example, swift_reflection_ptr_t can be 64-bit on 32-bit
+          // systems, while StoredPointer is always the pointer size of the
+          // target system.) Convert the array to an array of
+          // swift_reflection_ptr_t.
+          std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
+                                                            &Ptrs[Count]};
+          Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+        });
+    return returnableCString(ContextRef, Error);
+  });
 }
 
 swift_async_task_slab_return_t
 swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
                                       swift_reflection_ptr_t AsyncTaskPtr) {
-  auto Context = ContextRef->nativeContext;
+  return ContextRef->withContext([&](auto *Context) {
+    // We only care about the AllocatorSlabPtr field. Disable child task and
+    // async backtrace iteration to save wasted work.
+    unsigned ChildTaskLimit = 0;
+    unsigned AsyncBacktraceLimit = 0;
 
-  // We only care about the AllocatorSlabPtr field. Disable child task and async
-  // backtrace iteration to save wasted work.
-  unsigned ChildTaskLimit = 0;
-  unsigned AsyncBacktraceLimit = 0;
+    auto [Error, TaskInfo] = Context->asyncTaskInfo(
+        AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
 
-  llvm::Optional<std::string> Error;
-  NativeReflectionContext::AsyncTaskInfo TaskInfo;
-  std::tie(Error, TaskInfo) =
-      Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
-
-  swift_async_task_slab_return_t Result = {};
-  if (Error) {
-    Result.Error = returnableCString(ContextRef, Error);
-  }
-  Result.SlabPtr = TaskInfo.AllocatorSlabPtr;
-  return Result;
+    swift_async_task_slab_return_t Result = {};
+    if (Error) {
+      Result.Error = returnableCString(ContextRef, Error);
+    }
+    Result.SlabPtr = TaskInfo.AllocatorSlabPtr;
+    return Result;
+  });
 }
 
 swift_async_task_slab_allocations_return_t
 swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
                                           swift_reflection_ptr_t SlabPtr) {
-  auto Context = ContextRef->nativeContext;
-  llvm::Optional<std::string> Error;
-  NativeReflectionContext::AsyncTaskSlabInfo Info;
-  std::tie(Error, Info) = Context->asyncTaskSlabAllocations(SlabPtr);
+  return ContextRef->withContext([&](auto *Context) {
+    auto [Error, Info] = Context->asyncTaskSlabAllocations(SlabPtr);
 
-  swift_async_task_slab_allocations_return_t Result = {};
-  if (Result.Error) {
-    Result.Error = returnableCString(ContextRef, Error);
+    swift_async_task_slab_allocations_return_t Result = {};
+    if (Result.Error) {
+      Result.Error = returnableCString(ContextRef, Error);
+      return Result;
+    }
+
+    Result.NextSlab = Info.NextSlab;
+    Result.SlabSize = Info.SlabSize;
+
+    auto *Chunks = ContextRef->allocateTemporaryObject<
+        std::vector<swift_async_task_allocation_chunk_t>>();
+    Chunks->reserve(Info.Chunks.size());
+    for (auto &Chunk : Info.Chunks) {
+      swift_async_task_allocation_chunk_t ConvertedChunk;
+      ConvertedChunk.Start = Chunk.Start;
+      ConvertedChunk.Length = Chunk.Length;
+
+      // This pedantry is required to properly template over *Context.
+      ConvertedChunk.Kind = convertAllocationChunkKind<
+          typename std::pointer_traits<decltype(Context)>::element_type>(
+          Chunk.Kind);
+
+      Chunks->push_back(ConvertedChunk);
+    }
+
+    Result.ChunkCount = Chunks->size();
+    Result.Chunks = Chunks->data();
+
     return Result;
-  }
-
-  Result.NextSlab = Info.NextSlab;
-  Result.SlabSize = Info.SlabSize;
-
-  auto *Chunks = ContextRef->allocateTemporaryObject<
-      std::vector<swift_async_task_allocation_chunk_t>>();
-  Chunks->reserve(Info.Chunks.size());
-  for (auto &Chunk : Info.Chunks) {
-    swift_async_task_allocation_chunk_t ConvertedChunk;
-    ConvertedChunk.Start = Chunk.Start;
-    ConvertedChunk.Length = Chunk.Length;
-    ConvertedChunk.Kind = convertAllocationChunkKind(Chunk.Kind);
-    Chunks->push_back(ConvertedChunk);
-  }
-
-  Result.ChunkCount = Chunks->size();
-  Result.Chunks = Chunks->data();
-
-  return Result;
+  });
 }
 
 swift_async_task_info_t
 swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
                                swift_reflection_ptr_t AsyncTaskPtr) {
-  auto Context = ContextRef->nativeContext;
+  return ContextRef->withContext([&](auto *Context) {
+    // Limit the child task and async backtrace iteration to semi-reasonable
+    // numbers to avoid doing excessive work on bad data.
+    unsigned ChildTaskLimit = 1000000;
+    unsigned AsyncBacktraceLimit = 1000;
 
-  // Limit the child task and async backtrace iteration to semi-reasonable
-  // numbers to avoid doing excessive work on bad data.
-  unsigned ChildTaskLimit = 1000000;
-  unsigned AsyncBacktraceLimit = 1000;
+    auto [Error, TaskInfo] = Context->asyncTaskInfo(
+        AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
 
-  llvm::Optional<std::string> Error;
-  NativeReflectionContext::AsyncTaskInfo TaskInfo;
-  std::tie(Error, TaskInfo) =
-      Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
+    swift_async_task_info_t Result = {};
+    if (Error) {
+      Result.Error = returnableCString(ContextRef, Error);
+      return Result;
+    }
 
-  swift_async_task_info_t Result = {};
-  if (Error) {
-    Result.Error = returnableCString(ContextRef, Error);
+    Result.Kind = TaskInfo.Kind;
+    Result.EnqueuePriority = TaskInfo.EnqueuePriority;
+    Result.IsChildTask = TaskInfo.IsChildTask;
+    Result.IsFuture = TaskInfo.IsFuture;
+    Result.IsGroupChildTask = TaskInfo.IsGroupChildTask;
+    Result.IsAsyncLetTask = TaskInfo.IsAsyncLetTask;
+    Result.IsSynchronousStartTask = TaskInfo.IsSynchronousStartTask;
+
+    Result.MaxPriority = TaskInfo.MaxPriority;
+    Result.IsCancelled = TaskInfo.IsCancelled;
+    Result.IsStatusRecordLocked = TaskInfo.IsStatusRecordLocked;
+    Result.IsEscalated = TaskInfo.IsEscalated;
+    Result.HasIsRunning = TaskInfo.HasIsRunning;
+    Result.IsRunning = TaskInfo.IsRunning;
+    Result.IsEnqueued = TaskInfo.IsEnqueued;
+    Result.Id = TaskInfo.Id;
+
+    Result.HasThreadPort = TaskInfo.HasThreadPort;
+    Result.ThreadPort = TaskInfo.ThreadPort;
+
+    Result.RunJob = TaskInfo.RunJob;
+    Result.AllocatorSlabPtr = TaskInfo.AllocatorSlabPtr;
+
+    auto *ChildTasks =
+        ContextRef
+            ->allocateTemporaryObject<std::vector<swift_reflection_ptr_t>>();
+    std::copy(TaskInfo.ChildTasks.begin(), TaskInfo.ChildTasks.end(),
+              std::back_inserter(*ChildTasks));
+    Result.ChildTaskCount = ChildTasks->size();
+    Result.ChildTasks = ChildTasks->data();
+
+    auto *AsyncBacktraceFrames = ContextRef->allocateSubsequentTemporaryObject<
+        std::vector<swift_reflection_ptr_t>>();
+    std::copy(TaskInfo.AsyncBacktraceFrames.begin(),
+              TaskInfo.AsyncBacktraceFrames.end(),
+              std::back_inserter(*AsyncBacktraceFrames));
+    Result.AsyncBacktraceFramesCount = AsyncBacktraceFrames->size();
+    Result.AsyncBacktraceFrames = AsyncBacktraceFrames->data();
+
     return Result;
-  }
-
-  Result.Kind = TaskInfo.Kind;
-  Result.EnqueuePriority = TaskInfo.EnqueuePriority;
-  Result.IsChildTask = TaskInfo.IsChildTask;
-  Result.IsFuture = TaskInfo.IsFuture;
-  Result.IsGroupChildTask = TaskInfo.IsGroupChildTask;
-  Result.IsAsyncLetTask = TaskInfo.IsAsyncLetTask;
-
-  Result.MaxPriority = TaskInfo.MaxPriority;
-  Result.IsCancelled = TaskInfo.IsCancelled;
-  Result.IsStatusRecordLocked = TaskInfo.IsStatusRecordLocked;
-  Result.IsEscalated = TaskInfo.IsEscalated;
-  Result.HasIsRunning = TaskInfo.HasIsRunning;
-  Result.IsRunning = TaskInfo.IsRunning;
-  Result.IsEnqueued = TaskInfo.IsEnqueued;
-  Result.Id = TaskInfo.Id;
-
-  Result.HasThreadPort = TaskInfo.HasThreadPort;
-  Result.ThreadPort = TaskInfo.ThreadPort;
-
-  Result.RunJob = TaskInfo.RunJob;
-  Result.AllocatorSlabPtr = TaskInfo.AllocatorSlabPtr;
-
-  auto *ChildTasks =
-      ContextRef
-          ->allocateTemporaryObject<std::vector<swift_reflection_ptr_t>>();
-  std::copy(TaskInfo.ChildTasks.begin(), TaskInfo.ChildTasks.end(),
-            std::back_inserter(*ChildTasks));
-  Result.ChildTaskCount = ChildTasks->size();
-  Result.ChildTasks = ChildTasks->data();
-
-  auto *AsyncBacktraceFrames = ContextRef->allocateSubsequentTemporaryObject<
-      std::vector<swift_reflection_ptr_t>>();
-  std::copy(TaskInfo.AsyncBacktraceFrames.begin(),
-            TaskInfo.AsyncBacktraceFrames.end(),
-            std::back_inserter(*AsyncBacktraceFrames));
-  Result.AsyncBacktraceFramesCount = AsyncBacktraceFrames->size();
-  Result.AsyncBacktraceFrames = AsyncBacktraceFrames->data();
-
-  return Result;
+  });
 }
 
 swift_actor_info_t
 swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
                            swift_reflection_ptr_t ActorPtr) {
-  auto Context = ContextRef->nativeContext;
-  llvm::Optional<std::string> Error;
-  NativeReflectionContext::ActorInfo ActorInfo;
-  std::tie(Error, ActorInfo) = Context->actorInfo(ActorPtr);
+  return ContextRef->withContext([&](auto *Context) {
+    auto [Error, ActorInfo] = Context->actorInfo(ActorPtr);
 
-  swift_actor_info_t Result = {};
-  Result.Error = returnableCString(ContextRef, Error);
-  Result.State = ActorInfo.State;
-  Result.IsDistributedRemote = ActorInfo.IsDistributedRemote;
-  Result.IsPriorityEscalated = ActorInfo.IsPriorityEscalated;
-  Result.MaxPriority = ActorInfo.MaxPriority;
-  Result.FirstJob = ActorInfo.FirstJob;
+    swift_actor_info_t Result = {};
+    Result.Error = returnableCString(ContextRef, Error);
+    Result.State = ActorInfo.State;
+    Result.IsDistributedRemote = ActorInfo.IsDistributedRemote;
+    Result.IsPriorityEscalated = ActorInfo.IsPriorityEscalated;
+    Result.MaxPriority = ActorInfo.MaxPriority;
+    Result.FirstJob = ActorInfo.FirstJob;
 
-  Result.HasThreadPort = ActorInfo.HasThreadPort;
-  Result.ThreadPort = ActorInfo.ThreadPort;
+    Result.HasThreadPort = ActorInfo.HasThreadPort;
+    Result.ThreadPort = ActorInfo.ThreadPort;
 
-  return Result;
+    return Result;
+  });
 }
 
 swift_reflection_ptr_t
 swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
                          swift_reflection_ptr_t JobPtr) {
-  auto Context = ContextRef->nativeContext;
-  return Context->nextJob(JobPtr);
+  return ContextRef->withContext([&](auto *Context) {
+    return Context->nextJob(JobPtr);
+  });
 }

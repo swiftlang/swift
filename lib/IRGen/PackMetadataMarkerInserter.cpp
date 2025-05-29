@@ -94,7 +94,9 @@ Inserter::shouldInsertMarkersForInstruction(SILInstruction *inst) {
     LLVM_FALLTHROUGH;
   }
   default:
-    return inst->mayRequirePackMetadata() ? FindResult::Some : FindResult::None;
+    return inst->mayRequirePackMetadata(*inst->getFunction())
+               ? FindResult::Some
+               : FindResult::None;
   }
 }
 

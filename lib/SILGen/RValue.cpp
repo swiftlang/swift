@@ -21,6 +21,7 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -33,12 +34,6 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 //                              Helper Routines
 //===----------------------------------------------------------------------===//
-
-static unsigned getTupleSize(CanType t) {
-  if (auto tt = dyn_cast<TupleType>(t))
-    return tt->getNumElements();
-  return 1;
-}
 
 unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
   if (pattern.isTuple()) {
@@ -406,12 +401,8 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
 // This is a no-op in non-assert builds.
 #ifndef NDEBUG
   ValueOwnershipKind result = OwnershipKind::None;
-  llvm::Optional<bool> sameHaveCleanups;
+  std::optional<bool> sameHaveCleanups;
   for (ManagedValue v : values) {
-    assert((!SGF || !v.getType().isLoadable(SGF.get()->F) ||
-            v.getType().isObject()) &&
-           "All loadable values in an RValue must be an object");
-
     ValueOwnershipKind kind = v.getOwnershipKind();
     if (kind == OwnershipKind::None)
       continue;
@@ -486,7 +477,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
 }
 
 RValue::RValue(CanType type)
-  : type(type), elementsToBeAdded(getTupleSize(type)) {
+  : type(type), elementsToBeAdded(getRValueSize(type)) {
 }
 
 RValue::RValue(AbstractionPattern pattern, CanType type)
@@ -496,12 +487,14 @@ RValue::RValue(AbstractionPattern pattern, CanType type)
 void RValue::addElement(RValue &&element) & {
   assert(!element.isUsed() && "adding consumed value to r-value");
   assert(!element.isInSpecialState() && "adding special value to r-value");
-  assert(!isComplete() && "rvalue already complete");
-  assert(!isInSpecialState() && "cannot add elements to a special r-value");
-  --elementsToBeAdded;
-  values.insert(values.end(),
-                element.values.begin(), element.values.end());
-  element.makeUsed();
+  assert(elementsToBeAdded >= element.values.size() && "rvalue too full");
+  if (!element.values.empty()) {
+    assert(!isInSpecialState() && "cannot add elements to a special r-value");
+    elementsToBeAdded -= element.values.size();
+    values.insert(values.end(),
+                  element.values.begin(), element.values.end());
+    element.makeUsed();
+  }
 
   assert(!isComplete() || values.size() == getRValueSize(type));
   // Call into the verifier helper directly without an SGF since we know that
@@ -558,36 +551,44 @@ void RValue::copyInto(SILGenFunction &SGF, SILLocation loc,
   copyOrInitValuesInto<ImplodeKind::Copy>(I, elts, type, loc, SGF);
 }
 
-static void assignRecursive(SILGenFunction &SGF, SILLocation loc,
-                            CanType type, ArrayRef<ManagedValue> &srcValues,
-                            SILValue destAddr) {
-  // Recurse into tuples.
-  auto srcTupleType = dyn_cast<TupleType>(type);
-  if (srcTupleType && !srcTupleType.containsPackExpansionType()) {
-    assert(destAddr->getType().castTo<TupleType>()->getNumElements()
-             == srcTupleType->getNumElements());
-    for (auto eltIndex : indices(srcTupleType.getElementTypes())) {
-      auto eltDestAddr = SGF.B.createTupleElementAddr(loc, destAddr, eltIndex);
-      assignRecursive(SGF, loc, srcTupleType.getElementType(eltIndex),
-                      srcValues, eltDestAddr);
-    }
-    return;
-  }
-
-  // Otherwise, pull the front value off the list.
-  auto srcValue = srcValues.front();
-  srcValues = srcValues.slice(1);
-
-  srcValue.assignInto(SGF, loc, destAddr);
-}
-
 void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         SILValue destAddr) && {
   assert(isComplete() && "rvalue is not complete");
   assert(isPlusOneOrTrivial(SGF) && "Can not assign borrowed RValues");
-  ArrayRef<ManagedValue> srcValues = values;
-  assignRecursive(SGF, loc, type, srcValues, destAddr);
-  assert(srcValues.empty() && "didn't claim all elements!");
+  ArrayRef<ManagedValue> srcMvValues = values;
+
+  SWIFT_DEFER { assert(srcMvValues.empty() && "didn't claim all elements!"); };
+
+  // If we do not have a tuple, just bail early.
+  auto srcTupleType = dyn_cast<TupleType>(type);
+  if (!srcTupleType || srcTupleType.containsPackExpansionType()) {
+    // Otherwise, pull the front value off the list.
+    auto srcValue = srcMvValues.front();
+    srcMvValues = srcMvValues.slice(1);
+    srcValue.assignInto(SGF, loc, destAddr);
+    return;
+  }
+
+  assert(destAddr->getType().castTo<TupleType>()->getNumElements() ==
+         srcTupleType->getNumElements());
+
+  // If there are sourced managed values, initialize the address with a tuple.
+  if (srcMvValues.size()) {
+    if (SGF.useLoweredAddresses()) {
+      // Without opaque values, a tuple_addr_constructor is used to initialize
+      // the memory all at once.
+      SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
+                                       IsNotInitialization);
+    } else {
+      // With opaque values, a tuple can always be formed and assigned to the
+      // memory.
+      auto tupleTy = destAddr->getType().getObjectType();
+      auto tuple = SGF.B.createTuple(loc, tupleTy, srcMvValues);
+      SGF.B.createAssign(loc, tuple.forward(SGF), destAddr,
+                         AssignOwnershipQualifier::Unknown);
+    }
+  }
+  srcMvValues = ArrayRef<ManagedValue>();
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
@@ -664,7 +665,7 @@ RValue RValue::extractElement(unsigned n) && {
     assert(n == 0);
     unsigned to = getRValueSize(type);
     assert(to == values.size());
-    RValue element(nullptr, llvm::makeArrayRef(values).slice(0, to), type);
+    RValue element(nullptr, llvm::ArrayRef(values).slice(0, to), type);
     makeUsed();
     return element;
   }
@@ -679,7 +680,8 @@ RValue RValue::extractElement(unsigned n) && {
   unsigned from = range.first, to = range.second;
 
   CanType eltType = tupleTy.getElementType(n);
-  RValue element(nullptr, llvm::makeArrayRef(values).slice(from, to - from), eltType);
+  RValue element(nullptr, llvm::ArrayRef(values).slice(from, to - from),
+                 eltType);
   makeUsed();
   return element;
 }
@@ -693,7 +695,7 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
     assert(to == values.size());
     // We use push_back instead of emplace_back since emplace_back can not
     // invoke the private constructor we are attempting to invoke.
-    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(0, to), type});
+    elements.push_back({nullptr, llvm::ArrayRef(values).slice(0, to), type});
     makeUsed();
     return;
   }
@@ -709,8 +711,8 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
     unsigned to = from + getRValueSize(eltType);
     // We use push_back instead of emplace_back since emplace_back can not
     // invoke the private constructor we are attempting to invoke.
-    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(from, to - from),
-                        eltType});
+    elements.push_back(
+        {nullptr, llvm::ArrayRef(values).slice(from, to - from), eltType});
     from = to;
   }
   assert(from == values.size());

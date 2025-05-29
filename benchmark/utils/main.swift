@@ -28,6 +28,7 @@ import ArrayOfRef
 import ArrayRemoveAll
 import ArraySetElement
 import ArraySubscript
+import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
@@ -52,10 +53,14 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
+import CountAlgo
 import CreateObjects
-import CxxSetToCollection
-import CxxStringConversion
-import CxxVectorSum
+// rdar://128520766
+// import CxxSetToCollection
+// import CxxSpanTests
+// import CxxStringConversion
+// rdar://128520766
+// import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -89,6 +94,7 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import FindStringNaive
+import FlattenDistanceFromTo
 import FlattenList
 import FloatingPointConversion
 import FloatingPointParsing
@@ -157,6 +163,7 @@ import RandomShuffle
 import RandomTree
 import RandomValues
 import RangeAssignment
+import RangeContains
 import RangeIteration
 import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
@@ -221,6 +228,7 @@ register(ArrayOfRef.benchmarks)
 register(ArrayRemoveAll.benchmarks)
 register(ArraySetElement.benchmarks)
 register(ArraySubscript.benchmarks)
+register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
 register(BitCount.benchmarks)
@@ -244,11 +252,15 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
-register(CxxSetToCollection.benchmarks)
-register(CxxStringConversion.benchmarks)
-register(CxxVectorSum.benchmarks)
+// rdar://128520766
+// register(CxxSetToCollection.benchmarks)
+// register(CxxSpanTests.benchmarks)
+// register(CxxStringConversion.benchmarks)
+// rdar://128520766
+// register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
@@ -282,6 +294,7 @@ register(Exclusivity.benchmarks)
 register(ExistentialPerformance.benchmarks)
 register(Fibonacci.benchmarks)
 register(FindStringNaive.benchmarks)
+register(FlattenDistanceFromTo.benchmarks)
 register(FlattenList.benchmarks)
 register(FloatingPointConversion.benchmarks)
 register(FloatingPointParsing.benchmarks)
@@ -350,6 +363,7 @@ register(RandomShuffle.benchmarks)
 register(RandomTree.benchmarks)
 register(RandomValues.benchmarks)
 register(RangeAssignment.benchmarks)
+register(RangeContains.benchmarks)
 register(RangeIteration.benchmarks)
 register(RangeOverlaps.benchmarks)
 register(RangeReplaceableCollectionPlusDefault.benchmarks)

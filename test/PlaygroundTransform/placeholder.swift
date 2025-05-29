@@ -1,9 +1,18 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-build-swift -Xfrontend -playground -Xfrontend -disable-playground-transform -o %t/main %t/main.swift
-// RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
-// RUN: %{python} %S/../Inputs/not.py "%target-run %t/main --crash" 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
+
+// RUN: %target-build-swift -swift-version 5 -Xfrontend -playground -Xfrontend -disable-playground-transform -o %t/main5 %t/main.swift
+// RUN: %target-build-swift -swift-version 6 -Xfrontend -playground -Xfrontend -disable-playground-transform -o %t/main6 %t/main.swift
+
+// RUN: %target-codesign %t/main5
+// RUN: %target-codesign %t/main6
+
+// RUN: %target-run %t/main5 | %FileCheck %s
+// RUN: %target-run %t/main6 | %FileCheck %s
+
+// RUN: %{python} %S/../Inputs/not.py "%target-run %t/main5 --crash" 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
+// RUN: %{python} %S/../Inputs/not.py "%target-run %t/main6 --crash" 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
+
 // REQUIRES: executable_test
 
 // The runtime error format changed after the 5.3 release.

@@ -20,10 +20,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include <algorithm>
 #include <vector>
 #include "PropertyMap.h"
@@ -123,9 +125,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     ArrayRef<Term> substitutions,
     ArrayRef<unsigned> conformsToRules,
     ArrayRef<const ProtocolDecl *> conformsTo) {
-  assert(requirementKind == RequirementKind::SameType ||
+  ASSERT(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
-  assert(conformsTo.size() == conformsToRules.size());
+  ASSERT(conformsTo.size() == conformsToRules.size());
 
   for (unsigned i : indices(conformsTo)) {
     auto *proto = conformsTo[i];
@@ -139,10 +141,6 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     if (!checkRulePairOnce(concreteRuleID, conformanceRuleID))
       continue;
 
-    // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
-    // or pass the correct one down in here.
-    auto *module = proto->getParentModule();
-
     // For conformance to 'Sendable', allow synthesis of a missing conformance
     // if the requirement is a concrete type requirement, that is, if we're
     // looking at a signature of the form 'T == Foo, T : Sendable'.
@@ -153,9 +151,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = (requirementKind == RequirementKind::SameType);
 
-    auto conformance = module->lookupConformance(concreteType,
-                                                 const_cast<ProtocolDecl *>(proto),
-                                                 allowMissing);
+    auto conformance = lookupConformance(concreteType,
+                                         const_cast<ProtocolDecl *>(proto),
+                                         allowMissing);
     if (!allowMissing &&
         proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
         conformance.hasUnavailableConformance()) {
@@ -226,7 +224,7 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   auto substitutions = concreteConformanceSymbol.getSubstitutions();
 
   auto *proto = assocType->getProtocol();
-  assert(proto == concreteConformanceSymbol.getProtocol());
+  ASSERT(proto == concreteConformanceSymbol.getProtocol());
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ " << "Looking up type witness for "
@@ -251,12 +249,13 @@ void PropertyMap::concretizeTypeWitnessInConformance(
   } else if (conformance.isAbstract()) {
     auto archetype = concreteType->getAs<OpaqueTypeArchetypeType>();
     if (archetype == nullptr) {
-      llvm::errs() << "Should only have an abstract conformance with an "
-                   << "opaque archetype type\n";
-      llvm::errs() << "Symbol: " << concreteConformanceSymbol << "\n";
-      llvm::errs() << "Term: " << key << "\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Should only have an abstract conformance with an opaque "
+            << "archetype type\n";
+        out << "Symbol: " << concreteConformanceSymbol << "\n";
+        out << "Term: " << key << "\n";
+        dump(out);
+      });
     }
 
     typeWitness = archetype->getNestedType(assocType)->getCanonicalType();
@@ -283,7 +282,7 @@ void PropertyMap::concretizeTypeWitnessInConformance(
       key, requirementKind, concreteType, typeWitness, subjectType,
       substitutions, path);
 
-  assert(!path.empty());
+  ASSERT(!path.empty());
   (void) System.addRule(constraintType, subjectType, &path);
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ Induced rule " << constraintType
@@ -410,7 +409,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
       &substPath);
   if (differenceID) {
     const auto &difference = System.getTypeDifference(*differenceID);
-    assert(difference.LHS == typeWitnessSymbol);
+    ASSERT(difference.LHS == typeWitnessSymbol);
     typeWitnessSymbol = difference.RHS;
     substPath.invert();
   }
@@ -576,6 +575,7 @@ void PropertyMap::inferConditionalRequirements(
 
   // FIXME: Do we need to diagnose these errors?
   SmallVector<RequirementError, 2> errors;
+  SmallVector<InverseRequirement, 2> ignoredInverses;
 
   // First, desugar all conditional requirements.
   for (auto req : conditionalRequirements) {
@@ -585,7 +585,8 @@ void PropertyMap::inferConditionalRequirements(
       llvm::dbgs() << "\n";
     }
 
-    desugarRequirement(req, SourceLoc(), desugaredRequirements, errors);
+    desugarRequirement(req, SourceLoc(), desugaredRequirements,
+                       ignoredInverses, errors);
   }
 
   // Now, convert desugared conditional requirements to rules.
@@ -596,8 +597,7 @@ void PropertyMap::inferConditionalRequirements(
   builder.initWithConditionalRequirements(desugaredRequirements,
                                           substitutions);
 
-  assert(builder.PermanentRules.empty());
-  assert(builder.WrittenRequirements.empty());
+  ASSERT(builder.PermanentRules.empty());
 
   System.addRules(std::move(builder.ImportedRules),
                   std::move(builder.PermanentRules),

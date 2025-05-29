@@ -109,7 +109,7 @@ public func publicFuncInlinable() {
 }
 
 //--- Lib.swift
-import Dep // expected-error {{module 'Dep' is in package 'myPkg' but was built from interface; modules of the same package can only be loaded if built from source}}
+import Dep // expected-error {{module 'Dep' is in package 'myPkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface}}
 
 public func libFunc() {
   publicFuncInlinable()

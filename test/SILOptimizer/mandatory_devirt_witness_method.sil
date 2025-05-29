@@ -1,0 +1,59 @@
+// RUN: %target-sil-opt -module-name=test -enable-sil-verify-all %s -mandatory-performance-optimizations -performance-diagnostics | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import SwiftShims
+import Builtin
+
+public protocol P {
+  func foo()
+}
+
+private struct S : P {
+  @_hasStorage var x: Int
+  func foo()
+}
+
+// Linkage should be set to public
+// CHECK-LABEL: sil [perf_constraint] [ossa] @S_foo : $@convention(method) (S) -> () {
+sil private [ossa] @S_foo : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil private [transparent] [thunk] [ossa] @S_foo_thunk : $@convention(witness_method: P) (@in_guaranteed S) -> () {
+bb0(%0 : $*S):
+  %1 = load [trivial] %0 : $*S
+  %2 = function_ref @S_foo : $@convention(method) (S) -> ()
+  %3 = apply %2(%1) : $@convention(method) (S) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil shared [serialized] [perf_constraint] [ossa] @$s8call_foo4test1S{{.*}}_Tgq5 : $@convention(thin) (S) -> () {
+// CHECK:         [[F:%.*]] = function_ref @S_foo : $@convention(method) (S) -> ()
+// CHECK:         = apply [[F]](%0) : $@convention(method) (S) -> ()
+// CHECK:       // end sil function '$s8call_foo4test1S{{.*}}_Tgq5'
+sil [ossa] [serialized] @call_foo : $@convention(thin) <T where T : P> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = witness_method $T, #P.foo : <Self where Self : P> (Self) -> () -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%0) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil [no_locks] [ossa] [serialized] @main : $@convention(thin) (@in_guaranteed S) -> () {
+bb0(%0 : $*S):
+  %5 = function_ref @call_foo : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %6 = apply %5<S>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil_witness_table private S: P module test {
+  method #P.foo: <Self where Self : P> (Self) -> () -> () : @S_foo_thunk	
+}
+
+

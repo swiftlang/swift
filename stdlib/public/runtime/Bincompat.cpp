@@ -20,6 +20,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Threading/Once.h"
 #include "swift/shims/RuntimeShims.h"
+#include "swift/shims/Target.h"
 #include <stdint.h>
 
 // If this is an Apple OS, use the Apple binary compatibility rules
@@ -66,6 +67,11 @@ static enum sdk_test isAppAtLeastFall2023() {
     const dyld_build_version_t fall_2023_os_versions = {0xffffffff, 0x007e70901};
     return isAppAtLeast(fall_2023_os_versions);
 }
+
+static enum sdk_test isAppAtLeastFall2024() {
+    const dyld_build_version_t fall_2024_os_versions = {0xffffffff, 0x007e80000};
+    return isAppAtLeast(fall_2024_os_versions);
+}
 #endif
 
 static _SwiftStdlibVersion binCompatVersionOverride = { 0 };
@@ -73,6 +79,8 @@ static _SwiftStdlibVersion binCompatVersionOverride = { 0 };
 static _SwiftStdlibVersion const knownVersions[] = {
   { /* 5.6.0 */0x050600 },
   { /* 5.7.0 */0x050700 },
+  // Note: If you add a new entry here, also add it to versionMap in
+  // _swift_stdlib_isExecutableLinkedOnOrAfter below.
   { 0 },
 };
 
@@ -110,9 +118,27 @@ extern "C" __swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
   }
 
 #if BINARY_COMPATIBILITY_APPLE
-  // Return true for all known versions for now -- we can't map them to OS
-  // versions at this time.
-  return isKnownBinCompatVersion(version);
+  typedef struct {
+    _SwiftStdlibVersion stdlib;
+    dyld_build_version_t dyld;
+  } stdlib_version_map;
+
+  const dyld_build_version_t spring_2022_os_versions = {0xffffffff, 0x007e60301};
+  const dyld_build_version_t fall_2022_os_versions = {0xffffffff, 0x007e60901};
+
+  static stdlib_version_map const versionMap[] = {
+    { { /* 5.6.0 */0x050600 }, spring_2022_os_versions },
+    { { /* 5.7.0 */0x050700 }, fall_2022_os_versions },
+    // Note: if you add a new entry here, also add it to knownVersions above.
+    { { 0 }, { 0, 0 } },
+  };
+
+  for (uint32_t i = 0; versionMap[i].stdlib._value != 0; ++i) {
+    if (versionMap[i].stdlib._value == version._value) {
+      return isAppAtLeast(versionMap[i].dyld) == newApp;
+    }
+  }
+  return false;
 
 #else // !BINARY_COMPATIBILITY_APPLE
   return isKnownBinCompatVersion(version);
@@ -219,6 +245,59 @@ bool useLegacyObjCBoxingInCasting() {
 bool useLegacySwiftValueUnboxingInCasting() {
 #if BINARY_COMPATIBILITY_APPLE
   switch (isAppAtLeastFall2023()) {
+  case oldOS: return true; // Legacy behavior on old OS
+  case oldApp: return true; // Legacy behavior for old apps
+  case newApp: return false; // New behavior for new apps
+  }
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
+// Controls how ObjC -hashValue and -isEqual are handled
+// by Swift objects.
+// There are two basic semantics:
+// * pointer: -hashValue returns pointer, -isEqual: tests pointer equality
+// * proxy: -hashValue calls on Hashable conformance, -isEqual: calls Equatable conformance
+//
+// Legacy handling:
+// * Swift struct/enum values that implement Hashable: proxy -hashValue and -isEqual:
+// * Swift struct/enum values that implement Equatable but not Hashable: pointer semantics
+// * Swift class values regardless of hashable/Equatable support: pointer semantics
+//
+// New behavior:
+// * Swift struct/enum/class values that implement Hashable: proxy -hashValue and -isEqual:
+// * Swift struct/enum/class values that implement Equatable but not Hashable: proxy -isEqual:, constant -hashValue
+// * All other cases: pointer semantics
+//
+bool useLegacySwiftObjCHashing() {
+#if BINARY_COMPATIBILITY_APPLE
+  switch (isAppAtLeastFall2024()) {
+  case oldOS: return true; // Legacy behavior on old OS
+  case oldApp: return true; // Legacy behavior for old apps
+  case newApp: return false; // New behavior for new apps
+  }
+#else
+  return false; // Always use the new behavior on non-Apple OSes
+#endif
+}
+
+// Controls legacy mode for the 'swift_task_isCurrentExecutorImpl' runtime function.
+//
+// In "legacy" / "no crash" mode:
+// * The `swift_task_isCurrentExecutorImpl` cannot crash
+// * This means cases where no "current" executor is present cannot be diagnosed correctly
+//    * The runtime can NOT use 'SerialExecutor/checkIsolated'
+//    * The runtime can NOT use 'dispatch_precondition' which is able to handle some dispatch and main actor edge cases
+//
+// New behavior in "swift6" "crash" mode:
+// * The 'swift_task_isCurrentExecutorImpl' will CRASH rather than return 'false'
+// * This allows the method to invoke 'SerialExecutor/checkIsolated'
+//   * Which is allowed to call 'dispatch_precondition' and handle "on dispatch queue but not on Swift executor" cases
+//
+bool swift_bincompat_useLegacyNonCrashingExecutorChecks() {
+#if BINARY_COMPATIBILITY_APPLE
+  switch (isAppAtLeastFall2024()) {
   case oldOS: return true; // Legacy behavior on old OS
   case oldApp: return true; // Legacy behavior for old apps
   case newApp: return false; // New behavior for new apps

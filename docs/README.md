@@ -131,15 +131,16 @@ documentation, please create a thread on the Swift forums under the
 - SIL and SIL Optimizations:
   - <doc:SILFunctionConventions>:
   - <doc:SILMemoryAccess>:
-  - <doc:SILProgrammersManual>:
-    Provides an overview of the implementation of SIL in the compiler.
   - <doc:OptimizerDesign>:
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
-    operations on [currency](/docs/Lexicon.md#currency-type) data types and 
+    operations on [currency](/docs/Lexicon.md#currency-type) data types and
     optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
+  - [HowToUpdateDebugInfo.md](/docs/HowToUpdateDebugInfo.md): A guide for SIL
+    optimization pass authors for how to properly update debug info in SIL
+    program transformations.
 - Runtime specifics:
   - [Backtracing.rst](/docs/Backtracing.rst):
     Describes Swift's backtracing and crash catching support.
@@ -178,7 +179,7 @@ documentation, please create a thread on the Swift forums under the
   Documents how Swift interoperates with ObjC code and the ObjC runtime.
 - [LibraryEvolution.rst](/docs/LibraryEvolution.rst):
   Specifies what changes can be made without breaking binary compatibility.
-- [SIL.rst](/docs/SIL.rst):
+- [SIL.md](/docs/SIL/SIL.md):
   Documents the Swift Intermediate Language (SIL).
   - <doc:TransparentAttr>:
     Documents the semantics of the `@_transparent` attribute.
@@ -194,7 +195,7 @@ documentation, please create a thread on the Swift forums under the
 
 ### ABI
 
-- [CallConvSummary.rst](/docs/ABI/CallConvSummary.rst):
+- [CallingConventionSummary.rst](/docs/ABI/CallingConventionSummary.rst):
 	A concise summary of the calling conventions used for C/C++, Objective-C
 	and Swift on Apple platforms.  Contains references to source documents,
 	where further detail is required.
@@ -271,11 +272,11 @@ documentation, please create a thread on the Swift forums under the
 ### Proposals
 
 Old proposals are present in the [/docs/proposals](/docs/proposals) directory.
-More recent proposals are located in the [apple/swift-evolution][] repository.
+More recent proposals are located in the [swiftlang/swift-evolution][] repository.
 You can see the status of different proposals at
 <https://apple.github.io/swift-evolution/>.
 
-[apple/swift-evolution]: https://github.com/apple/swift-evolution
+[swiftlang/swift-evolution]: https://github.com/swiftlang/swift-evolution
 
 ### Surveys
 
@@ -337,11 +338,11 @@ provide greater clarity to contributors wanting to add new documentation.
   It might also be valuable to introduce the tips in context, and have the
   explanation link to all the different tips.
 - <doc:Diagnostics>:
-  Describes how to write diagnostic messages and associated educational notes.
+  Describes how to write diagnostic messages and associated documentation.
   TODO: Consider splitting into how-tos and recommended practices.
   For example, we could have a how-to guide on adding a new diagnostic,
   and have a recommended practices page which explains the writing style
-  for diagnostics and educational notes.
+  for diagnostics and diagnostic groups.
 - <doc:HowSwiftImportsCAPIs>:
   Contains a thorough description of the mapping between C/ObjC entities and
   Swift entities.
@@ -357,8 +358,6 @@ provide greater clarity to contributors wanting to add new documentation.
 - <doc:Testing>:
   TODO: Consider splitting into a how-to guide on writing a new test case
   and an explanation for how the compiler is tested.
-- <doc:SwiftIndent>:
-  TODO: Unclear if this is intended to be an explanation or a reference guide.
 - <doc:Random>: Stub.
 
 ### Archive

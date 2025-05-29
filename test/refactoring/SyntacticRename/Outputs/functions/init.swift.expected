@@ -54,7 +54,7 @@ let _ = "Some text \(/*param-label:call*/aFunc(a:1)) around"
 
 class SomeClass {
     init() {}
-    /*init:def*/init(_ a: Int, d:Int, e:Int) {}
+    /*init:def*/<keywordBase>init</keywordBase>(<arglabel index=0>a</arglabel><param index=0></param>: Int, <arglabel index=1>b</arglabel><param index=1></param>:Int, <arglabel index=2>c</arglabel><param index=2></param>:Int) {}
     /*sub:def*/subscript(x: Int, y j: Int) -> Int {
         get { return 1 }
         set {}
@@ -62,8 +62,8 @@ class SomeClass {
 }
 
 let someClass = SomeClass();
-let _ = /*init:call*/SomeClass(1, d:1, e:1)
-let _ = SomeClass . /*init*/init(_:d:e:)
+let _ = /*init:call*/SomeClass(<callarg index=0>a</callarg><callcolon index=0>:</callcolon>1, <callarg index=1>b</callarg><callcolon index=1>:</callcolon>1, <callarg index=2>c</callarg><callcolon index=2>:</callcolon>1)
+let _ = SomeClass . /*init*/<keywordBase>init</keywordBase>(<sel index=0>a</sel>:<sel index=1>b</sel>:<sel index=2>c</sel>:)
 _ = someClass/*sub:ref*/[1, y: 2]
 someClass/*sub:ref*/[1, y: 2] = 2
 

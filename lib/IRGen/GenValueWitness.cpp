@@ -23,8 +23,11 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -553,7 +556,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
       typeLayoutEntry->initWithTake(IGF, dest, src);
     } else {
-      type.initializeWithTake(IGF, dest, src, concreteType, true);
+      type.initializeWithTake(IGF, dest, src, concreteType, true,
+                              /*zeroizeIfSensitive=*/ true);
     }
     dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.OpaqueTy);
     IGF.Builder.CreateRet(dest.getAddress());
@@ -845,12 +849,22 @@ ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
     bool isInline = packing == FixedPacking::OffsetZero;
     bool isBitwiseTakable =
         fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
+    bool isBitwiseBorrowable =
+        fixedTI->isBitwiseBorrowable(ResilienceExpansion::Maximal);
     assert(isBitwiseTakable || !isInline);
     flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
                 .withPOD(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal))
                 .withCopyable(fixedTI->isCopyable(ResilienceExpansion::Maximal))
                 .withInlineStorage(isInline)
-                .withBitwiseTakable(isBitwiseTakable);
+                .withBitwiseTakable(isBitwiseTakable)
+                // the IsNotBitwiseBorrowable bit only needs to be set if the
+                // type is bitwise-takable but not bitwise-borrowable, since
+                // a type must be bitwise-takable to be bitwise-borrowable.
+                //
+                // Swift prior to version 6 didn't have the
+                // IsNotBitwiseBorrowable bit, so to avoid unnecessary variation
+                // in metadata output, we only set the bit when needed.
+                .withBitwiseBorrowable(!isBitwiseTakable || isBitwiseBorrowable);
   } else {
     flags = flags.withIncomplete(true);
   }
@@ -885,9 +899,29 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 }
 } // end anonymous namespace
 
+bool irgen::layoutStringsEnabled(IRGenModule &IGM, bool diagnose) {
+  if (!IGM.isLayoutStringValueWitnessesFeatureAvailable(IGM.Context)) {
+    return false;
+  }
+  auto moduleName = IGM.getSwiftModule()->getRealName().str();
+  if (IGM.Context.blockListConfig.hasBlockListAction(
+          moduleName, BlockListKeyKind::ModuleName,
+          BlockListAction::ShouldUseLayoutStringValueWitnesses)) {
+    if (diagnose) {
+      IGM.Context.Diags.diagnose(SourceLoc(), diag::layout_strings_blocked,
+                                 moduleName);
+    }
+    return false;
+  }
+
+  return IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+         IGM.getOptions().EnableLayoutStringValueWitnesses;
+}
+
 static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
                                        const TypeLayoutEntry *typeLayoutEntry) {
-  if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
+
+  if (layoutStringsEnabled(IGM) &&
       IGM.Context.LangOpts.hasFeature(
           Feature::LayoutStringValueWitnessesInstantiation) &&
       IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
@@ -896,6 +930,21 @@ static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
         !typeLayoutEntry->isFixedSize(IGM));
   }
 
+  return false;
+}
+
+static bool
+useMultiPayloadEnumFNSpecialization(IRGenModule &IGM,
+                                    const TypeLayoutEntry *typeLayoutEntry,
+                                    GenericSignature genericSig) {
+  // if (!typeLayoutEntry->layoutString(IGM, genericSig)) {
+  //   return false;
+  // }
+  // auto *enumTLE = typeLayoutEntry->getAsEnum();
+  // return enumTLE && enumTLE->isFixedSize(IGM) &&
+  // enumTLE->isMultiPayloadEnum();
+
+  // Disabled for now
   return false;
 }
 
@@ -919,19 +968,7 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
   } else if (typeLayoutEntry->isMultiPayloadEnum()) {
     return IGM.getEnumFnGetEnumTagFn();
   } else {
-    auto &payloadTI = **(typeLayoutEntry->cases[0]->getFixedTypeInfo());
-    auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
-    auto tzCount = mask.countTrailingZeros();
-    auto shiftedMask = mask.lshr(tzCount);
-    auto toCount = shiftedMask.countTrailingOnes();
-    if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-        (mask.popcount() > 64 ||
-         toCount != mask.popcount() ||
-         (tzCount % toCount != 0))) {
-      return IGM.getEnumFnGetEnumTagFn();
-    } else {
-      return IGM.getEnumSimpleGetEnumTagFn();
-    }
+    return IGM.getEnumFnGetEnumTagFn();
   }
 }
 
@@ -956,18 +993,7 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
   } else if (typeLayoutEntry->isMultiPayloadEnum()) {
     return nullptr;
   } else {
-    auto &payloadTI = **(typeLayoutEntry->cases[0]->getFixedTypeInfo());
-    auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
-    auto tzCount = mask.countTrailingZeros();
-    auto shiftedMask = mask.lshr(tzCount);
-    auto toCount = shiftedMask.countTrailingOnes();
-    if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-        (mask.popcount() > 64 || toCount != mask.popcount() ||
-         (tzCount % toCount != 0))) {
-      return nullptr;
-    } else {
-      return IGM.getEnumSimpleDestructiveInjectEnumTagFn();
-    }
+    return nullptr;
   }
 }
 
@@ -1000,12 +1026,12 @@ valueWitnessRequiresCopyability(ValueWitness index) {
 
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
-static void
-addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
-                FixedPacking packing, CanType abstractType,
-                SILType concreteType, const TypeInfo &concreteTI,
-                const llvm::Optional<BoundGenericTypeCharacteristics>
-                    boundGenericCharacteristics = llvm::None) {
+static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
+                            ValueWitness index, FixedPacking packing,
+                            CanType abstractType, SILType concreteType,
+                            const TypeInfo &concreteTI,
+                            const std::optional<BoundGenericTypeCharacteristics>
+                                boundGenericCharacteristics = std::nullopt) {
   auto addFunction = [&](llvm::Constant *fn) {
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
@@ -1028,8 +1054,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getDestroyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1038,7 +1064,12 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericDestroyFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(IGM.getGenericDestroyMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericDestroyFn());
+          }
         }
       }
     }
@@ -1053,8 +1084,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       }
     }
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM) &&
+        concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1067,8 +1098,14 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(
-              IGM.getGenericInitializeBufferWithCopyOfBufferFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericInitializeBufferWithCopyOfBufferMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(
+                IGM.getGenericInitializeBufferWithCopyOfBufferFn());
+          }
         }
       }
     }
@@ -1077,8 +1114,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1087,7 +1124,13 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericInitWithTakeFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericInitWithTakeMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericInitWithTakeFn());
+          }
         }
       }
     }
@@ -1098,8 +1141,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithCopyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1108,7 +1151,13 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericAssignWithCopyFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericAssignWithCopyMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericAssignWithCopyFn());
+          }
         }
       }
     }
@@ -1119,8 +1168,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getAssignWithTakeStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1129,7 +1178,13 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericAssignWithTakeFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericAssignWithTakeMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericAssignWithTakeFn());
+          }
         }
       }
     }
@@ -1140,8 +1195,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
-    } else if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-               IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    } else if (layoutStringsEnabled(IGM) &&
+               concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
       auto &typeInfo = boundGenericCharacteristics ? *boundGenericCharacteristics->TI : concreteTI;
       if (auto *typeLayoutEntry =
@@ -1150,7 +1205,13 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericInitWithCopyFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericInitWithCopyMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericInitWithCopyFn());
+          }
         }
       }
     }
@@ -1208,8 +1269,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
   case ValueWitness::GetEnumTag: {
     assert(concreteType.getEnumOrBoundGenericEnum());
 
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM) &&
+        concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1231,8 +1292,8 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
   }
   case ValueWitness::DestructiveInjectEnumTag: {
     assert(concreteType.getEnumOrBoundGenericEnum());
-    if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnesses) &&
-        IGM.getOptions().EnableLayoutStringValueWitnesses) {
+    if (layoutStringsEnabled(IGM) &&
+        concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics
                     ? boundGenericCharacteristics->concreteType
                     : concreteType;
@@ -1293,8 +1354,8 @@ static void
 addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
                   FixedPacking packing, CanType abstractType,
                   SILType concreteType, const TypeInfo &concreteTI,
-                  const llvm::Optional<BoundGenericTypeCharacteristics>
-                      boundGenericCharacteristics = llvm::None) {
+                  const std::optional<BoundGenericTypeCharacteristics>
+                      boundGenericCharacteristics = std::nullopt) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
     addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
                     concreteType, concreteTI, boundGenericCharacteristics);
@@ -1321,7 +1382,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              ConstantStructBuilder &B,
                                              CanType abstractType,
                                              bool &canBeConstant) {
-  llvm::Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
+  std::optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
   if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
     CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 
@@ -1362,9 +1423,9 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
                                 bool relativeReference) {
   // Native PE binaries shouldn't reference data symbols across DLLs, so disable
   // this on Windows, unless we're forming a relative indirectable reference.
-  if (IGM.useDllStorage() && !relativeReference)
+  if (useDllStorage(IGM.Triple) && !relativeReference)
     return {};
-  
+
   if (auto nom = type->getAnyNominal()) {
     // TODO: Non-C enums have extra inhabitants and also need additional value
     // witnesses for their tag manipulation (except when they're empty, in
@@ -1460,16 +1521,6 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
   return {};
 }
 
-llvm::Constant *
-IRGenModule::getAddrOfEffectiveValueWitnessTable(CanType concreteType,
-                                                 ConstantInit init) {
-  if (auto known =
-          getAddrOfKnownValueWitnessTable(*this, concreteType, false)) {
-    return known.getValue();
-  }
-  return getAddrOfValueWitnessTable(concreteType);
-}
-
 /// Emit a value-witness table for the given type.
 ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              CanType abstractType,
@@ -1519,12 +1570,12 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
   unsigned align = ti.getFixedAlignment().getValue();
 
   bool pod = ti.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-  bool bt = ti.isBitwiseTakable(ResilienceExpansion::Maximal);
+  IsBitwiseTakable_t bt = ti.getBitwiseTakable(ResilienceExpansion::Maximal);
   unsigned numExtraInhabitants = ti.getFixedExtraInhabitantCount(*this);
 
   // Try to use common type layouts exported by the runtime.
   llvm::Constant *commonValueWitnessTable = nullptr;
-  if (pod && bt && numExtraInhabitants == 0) {
+  if (pod && bt == IsBitwiseTakableAndBorrowable && numExtraInhabitants == 0) {
     if (size == 0)
       commonValueWitnessTable =
         getAddrOfValueWitnessTable(Context.TheEmptyTupleType);
@@ -1549,7 +1600,7 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
 
   // Otherwise, see if a layout has been emitted with these characteristics
   // already.
-  FixedLayoutKey key{size, numExtraInhabitants, align, pod, bt};
+  FixedLayoutKey key{size, numExtraInhabitants, align, pod, unsigned(bt)};
 
   auto found = PrivateFixedLayouts.find(key);
   if (found != PrivateFixedLayouts.end())
@@ -1565,16 +1616,29 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
     addValueWitness(*this, witnesses, witness, packing, t, silTy, ti);
   }
 
+  auto pod_bt_string = [](bool pod, IsBitwiseTakable_t bt) -> StringRef {
+    if (pod) {
+      return "_pod";
+    }
+    switch (bt) {
+    case IsNotBitwiseTakable:
+      return "";
+    case IsBitwiseTakableOnly:
+      return "_bt_nbb";
+    case IsBitwiseTakableAndBorrowable:
+      return "_bt";
+    }
+  };
+
   auto layoutVar
     = witnesses.finishAndCreateGlobal(
         "type_layout_" + llvm::Twine(size)
                        + "_" + llvm::Twine(align)
                        + "_" + llvm::Twine::utohexstr(numExtraInhabitants)
-                       + (pod ? "_pod" :
-                          bt  ? "_bt"  : ""),
-                                      getPointerAlignment(),
-                                      /*constant*/ true,
-                                      llvm::GlobalValue::PrivateLinkage);
+                       + pod_bt_string(pod, bt),
+        getPointerAlignment(),
+        /*constant*/ true,
+        llvm::GlobalValue::PrivateLinkage);
 
   // Cast to the standard currency type for type layouts.
   auto layout = llvm::ConstantExpr::getBitCast(layoutVar, Int8PtrPtrTy);

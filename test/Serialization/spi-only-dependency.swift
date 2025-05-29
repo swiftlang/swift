@@ -35,6 +35,13 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -experimental-spi-only-imports \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefix=VISIBLE-DEP-NOT %s
-// VISIBLE-DEP-NOT-NOT: loaded module 'SPIDependency'
 
 import Lib
+
+// Note: extra newlines below ensure that context printing doesn't show the
+// lines that we shouldn't see.
+
+
+
+
+// VISIBLE-DEP-NOT-NOT: loaded module 'SPIDependency'

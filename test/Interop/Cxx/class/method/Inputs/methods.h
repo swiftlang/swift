@@ -14,7 +14,10 @@ struct __attribute__((swift_attr("import_unsafe"))) NonTrivialInWrapper {
 
 struct HasMethods {
   void nonConstMethod() { }
+  void nonConstMethod(int) { }
+  static void nonConstMethod(float) { } // checking name colisions: rdar://120858502
   void constMethod() const { }
+  static void constMethod(float) { } // checking name colisions: rdar://120858502
 
   int nonConstPassThrough(int a) { return a; }
   int constPassThrough(int a) const { return a; }
@@ -30,6 +33,9 @@ struct HasMethods {
 
   NonTrivialInWrapper nonConstPassThroughAsWrapper(int a) { return {a}; }
   NonTrivialInWrapper constPassThroughAsWrapper(int a) const { return {a}; }
+
+  void nonTrivialTakesConstRef(const NonTrivialInWrapper& w) const {}
+  void nonTrivialTakesRef(NonTrivialInWrapper& w) const {}
 };
 
 struct ReferenceParams {
