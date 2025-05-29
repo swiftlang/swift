@@ -8676,5 +8676,14 @@ GROUPED_WARNING(
     "behavior",
     (StringRef))
 
+//===----------------------------------------------------------------------===//
+// MARK: `using` declaration
+//===----------------------------------------------------------------------===//
+ERROR(invalid_redecl_of_file_isolation,none,
+      "invalid redeclaration of file-level default actor isolation", ())
+NOTE(invalid_redecl_of_file_isolation_prev,none,
+     "default isolation was previously declared here", ())
+
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
