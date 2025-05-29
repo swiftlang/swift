@@ -266,7 +266,7 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 static void synthesizeCodingKeysIfNeededForUnqualifiedLookup(ASTContext &ctx,
                                                              DeclContext *dc,
                                                              DeclNameRef name) {
-  if (name.getBaseIdentifier() != ctx.Id_CodingKeys)
+  if (!name.isSimpleName(ctx.Id_CodingKeys))
     return;
 
   for (auto typeCtx = dc->getInnermostTypeContext(); typeCtx != nullptr;
