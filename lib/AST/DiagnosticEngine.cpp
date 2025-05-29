@@ -361,17 +361,6 @@ InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
 
   if (bestLoc.isValid()) {
     llvm::SmallString<64> importText;
-
-    // @_spi imports.
-    if (Member->isSPI()) {
-      auto spiGroups = Member->getSPIGroups();
-      if (!spiGroups.empty()) {
-        importText += "@_spi(";
-        importText += spiGroups[0].str();
-        importText += ") ";
-      }
-    }
-
     importText += "import ";
     importText += ModuleName;
     importText += "\n";
