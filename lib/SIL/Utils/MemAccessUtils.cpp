@@ -1461,7 +1461,7 @@ bool swift::visitProductLeafAccessPathNodes(
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
-      if (decl->isCxxNonTrivial()) {
+      if (decl->isCxxNonTrivial() || !silType.isEscapable(function)) {
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
