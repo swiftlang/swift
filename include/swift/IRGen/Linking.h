@@ -1043,7 +1043,7 @@ public:
   }
 
   static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
-    assert(decl->exportsPropertyDescriptor());
+    assert((bool)decl->getPropertyDescriptorGenericSignature());
     LinkEntity entity;
     entity.setForDecl(Kind::PropertyDescriptor, decl);
     return entity;
