@@ -3747,15 +3747,18 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
 }
 
 std::string Demangle::nodeToString(NodePointer root,
-                                   const DemangleOptions &options,
-                                   NodePrinter *printer) {
+                                   const DemangleOptions &options) {
   if (!root)
     return "";
+  NodePrinter printer = NodePrinter(options);
+  nodeToString(root, &printer);
+  return printer.takeString();
+}
 
-  if (printer) {
-    return printer->printRoot(root);
-  }
-  return NodePrinter(options).printRoot(root);
+void Demangle::nodeToString(NodePointer root, NodePrinter *printer) {
+  if (!root)
+    return;
+  printer->printRoot(root);
 }
 
 #endif

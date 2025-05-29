@@ -56,15 +56,20 @@ NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
 #if SWIFT_STDLIB_HAS_TYPE_PRINTING
 
 std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
-                                            const DemangleOptions &Options,
-                                            NodePrinter *printer) {
+                                            const DemangleOptions &Options) {
   NodePointer root = demangleSymbolAsNode(MangledName);
   if (!root) return MangledName.str();
 
-  std::string demangling = nodeToString(root, Options, printer);
+  std::string demangling = nodeToString(root, Options);
   if (demangling.empty())
     return MangledName.str();
   return demangling;
+}
+
+void Context::demangleSymbolAsString(llvm::StringRef MangledName,
+                                     NodePrinter *printer) {
+  NodePointer root = demangleSymbolAsNode(MangledName);
+  nodeToString(root, printer);
 }
 
 std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
@@ -270,11 +275,17 @@ std::string Context::getModuleName(llvm::StringRef mangledName) {
 
 std::string demangleSymbolAsString(const char *MangledName,
                                    size_t MangledNameLength,
-                                   const DemangleOptions &Options,
-                                   NodePrinter *printer) {
+                                   const DemangleOptions &Options) {
   Context Ctx;
   return Ctx.demangleSymbolAsString(StringRef(MangledName, MangledNameLength),
-                                    Options, printer);
+                                    Options);
+}
+
+void demangleSymbolAsString(const char *MangledName, size_t MangledNameLength,
+                            NodePrinter *printer) {
+  Context Ctx;
+  return Ctx.demangleSymbolAsString(StringRef(MangledName, MangledNameLength),
+                                    printer);
 }
 
 std::string demangleTypeAsString(const char *MangledName,
