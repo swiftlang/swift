@@ -5,16 +5,24 @@
 // REQUIRES: concurrency
 
 using @MainActor
+// expected-note@-1 {{default isolation was previously declared here}}
+
 using nonisolated
+// expected-error@-1 {{invalid redeclaration of file-level default actor isolation}}
 
 using @Test // expected-error {{'using' declaration does not support 'Test' attribute}}
 using test // expected-error {{'using' declaration does not support 'test' modifier}}
 
-using
-@MainActor
+do {
+  using // expected-warning {{expression of type 'Int' is unused}}
+  @MainActor
+// expected-error@+1 {{expected declaration}}
+}
 
-using
-nonisolated
+do {
+  using // expected-warning {{expression of type 'Int' is unused}}
+  nonisolated // expected-error {{cannot find 'nonisolated' in scope}}
+}
 
 do {
   func
