@@ -1389,7 +1389,7 @@ public:
 
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
-      Call(Element.Type, Element.Proto);
+      Call(Element.Type, stripSignedPointer(Element.Proto));
     }
   }
 
