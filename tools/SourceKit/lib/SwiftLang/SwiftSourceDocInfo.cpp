@@ -877,11 +877,6 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
   }
 }
 
-static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
-  SourceLoc CharEndLoc = Lexer::getLocForEndOfToken(SM, TokenRange.End);
-  return SM.getByteDistance(TokenRange.Start, CharEndLoc);
-}
-
 static void setLocationInfo(const ValueDecl *VD,
                             LocationInfo &Location) {
   ASTContext &Ctx = VD->getASTContext();
@@ -891,29 +886,24 @@ static void setLocationInfo(const ValueDecl *VD,
 
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isValid()) {
-    auto getParameterListRange =
-        [&](const ValueDecl *VD) -> std::optional<unsigned> {
-      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-        SourceRange R = FD->getParameterListSourceRange();
-        if (R.isValid())
-          return getCharLength(SM, R);
-      }
-      return std::nullopt;
-    };
-    unsigned NameLen;
-    if (auto SigLen = getParameterListRange(VD)) {
-      NameLen = SigLen.value();
-    } else if (VD->hasName()) {
-      NameLen = VD->getBaseName().userFacingName().size();
-    } else {
-      NameLen = getCharLength(SM, Loc);
+    // For most cases we just want the range of the name itself. One exception
+    // is for functions, where we also want to include the parameter list.
+    SourceRange Range = Loc;
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      if (auto R = FD->getParameterListSourceRange())
+        Range = R;
     }
 
-    auto [DeclBufID, DeclLoc] =
-        VD->getModuleContext()->getOriginalLocation(Loc);
+    auto [DeclBufID, DeclRange] =
+        VD->getModuleContext()->getOriginalRange(Range);
+
+    auto DeclCharRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, DeclRange);
+    auto DeclLoc = DeclCharRange.getStart();
+
     Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
     Location.Offset = SM.getLocOffsetInBuffer(DeclLoc, DeclBufID);
-    Location.Length = NameLen;
+    Location.Length = DeclCharRange.getByteLength();
     std::tie(Location.Line, Location.Column) =
         SM.getLineAndColumnInBuffer(DeclLoc, DeclBufID);
     if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(DeclBufID)) {

@@ -847,14 +847,14 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return nullptr;
 }
 
-std::pair<unsigned, SourceLoc>
-ModuleDecl::getOriginalLocation(SourceLoc loc) const {
-  assert(loc.isValid());
+std::pair<unsigned, SourceRange>
+ModuleDecl::getOriginalRange(SourceRange range) const {
+  assert(range.isValid());
 
   SourceManager &SM = getASTContext().SourceMgr;
-  unsigned bufferID = SM.findBufferContainingLoc(loc);
+  unsigned bufferID = SM.findBufferContainingLoc(range.Start);
 
-  SourceLoc startLoc = loc;
+  auto startRange = range;
   unsigned startBufferID = bufferID;
   while (const GeneratedSourceInfo *info =
              SM.getGeneratedSourceInfo(bufferID)) {
@@ -866,12 +866,12 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
       // Location was within a macro expansion, return the expansion site, not
       // the insertion location.
       if (info->attachedMacroCustomAttr) {
-        loc = info->attachedMacroCustomAttr->getLocation();
+        range = info->attachedMacroCustomAttr->getRange();
       } else {
         ASTNode expansionNode = ASTNode::getFromOpaqueValue(info->astNode);
-        loc = expansionNode.getStartLoc();
+        range = expansionNode.getSourceRange();
       }
-      bufferID = SM.findBufferContainingLoc(loc);
+      bufferID = SM.findBufferContainingLoc(range.Start);
       break;
     }
     case GeneratedSourceInfo::DefaultArgument:
@@ -883,11 +883,11 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
     case GeneratedSourceInfo::PrettyPrinted:
     case GeneratedSourceInfo::AttributeFromClang:
       // No original location, return the original buffer/location
-      return {startBufferID, startLoc};
+      return {startBufferID, startRange};
     }
   }
 
-  return {bufferID, loc};
+  return {bufferID, range};
 }
 
 ArrayRef<SourceFile *>
