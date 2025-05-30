@@ -54,10 +54,6 @@ The toolchain snapshot to build the early components with.
 .PARAMETER PinnedSHA256
 The SHA256 for the pinned toolchain.
 
-.PARAMETER PinnedToolchainVariant
-The toolchain variant to use while building the toolchain. Defaults to
-`Asserts`.
-
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
 
@@ -132,8 +128,6 @@ param
   [ValidatePattern("^([A-Fa-f0-9]{64}|)$")]
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
-  [ValidateSet("Asserts", "NoAsserts")]
-  [string] $PinnedToolchainVariant = "Asserts",
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $PythonVersion = "3.9.10",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
@@ -622,9 +616,9 @@ function Get-InstallDir([Hashtable] $Platform) {
 
 # For dev productivity, install the host toolchain directly using CMake.
 # This allows iterating on the toolchain using ninja builds.
-$HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+$PinnedToolchainVariant"
+$HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+Asserts"
 $HostPlatform.NoAssertsToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+NoAsserts"
-$BuildPlatform.ToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+$PinnedToolchainVariant"
+$BuildPlatform.ToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+Asserts"
 $BuildPlatform.NoAssertsToolchainInstallRoot = "$(Get-InstallDir $BuildPlatform)\Toolchains\$ProductVersion+NoAsserts"
 
 # Build functions
@@ -1195,7 +1189,7 @@ function Get-PinnedToolchainToolsDir() {
     }
   }
 
-  $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$(Get-PinnedToolchainVersion)+$PinnedToolchainVariant", "usr", "bin")
+  $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$(Get-PinnedToolchainVersion)+Asserts", "usr", "bin")
 
   if (Test-Path $VariantToolchainPath) {
     return $VariantToolchainPath
@@ -1203,7 +1197,7 @@ function Get-PinnedToolchainToolsDir() {
 
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
     "Library", "Developer", "Toolchains",
-    "unknown-$PinnedToolchainVariant-development.xctoolchain", "usr", "bin")
+    "unknown-Asserts-development.xctoolchain", "usr", "bin")
 }
 
 function Get-PinnedToolchainSDK() {
@@ -1710,7 +1704,7 @@ function Build-CMark([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin (Get-CMarkBinaryCache $Platform) `
-    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr" `
+    -InstallTo "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr" `
     -Platform $Platform `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
@@ -1753,7 +1747,7 @@ function Build-BuildTools([Hashtable] $Platform) {
       SWIFT_INCLUDE_APINOTES = "NO";
       SWIFT_INCLUDE_DOCS = "NO";
       SWIFT_INCLUDE_TESTS = "NO";
-      "cmark-gfm_DIR" = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr\lib\cmake";
+      "cmark-gfm_DIR" = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\lib\cmake";
     }
 }
 
@@ -3255,8 +3249,8 @@ function Test-PackageManager() {
     -Src $SrcDir `
     -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
     -Platform $HostPlatform `
-    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr\include" `
-    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$PinnedToolchainVariant\usr\lib"
+    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\include" `
+    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\lib"
 }
 
 function Build-Installer([Hashtable] $Platform) {
@@ -3338,7 +3332,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-BuildTools $BuildPlatform
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-XML2 $BuildPlatform
-    Invoke-BuildStep Build-Compilers $BuildPlatform -Variant $PinnedToolchainVariant
+    Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
   }
   if ($IncludeDS2) {
     Invoke-BuildStep Build-RegsGen2 $BuildPlatform
@@ -3446,7 +3440,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform $PinnedToolchainVariant $Tests 
+    Invoke-BuildStep Test-Compilers $HostPlatform "Asserts" $Tests 
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
