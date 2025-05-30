@@ -24,6 +24,8 @@ import BoundsAttributedGlobal
 
 func access() {
 #if VERIFY
+// rdar://152293598 ([ClangImporter] Importing global array errors on macOS and Linux, but not on Windows)
+// XFAIL: OS=windows-msvc
     let _ = a // expected-error{{cannot reference invalid declaration 'a'}} rdar://151665752
 #endif
     let _ = b.pointee
