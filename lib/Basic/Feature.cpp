@@ -73,6 +73,7 @@ bool Feature::isMigratable() const {
   switch (kind) {
 #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:
 #include "swift/Basic/Features.def"
@@ -81,6 +82,8 @@ bool Feature::isMigratable() const {
 #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)            \
   case Feature::FeatureName:
 #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)          \
+  case Feature::FeatureName:
+#define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)      \
   case Feature::FeatureName:
 #include "swift/Basic/Features.def"
     return true;

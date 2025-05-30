@@ -996,6 +996,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_strict_memory_safety))
     Opts.enableFeature(Feature::StrictMemorySafety);
+  else if (Args.hasArg(OPT_strict_memory_safety_migrate))
+    Opts.enableFeature(Feature::StrictMemorySafety, /*forMigration=*/true);
 
   return HadError;
 }
