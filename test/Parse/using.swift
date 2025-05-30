@@ -10,8 +10,8 @@ using @MainActor
 using nonisolated
 // expected-error@-1 {{invalid redeclaration of file-level default actor isolation}}
 
-using @Test // expected-error {{'using' declaration does not support 'Test' attribute}}
-using test // expected-error {{'using' declaration does not support 'test' modifier}}
+using @Test // expected-error {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
+using test // expected-error {{default isolation can only be set to '@MainActor' or 'nonisolated'}}
 
 do {
   using // expected-warning {{expression of type 'Int' is unused}}

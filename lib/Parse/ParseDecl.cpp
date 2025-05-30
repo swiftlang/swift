@@ -6680,8 +6680,7 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
           .Default(std::nullopt);
 
   if (!Specifier) {
-    diagnose(SpecifierLoc, diag::using_decl_invalid_specifier, RawSpecifier,
-             AtLoc.isValid());
+    diagnose(SpecifierLoc, diag::using_decl_invalid_specifier);
     return nullptr;
   }
 
