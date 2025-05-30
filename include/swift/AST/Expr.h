@@ -2292,7 +2292,7 @@ public:
 /// getSemanticsProvidingExpr() looks through this because it doesn't
 /// provide the value and only very specific clients care where the
 /// 'borrow' was written.
-class BorrowExpr final : public IdentityExpr {
+class BorrowExpr final : public IdentityExpr { // FIXME: this should be a ImplicitConversionExpr like LoadExpr
   SourceLoc BorrowLoc;
 
 public:

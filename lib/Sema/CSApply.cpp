@@ -7125,6 +7125,15 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 }
 
 Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
+  /// Avoid copying if we're in a manual ownership context; borrow instead.
+  if (auto *decl = DC->getAsDecl()) {
+    if (decl->getAttrs().hasAttribute<ManualOwnershipAttr>()) {
+      return TypeChecker::addImplicitBorrowExpr(
+        getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
+        [this](Expr *expr, Type type) { setType(expr, type); });
+    }
+  }
+
   return TypeChecker::addImplicitLoadExpr(
       getASTContext(), expr, [this](Expr *expr) { return getType(expr); },
       [this](Expr *expr, Type type) { setType(expr, type); });
