@@ -2193,6 +2193,8 @@ ERROR(nonisolated_nonsending_repeated,none,
 ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
       "'using' declaration does not support %0 %select{modifier|attribute}1",
       (Identifier, bool))
+ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
+      "'using' is an experimental feature that is currently disabled", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

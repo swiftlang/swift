@@ -6672,6 +6672,10 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
   assert(Tok.isContextualKeyword("using"));
   DebuggerContextChange DCC(*this);
 
+  if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
+    diagnose(Tok, diag::experimental_using_decl_disabled);
+  }
+
   SourceLoc UsingLoc = consumeToken();
 
   if (Tok.is(tok::code_complete)) {
