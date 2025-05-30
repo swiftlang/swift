@@ -8,6 +8,10 @@ public protocol P<A, B> {
   associatedtype B
 }
 
+public protocol P1<A> {
+  associatedtype A
+}
+
 public protocol Q<C> {
   associatedtype C
 }
@@ -34,16 +38,29 @@ public func foo(_ a: (any P<Int, Float> & Q<String> & R).Type) {}
 public func foo(_ a: (any P<Int, Float> & Q<String> & R & C<Bool>).Type) {}
 public func foo(_ a: (any P<Int, Float> & Q<String> & R & AnyObject).Type) {}
 
-public func foo(_ a: (any P & R).Type) {}
-public func foo(_ a: (any P & Q<String>).Type) {}
-public func foo(_ a: (any P & Q<String> & R).Type) {}
-public func foo(_ a: (any P & Q<String> & R & C<Bool>).Type) {}
-public func foo(_ a: (any P & Q<String> & R & AnyObject).Type) {}
+public func foo(_ a: (any P & P1).Type) {}
+public func foo(_ a: (any P & P1<String>).Type) {}
+public func foo(_ a: (any P & P1<String> & R).Type) {}
+public func foo(_ a: (any P & P1<String> & R & C<Bool>).Type) {}
+public func foo(_ a: (any P & P1<String> & R & AnyObject).Type) {}
 
-public func foo(_ a: (any P<Int, Float> & Q).Type) {}
-public func foo(_ a: (any P<Int, Float> & Q & R).Type) {}
-public func foo(_ a: (any P<Int, Float> & Q & R & C<Bool>).Type) {}
-public func foo(_ a: (any P<Int, Float> & Q & R & AnyObject).Type) {}
+public func foo(_ a: (any P<Int, Float> & P1).Type) {}
+public func foo(_ a: (any P<Int, Float> & P1 & R).Type) {}
+public func foo(_ a: (any P<Int, Float> & P1 & R & C<Bool>).Type) {}
+public func foo(_ a: (any P<Int, Float> & P1 & R & AnyObject).Type) {}
+
+public protocol Q2<C>: Q {}
+
+public protocol Q3<C>: Q {
+  associatedtype C
+}
+
+public func foo(_ a: (any Q2<Int> & R).Type) {}
+public func foo(_ a: (any Q3<Int> & R).Type) {}
+public func foo(_ a: (any Q2 & Q3).Type) {}
+public func foo(_ a: (any Q2 & Q3<Int>).Type) {}
+public func foo2(_ a: (any Q2<Int> & Q3).Type) {}
+public func foo3(_ a: (any Q2<Int> & Q3<Int>).Type) {}
 
 public struct Foo<each T, U> {
   public var a1: (repeat any P<each T, U> & R)
