@@ -260,6 +260,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
       # generate valid COFF object files.
       "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
       "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
+      "aarch64  aarch64-unknown-windows-msvc aarch64-unknown-windows-msvc"
     )
   endif()
 endif()
