@@ -499,6 +499,18 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
   SharedFilesystemCache.emplace();
 }
 
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftDependencyScanningService::getClangScanningFS(ASTContext &ctx) const {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
+      llvm::vfs::createPhysicalFileSystem();
+  ClangInvocationFileMapping fileMapping =
+    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
+
+  if (CAS)
+    return llvm::cas::createCASProvidingFileSystem(CAS, baseFileSystem);
+  return baseFileSystem;
+}
+
 bool
 swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath,
                                                 const SourceLoc importLoc,
