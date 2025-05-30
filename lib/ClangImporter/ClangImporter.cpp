@@ -513,6 +513,10 @@ void importer::getNormalInvocationArguments(
       "-isystem", searchPathOpts.RuntimeResourcePath,
   });
 
+  if (LangOpts.hasFeature(Feature::Embedded)) {
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-D__swift_embedded__"});
+  }
+
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
   // is implicitly position independent.
   if (!triple.isOSWindows())

@@ -918,7 +918,6 @@ Added: _$ss11MutableSpanVMa
 Added: _$ss11MutableSpanVMn
 Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
 Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
-Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
 Added: _$ss14MutableRawSpanV6_countSivg
 Added: _$ss14MutableRawSpanV8_pointerSvSgvg
 Added: _$ss14MutableRawSpanVMa
@@ -1050,7 +1049,6 @@ Added: __swift_stdlib_CreateIndirectTaggedPointerString
 // Span backward deployment
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMa$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV6_countSivg$
