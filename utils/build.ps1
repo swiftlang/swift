@@ -1996,9 +1996,7 @@ function Build-mimalloc() {
   )
   $Binaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $_)}
   if ($IncludeNoAsserts) {
-    $NoAssertBinaries = $Tools `
-      | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)} `
-      | Where-Object { Test-Path $_ -PathType Leaf }
+    $NoAssertBinaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)}
     $Binaries = $Binaries + $NoAssertBinaries
   }
   foreach ($Binary in $Binaries) {
@@ -3302,6 +3300,37 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Invoke-Program "$($WiX.Path)\wix.exe" -- burn detach "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
 }
 
+function Build-NoAssertsToolchain() {
+  if ($ToBatch) {
+    Write-Output ""
+    Write-Output "Building NoAsserts Toolchain ..."
+  } else {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building NoAsserts Toolchain ..."
+  }
+  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+
+  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts"
+
+  # Only compilers have NoAsserts enabled. Copy the rest of the Toolcahin binaries from the Asserts output
+  # Use robocopy for efficient copying
+  #   /E : Copies subdirectories, including empty ones.
+  #   /XC: Excludes existing files with the same timestamp but different file sizes.
+  #   /XN: Excludes existing files that are newer than the copy in the source directory.
+  #   /XO: Excludes existing files that are older than the copy in the source directory.
+  #   /NFL: Do not list coppied files in output
+  #   /NDL: Do not list directories in output
+  #   /NJH: Do not write a job header
+  #   /NC: Do not write file classes
+  #   /NS: Do not write file sizes
+  #   /NP: Do not show progress indicator
+  &robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
+
+  if (-not $ToBatch) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building Instalting NoAsserts Toolchain in $($Stopwatch.Elapsed)"
+    Write-Host ""
+  }
+}
+
 #-------------------------------------------------------------------
 try {
 
@@ -3341,9 +3370,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
-  if ($IncludeNoAsserts) {
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts"
-  }
 
   Invoke-BuildStep Build-SDK $BuildPlatform -IncludeMacros
 
@@ -3413,6 +3439,10 @@ if (-not $SkipBuild) {
 }
 
 Install-HostToolchain
+
+if ($IncludeNoAsserts) {
+  Build-NoAssertsToolchain
+}
 
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
