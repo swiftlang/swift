@@ -7003,6 +7003,10 @@ public:
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
 
+  static ParamDecl *cloneAccessor(const ASTContext &Ctx,
+                                  ParamDecl const *subscriptParam,
+                                  DeclContext *Parent);
+
   static ParamDecl *
   createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                  SourceLoc argumentNameLoc, Identifier argumentName,
