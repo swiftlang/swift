@@ -6489,7 +6489,7 @@ DefaultIsolationInSourceFileRequest::evaluate(Evaluator &evaluator,
     case UsingSpecifier::MainActor:
       setIsolation(D, DefaultIsolation::MainActor);
       break;
-    case UsingSpecifier::nonisolated:
+    case UsingSpecifier::Nonisolated:
       setIsolation(D, DefaultIsolation::Nonisolated);
       break;
     }

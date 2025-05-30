@@ -270,17 +270,13 @@ static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
 
 enum class UsingSpecifier : uint8_t {
   MainActor,
-  nonisolated,
-  LastSpecifier = nonisolated,
+  Nonisolated,
+  LastSpecifier = Nonisolated,
 };
 enum : unsigned {
   NumUsingSpecifierBits =
       countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
 };
-static_assert(uint8_t(UsingSpecifier::LastSpecifier) <
-                  (NumUsingSpecifierBits << 1),
-              "UsingSpecifier is too small to fit in UsingDecl specifier bits. "
-              "Please expand ");
 
 /// Diagnostic printing of \c SelfAccessKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);

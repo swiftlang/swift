@@ -1854,7 +1854,7 @@ std::string UsingDecl::getSpecifierName() const {
   switch (getSpecifier()) {
   case UsingSpecifier::MainActor:
     return "@MainActor";
-  case UsingSpecifier::nonisolated:
+  case UsingSpecifier::Nonisolated:
     return "nonisolated";
   }
 }
