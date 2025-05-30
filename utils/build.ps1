@@ -3440,7 +3440,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Invoke-BuildStep Test-Compilers $HostPlatform "Asserts" $Tests 
+    Invoke-BuildStep Test-Compilers $HostPlatform "Asserts" $Tests
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
