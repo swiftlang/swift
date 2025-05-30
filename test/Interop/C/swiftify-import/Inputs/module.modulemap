@@ -26,3 +26,10 @@ module CommentsClang {
     header "comments.h"
     export *
 }
+module ClangIncludesModule {
+    header "clang-includes.h"
+    export *
+}
+module ClangIncludesNoExportModule {
+    header "clang-includes.h"
+}

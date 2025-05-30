@@ -320,7 +320,7 @@ void swift::performImportResolution(SourceFile &SF) {
 }
 
 void swift::performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
+    SourceFile &SF, ModuleDecl *clangModule, const clang::Module *M
 ) {
   // If we've already performed import resolution, bail.
   if (SF.ASTStage == SourceFile::ImportsResolved)
@@ -328,6 +328,21 @@ void swift::performImportResolutionForClangMacroBuffer(
 
   ImportResolver resolver(SF);
   resolver.addImplicitImport(clangModule);
+
+  ASTContext &ctx = clangModule->getASTContext();
+  auto *clangImporter = ctx.getClangModuleLoader();
+  llvm::dbgs() << "adding self from actual clang module:\n";
+  M->dump();
+  auto wrapper = clangImporter->getWrapperForModule(M);
+  wrapper->dump();
+  resolver.addImplicitImport(wrapper);
+  for (auto &I : M->Imports) {
+    llvm::dbgs() << "adding import from actual clang module:\n";
+    I->dump();
+    auto wrapper = clangImporter->getWrapperForModule(I);
+    wrapper->dump();
+    resolver.addImplicitImport(wrapper);
+  }
 
   // FIXME: This is a hack that we shouldn't need, but be sure that we can
   // see the Swift standard library.
