@@ -712,6 +712,8 @@ public:
       }
     } else if (auto TE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
       recurse = asImpl().checkTemporarilyEscapable(TE);
+    } else if (auto OSE = dyn_cast<ObjCSelectorExpr>(E)) {
+      recurse = asImpl().checkObjCSelector(OSE);
     }
 
     // Error handling validation (via checkTopLevelEffects) happens after
@@ -2268,6 +2270,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
+      return ShouldNotRecurse;
+    }
+        
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -2417,6 +2423,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
+      return ShouldNotRecurse;
+    }
+
     void visitExprPre(Expr *expr) { return; }
   };
 
@@ -2532,6 +2542,10 @@ private:
     ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
       classification.merge(Self.classifyTemporarilyEscapable(E));
       return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
+      return ShouldNotRecurse;
     }
 
     void visitExprPre(Expr *expr) { return; }
@@ -3715,6 +3729,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.set(ContextFlags::InAsyncLet);
     }
 
+    /// Enter a subexpression that's never exected.
+    void enterNonExecuting() {
+      Self.Flags.set(ContextFlags::IsTryCovered);
+      Self.Flags.set(ContextFlags::IsAsyncCovered);
+    }
+
     void refineLocalContext(Context newContext) {
       Self.CurContext = newContext;
     }
@@ -3820,6 +3840,13 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     void preserveCoverageFromTryOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::unsafeFlags(), Self.Flags);
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+    }
+
+    void preserveCoverageFromNonExecutingOperand() {
+      OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
+      OldFlags.mergeFrom(ContextFlags::throwFlags(), Self.Flags);
       OldFlags.mergeFrom(ContextFlags::unsafeFlags(), Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
     }
@@ -4023,6 +4050,17 @@ private:
         classifyTemporarilyEscapable(E);
     checkEffectSite(E, /*requiresTry=*/false, classification);
     return ShouldRecurse;
+  }
+
+  ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
+    // Walk the operand.
+    ContextScope scope(*this, std::nullopt);
+    scope.enterNonExecuting();
+
+    E->getSubExpr()->walk(*this);
+
+    scope.preserveCoverageFromNonExecutingOperand();
+    return ShouldNotRecurse;
   }
 
   ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
