@@ -15,7 +15,7 @@ foreach(def ${availability_defs})
     # ON will cause us to use the "proper" availability instead.
     string(REPLACE "SwiftStdlib" "SwiftStdlibCurrentOS" current "${def}")
     if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND SwiftCore_SWIFT_AVAILABILITY_PLATFORM)
-      if(SwiftCore_SWIFT_AVAILABILITY_PLATFORM STREQUAL "macOS" and SwiftCore_VARIANT_AVAILABILITY_PLATFORM STREQUAL "iOS")
+      if("${SwiftCore_SWIFT_AVAILABILITY_PLATFORM}" STREQUAL "macOS" AND "${SwiftCore_VARIANT_AVAILABILITY_PLATFORM}" STREQUAL "iOS")
         string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" ios_platform_version "${def}")
         string(REGEX MATCH "[0-9]+(\.[0-9]+)+" ios_version "${ios_platform_version}")
         string(REGEX MATCH "macOS ([0-9]+(\.[0-9]+)+)" macos_platform_version "${def}")
