@@ -285,7 +285,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     if let paramIdx = parameterIndex(for: argumentIndex) {
       return convention.parameters[paramIdx].convention
     }
-    let resultInfo = convention.indirectSILResults[argumentIndex]
+    let resultInfo = convention.indirectSILResult(at: argumentIndex)
     return ArgumentConvention(result: resultInfo.convention)
   }
 
@@ -293,7 +293,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     if parameterIndex(for: argumentIndex) != nil {
       return nil
     }
-    return convention.indirectSILResults[argumentIndex]
+    return convention.indirectSILResult(at: argumentIndex)
   }
 
   public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
