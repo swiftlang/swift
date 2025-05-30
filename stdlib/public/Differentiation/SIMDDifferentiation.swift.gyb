@@ -456,12 +456,8 @@ where
   }
 }
 
-%for (Scalar, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
+%for (Scalar, bits) in [('Float',32), ('Double',64)]:
 % for n in vectorscalarCounts:
-%  if bits == 16:
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(SwiftStdlib 5.3, *)
-%  end
 extension SIMD${n} where Scalar == ${Scalar} {
   @inlinable
   @_alwaysEmitIntoClient
@@ -481,8 +477,5 @@ extension SIMD${n} where Scalar == ${Scalar} {
     return (Self(repeating: value), { v in Self(repeating: v) })
   }
 }
-%  if bits == 16:
-#endif
-%  end
 % end
 %end
