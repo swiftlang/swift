@@ -1,9 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-bare-slash-regex -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift -disable-availability-checking \
+// RUN:   -enable-bare-slash-regex \
+// RUN:   -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature DefaultIsolationPerFile
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_DefaultIsolationPerFile
 
 // rdar://116686158
 // UNSUPPORTED: asan

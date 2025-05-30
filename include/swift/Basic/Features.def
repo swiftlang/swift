@@ -522,6 +522,10 @@ EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 /// Optimize copies of ObjectiveC blocks.
 EXPERIMENTAL_FEATURE(CopyBlockOptimization, true)
 
+/// Allow use of `using` declaration that control default isolation
+/// in a file scope.
+EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
