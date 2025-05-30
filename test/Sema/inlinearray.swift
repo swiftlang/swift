@@ -13,26 +13,26 @@ let f: InlineArray<_, Int> = ["hello"] // expected-error {{cannot convert value 
 
 let g: InlineArray<1, 1> // expected-error {{cannot use value type '1' for generic argument 'Element'}}
 
-let _: [3 x Int] = [1, 2, 3]  // Ok, InlineArray<3, Int>
-let _: [_ x Int] = [1, 2, 3]  // Ok, InlineArray<3, Int>
-let _: [3 x _] = [1, 2, 3]    // Ok, InlineArray<3, Int>
-let _: [_ x _] = ["", "", ""] // Ok, InlineArray<3, String>
+let _: [3 of Int] = [1, 2, 3]  // Ok, InlineArray<3, Int>
+let _: [_ of Int] = [1, 2, 3]  // Ok, InlineArray<3, Int>
+let _: [3 of _] = [1, 2, 3]    // Ok, InlineArray<3, Int>
+let _: [_ of _] = ["", "", ""] // Ok, InlineArray<3, String>
 
-let _: [3 x [3 x Int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-let _: [3 x [3 x Int]] = [[1, 2], [3, 4, 5, 6]]
+let _: [3 of [3 of Int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+let _: [3 of [3 of Int]] = [[1, 2], [3, 4, 5, 6]]
 // expected-error@-1 {{'3' elements in inline array literal, but got '2'}}
-// expected-error@-2 2{{cannot convert value of type '[Int]' to expected element type '[3 x Int]'}}
+// expected-error@-2 2{{cannot convert value of type '[Int]' to expected element type '[3 of Int]'}}
 
-let _ = [3 x [3 x Int]](repeating: [1, 2]) // expected-error {{expected '3' elements in inline array literal, but got '2'}}
-let _ = [3 x [_ x Int]](repeating: [1, 2])
+let _ = [3 of [3 of Int]](repeating: [1, 2]) // expected-error {{expected '3' elements in inline array literal, but got '2'}}
+let _ = [3 of [_ of Int]](repeating: [1, 2])
 
-let _: [Int x 10] = [1, 2] // expected-error {{element count must precede inline array element type}} {{15-17=Int}} {{9-12=10}}
+let _: [Int of 10] = [1, 2] // expected-error {{element count must precede inline array element type}} {{16-18=Int}} {{9-12=10}}
 // expected-error@-1 {{expected '10' elements in inline array literal, but got '2'}}
 
-let _: [4 x _] = [1, 2, 3]   // expected-error {{expected '4' elements in inline array literal, but got '3'}}
-let _: [3 x Int] = [1, 2, 3, 4] // expected-error {{expected '3' elements in inline array literal, but got '4'}}
-let _: [3 x String] = [1, 2, 3] // expected-error 3{{cannot convert value of type 'Int' to expected element type 'String'}}
-let _: [3 x String] = [1] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+let _: [4 of _] = [1, 2, 3]   // expected-error {{expected '4' elements in inline array literal, but got '3'}}
+let _: [3 of Int] = [1, 2, 3, 4] // expected-error {{expected '3' elements in inline array literal, but got '4'}}
+let _: [3 of String] = [1, 2, 3] // expected-error 3{{cannot convert value of type 'Int' to expected element type 'String'}}
+let _: [3 of String] = [1] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
 // expected-error@-1 {{expected '3' elements in inline array literal, but got '1'}}
 
 func takeVectorOf2<T>(_: InlineArray<2, T>) {}
@@ -63,10 +63,10 @@ takeVectorOf2Int(["hello", "world"]) // expected-error {{cannot convert value of
 
 takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
 
-func takeSugarVectorOf2<T>(_: [2 x T], ty: T.Type = T.self) {}
+func takeSugarVectorOf2<T>(_: [2 of T], ty: T.Type = T.self) {}
 takeSugarVectorOf2([1, 2])
 takeSugarVectorOf2(["hello"]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
-takeSugarVectorOf2(["hello"], ty: Int.self) // expected-error {{cannot convert value of type '[String]' to expected argument type '[2 x Int]'}}
+takeSugarVectorOf2(["hello"], ty: Int.self) // expected-error {{cannot convert value of type '[String]' to expected argument type '[2 of Int]'}}
 takeSugarVectorOf2(["hello", "hi"], ty: Int.self) // expected-error 2{{cannot convert value of type 'String' to expected element type 'Int'}}
 
 
@@ -112,15 +112,15 @@ extension InlineArray where Element: ~Copyable {
   }
 }
 
-extension [3 x Int] { // expected-note 2{{where 'count' = '2'}} expected-note {{where 'Element' = 'String'}}
+extension [3 of Int] { // expected-note 2{{where 'count' = '2'}} expected-note {{where 'Element' = 'String'}}
   func methodOnSugar() {}
 }
 
 func testExtension(
-  _ a: [3 x Int],
+  _ a: [3 of Int],
   _ b: InlineArray<3, Int>,
-  _ c: [2 x Int],
-  _ d: [2 x String]
+  _ c: [2 of Int],
+  _ d: [2 of String]
 ) {
   a.enumerated { _, _ in }
   a.methodOnSugar()
@@ -133,23 +133,23 @@ func testExtension(
 }
 
 func redecl(_ x: InlineArray<2, Int>) {} // expected-note {{'redecl' previously declared here}}
-func redecl(_ x: [2 x Int]) {} // expected-error {{invalid redeclaration of 'redecl'}}
+func redecl(_ x: [2 of Int]) {} // expected-error {{invalid redeclaration of 'redecl'}}
 
 func noRedecl(_ x: InlineArray<2, Int>) {}
-func noRedecl(_ x: [3 x Int]) {}
-func noRedecl(_ x: [2 x String]) {}
-func noRedecl(_ x: [3 x String]) {}
+func noRedecl(_ x: [3 of Int]) {}
+func noRedecl(_ x: [2 of String]) {}
+func noRedecl(_ x: [3 of String]) {}
 
-func testMismatches(_ x: [3 x Int], _ y: InlineArray<3, Int>) {
+func testMismatches(_ x: [3 of Int], _ y: InlineArray<3, Int>) {
   let _: InlineArray<3, Int> = x
-  let _: InlineArray<4, Int> = x // expected-error {{cannot assign value of type '[3 x Int]' to type 'InlineArray<4, Int>'}}
+  let _: InlineArray<4, Int> = x // expected-error {{cannot assign value of type '[3 of Int]' to type 'InlineArray<4, Int>'}}
   // expected-note@-1 {{arguments to generic parameter 'count' ('3' and '4') are expected to be equal}}
-  let _: InlineArray<3, String> = x  // expected-error {{cannot assign value of type '[3 x Int]' to type 'InlineArray<3, String>'}}
+  let _: InlineArray<3, String> = x  // expected-error {{cannot assign value of type '[3 of Int]' to type 'InlineArray<3, String>'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 
-  let _: [3 x Int] = y
-  let _: [4 x Int] = y // expected-error {{cannot assign value of type 'InlineArray<3, Int>' to type '[4 x Int]'}}
+  let _: [3 of Int] = y
+  let _: [4 of Int] = y // expected-error {{cannot assign value of type 'InlineArray<3, Int>' to type '[4 of Int]'}}
   // expected-note@-1 {{arguments to generic parameter 'count' ('3' and '4') are expected to be equal}}
-  let _: [3 x String] = y  // expected-error {{cannot assign value of type 'InlineArray<3, Int>' to type '[3 x String]'}}
+  let _: [3 of String] = y  // expected-error {{cannot assign value of type 'InlineArray<3, Int>' to type '[3 of String]'}}
   // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 }

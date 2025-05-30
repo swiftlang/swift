@@ -1322,13 +1322,13 @@ ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
 
   ParserStatus status;
 
-  // 'isStartOfInlineArrayTypeBody' means we should at least have a type and 'x'
-  // to start with.
+  // 'isStartOfInlineArrayTypeBody' means we should at least have a type and
+  // 'of' to start with.
   auto count = parseTypeOrValue();
   auto *countTy = count.get();
   status |= count;
 
-  // 'x'
+  // 'of'
   consumeToken(tok::identifier);
 
   // Allow parsing a value for better recovery, Sema will diagnose any
@@ -1827,16 +1827,16 @@ bool Parser::canParseStartOfInlineArrayType() {
   if (!Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar))
     return false;
 
-  // We must have at least '[<type> x', which cannot be any other kind of
+  // We must have at least '[<type> of', which cannot be any other kind of
   // expression or type. We specifically look for any type, not just integers
-  // for better recovery in e.g cases where the user writes '[Int x 2]'. We
-  // only do type-scalar since variadics would be ambiguous e.g 'Int...x'.
+  // for better recovery in e.g cases where the user writes '[Int of 2]'. We
+  // only do type-scalar since variadics would be ambiguous e.g 'Int...of'.
   if (!canParseTypeScalar())
     return false;
 
   // For now we don't allow multi-line since that would require
   // disambiguation.
-  if (Tok.isAtStartOfLine() || !Tok.isContextualKeyword("x"))
+  if (Tok.isAtStartOfLine() || !Tok.isContextualKeyword("of"))
     return false;
 
   consumeToken();
