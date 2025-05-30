@@ -7222,7 +7222,9 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
   }
 
   if (subType.isLoadable(SGF.F)) {
-    ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
+    ManagedValue mv =
+      SGF.emitRValue(subExpr, SGFContext::AllowImmediatePlusZero)
+         .getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
       return RValue(SGF, {mv}, subType.getASTType());
     {
