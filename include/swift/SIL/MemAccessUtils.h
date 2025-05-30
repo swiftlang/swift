@@ -1279,7 +1279,7 @@ struct AccessPathWithBase {
 //
 // Returns false if the access path couldn't be computed.
 bool visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    SILValue address, TypeExpansionContext tec, SILFunction &function,
     std::function<void(AccessPath::PathNode, SILType)> visitor);
 
 inline AccessPath AccessPath::compute(SILValue address) {
