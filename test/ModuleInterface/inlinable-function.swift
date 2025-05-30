@@ -99,7 +99,7 @@ public struct Foo: Hashable {
     // FROMSOURCE:     print("I am set to \(newValue)")
     // FROMSOURCE-NOT: #else
     // FROMSOURCE-NOT: print("I should not appear")
-    // FROMSOURCE-NOT  #endif
+    // FROMSOURCE-NOT:  #endif
     // FROMSOURCE: }
     set {
       #if true

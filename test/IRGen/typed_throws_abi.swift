@@ -2426,7 +2426,7 @@ func callImplAsync_g4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}})
 // CHECK:   unreachable
 // CHECK: [[SET_ERROR]]:
-// CHECK    [[ERROR_RES0]] = phi i64 [ [[ERROR_X]], %typed.error.load ]
+// CHECK:    [[ERROR_RES0]] = phi i64 [ [[ERROR_X]], %typed.error.load ]
 // CHECK:   store ptr null, ptr %swifterror1, align 8
 // CHECK:   br label %[[COMMON_RET]]
 // CHECK: }
