@@ -83,4 +83,14 @@ FieldsTestSuite.test("Non-standard-layout field padding in templated class reuse
   expectEqual(s2.get_c(), 6)
 }
 
+FieldsTestSuite.test("Last field is no unique address") {
+  var s = LastFieldNoUniqueAddress()
+
+  s.c = 5
+  expectEqual(s.c, 5)
+
+  s.c = 6
+  expectEqual(s.c, 6)
+}
+
 runAllTests()
