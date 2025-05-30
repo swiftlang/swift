@@ -397,7 +397,7 @@ void CompletionLookup::addUsingSpecifiers() {
     case UsingSpecifier::MainActor:
       Builder.addTextChunk("@MainActor");
       break;
-    case UsingSpecifier::nonisolated:
+    case UsingSpecifier::Nonisolated:
       Builder.addTextChunk("nonisolated");
       break;
     }

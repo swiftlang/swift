@@ -6676,7 +6676,7 @@ ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
   std::optional<UsingSpecifier> Specifier =
       llvm::StringSwitch<std::optional<UsingSpecifier>>(RawSpecifier.str())
           .Case("MainActor", UsingSpecifier::MainActor)
-          .Case("nonisolated", UsingSpecifier::nonisolated)
+          .Case("nonisolated", UsingSpecifier::Nonisolated)
           .Default(std::nullopt);
 
   if (!Specifier) {
