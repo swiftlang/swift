@@ -3440,6 +3440,10 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   return true;
 }
 
+bool AbstractStorageDecl::requiresOpaqueGetter() const {
+  return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
+}
+
 bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
