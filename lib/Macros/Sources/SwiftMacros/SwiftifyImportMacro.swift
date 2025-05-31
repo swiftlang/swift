@@ -1166,6 +1166,19 @@ func parseSpanAvailabilityParam(_ paramAST: LabeledExprSyntax?) throws -> String
   return stringLitExpr.representedLiteralValue
 }
 
+func parseDebugParam(_ paramAST: LabeledExprSyntax?) throws -> Bool? {
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  guard let label = unwrappedParamAST.label else {
+    return nil
+  }
+  if label.trimmed.text != "debug" {
+    return nil
+  }
+  return try getBoolLiteralValue(unwrappedParamAST.expression)
+}
+
 func parseCxxSpansInSignature(
   _ signature: FunctionSignatureSyntax,
   _ typeMappings: [String: String]?
@@ -1528,6 +1541,15 @@ public struct SwiftifyImportMacro: PeerMacro {
 
       let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
       var arguments = [LabeledExprSyntax](argumentList)
+
+      let debugSetting = try parseDebugParam(arguments.last)
+      if let debug = debugSetting {
+        arguments = arguments.dropLast()
+        if debug {
+          print("Running _SwiftifyImport on '\(declaration.trimmedDescription)'")
+          print("with input '\(node.trimmedDescription)'")
+        }
+      }
       let typeMappings = try parseTypeMappingParam(arguments.last)
       if typeMappings != nil {
         arguments = arguments.dropLast()

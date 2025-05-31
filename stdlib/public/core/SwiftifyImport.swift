@@ -62,7 +62,8 @@ public enum _SwiftifyInfo {
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
-                             typeMappings: [String: String] = [:]) =
+                             typeMappings: [String: String] = [:],
+                             debug: Bool = false) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
