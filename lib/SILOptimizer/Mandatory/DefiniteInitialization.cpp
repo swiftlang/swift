@@ -17,11 +17,11 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -30,7 +30,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -40,6 +39,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
+#include <unordered_map>
 
 using namespace swift;
 using namespace ownership;
@@ -535,6 +535,8 @@ namespace {
     bool shouldEmitError(const SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
     void noteUninitializedMembers(const DIMemoryUse &Use);
+    void emitUninitializedMembersFixit(const SILInstruction *Inst,
+                                       SILLocation loc, const DIMemoryUse &Use);
     void diagnoseInitError(const DIMemoryUse &Use,
                            Diag<StringRef, bool> DiagMessage);
     void diagnoseRefElementAddr(RefElementAddrInst *REI);
@@ -747,8 +749,7 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     }
 
     if (propertyInitIsolation.isGlobalActor()) {
-      auto *init =
-          dyn_cast<ConstructorDecl>(F.getDeclContext()->getAsDecl());
+      auto *init = dyn_cast<ConstructorDecl>(F.getDeclContext()->getAsDecl());
       diagnose(Module, Loc, diag::isolated_property_initializer,
                StringRef(Name), propertyInitIsolation,
                getActorIsolation(init));
@@ -2298,12 +2299,110 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
              theStruct->getParentModule()->getName(),
              theStruct->hasClangNode());
   } else {
-    diagnose(Module, loc,
-             diag::return_from_init_without_initing_stored_properties);
+    emitUninitializedMembersFixit(Inst, loc, Use);
     noteUninitializedMembers(Use);
   }
 
   return true;
+}
+
+/// Emit fix-its for each uninitialized stored property in a designated
+/// initializer.
+void LifetimeChecker::emitUninitializedMembersFixit(const SILInstruction *Inst,
+                                                    SILLocation loc,
+                                                    const DIMemoryUse &Use) {
+  // to generate the missing variables
+  std::string missingVariablesFixIt;
+  std::string suggestedInitializerDeclsString;
+  std::unordered_map<std::string, bool> handledVariablesMap;
+  AvailabilitySet Liveness =
+      getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
+  Decl *initFunctionDecl = Inst->getFunction()->getDeclContext()->getAsDecl();
+  AbstractFunctionDecl *functionDecl =
+      dyn_cast<AbstractFunctionDecl>(initFunctionDecl);
+  auto *parameters = functionDecl->getParameters();
+  SourceLoc RParenLoc = parameters->getRParenLoc();
+  SILLocation initFunctionLocation = SILLocation(functionDecl);
+
+  for (auto param : parameters->getArray()) {
+    auto paramName = param->getName().str().str();
+    handledVariablesMap[paramName] = false;
+  }
+  for (unsigned i = Use.FirstElement, e = Use.FirstElement + Use.NumElements;
+       i != e; ++i) {
+    // if Already initialized, skip the Decl.
+    if (Liveness.get(i) == DIKind::Yes)
+      continue;
+
+    // Ignore a failed super.init requirement.
+    if (i == TheMemory.getNumElements() - 1 && TheMemory.isDerivedClassSelf())
+      continue;
+    std::string Name;
+    auto *Decl = TheMemory.getPathStringToElement(i, Name);
+
+    auto propertyInitIsolation = ActorIsolation::forUnspecified();
+
+    std::string inferredDeclType;
+    std::string declName;
+
+    if (Decl) {
+      if (auto *var = dyn_cast<VarDecl>(Decl)) {
+        inferredDeclType = var->getValueInterfaceType().getString();
+        declName = var->getName().str();
+        propertyInitIsolation = var->getInitializerIsolation();
+      }
+
+      auto variable = handledVariablesMap.find(declName);
+      auto variableWasSuggestedOrExistsInCurrentParams =
+          variable != handledVariablesMap.end();
+      if (variableWasSuggestedOrExistsInCurrentParams && variable->second) {
+        continue;
+      }
+    }
+
+    auto variable = handledVariablesMap.find(declName);
+    // if a variable exists, and it's false so it's alreeady passed in the
+    // init(..)
+    auto shouldAddDecl = false;
+    if (variable != handledVariablesMap.end()) {
+      shouldAddDecl = variable->first == declName;
+    }
+
+    if (!shouldAddDecl) {
+      suggestedInitializerDeclsString +=
+          declName + ": " + inferredDeclType + ", ";
+    }
+    missingVariablesFixIt += "self." + declName + " = " + declName + "\n";
+
+    // mark variable as handled, which means it's already passed in the init, or
+    // going to appear in the fixit, this's needed for tuples, to avoid
+    // generating a decl for each element type defined.
+    handledVariablesMap[declName] = true;
+  }
+
+  // Drop last `, ` from the parameters String
+  auto didGenerateInitializingStoredProperties =
+      suggestedInitializerDeclsString.size() > 0;
+  if (didGenerateInitializingStoredProperties) {
+    suggestedInitializerDeclsString.pop_back();
+    suggestedInitializerDeclsString.pop_back();
+  }
+
+  // if we have a message,and there is already one parameter at least in the
+  // init then we add a comma to the beginning of the message
+  if (parameters->size() >= 1 && didGenerateInitializingStoredProperties) {
+    suggestedInitializerDeclsString = ", " + suggestedInitializerDeclsString;
+  }
+
+  auto diag =
+      diagnose(Module, initFunctionLocation,
+               diag::return_from_init_without_initing_stored_properties);
+  diag.fixItInsert(initFunctionLocation.getEndSourceLoc(),
+                   missingVariablesFixIt);
+
+  if (suggestedInitializerDeclsString.size() > 0) {
+    diag.fixItInsert(RParenLoc, suggestedInitializerDeclsString);
+  }
 }
 
 /// Check and diagnose various failures when a load use is not fully
@@ -2390,8 +2489,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                diag::superselfinit_not_called_before_return,
                (unsigned)TheMemory.isDelegatingInit());
     } else {
-      diagnose(Module, Inst->getLoc(),
-               diag::return_from_init_without_initing_stored_properties);
+      emitUninitializedMembersFixit(Inst, Inst->getLoc(), Use);
       noteUninitializedMembers(Use);
     }
     return;
