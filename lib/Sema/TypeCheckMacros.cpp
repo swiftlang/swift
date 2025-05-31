@@ -1062,7 +1062,9 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
   else if (auto clangModuleUnit =
                dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
     auto clangModule = clangModuleUnit->getParentModule();
-    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+    const clang::Decl *clangDecl = target.get<Decl*>()->getClangDecl();
+    const clang::Module *M = clangDecl->getOwningModule();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule, M);
   }
   return macroSourceFile;
 }

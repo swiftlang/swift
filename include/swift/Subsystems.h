@@ -126,7 +126,7 @@ namespace swift {
   /// Resolve imports for a source file generated to adapt a given
   /// Clang module.
   void performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
+    SourceFile &SF, ModuleDecl *clangModule, const clang::Module *M
   );
 
   /// Once type-checking is complete, this instruments code with calls to an
