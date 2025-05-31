@@ -227,6 +227,24 @@ public:
             || !conditionallyAddressableParamIndices
             || conditionallyAddressableParamIndices->isDisjointWith(
               addressableParamIndices)));
+#ifndef NDEBUG
+    // Ensure inherit/scope/addressable param indices are of the same length or
+    // 0.
+    unsigned paramIndicesLength = 0;
+    if (inheritLifetimeParamIndices) {
+      paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
+    }
+    if (scopeLifetimeParamIndices) {
+      assert(paramIndicesLength == 0 ||
+             paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
+      paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
+    }
+    if (addressableParamIndices) {
+      assert(paramIndicesLength == 0 ||
+             paramIndicesLength == addressableParamIndices->getCapacity());
+      paramIndicesLength = addressableParamIndices->getCapacity();
+    }
+#endif
   }
 
   operator bool() const { return !empty(); }
@@ -248,6 +266,19 @@ public:
   }
   bool hasAddressableParamIndices() const {
     return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+  }
+
+  unsigned getParamIndicesLength() const {
+    if (hasInheritLifetimeParamIndices()) {
+      return getInheritIndices()->getCapacity();
+    }
+    if (hasScopeLifetimeParamIndices()) {
+      return getScopeIndices()->getCapacity();
+    }
+    if (hasAddressableParamIndices()) {
+      return getAddressableIndices()->getCapacity();
+    }
+    return 0;
   }
 
   IndexSubset *getInheritIndices() const { return inheritLifetimeParamIndices; }
