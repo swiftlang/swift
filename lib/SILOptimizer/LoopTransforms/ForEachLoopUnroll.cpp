@@ -394,7 +394,7 @@ void ArrayInfo::getLastDestroys(
 /// not clean up any resulting dead instructions.
 static void removeForEachCall(TryApplyInst *forEachCall,
                               InstructionDeleter &deleter) {
-  auto *sbi = cast<StoreBorrowInst>(forEachCall->getArgument(1));
+  auto *sbi = cast<StoreBorrowInst>(forEachCall->getArgument(2));
   auto *asi = cast<AllocStackInst>(sbi->getDest());
   // The allocStack will be used in the forEach call and also in a store
   // instruction and a dealloc_stack instruction. Force delete all of them.
@@ -440,7 +440,8 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
 
   SILFunction *fun = forEachCall->getFunction();
   SILLocation forEachLoc = forEachCall->getLoc();
-  SILValue forEachBodyClosure = forEachCall->getArgument(0);
+  SILValue typedThrowValue = forEachCall->getArgument(0);
+  SILValue forEachBodyClosure = forEachCall->getArgument(1);
   SILType arrayElementType = arrayInfo.getElementSILType();
 
   SILFunctionType *bodyClosureType =
@@ -582,7 +583,7 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     // elements of address-only type. All elements in the array are guaranteed
     // to be loadable. TODO: generalize this to address-only types.
     unrollBuilder.createTryApply(forEachLoc, forEachBodyClosure,
-                                 SubstitutionMap(), addr, nextNormalBB,
+                                 SubstitutionMap(), {typedThrowValue, addr}, nextNormalBB,
                                  errorTarget);
 
     if (nextNormalBB == normalBB) {
