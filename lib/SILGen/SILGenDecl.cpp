@@ -2542,6 +2542,8 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
+    ASSERT(AddressableBuffers.find(decl) != AddressableBuffers.end()
+           && "local variable did not have an addressability scope set");
     auto insertPoint = AddressableBuffers[decl].insertPoint;
     B.setInsertionPoint(insertPoint);
     auto allocStackTy = fullyAbstractedTy;

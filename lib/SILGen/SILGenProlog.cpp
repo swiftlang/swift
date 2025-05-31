@@ -1406,6 +1406,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 
   SGF.VarLocs[VD] = SILGenFunction::VarLoc(arg, enforcement, box);
+  SGF.enterLocalVariableAddressableBufferScope(VD);
   SILDebugVariable DbgVar(VD->isLet(), ArgNo);
   if (auto *AllocStack = dyn_cast<AllocStackInst>(arg)) {
     AllocStack->setArgNo(ArgNo);
