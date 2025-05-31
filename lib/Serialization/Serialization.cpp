@@ -6968,7 +6968,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<TopLevelCodeDecl>(D)) {
+          isa<TopLevelCodeDecl>(D) || isa<UsingDecl>(D)) {
         continue;
       }
 
