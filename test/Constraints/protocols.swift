@@ -577,3 +577,11 @@ do {
 
   isFooableError(overloaded()) // Ok
 }
+
+do {
+  func takesFooables(_: [any Fooable]) {}
+
+  func test(v: String) {
+    takesFooables([v]) // expected-error {{cannot convert value of type 'String' to expected element type 'any Fooable'}}
+  }
+}
