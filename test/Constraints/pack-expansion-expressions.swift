@@ -798,3 +798,13 @@ do {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/78426
+func test_pack_param_inference_closure<each T>(_: repeat each T) {
+  func takesGeneric<U>(_: U) {}
+  let _: (repeat each T) -> Void = { x in }
+  let _: (repeat each T) -> Void = { repeat takesGeneric(each $0) }
+  let _: (Any, repeat each T) -> Void = { _,x in repeat takesGeneric(each x) }
+  let _ = { x in repeat takesGeneric(each x) }
+  // expected-error@-1{{cannot infer type of closure parameter 'x' without a type annotation}}
+}
