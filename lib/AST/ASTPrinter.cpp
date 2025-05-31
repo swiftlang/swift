@@ -7115,7 +7115,7 @@ public:
     } else {
       Printer << "[";
       visit(T->getCountType());
-      Printer << " x ";
+      Printer << " of ";
       visit(T->getElementType());
       Printer << "]";
     }

@@ -497,7 +497,7 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
-/// Enable syntax sugar type '[3 x Int]' for Inline Array
+/// Enable syntax sugar type '[3 of Int]' for Inline Array
 EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 
 /// Allow declaration of compile-time values
