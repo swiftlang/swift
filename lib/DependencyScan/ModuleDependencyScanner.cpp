@@ -420,7 +420,7 @@ bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     };
 
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
-        /*ACTODO:*/ inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs, headerPath),
+        inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs, headerPath),
         clangScanningWorkingDirectoryPath,
         cache.getAlreadySeenClangModules(), lookupModuleOutput, sourceBuffer);
     if (!dependencies)
@@ -450,11 +450,9 @@ bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
   // - Binary module dependnecies may have arbitrary header inputs.
   auto clangModuleDependencies = scanHeaderDependencies();
   if (!clangModuleDependencies) {
-    // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
-                                llvm::errs());
-    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                       "failed to scan header dependencies");
+    auto errorStr = toString(clangModuleDependencies.takeError());
+    workerASTContext->Diags.diagnose(
+            SourceLoc(), diag::clang_header_dependency_scan_error, errorStr);
     return true;
   }
 
