@@ -194,7 +194,7 @@ public struct Range<Bound: Comparable> {
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
-  @inlinable
+  @_transparent
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element && element < upperBound
   }
@@ -1074,6 +1074,7 @@ extension Range {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: Range<Bound>) -> Bool {
     other.isEmpty ||
       (lowerBound <= other.lowerBound && upperBound >= other.upperBound)
@@ -1101,6 +1102,7 @@ extension Range {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound > other.upperBound
   }
