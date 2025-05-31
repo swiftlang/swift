@@ -34,8 +34,6 @@ extension SIMD${n} where Scalar == ${Scalar} {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
   
-  /* Breaks differentiation testing, commented out while we figure out
-     what to do about that.
   @_alwaysEmitIntoClient @_transparent
   public init(repeating scalar: ${Scalar}) {
     let asVector = Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
@@ -52,7 +50,6 @@ extension SIMD${n} where Scalar == ${Scalar} {
     ))
 %end
   }
-  */
   
 %  if n >= 4:
   @_alwaysEmitIntoClient @_transparent
