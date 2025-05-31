@@ -700,6 +700,8 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
 
+  bool isClonedBaseMemberDecl(ValueDecl *decl);
+
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
   // Cache for already-specialized function templates and any thunks they may
