@@ -2248,13 +2248,20 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
   auto typeRepr = param->getTypeRepr();
 
-  if (!typeRepr && !param->isImplicit()) {
-    // Untyped closure parameter.
-    return ParamSpecifier::Default;
-  }
+  if (!typeRepr) {
+    if (!param->isImplicit()) {
+      // Untyped closure parameter.
+      return ParamSpecifier::Default;
+    }
 
-  assert(typeRepr != nullptr && "Should call setSpecifier() on "
-         "synthesized parameter declarations");
+    if (param->isInvalid()) {
+      // Invalid parse.
+      return ParamSpecifier::Default;
+    }
+
+    ASSERT(false && "Should call setSpecifier() on "
+           "synthesized parameter declarations");
+  }
 
   // Look through top-level pack expansions.  These specifiers are
   // part of what's repeated.

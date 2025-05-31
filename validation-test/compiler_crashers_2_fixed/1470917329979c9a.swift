@@ -1,5 +1,5 @@
 // {"signature":"swift::PackExpansionType::PackExpansionType(swift::Type, swift::Type, swift::RecursiveTypeProperties, swift::ASTContext const*)"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 struct a < each b {
   struct c {
           d : (repeat(each b
