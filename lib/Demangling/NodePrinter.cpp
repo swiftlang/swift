@@ -3316,7 +3316,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::SugaredInlineArray: {
     Printer << "[";
     print(Node->getChild(0), depth + 1);
-    Printer << " x ";
+    Printer << " of ";
     print(Node->getChild(1), depth + 1);
     Printer << "]";
     return nullptr;
