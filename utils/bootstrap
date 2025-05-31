@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+#===--- bootstrap - Bootstrap the compiler ---------------------------------===#
+#
+## This source file is part of the Swift.org open source project
+##
+## Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+## Licensed under Apache License v2.0 with Runtime Library Exception
+##
+## See https://swift.org/LICENSE.txt for license information
+## See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===------------------------------------------------------------------------===#
+#                                                                              #
+# Builds the compiler on a system where no Swift host tools are available.     #
+# For details see the help message below                                       #
+#                                                                              #
+#===------------------------------------------------------------------------===#
+
+set -e
+
+first_version="6.0"
+do_checkout="yes"
+do_build="yes"
+do_build_v1="yes"
+do_build_v2="yes"
+do_build_final="yes"
+
+v1_build_script_options="\
+  -R --no-swift-stdlib-assertions \
+  --build-subdir=v1 \
+  --bootstrapping=off \
+  --skip-build-benchmarks \
+  --skip-early-swift-driver \
+  --skip-early-swiftsyntax \
+  --enable-experimental-concurrency=0 \
+  --enable-experimental-distributed=0 \
+  --enable-experimental-observation=0 \
+  --swift-enable-backtracing=0 \
+  "
+
+v2_build_script_options="\
+  -R --no-swift-stdlib-assertions \
+  --build-subdir=v2 \
+  --skip-build-benchmarks \
+  "
+
+final_build_script_options="\
+  -R --no-swift-stdlib-assertions \
+  --skip-build-benchmarks \
+  "
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h | -help | --help)
+      cat <<'EOF'
+
+bootstrap [option..] [build-script-options]
+
+Builds the compiler on a system where no Swift host tools are available.
+This is done in the following stages:
+* checkout:    checkout the release/6.0 sources into the bootstrapping directory
+* build-v1:    build the 6.0 compiler without any Swift sources (with limited functionality)
+* build-v2:    build a fully functional the 6.0 compiler using the v1 compiler
+* build-final: build the current compiler using the v2 compiler as host tools
+
+options:
+  -skip-checkout   Assume that the previous compiler sources are already checked out
+  -skip-build      Don't build and only check out the previous compiler sources
+  -skip-<stage>    Skip a specific stage, e.g. -skip-build-v1
+  -help            Display this help message
+EOF
+      exit 0
+      ;;
+    -skip-*)
+      w=${1/-skip-/}
+      what=${w/-/_}
+      eval 'do_'${what}="no"
+      ;;
+    *)
+      final_build_script_options="${build_script_options} $1"
+  esac
+  shift
+done
+
+
+cd `dirname "$0"`/../..
+
+bootstrapping_dir=bootstrapping${first_version}
+
+mkdir -p ${bootstrapping_dir}
+pushd ${bootstrapping_dir}
+
+if [[ ${do_checkout} == "yes" && ! -d llvm-project ]]; then
+
+
+  echo "==============================================================="
+  echo "                Checking out release/${first_version}"
+  echo "==============================================================="
+  echo
+
+  if [ ! -d swift ]; then
+    git clone git@github.com:swiftlang/swift.git
+  fi
+  pushd swift
+    ./utils/update-checkout --scheme release/${first_version} --clone-with-ssh --all-repositories
+  popd
+  
+  patch -d swift -p1 -i ../../swift/utils/bootstrapping_patches/swift-6.0.patch
+  patch -d swift-syntax -p1 -i ../../swift/utils/bootstrapping_patches/swift-syntax-6.0.patch
+fi
+
+
+if [[ ${do_build} == "yes" && ${do_build_v1} == "yes" ]]; then
+
+  # Build a 6.0 compiler without any swift sources.
+  # The resulting compiler does not support macros and therefore cannot build e.g. Concurrency
+
+  echo "==============================================================="
+  echo "            Building v1 of release/${first_version}"
+  echo "==============================================================="
+  echo
+
+  ./swift/utils/build-script ${v1_build_script_options}
+fi
+
+v1_swiftc=(`pwd`/build/v1/swift-*/bin/swiftc)
+
+if [[ ${do_build} == "yes" && ${do_build_v2} == "yes" ]]; then
+
+  # Build a fully functional 6.0 compiler using the compiler from v1.
+
+  echo "==============================================================="
+  echo "            Building v2 of release/${first_version}"
+  echo "==============================================================="
+  echo
+
+  ./swift/utils/build-script ${v2_build_script_options} "--extra-cmake-options=-DCMAKE_Swift_COMPILER=${v1_swiftc}" 
+fi
+
+v2_swiftc=(`pwd`/build/v2/swift-*/bin/swiftc)
+
+popd # out of bootstrapping_dir into main project dir
+
+if [[ ${do_build} == "yes" && ${do_build_final} == "yes" ]]; then
+
+  # Build the actual compiler using the 6.0 compiler as host tools.
+
+  echo "==============================================================="
+  echo "            Building final"
+  echo "==============================================================="
+  echo
+
+  ./swift/utils/build-script ${final_build_script_options} "--extra-cmake-options=-DCMAKE_Swift_COMPILER=${v2_swiftc}"
+fi
