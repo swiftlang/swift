@@ -332,11 +332,27 @@ void SILDeclRef::print(raw_ostream &OS) const {
     auto *accessor = dyn_cast<AccessorDecl>(getDecl());
     if (!accessor) {
       printValueDecl(getDecl(), OS);
+      if (isDistributed()) {
+        OS << "!distributed";
+        OS << "(" << getDecl() << ")";
+      }
+      if (isDistributedThunk()) {
+        OS << "!distributed_thunk";
+        OS << "(" << getDecl() << ")";
+      }
       isDot = false;
       break;
     }
 
     printValueDecl(accessor->getStorage(), OS);
+    if (isDistributed()) {
+      OS << "!distributed";
+      OS << "(" << getDecl() << ")";
+    }
+    if (isDistributedThunk()) {
+      OS << "!distributed_thunk";
+      OS << "(" << getDecl() << ")";
+    }
     switch (accessor->getAccessorKind()) {
     case AccessorKind::WillSet:
       OS << "!willSet";

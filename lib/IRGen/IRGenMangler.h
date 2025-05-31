@@ -86,6 +86,8 @@ public:
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
+    if (func->isDistributedThunk())
+      appendSymbolKind(SymbolKind::DistributedThunk);
     return finalize();
   }
 

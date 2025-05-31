@@ -4373,6 +4373,11 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   appendDeclName(decl);
   appendDeclType(decl, base, FunctionMangling);
   appendOperator("F");
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->isDistributedThunk()) {
+      appendSymbolKind(SymbolKind::DistributedThunk);
+    }
+  }
   if (decl->isStatic())
     appendOperator("Z");
 }
