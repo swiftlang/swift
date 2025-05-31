@@ -3829,6 +3829,12 @@ bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
          fileName == llvm::sys::path::filename(file->getFilename());
 }
 
+std::optional<DefaultIsolation> SourceFile::getDefaultIsolation() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, DefaultIsolationInSourceFileRequest{this}, std::nullopt);
+}
+
 namespace {
 class LocalTypeDeclCollector : public ASTWalker {
   SmallVectorImpl<TypeDecl *> &results;

@@ -32,6 +32,7 @@ class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
 class Token;
+enum class DefaultIsolation : uint8_t;
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -689,6 +690,11 @@ public:
   void setDelayedParserState(ParserStatePtr &&state) {
     DelayedParserState = std::move(state);
   }
+
+  /// Retrieve default action isolation to be used for this source file.
+  /// It's determine based on on top-level `using <<isolation>>` declaration
+  /// found in the file.
+  std::optional<DefaultIsolation> getDefaultIsolation() const;
 
   SWIFT_DEBUG_DUMP;
   void

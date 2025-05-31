@@ -5938,6 +5938,17 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
     }
   }
 
+  // `using @<attribute>` or `using <identifier>`.
+  if (Tok.isContextualKeyword("using")) {
+    // `using` declarations don't support attributes or modifiers.
+    if (hadAttrsOrModifiers)
+      return false;
+
+    return !Tok2.isAtStartOfLine() &&
+           (Tok2.is(tok::at_sign) || Tok2.is(tok::identifier) ||
+            Tok2.is(tok::code_complete));
+  }
+
   // If the next token is obviously not the start of a decl, bail early.
   if (!isKeywordPossibleDeclStart(Context.LangOpts, Tok2))
     return false;
@@ -6292,6 +6303,17 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       break;
     }
 
+    // `using @<attribute>` or `using <identifier>`
+    if (Tok.isContextualKeyword("using")) {
+      auto nextToken = peekToken();
+      if (!nextToken.isAtStartOfLine() &&
+          (nextToken.is(tok::at_sign) || nextToken.is(tok::identifier) ||
+           nextToken.is(tok::code_complete))) {
+        DeclResult = parseDeclUsing(Flags, Attributes);
+        break;
+      }
+    }
+
     if (Flags.contains(PD_HasContainerType) &&
         IsAtStartOfLineOrPreviousHadSemi) {
 
@@ -6637,6 +6659,68 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                 KindLoc, importPath.get());
   ID->attachParsedAttrs(Attributes);
   return DCC.fixupParserResult(ID);
+}
+
+/// Parse an `using` declaration.
+///
+/// \verbatim
+///   decl-using:
+///     'using' (@<attribute> | <modifier>)
+/// \endverbatim
+ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
+                                               DeclAttributes &Attributes) {
+  assert(Tok.isContextualKeyword("using"));
+  DebuggerContextChange DCC(*this);
+
+  if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
+    diagnose(Tok, diag::experimental_using_decl_disabled);
+  }
+
+  SourceLoc UsingLoc = consumeToken();
+
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeUsingDecl();
+    }
+    return makeParserCodeCompletionStatus();
+  }
+
+  SourceLoc AtLoc;
+  // @<<attribute>>
+  if (Tok.is(tok::at_sign))
+    AtLoc = consumeToken();
+
+  SourceLoc SpecifierLoc;
+  Identifier RawSpecifier;
+
+  if (parseIdentifier(RawSpecifier, SpecifierLoc,
+                      /*diagnoseDollarPrefix=*/false,
+                      diag::expected_identifier_in_decl, "using"))
+    return nullptr;
+
+  std::optional<UsingSpecifier> Specifier =
+      llvm::StringSwitch<std::optional<UsingSpecifier>>(RawSpecifier.str())
+          .Case("MainActor", UsingSpecifier::MainActor)
+          .Case("nonisolated", UsingSpecifier::Nonisolated)
+          .Default(std::nullopt);
+
+  if (!Specifier) {
+    diagnose(SpecifierLoc, diag::using_decl_invalid_specifier);
+    return nullptr;
+  }
+
+  // Complain the `using` not being at top-level only after the specifier
+  // has been consumed, otherwise the specifier is going to be interpreted
+  // as a start of another declaration.
+  if (!CodeCompletionCallbacks && !DCC.movedToTopLevel() &&
+      !(Flags & PD_AllowTopLevel)) {
+    diagnose(UsingLoc, diag::decl_inner_scope);
+    return nullptr;
+  }
+
+  auto *UD = UsingDecl::create(Context, UsingLoc, AtLoc ? AtLoc : SpecifierLoc,
+                               *Specifier, CurDeclContext);
+  return DCC.fixupParserResult(UD);
 }
 
 /// Parse an inheritance clause.

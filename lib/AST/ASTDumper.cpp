@@ -2114,6 +2114,11 @@ namespace {
       printFoot();
     }
 
+    void visitUsingDecl(UsingDecl *UD, Label label) {
+      printCommon(UD, "using_decl", label);
+      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
+    }
+
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
       printCommon(ED, "extension_decl", label, ExtensionColor);
       printFlag(!ED->hasBeenBound(), "unbound");

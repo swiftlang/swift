@@ -2187,5 +2187,14 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
 
+//------------------------------------------------------------------------------
+// MARK: using @<attribute> or using <identifier>
+//------------------------------------------------------------------------------
+ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
+      "default isolation can only be set to '@MainActor' or 'nonisolated'",
+      ())
+ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
+      "'using' is an experimental feature that is currently disabled", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

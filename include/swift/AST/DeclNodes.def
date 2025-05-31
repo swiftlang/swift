@@ -190,6 +190,7 @@ DECL(Missing, Decl)
 DECL(MissingMember, Decl)
 DECL(PatternBinding, Decl)
 DECL(EnumCase, Decl)
+DECL(Using, Decl)
 
 ABSTRACT_DECL(Operator, Decl)
   OPERATOR_DECL(InfixOperator, OperatorDecl)

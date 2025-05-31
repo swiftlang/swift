@@ -1744,6 +1744,19 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements);
 
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedUsingSpecifier {
+  BridgedUsingSpecifierMainActor,
+  BridgedUsingSpecifierNonisolated,
+};
+
+SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
+           "specifierLoc:specifier:)")
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier);
+
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
            "arrowLoc:returnType:genericWhereClause:)")
