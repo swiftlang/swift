@@ -16,3 +16,5 @@ int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * __counted_by(l
 int * __counted_by(len) _Nullable nullable(int len, int len2, int * __counted_by(len2) __lifetimebound _Nullable p);
 
 int * __counted_by(len) noncountedLifetime(int len, int * __lifetimebound p);
+
+int * __counted_by(13) _Nullable constant(int * __counted_by(13) __lifetimebound _Nullable p);

@@ -170,4 +170,7 @@ struct SpanWithoutTypeAlias {
   void foo(std::span<const int> s [[clang::noescape]]);
 };
 
+inline void func(ConstSpanOfInt copy [[clang::noescape]]) {}
+inline void mutableKeyword(SpanOfInt copy [[clang::noescape]]) {}
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
