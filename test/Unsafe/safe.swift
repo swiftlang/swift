@@ -359,3 +359,17 @@ func testSwitch(se: SomeEnum) {
 
   if case unsafe someEnumValue = unsafe se { }
 }
+
+@unsafe class SomeClass {}
+@unsafe class SomeClassWrapper { }
+
+protocol Associated {
+    associatedtype Associated
+}
+
+protocol CustomAssociated: Associated { }
+
+// expected-warning@+1{{conformance of 'SomeClass' to protocol 'Associated' involves unsafe code}}{{22-22=@unsafe }}
+extension SomeClass: CustomAssociated {
+  typealias Associated = SomeClassWrapper // expected-note{{unsafe type 'SomeClass.Associated' (aka 'SomeClassWrapper') cannot satisfy safe associated type 'Associated'}}
+}
