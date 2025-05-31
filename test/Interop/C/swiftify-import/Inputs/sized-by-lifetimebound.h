@@ -1,6 +1,10 @@
 #pragma once
 
+#include <stdint.h>
+
+#ifndef __sized_by
 #define __sized_by(x) __attribute__((__sized_by__(x)))
+#endif
 #define __lifetimebound __attribute__((lifetimebound))
 
 const void * __sized_by(len) simple(int len, int len2, const void * __sized_by(len2) __lifetimebound p);
@@ -19,3 +23,9 @@ typedef struct foo opaque_t;
 opaque_t * __sized_by(len) opaque(int len, int len2, opaque_t * __sized_by(len2) __lifetimebound p);
 
 const void * __sized_by(len) nonsizedLifetime(int len, const void * __lifetimebound p);
+
+uint8_t *__sized_by(size)  bytesized(int size, const uint8_t *__sized_by(size) __lifetimebound);
+
+char *__sized_by(size) charsized(char *__sized_by(size) __lifetimebound, int size);
+
+const uint16_t *__sized_by(size)  doublebytesized(uint16_t *__sized_by(size) __lifetimebound, int size);
