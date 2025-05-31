@@ -2691,10 +2691,28 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
 
     if (!unsafeUses.empty()) {
-      Context.Diags.diagnose(
+      // Primary diagnostic along with a Fix-It to add @unsafe in the appropriate
+      // place.
+      {
+        auto diag = Context.Diags.diagnose(
           conformance->getLoc(), diag::conformance_involves_unsafe,
-          conformance->getType(), Proto)
-      .fixItInsert(conformance->getProtocolNameLoc(), "@unsafe ");
+          conformance->getType(), Proto);
+        
+        // Find the original explicit conformance, where we can add the Fix-It.
+        auto explicitConformance = conformance;
+        while (explicitConformance->getSourceKind() ==
+                  ConformanceEntryKind::Implied) {
+          explicitConformance =
+            explicitConformance->ProtocolConformance::getImplyingConformance();
+        }
+        
+        if (explicitConformance->getSourceKind() ==
+              ConformanceEntryKind::Explicit) {
+          diag.fixItInsert(explicitConformance->getProtocolNameLoc(),
+                           "@unsafe ");
+        }
+      }
+
       for (const auto& unsafeUse : unsafeUses)
         diagnoseUnsafeUse(unsafeUse);
     }
