@@ -116,6 +116,8 @@ func call(aa: a, bb: b, cc: c, dd: d, ee: e, ff: f, ii: UnsafeMutablePointer<i>,
 
     let _ = unsafe ii.pointee.len
 #if VERIFY
+    // rdar://152293598 ([ClangImporter] Importing global array errors on macOS and Linux, but not on Windows)
+    // XFAIL: OS=windows-msvc
     // flexible array member not imported rdar://151665752
     let _ = i.a // expected-error{{type 'i' has no member 'a'}}
 #endif
