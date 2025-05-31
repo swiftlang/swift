@@ -195,8 +195,8 @@ func test6(_ a: Array<Int>) {
 // CHECK:   [[MD2:%.*]] = mark_dependence [nonescaping] [[VIEW2]] : $View on [[BA]] : $*View
 // CHECK:   [[USE:%.*]] = function_ref @$s31lifetime_dependence_scope_fixup3useyyAA4ViewVF : $@convention(thin) (@guaranteed View) -> ()
 // CHECK:   apply [[USE]]([[MD2]]) : $@convention(thin) (@guaranteed View) -> ()
-// CHECK:   release_value [[MD2]] : $View
 // CHECK:   end_access [[BA]] : $*View
+// CHECK:   release_value [[MD2]] : $View
 // CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup5test7yySWF'
 func test7(_ a: UnsafeRawBufferPointer) {
   var x = View(a, a.count)
