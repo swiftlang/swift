@@ -308,7 +308,10 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
            originKind == DisallowedOriginKind::MissingImport &&
            "Only implicitly imported decls should be reported as a warning.");
 
-    ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
+    auto diagID = diag::inlinable_decl_ref_from_hidden_module;
+    if (ctx.TypeCheckerOpts.DiagnoseEscapingImplementationOnlyProperties)
+      diagID = diag::inlinable_decl_ref_from_hidden_module_leak;
+    ctx.Diags.diagnose(loc, diagID, D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))
         .warnUntilSwiftVersionIf(downgradeToWarning == DowngradeToWarning::Yes,
