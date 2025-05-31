@@ -175,3 +175,16 @@ extension TestUnapplied {
 func testUnappliedWithOpetator<T: Comparable>(v: TestUnapplied<T>) {
   v<=>(>) // expected-error {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
 }
+
+protocol P {}
+
+func acceptClosure(_: () -> Void) {}
+
+@MainActor
+func f<T: P>(_: T.Type) {
+  acceptClosure {
+    Task {
+      _ = T.self // okay to capture T.Type in this closure.
+    }
+  }
+}
