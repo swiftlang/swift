@@ -767,8 +767,8 @@ Type ASTBuilder::createExistentialMetatypeType(
 Type ASTBuilder::createConstrainedExistentialType(
     Type base, ArrayRef<BuiltRequirement> constraints,
     ArrayRef<BuiltInverseRequirement> inverseRequirements) {
-  llvm::SmallDenseMap<Identifier, Type> primaryAssociatedTypes;
-  llvm::SmallDenseSet<Identifier> claimed;
+  llvm::SmallDenseMap<AssociatedTypeDecl *, Type> primaryAssociatedTypes;
+  llvm::SmallDenseSet<AssociatedTypeDecl *> claimed;
 
   for (const auto &req : constraints) {
     switch (req.getKind()) {
@@ -782,7 +782,7 @@ Type ASTBuilder::createConstrainedExistentialType(
       if (auto *memberTy = req.getFirstType()->getAs<DependentMemberType>()) {
         if (memberTy->getBase()->is<GenericTypeParamType>()) {
           // This is the only case we understand so far.
-          primaryAssociatedTypes[memberTy->getName()] = req.getSecondType();
+          primaryAssociatedTypes[memberTy->getAssocType()] = req.getSecondType();
           continue;
         }
       }
@@ -799,7 +799,7 @@ Type ASTBuilder::createConstrainedExistentialType(
 
     llvm::SmallVector<Type, 4> args;
     for (auto *assocTy : proto->getPrimaryAssociatedTypes()) {
-      auto found = primaryAssociatedTypes.find(assocTy->getName());
+      auto found = primaryAssociatedTypes.find(assocTy);
       if (found == primaryAssociatedTypes.end())
         return protoTy;
       args.push_back(found->second);
