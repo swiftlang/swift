@@ -40,7 +40,8 @@ public:
   /// to ToDecl.
   static void
   applyInferredAvailableAttrs(Decl *ToDecl,
-                              ArrayRef<const Decl *> InferredFromDecls);
+                              ArrayRef<const Decl *> InferredFromDecls,
+                              bool includeSwiftToolchain = true);
 
   static AvailabilityRange inferForType(Type t);
 
