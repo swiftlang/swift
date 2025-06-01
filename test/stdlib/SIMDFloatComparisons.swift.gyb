@@ -36,13 +36,13 @@ func compare_eq${n}x${bits}(
 // CHECK-arm64: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
 // CHECK: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECK-x86_64: cmpeqp${'s' if bits == 32 else 'd'}
+// CHECK-x86_64: ret
 %   end
 // CHECKO-arm64-NEXT: fcmeq.${neonSuffix} v0, v0, v1
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmeq.${neonSuffix}
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: cmpeqp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 
 %   if bits == 16:
 #if arch(arm64)
@@ -58,6 +58,8 @@ func compare_ne${n}x${bits}(
 // CHECK-arm64: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
 // CHECK: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECK-x86_64: cmpneqp${'s' if bits == 32 else 'd'}
+// CHECK-x86_64: ret
 %   end
 // CHECKO-arm64-NEXT: fcmeq.${neonSuffix} [[TMP:v[0-9]+]], v0, v1
 // CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, [[TMP]]
@@ -65,8 +67,6 @@ func compare_ne${n}x${bits}(
 // CHECKOnone-arm64: fcmeq.${neonSuffix}
 // CHECKOnone-arm64: mvn.${totalBits//8}b
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: cmpnep${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 
 %   if bits == 16:
 #if arch(arm64)
@@ -82,13 +82,13 @@ func compare_lt${n}x${bits}(
 // CHECK-arm64: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
 // CHECK: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
+// CHECK-x86_64: ret
 %   end
 // CHECKO-arm64-NEXT: fcmgt.${neonSuffix} v0, v1, v0
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmgt.${neonSuffix}
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 
 %   if bits == 16:
 #if arch(arm64)
@@ -104,13 +104,13 @@ func compare_le${n}x${bits}(
 // CHECK-arm64: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
 // CHECK: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
+// CHECK-x86_64: ret
 %   end
 // CHECKO-arm64-NEXT: fcmge.${neonSuffix} v0, v1, v0
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmge.${neonSuffix}
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 
 %   if bits == 16:
 #if arch(arm64)
@@ -126,13 +126,13 @@ func compare_ge${n}x${bits}(
 // CHECK-arm64: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
 // CHECK: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
+// CHECK-x86_64: ret
 %   end
 // CHECKO-arm64-NEXT: fcmge.${neonSuffix} v0, v0, v1
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmge.${neonSuffix}
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 
 %   if bits == 16:
 #if arch(arm64)
@@ -148,13 +148,13 @@ func compare_gt${n}x${bits}(
 // CHECK-arm64: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
 // CHECK: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
+// CHECK-x86_64: ret
 %   end
 // CHECKO-arm64-NEXT: fcmgt.${neonSuffix} v0, v0, v1
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmgt.${neonSuffix}
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 
 %  end
 % end
