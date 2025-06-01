@@ -873,12 +873,16 @@ namespace swift {
 
     /// Returns whether the given feature is enabled.
     ///
-    /// If allowMigration is set, also returns true when the feature has been enabled for migration.
+    /// If allowMigration is set, also returns true when the feature has been
+    /// enabled for migration.
     bool hasFeature(Feature feature, bool allowMigration = false) const;
 
     /// Returns whether a feature with the given name is enabled. Returns
     /// `false` if a feature by this name is not known.
     bool hasFeature(llvm::StringRef featureName) const;
+
+    /// Returns whether the given feature is enabled for migration.
+    bool isMigratingToFeature(Feature feature) const;
 
     /// Enables the given feature (enables in migration mode if `forMigration`
     /// is `true`).

@@ -6322,7 +6322,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   };
 
   auto &ctx = DC->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return;
 
   DiagnoseWalker walker(DC);

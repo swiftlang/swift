@@ -340,8 +340,10 @@ bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
   if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageVersion())
-    return isSwiftVersionAtLeast(*version);
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version))
+      return true;
+  }
 
   if (allowMigration && state.isEnabledForMigration())
     return true;
@@ -359,6 +361,10 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
     return hasFeature(*feature);
 
   return false;
+}
+
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
 }
 
 void LangOptions::enableFeature(Feature feature, bool forMigration) {
