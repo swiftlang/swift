@@ -11102,7 +11102,7 @@ AccessorDecl *AccessorDecl::createImplicit(ASTContext &ctx,
       ctx, /*declLoc=*/SourceLoc(),
       /*accessorKeywordLoc=*/SourceLoc(), accessorKind,
       storage, async, /*asyncLoc=*/SourceLoc(),
-      /*throws=*/true, /*throwsLoc=*/SourceLoc(),
+      /*throws=*/throws, /*throwsLoc=*/SourceLoc(),
       thrownType, parent,
       /*clangNode=*/ClangNode());
   D->setImplicit();
