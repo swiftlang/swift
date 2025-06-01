@@ -24,7 +24,7 @@ import Swift
 func repeating${n}_mask${bits}(_ scalar: Bool) -> SIMDMask<SIMD${n}<Int${bits}>> {
   SIMDMask(repeating: scalar)
 }
-// CHECK: repeating${n}_mask${bits}{{[[:alnum:]]+}}:
+// CHECK: repeating${n}_mask${bits}{{[[:alnum:]_]+}}:
 // CHECKO-arm64-NEXT: sbfx [[REG:[wx][0-9]]], {{[wx]}}0, #0, #1
 // CHECKO-arm64-NEXT: dup.${neonSuffix} v0, [[REG]]
 // CHECKO-arm64-NEXT: ret
