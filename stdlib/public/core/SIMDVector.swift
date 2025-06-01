@@ -111,7 +111,15 @@ extension SIMD {
     return 0 ..< scalarCount
   }
   
-  /// A vector with the specified value in all lanes.
+  /// A vector with the specified scalar in all lanes.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in result.indices {
+  ///   result[i] = scalar
+  /// }
+  /// ```
   @_transparent
   public init(repeating value: Scalar) {
     self.init()
