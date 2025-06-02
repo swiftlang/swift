@@ -530,6 +530,10 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
+    // Don't forward declare C enums.
+    if (ED->getAttrs().getAttribute<CDeclAttr>())
+      return;
+
     assert(ED->isObjC() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
@@ -864,7 +868,7 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (outputLangMode != OutputLanguageMode::Cxx
+    if (outputLangMode == OutputLanguageMode::ObjC
         && ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
