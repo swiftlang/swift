@@ -32,7 +32,9 @@ func compare_eq${n}x${bits}(
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: cmeq.${neonSuffix}
 // CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPEQQ until SSE4.1
 // CHECK-x86_64: pcmpeq${sseSuffix}
+%   end
 // CHECK-x86_64: ret
 
 func compare_eq${n}x${bits}(
@@ -67,8 +69,10 @@ func compare_ne${n}x${bits}(
 // CHECKOnone-arm64: cmeq.${neonSuffix}
 // CHECKOnone-arm64: mvn.${totalBits//8}b
 // CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPEQQ until SSE4.1
 // CHECK-x86_64: pcmpeq${sseSuffix}
 // CHECK-x86_64: pxor
+%   end
 // CHECK-x86_64: ret
 
 func compare_ne${n}x${bits}(
