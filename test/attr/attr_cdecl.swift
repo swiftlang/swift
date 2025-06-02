@@ -25,7 +25,7 @@ enum SwiftEnum { case A, B }
 #endif
 
 @_cdecl("enum") // expected-error {{@_cdecl may only be used on 'func' declarations}}
-enum UnderscoreCDeclEnum: Int { case A, B }
+enum UnderscoreCDeclEnum: CInt { case A, B }
 
 @_cdecl("swiftStruct")
 func swiftStruct(x: SwiftStruct) {} // expected-error{{cannot be represented}} expected-note{{Swift struct}}
