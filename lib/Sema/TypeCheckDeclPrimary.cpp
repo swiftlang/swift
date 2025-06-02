@@ -3280,6 +3280,13 @@ public:
       }
     }
 
+    // If the enum is exported to C, it must be representable in C.
+    if (auto CDeclAttr = ED->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclEnumRequest{ED, CDeclAttr},
+                        {});
+    }
+
     // -----
     // NonCopyableChecks
     //
@@ -3813,7 +3820,7 @@ public:
     // If the function is exported to C, it must be representable in (Obj-)C.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       evaluateOrDefault(Ctx.evaluator,
-                        TypeCheckCDeclAttributeRequest{FD, CDeclAttr},
+                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
                         {});
     }
 
