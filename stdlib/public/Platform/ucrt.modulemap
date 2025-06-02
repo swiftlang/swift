@@ -12,12 +12,6 @@
 
 // The following modules have to be standalone top-level modules to deal with
 // version 10.0.26100 of the Windows SDK.
-module _malloc [system] [no_undeclared_includes] {
-  use corecrt
-  header "malloc.h"
-  export *
-}
-
 module _complex [system] [no_undeclared_includes] {
   use corecrt
   use std
@@ -25,41 +19,10 @@ module _complex [system] [no_undeclared_includes] {
   export *
 }
 
-module _stddef [system] [no_undeclared_includes] {
-  use corecrt
-  textual header "stddef.h"
-}
-
-module _stdlib [system] [no_undeclared_includes] {
-  use corecrt
-  use vcruntime
-  header "stdlib.h"
-  export *
-}
-
-module _ctype [system] [no_undeclared_includes] {
-  use corecrt
-  textual header "ctype.h"
-}
-
-module _errno [system] [no_undeclared_includes] {
-  use corecrt
-  textual header "errno.h"
-}
-
-module _stdnoreturn [system] [no_undeclared_includes] {
-  use corecrt
-  textual header "stdnoreturn.h"
-}
-
-
 module ucrt [system] {
-  export _malloc
 
   module C {
     export _complex
-    export _stdlib
-
 
     module ctype {
       header "ctype.h"
@@ -91,6 +54,11 @@ module ucrt [system] {
       export *
     }
 
+    module malloc {
+      header "malloc.h"
+      export *
+    }
+
     module math {
       header "math.h"
       export *
@@ -104,6 +72,11 @@ module ucrt [system] {
     module stdalign {
       header "stdalign.h"
       export  *
+    }
+
+    module stddef {
+      textual header "stddef.h"
+      export *
     }
 
     module stdio {
@@ -202,11 +175,6 @@ module ucrt [system] {
   }
 }
 
-module _corecrt_memcpy_s [system] [no_undeclared_includes] {
-  textual header "corecrt_memcpy_s.h"
-  export *
-}
-
 module corecrt [system] {
   use vcruntime
 
@@ -246,7 +214,8 @@ module corecrt [system] {
   }
 
   module memcpy {
-    textual header "corecrt_memcpy_s.h"
+    header "corecrt_memcpy_s.h"
+    export *
   }
 
   module process {
