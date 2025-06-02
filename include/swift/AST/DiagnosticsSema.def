@@ -2056,6 +2056,9 @@ ERROR(cdecl_empty_name,none,
       "%0 symbol name cannot be empty", (DeclAttribute))
 ERROR(cdecl_throws,none,
       "raising errors from %0 functions is not supported", (DeclAttribute))
+ERROR(cdecl_incompatible_with_objc,none,
+      "cannot apply both '@cdecl' and '@objc' to %kindonly0",
+      (const Decl *))
 ERROR(cdecl_feature_required,none,
       "@cdecl requires '-enable-experimental-feature CDecl'",
       ())
