@@ -31,9 +31,9 @@ func repeating${n}x${bits}(_ scalar: ${scalar}) -> SIMD${n}<${scalar}> {
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: repeating${n}x${bits}{{[[:alnum:]]+}}:
+// CHECK-arm64: repeating${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
-// CHECK: repeating${n}x${bits}{{[[:alnum:]]+}}:
+// CHECK: repeating${n}x${bits}{{[[:alnum:]_]+}}:
 %   end
 // CHECKO-arm64-NEXT: dup.${neonSuffix} v0, v0[0]
 // CHECKO-arm64-NEXT: ret
