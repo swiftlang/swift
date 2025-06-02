@@ -59,6 +59,14 @@ func swiftEnum(x: SwiftEnum) {} // expected-error{{cannot be represented}} expec
 @cdecl("cEnum")
 func cEnum(x: CEnum) {}
 
+@cdecl("CDeclAndObjC") // expected-error {{cannot apply both '@cdecl' and '@objc' to enum}}
+@objc
+enum CDeclAndObjC: Int { case A, B }
+
+@cdecl("TwoCDecls") // expected-note {{attribute already specified here}}
+@_cdecl("TwoCDecls") // expected-error {{duplicate attribute}}
+func TwoCDecls() {}
+
 class Foo {
   @cdecl("Foo_foo") // expected-error{{@cdecl can only be applied to global functions}}
   func foo(x: Int) -> Int { return x }

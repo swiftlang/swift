@@ -2384,9 +2384,15 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
              attr, "func");
   }
 
+  // Reject using both @cdecl and @objc on the same decl.
+  if (D->getAttrs().getAttribute<ObjCAttr>()) {
+    diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
+  }
+
+  // @cdecl needs to be enabled via a feature flag.
   if (!attr->Underscored &&
       !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
-    Ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_feature_required);
+    diagnose(attr->getLocation(), diag::cdecl_feature_required);
   }
 }
 
