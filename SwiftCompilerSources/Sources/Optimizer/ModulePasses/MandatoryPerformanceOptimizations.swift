@@ -64,7 +64,7 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
     // We need handle this case with a function signature optimization.
     removeMetatypeArgumentsInCallees(of: f, moduleContext)
 
-    worklist.addCallees(of: f)
+    worklist.addCallees(of: f, moduleContext)
   }
 }
 
@@ -496,26 +496,38 @@ fileprivate struct FunctionWorklist {
     return
   }
 
-  mutating func addCallees(of function: Function) {
+  mutating func addCallees(of function: Function, _ context: ModulePassContext) {
     for inst in function.instructions {
       switch inst {
-      case let apply as ApplySite:
-        if let callee = apply.referencedFunction {
-          pushIfNotVisited(callee)
+      case let fri as FunctionRefInst:
+        pushIfNotVisited(fri.referencedFunction)
+      case let alloc as AllocRefInst:
+        if context.options.enableEmbeddedSwift {
+          addVTableMethods(forClassType: alloc.type, context)
         }
-      case let bi as BuiltinInst:
-        switch bi.id {
-        case .Once, .OnceWithContext:
-          if let fri = bi.operands[1].value as? FunctionRefInst {
-            pushIfNotVisited(fri.referencedFunction)
+      case let metatype as MetatypeInst:
+        if context.options.enableEmbeddedSwift {
+          let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
+          if instanceType.isClass {
+            addVTableMethods(forClassType: instanceType, context)
           }
-          break;
-        default:
-          break
         }
+
       default:
         break
       }
+    }
+  }
+
+  mutating func addVTableMethods(forClassType classType: Type, _ context: ModulePassContext) {
+    guard let vtable = classType.isGenericAtAnyLevel ?
+                        context.lookupSpecializedVTable(for: classType) :
+                        context.lookupVTable(for: classType.nominal!)
+    else {
+      return
+    }
+    for entry in vtable.entries where !entry.implementation.isGeneric {
+      pushIfNotVisited(entry.implementation)
     }
   }
 
