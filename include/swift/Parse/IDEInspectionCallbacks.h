@@ -255,6 +255,10 @@ public:
   virtual void
   completeImportDecl(ImportPath::Builder &Path) {};
 
+  /// Complete the 'using' decl with supported specifiers.
+  virtual void
+  completeUsingDecl() {};
+
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
                                         SourceLoc DotLoc) {};
