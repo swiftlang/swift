@@ -27,6 +27,22 @@
 // CHECK: extern "C" {
 // CHECK: #endif
 
+// CHECK: /// Enums
+// CHECK: typedef SWIFT_ENUM_NAMED(int, CEnum, "CEnum", closed) {
+// CHECK:   CEnumA = 0,
+// CHECK:   CEnumB = 1,
+// CHECK: };
+
+// CHECK: typedef SWIFT_ENUM_NAMED(long, CEnumRenamed_CName, "CEnumRenamed", closed) {
+// CHECK:   CEnumRenamed_CNameA = 0,
+// CHECK:   CEnumRenamed_CNameB = 1,
+// CHECK: };
+
+// CHECK: typedef SWIFT_ENUM_NAMED(char, zCEnumDefinedLate, "zCEnumDefinedLate", closed) {
+// CHECK:   CEnumDefinedLateA = 0,
+// CHECK:   CEnumDefinedLateB = 1,
+// CHECK: };
+
 /// My documentation
 @cdecl("simple")
 func a_simple(x: Int, bar y: Int) -> Int { return x }
@@ -62,6 +78,30 @@ func g_nullablePointers(_ x: UnsafeMutableRawPointer,
                           z: UnsafeMutableRawPointer!) {}
 // CHECK: SWIFT_EXTERN void nullable_pointers(void * _Nonnull x, void * _Nullable y, void * _Null_unspecified z) SWIFT_NOEXCEPT;
 
+/// Enums
+
+@cdecl("CEnum")
+enum CEnum: CInt { case A, B }
+
+@cdecl("CEnumRenamed_CName")
+enum CEnumRenamed: CLong { case A, B }
+
+@cdecl("use_enum")
+func h_useCEnum(e: CEnum) -> CEnum { return e }
+// CHECK: SWIFT_EXTERN SWIFT_ENUM_TAG CEnum use_enum(SWIFT_ENUM_TAG CEnum e) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
+
+@cdecl("use_enum_renamed")
+func i_useCEnumLong(e: CEnumRenamed) -> CEnumRenamed { return e }
+// CHECK: SWIFT_EXTERN SWIFT_ENUM_TAG CEnumRenamed_CName use_enum_renamed(SWIFT_ENUM_TAG CEnumRenamed_CName e) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
+
+@cdecl("use_enum_late")
+func j_useCEnumChar(e: zCEnumDefinedLate) -> zCEnumDefinedLate { return e }
+// CHECK: SWIFT_EXTERN SWIFT_ENUM_TAG zCEnumDefinedLate use_enum_late(SWIFT_ENUM_TAG zCEnumDefinedLate e) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
+
+/// Declare this enum late in the source file and in alphabetical order.
+@cdecl("zCEnumDefinedLate")
+enum zCEnumDefinedLate: CChar { case A, B }
+
 // CHECK:      #if defined(__cplusplus)
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
@@ -74,5 +114,10 @@ int main() {
     ptrdiff_t x = simple(42, 43);
     primitiveTypes(1, 2, 3, 'a', 1.0f, 2.0, true);
     has_keyword_arg_names(1, 2);
+
+    (void)use_enum(CEnumA);
+    (void)use_enum_renamed(CEnumRenamed_CNameB);
+    (void)use_enum_late(zCEnumDefinedLateA);
+
     return_never();
 }
