@@ -3742,9 +3742,9 @@ ERROR(enum_with_raw_type_case_with_argument,none,
 NOTE(enum_raw_type_here,none,
      "declared raw type %0 here", (Type))
 ERROR(objc_enum_no_raw_type,none,
-      "'@objc' enum must declare an integer raw type", ())
+      "'%0' enum must declare an integer raw type", (DeclAttribute))
 ERROR(objc_enum_raw_type_not_integer,none,
-      "'@objc' enum raw type %0 is not an integer type", (Type))
+      "'%0' enum raw type %1 is not an integer type", (DeclAttribute, Type))
 ERROR(enum_non_integer_raw_value_auto_increment,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,none,
@@ -6583,6 +6583,10 @@ NOTE(not_objc_swift_struct,none,
      (ForeignLanguage))
 NOTE(not_objc_swift_enum,none,
       "non-'@objc' enums cannot be represented in Objective-C", ())
+NOTE(not_cdecl_or_objc_swift_enum,none,
+     "Swift enums not marked '@cdecl'%select{| or '@objc'}0 cannot be "
+     "represented in %" FOREIGN_LANG_SELECT "0",
+     (ForeignLanguage))
 NOTE(not_objc_generic_type_param,none,
      "generic type parameters cannot be represented in "
      "%" FOREIGN_LANG_SELECT "0", (ForeignLanguage))
