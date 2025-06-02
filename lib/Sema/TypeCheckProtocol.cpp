@@ -4500,8 +4500,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
         if (protoForcesAccess && ctor && ctor->isSynthesized()) {
           diags.diagnose(diagLoc, diag::implicit_init_witness_not_accessible_proto,
-                         getProtocolRequirementKind(requirement),
-                         ctor, isSetter, requiredAccess,
+                         ctor, requiredAccess,
                          protoAccessScope.accessLevelForDiagnostics(),
                          proto);
           diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, diagLoc);
