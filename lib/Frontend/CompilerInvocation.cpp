@@ -2421,7 +2421,12 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     llvm::sys::path::append(
         SDKResourcePath, "usr", "lib",
         FrontendOpts.UseSharedResourceFolder ? "swift" : "swift_static");
-    Opts.RuntimeResourcePath = SDKResourcePath.str();
+    // Check for eg <sdkRoot>/usr/lib/swift/
+    if (llvm::sys::fs::exists(SDKResourcePath))
+      Opts.RuntimeResourcePath = SDKResourcePath.str();
+    else
+      Diags.diagnose(SourceLoc(), diag::warning_no_resource_dir_in_sdk,
+                     Opts.RuntimeResourcePath);
   }
 
   Opts.SkipAllImplicitImportPaths |= Args.hasArg(OPT_nostdimport);
