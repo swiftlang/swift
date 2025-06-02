@@ -39,8 +39,9 @@ public class MyCls {
 }
 
 public actor MyAct {
-  // CHECK-LABEL-NOT: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfZ : $@convention(thin) (@owned MyAct) -> ()
+  // CHECK-NOT: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfZ : $@convention(thin) (@owned MyAct) -> ()
   // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfD : $@convention(method) (@owned MyAct) -> ()
+  // CHECK-NOT: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfZ : $@convention(thin) (@owned MyAct) -> ()
   @inlinable deinit {}
 
   /// whether delegating or not, the initializers for an actor are not serialized unless marked inlinable.

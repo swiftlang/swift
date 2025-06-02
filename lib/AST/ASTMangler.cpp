@@ -5426,6 +5426,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       break;
     };
   }

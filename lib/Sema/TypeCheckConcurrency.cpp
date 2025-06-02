@@ -2543,7 +2543,8 @@ namespace {
     /// Determine whether code in the given use context might execute
     /// concurrently with code in the definition context.
     bool mayExecuteConcurrentlyWith(
-        const DeclContext *useContext, const DeclContext *defContext);
+        const DeclContext *useContext, const DeclContext *defContext,
+        bool includeSending = false);
 
     /// If the subexpression is a reference to a mutable local variable from a
     /// different context, record its parent. We'll query this as part of
@@ -3051,12 +3052,9 @@ namespace {
         }
       }
 
-      // FIXME: When passing to a sending parameter, should this be handled
-      // by region isolation? Or should it always be handled by region
-      // isolation?
       if (mayExecuteConcurrentlyWith(
-              localFunc.getAsDeclContext(), getDeclContext()) ||
-          (explicitClosure && explicitClosure->isPassedToSendingParameter())) {
+              localFunc.getAsDeclContext(), getDeclContext(),
+              /*includeSending*/true)) {
         auto innermostGenericDC = localFunc.getAsDeclContext();
         while (innermostGenericDC && !innermostGenericDC->isGenericContext())
           innermostGenericDC = innermostGenericDC->getParent();
@@ -4816,12 +4814,11 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
 }
 
 bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
-    const DeclContext *useContext, const DeclContext *defContext) {
+    const DeclContext *useContext, const DeclContext *defContext,
+    bool includeSending) {
   // Fast path for when the use and definition contexts are the same.
   if (useContext == defContext)
     return false;
-
-  bool isolatedStateMayEscape = false;
 
   auto useIsolation = getActorIsolationOfContext(
       const_cast<DeclContext *>(useContext), getClosureActorIsolation);
@@ -4840,16 +4837,6 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
         regionIsolationEnabled && useIsolation.isGlobalActor())
       return false;
-
-    // If the local function is not Sendable, its isolation differs
-    // from that of the context, and both contexts are actor isolated,
-    // then capturing non-Sendable values allows the closure to stash
-    // those values into actor-isolated state. The original context
-    // may also stash those values into isolated state, enabling concurrent
-    // access later on.
-    isolatedStateMayEscape =
-        (!regionIsolationEnabled &&
-        useIsolation.isActorIsolated() && defIsolation.isActorIsolated());
   }
 
   // Walk the context chain from the use to the definition.
@@ -4859,17 +4846,16 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
       if (closure->isSendable())
         return true;
 
-      if (isolatedStateMayEscape)
-        return true;
+      if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (includeSending && explicitClosure->isPassedToSendingParameter())
+          return true;
+      }
     }
 
     if (auto func = dyn_cast<FuncDecl>(useContext)) {
       if (func->isLocalCapture()) {
         // If the function is @Sendable... it can be run concurrently.
         if (func->isSendable())
-          return true;
-
-        if (isolatedStateMayEscape)
           return true;
       }
     }
@@ -5410,6 +5396,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::EnumElement:
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     return std::nullopt;
 
   case DeclKind::PatternBinding:
@@ -5830,8 +5817,14 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       return {};
     };
 
+    DefaultIsolation defaultIsolation = ctx.LangOpts.DefaultIsolationBehavior;
+    if (auto *SF = value->getDeclContext()->getParentSourceFile()) {
+      if (auto defaultIsolationInFile = SF->getDefaultIsolation())
+        defaultIsolation = defaultIsolationInFile.value();
+    }
+
     // If we are required to use main actor... just use that.
-    if (ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    if (defaultIsolation == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;
@@ -6453,6 +6446,43 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
   }
 
   return requiredIsolation;
+}
+
+std::optional<DefaultIsolation>
+DefaultIsolationInSourceFileRequest::evaluate(Evaluator &evaluator,
+                                              const SourceFile *file) const {
+  llvm::SmallVector<Decl *> usingDecls;
+  llvm::copy_if(file->getTopLevelDecls(), std::back_inserter(usingDecls),
+                [](Decl *D) { return isa<UsingDecl>(D); });
+
+  if (usingDecls.empty())
+    return std::nullopt;
+
+  std::optional<std::pair<Decl *, DefaultIsolation>> isolation;
+
+  auto setIsolation = [&isolation](Decl *D, DefaultIsolation newIsolation) {
+    if (isolation) {
+      D->diagnose(diag::invalid_redecl_of_file_isolation);
+      isolation->first->diagnose(diag::invalid_redecl_of_file_isolation_prev);
+      return;
+    }
+
+    isolation = std::make_pair(D, newIsolation);
+  };
+
+  for (auto *D : usingDecls) {
+    switch (cast<UsingDecl>(D)->getSpecifier()) {
+    case UsingSpecifier::MainActor:
+      setIsolation(D, DefaultIsolation::MainActor);
+      break;
+    case UsingSpecifier::Nonisolated:
+      setIsolation(D, DefaultIsolation::Nonisolated);
+      break;
+    }
+  }
+
+  return isolation.has_value() ? std::optional(isolation->second)
+                               : std::nullopt;
 }
 
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
@@ -7692,6 +7722,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     return true;
 
   case DeclKind::EnumElement:

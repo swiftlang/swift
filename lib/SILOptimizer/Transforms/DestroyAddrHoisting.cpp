@@ -604,7 +604,7 @@ bool HoistDestroys::foldBarrier(SILInstruction *barrier,
   SmallPtrSet<AccessPath::PathNode, 16> trivialLeaves;
 
   bool succeeded = visitProductLeafAccessPathNodes(
-      storageRoot, typeExpansionContext, module,
+      storageRoot, typeExpansionContext, *function,
       [&](AccessPath::PathNode node, SILType ty) {
         if (ty.isTrivial(*function))
           return;
@@ -765,7 +765,7 @@ bool HoistDestroys::checkFoldingBarrier(
     bool alreadySawLeaf = false;
     bool alreadySawTrivialSubleaf = false;
     auto succeeded = visitProductLeafAccessPathNodes(
-        address, typeExpansionContext, module,
+        address, typeExpansionContext, *function,
         [&](AccessPath::PathNode node, SILType ty) {
           if (ty.isTrivial(*function)) {
             bool inserted = !trivialLeaves.insert(node).second;

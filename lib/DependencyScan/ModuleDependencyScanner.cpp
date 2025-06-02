@@ -31,6 +31,7 @@
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -267,7 +268,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
     : clangScanningTool(*globalScanningService.ClangScanningService,
-                        globalScanningService.getClangScanningFS()) {
+                        globalScanningService.getClangScanningFS(ScanASTContext)) {
   // Create a scanner-specific Invocation and ASTContext.
   workerCompilerInvocation =
       std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
@@ -419,7 +420,7 @@ bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     };
 
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
-        /*ACTODO:*/ inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs, headerPath),
+        inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs, headerPath),
         clangScanningWorkingDirectoryPath,
         cache.getAlreadySeenClangModules(), lookupModuleOutput, sourceBuffer);
     if (!dependencies)
@@ -449,11 +450,9 @@ bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
   // - Binary module dependnecies may have arbitrary header inputs.
   auto clangModuleDependencies = scanHeaderDependencies();
   if (!clangModuleDependencies) {
-    // FIXME: Route this to a normal diagnostic.
-    llvm::logAllUnhandledErrors(clangModuleDependencies.takeError(),
-                                llvm::errs());
-    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
-                       "failed to scan header dependencies");
+    auto errorStr = toString(clangModuleDependencies.takeError());
+    workerASTContext->Diags.diagnose(
+            SourceLoc(), diag::clang_header_dependency_scan_error, errorStr);
     return true;
   }
 

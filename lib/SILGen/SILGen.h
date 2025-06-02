@@ -266,6 +266,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+  void visitUsingDecl(UsingDecl *) {}
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}

@@ -639,17 +639,26 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // Check whether generic parameters are only mentioned once in
   // the anchor's signature.
   {
-    auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
+    auto anchorTy = anchor->getInterfaceType()->castTo<AnyFunctionType>();
 
-    // Reject if generic parameters are used in multiple different positions
-    // in the parameter list.
+    if (anchor->hasCurriedSelf())
+      anchorTy = anchorTy->getResult()->castTo<AnyFunctionType>();
+
+    SmallPtrSet<CanType, 4> inferrableParams;
+    collectReferencedGenericParams(paramInterfaceTy, inferrableParams);
 
     llvm::SmallVector<unsigned, 2> affectedParams;
     for (unsigned i : indices(anchorTy->getParams())) {
-      const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypes(param.getPlainType()))
-        affectedParams.push_back(i);
+      SmallPtrSet<CanType, 4> referencedGenericParams;
+      collectReferencedGenericParams(anchorTy->getParams()[i].getPlainType(), referencedGenericParams);
+
+      for (auto can : referencedGenericParams) {
+        if (can->is<GenericTypeParamType>() && inferrableParams.contains(can)) {
+          affectedParams.push_back(i);
+          break;
+        }
+      }
     }
 
     if (affectedParams.size() > 1) {
@@ -660,12 +669,19 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
           affectedParams, [&](const unsigned index) { params << "#" << index; },
           [&] { params << ", "; });
 
-      ctx.Diags.diagnose(
+      auto diag = ctx.Diags.diagnose(
           defaultValue->getLoc(),
           diag::
               cannot_default_generic_parameter_inferrable_from_another_parameter,
           paramInterfaceTy, params.str());
-      return Type();
+
+      // In Swift 6.2 and below we incorrectly missed checking this rule for
+      // methods, downgrade to a warning until the next language mode.
+      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+      if (!anchor->hasCurriedSelf() || ctx.isSwiftVersionAtLeast(futureVersion))
+        return Type();
+
+      diag.warnUntilFutureSwiftVersion();
     }
   }
 

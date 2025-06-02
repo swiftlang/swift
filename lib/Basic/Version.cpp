@@ -304,17 +304,9 @@ StringRef getSwiftRevision() {
 #endif
 }
 
-bool isCurrentCompilerTagged() {
-#ifdef SWIFT_COMPILER_VERSION
-  return true;
-#else
-  return false;
-#endif
-}
-
 StringRef getCurrentCompilerTag() {
-#ifdef SWIFT_COMPILER_VERSION
-  return SWIFT_COMPILER_VERSION;
+#ifdef SWIFT_TOOLCHAIN_VERSION
+  return SWIFT_TOOLCHAIN_VERSION;
 #else
   return StringRef();
 #endif

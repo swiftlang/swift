@@ -1708,6 +1708,24 @@ bb0(%0 : $*ExistentialIntPair, %1 : $*ExistentialIntPair):
   return %4
 }
 
+sil @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+
+// CHECK-LABEL: sil [ossa] @aliasing_apply_with_direct_and_indirect_result :
+// CHECK:         apply
+// CHECK:         [[L:%.*]] = load
+// CHECK:         return [[L]]
+// CHECK-LABEL: } // end sil function 'aliasing_apply_with_direct_and_indirect_result'
+sil [ossa] @aliasing_apply_with_direct_and_indirect_result : $@convention(thin) (UInt64) -> UInt64 {
+bb0(%0 : $UInt64):
+  %4 = alloc_stack $UInt64
+  store %0 to [trivial] %4
+  %11 = function_ref @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+  %12 = apply %11(%4) : $@convention(thin) () -> (Int64, @out UInt64)
+  %13 = load [trivial] %4
+  dealloc_stack %4
+  return %13
+}
+
 // CHECK-LABEL: sil [ossa] @struct_of_optional_none :
 // CHECK:         [[E:%.*]] = enum
 // CHECK:         [[S:%.*]] = struct $S ([[E]] : $Optional<String>)

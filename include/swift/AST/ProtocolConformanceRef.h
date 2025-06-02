@@ -140,6 +140,7 @@ public:
   }
 
   AbstractConformance *getAbstract() const {
+    ASSERT(isAbstract());
     return Union.get<AbstractConformance *>();
   }
 

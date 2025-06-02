@@ -660,8 +660,8 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
 
 /// Returns true if the given string is entirely whitespace (considering only
 /// those whitespace code points permitted in raw identifiers).
-static bool isEntirelyWhitespace(StringRef string) {
-  if (string.empty()) return false;
+static bool isEscapedIdentifierEntirelyWhitespace(StringRef string) {
+  if (string.empty()) return true;
   char const *p = string.data(), *end = string.end();
   if (!advanceIf(p, end, isPermittedRawIdentifierWhitespace))
     return false;
@@ -703,7 +703,7 @@ bool Lexer::isValidAsEscapedIdentifier(StringRef string) {
     ;
   if (p != end)
     return false;
-  return !isEntirelyWhitespace(string);
+  return !isEscapedIdentifierEntirelyWhitespace(string);
 }
 
 /// Determines if the given string is a valid operator identifier,
@@ -2315,7 +2315,8 @@ void Lexer::lexEscapedIdentifier() {
   // If we have the terminating "`", it's an escaped/raw identifier, unless it
   // contained only operator characters or was entirely whitespace.
   StringRef IdStr(IdentifierStart, CurPtr - IdentifierStart);
-  if (*CurPtr == '`' && !isOperator(IdStr) && !isEntirelyWhitespace(IdStr)) {
+  if (*CurPtr == '`' && !isOperator(IdStr) &&
+      !isEscapedIdentifierEntirelyWhitespace(IdStr)) {
     ++CurPtr;
     formEscapedIdentifierToken(Quote);
     return;

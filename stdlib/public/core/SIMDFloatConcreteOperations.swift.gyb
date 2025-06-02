@@ -34,8 +34,15 @@ extension SIMD${n} where Scalar == ${Scalar} {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
   
-  /* Breaks differentiation testing, commented out while we figure out
-     what to do about that.
+  /// A vector with the specified scalar in all lanes.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in result.indices {
+  ///   result[i] = scalar
+  /// }
+  /// ```
   @_alwaysEmitIntoClient @_transparent
   public init(repeating scalar: ${Scalar}) {
     let asVector = Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
@@ -52,9 +59,18 @@ extension SIMD${n} where Scalar == ${Scalar} {
     ))
 %end
   }
-  */
   
 %  if n >= 4:
+  /// A vector formed by concatenating lowHalf and highHalf.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = lowHalf[i]
+  ///   result[${n//2}+i] = highHalf[i]
+  /// }
+  /// ```
   @_alwaysEmitIntoClient @_transparent
   public init(
     lowHalf: SIMD${n//2}<${Scalar}>,
@@ -64,53 +80,71 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
 %  end
-  /// A vector mask with the result of a pointwise equality comparison.
-  @_alwaysEmitIntoClient
-  public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
+%{
+compares = [
+  ("==", "oeq", "equal to"),
+  ("!=", "une", "not equal to"),
+  ("<",  "olt", "less than"),
+  ("<=", "ole", "less than or equal to"),
+  (">=", "oge", "greater than or equal to"),
+  (">",  "ogt", "greater than")
+]
+}%
+%  for (op, bi, description) in compares:
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} the
+  /// corresponding lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b[i])
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func .${op}(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.fcmp_oeq_${Builtin}(a._storage._value, b._storage._value)
+      Builtin.fcmp_${bi}_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
   
-  /// A vector mask with the result of a pointwise inequality comparison.
-  @_alwaysEmitIntoClient
-  public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.fcmp_une_${Builtin}(a._storage._value, b._storage._value)
-    ))
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} b,
+  /// and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b)
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func .${op}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a .${op} Self(repeating: b)
   }
-  
-  /// A vector mask with the result of a pointwise less-than comparison.
-  @_alwaysEmitIntoClient
-  public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.fcmp_olt_${Builtin}(a._storage._value, b._storage._value)
-    ))
+
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if a is ${description} the corresponding
+  /// lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a ${op} b[i])
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func .${op}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) .${op} b
   }
-  
-  /// A vector mask with the result of a pointwise less-than-or-equal-to comparison.
-  @_alwaysEmitIntoClient
-  public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.fcmp_ole_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
-  
-  /// A vector mask with the result of a pointwise greater-than comparison.
-  @_alwaysEmitIntoClient
-  public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.fcmp_ogt_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
-  
-  /// A vector mask with the result of a pointwise greater-than-or-equal-to comparison.
-  @_alwaysEmitIntoClient
-  public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.fcmp_oge_${Builtin}(a._storage._value, b._storage._value)
-    ))
-  }
+
+%  end
 }
 %  if bits == 16:
 #endif

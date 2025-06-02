@@ -14,10 +14,6 @@
 // RUN: %target-swift-frontend -primary-file %t/SIMDFloatInitializers.swift -S | %FileCheck %t/SIMDFloatInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
 // RUN: %target-swift-frontend -primary-file %t/SIMDFloatInitializers.swift -S -O | %FileCheck %t/SIMDFloatInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
 
-// Disable this test for now because aEIC/transparent functions still are not
-// correctly differentiable, and so these inits are suppressed in the stdlib.
-// REQUIRES: differentiable-aEIC-transparent
-
 import Swift
 
 %for bits in [16,32,64]:
@@ -35,9 +31,9 @@ func repeating${n}x${bits}(_ scalar: ${scalar}) -> SIMD${n}<${scalar}> {
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: repeating${n}x${bits}{{[[:alnum:]]+}}:
+// CHECK-arm64: repeating${n}x${bits}{{[[:alnum:]_]+}}:
 %   else:
-// CHECK: repeating${n}x${bits}{{[[:alnum:]]+}}:
+// CHECK: repeating${n}x${bits}{{[[:alnum:]_]+}}:
 %   end
 // CHECKO-arm64-NEXT: dup.${neonSuffix} v0, v0[0]
 // CHECKO-arm64-NEXT: ret

@@ -135,6 +135,7 @@ private func tryOptimizeEnumComparison(apply: ApplyInst, _ context: SimplifyCont
   let lhs = apply.arguments[0]
   let rhs = apply.arguments[1]
   guard let enumDecl = lhs.type.nominal as? EnumDecl,
+        enumDecl.hasRawType,
         !enumDecl.isResilient(in: apply.parentFunction),
         !enumDecl.hasClangNode,
         lhs.type.isAddress,

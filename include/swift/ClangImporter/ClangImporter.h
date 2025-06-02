@@ -873,9 +873,18 @@ struct ClangInvocationFileMapping {
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    ASTContext &ctx,
+    const ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
+
+/// Apply the given file mapping to the specified 'fileSystem', used
+/// primarily to inject modulemaps on platforms with non-modularized
+/// platform libraries.
+ClangInvocationFileMapping applyClangInvocationMapping(
+    const ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
+    bool suppressDiagnostics = false);
 
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {

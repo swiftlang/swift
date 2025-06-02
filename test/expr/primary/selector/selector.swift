@@ -172,3 +172,11 @@ extension SomeProtocol {
 func test() -> Selector {
   #selector(OverloadedFuncAndProperty.f)
 }
+
+@objc protocol HasThrows {
+  @objc optional func doSomething(to object: AnyObject) throws -> Void
+}
+
+func testWithThrowing(obj: AnyObject) {
+  _ = #selector(HasThrows.doSomething(to:))
+}

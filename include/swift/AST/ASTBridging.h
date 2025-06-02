@@ -402,6 +402,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
+  BRIDGED_INLINE bool Enum_hasRawType() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
@@ -1742,6 +1743,19 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedUsingSpecifier {
+  BridgedUsingSpecifierMainActor,
+  BridgedUsingSpecifierNonisolated,
+};
+
+SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
+           "specifierLoc:specifier:)")
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"

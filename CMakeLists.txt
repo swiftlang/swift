@@ -336,6 +336,8 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
+set(SWIFT_TOOLCHAIN_VERSION "" CACHE STRING
+    "The Swift compiler tag")
 
 option(SWIFT_DISABLE_DEAD_STRIPPING
       "Turn off Darwin-specific dead stripping for Swift host tools." FALSE)

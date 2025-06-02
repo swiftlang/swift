@@ -58,7 +58,9 @@ public class NominalTypeDecl: GenericTypeDecl {
   }
 }
 
-final public class EnumDecl: NominalTypeDecl {}
+final public class EnumDecl: NominalTypeDecl {
+  public var hasRawType: Bool { bridged.Enum_hasRawType() }
+}
 
 final public class StructDecl: NominalTypeDecl {
   public var hasUnreferenceableStorage: Bool { bridged.Struct_hasUnreferenceableStorage() }
@@ -121,6 +123,8 @@ final public class ExtensionDecl: Decl {}
 final public class TopLevelCodeDecl: Decl {}
 
 final public class ImportDecl: Decl {}
+
+final public class UsingDecl: Decl {}
 
 final public class PrecedenceGroupDecl: Decl {}
 

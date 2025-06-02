@@ -25,7 +25,7 @@ import Swift
 func repeating${n}_uint${bits}(_ scalar: UInt${bits}) -> SIMD${n}<UInt${bits}> {
   SIMD${n}(repeating: scalar)
 }
-// CHECK: repeating${n}_uint${bits}{{[[:alnum:]]+}}:
+// CHECK: repeating${n}_uint${bits}{{[[:alnum:]_]+}}:
 // CHECKO-arm64-NEXT: dup.${neonSuffix} v0, {{[wx]}}0
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: dup.${neonSuffix}
