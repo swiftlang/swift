@@ -1941,3 +1941,19 @@ bb0(%0 : $*C, %1 : $*C, %2 : @guaranteed $C):
   %99 = tuple ()
   return %99 : $()
 }
+
+sil @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+
+// CHECK-LABEL: @aliasing_apply_with_direct_and_indirect_result
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> (Int64, @out UInt64)
+// CHECK-NEXT:     %0 = argument of bb0 : $*UInt64
+// CHECK-NEXT:     r=0,w=1
+sil [ossa] @aliasing_apply_with_direct_and_indirect_result : $@convention(thin) () -> @out UInt64 {
+bb0(%0 : $*UInt64):
+  %1 = function_ref @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+  %2 = apply %1(%0) : $@convention(thin) () -> (Int64, @out UInt64)
+  %99 = tuple ()
+  return %99 : $()
+}
+
