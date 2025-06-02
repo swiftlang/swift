@@ -1745,7 +1745,7 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextParent = 0xbda2; // = 48546
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
-  const uint16_t CancellationNotificationFunction = 0xf73; // = 3955 (TaskPriority, TaskPriority) -> Void
+  const uint16_t CancellationNotificationFunction = 0x0f08; // = 3848
   const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
