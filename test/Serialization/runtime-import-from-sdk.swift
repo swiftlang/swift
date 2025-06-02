@@ -6,13 +6,16 @@
 
 // %t/good-sdk contains a loadable standard library.
 // RUN: %empty-directory(%t/good-sdk)
-// RUN: %empty-directory(%t/good-sdk/usr/lib/swift)
+// RUN: %empty-directory(%t/good-sdk/usr/lib/swift/%target-sdk-name)
 // RUN: cp -r %platform-module-dir/Swift.swiftmodule %t/good-sdk/usr/lib/swift/Swift.swiftmodule
+// RUN: cp -r %platform-module-dir/Swift.swiftmodule %t/good-sdk/usr/lib/swift/%target-sdk-name/Swift.swiftmodule
 
 // %t/bad-sdk contains an invalid standard library that cannot be loaded.
 // RUN: %empty-directory(%t/bad-sdk)
 // RUN: %empty-directory(%t/bad-sdk/usr/lib/swift/Swift.swiftmodule)
+// RUN: %empty-directory(%t/bad-sdk/usr/lib/swift/%target-sdk-name/Swift.swiftmodule)
 // RUN: touch %t/bad-sdk/usr/lib/swift/Swift.swiftmodule/garbage-garbage-garbage.swiftmodule
+// RUN: touch %t/bad-sdk/usr/lib/swift/%target-sdk-name/Swift.swiftmodule/garbage-garbage-garbage.swiftmodule
 
 // %t/empty-toolchain does not contain a standard library.
 // RUN: %empty-directory(%t/empty-toolchain)
@@ -44,11 +47,6 @@
 //
 // We also check that ClangImporter noticed SwiftShims in the toolchain and
 // didn't add a -isystem flag to look in the SDK.
-
-// FIXME: We can't properly test this on a non-Darwin platform because we'll get
-// the same error message for "unloadable standard library" and "no standard
-// library" (https://github.com/apple/swift/issues/52499).
-// REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t/mcp)
 // RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-sdk) -resource-dir %t/empty-toolchain/usr/lib/swift -module-cache-path %t/mcp -typecheck %s -dump-clang-diagnostics -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import 2>&1 | %FileCheck --check-prefix CHECK-EMPTY %s
