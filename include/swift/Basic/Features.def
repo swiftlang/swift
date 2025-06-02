@@ -287,7 +287,7 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 // Swift 7
 MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
-UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 
