@@ -422,7 +422,7 @@ public:
   Kind kind;
 
   /// The type and index of a differentiability parameter or result.
-  /// std::pair does not have a trivial copy constructor on FreeBSD <= 14 for
+  /// std::pair does not have a trivial copy constructor on FreeBSD for
   /// ABI reasons, so we have to define our own type here instead
   struct TypeAndIndex {
     Type first;

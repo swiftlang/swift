@@ -71,7 +71,7 @@ private:
 
     /// The parent `apply` instruction and the witness associated with the
     /// `IndirectDifferentiation` case.
-    /// Note: This used to be a std::pair, but on FreeBSD <= 14, libc++ is
+    /// Note: This used to be a std::pair, but on FreeBSD, libc++ is
     /// configured with _LIBCPP_DEPRECATED_ABI_DISABLE_PAIR_TRIVIAL_COPY_CTOR
     /// and hence does not have a trivial copy constructor
     struct IndirectDifferentiation {
