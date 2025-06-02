@@ -387,6 +387,23 @@ void CompletionLookup::addImportModuleNames() {
   }
 }
 
+void CompletionLookup::addUsingSpecifiers() {
+  for (unsigned i = 0,
+                n = static_cast<unsigned>(UsingSpecifier::LastSpecifier) + 1;
+       i != n; ++i) {
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Keyword, SemanticContextKind::None);
+    switch (static_cast<UsingSpecifier>(i)) {
+    case UsingSpecifier::MainActor:
+      Builder.addTextChunk("@MainActor");
+      break;
+    case UsingSpecifier::Nonisolated:
+      Builder.addTextChunk("nonisolated");
+      break;
+    }
+  }
+}
+
 SemanticContextKind
 CompletionLookup::getSemanticContext(const Decl *D, DeclVisibilityKind Reason,
                                      DynamicLookupInfo dynamicLookupInfo) {
