@@ -3641,10 +3641,11 @@ public:
 static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
                                                       ConstructorDecl *decl,
                                                       AccessLevel requiredAccess,
-                                                      NormalProtocolConformance *conformance,
                                                       SourceLoc diagLoc) {
   DeclContext *DC = decl->getDeclContext();
   auto *typeDecl = dyn_cast<NominalTypeDecl>(DC);
+  ASSERT(typeDecl);
+
   SourceRange typeBraces = typeDecl->getBraces();
 
   ASTContext &Ctx = decl->getASTContext();
@@ -3682,7 +3683,7 @@ static void diagnoseImplicitInitWitnessFixAccessLevel(DiagnosticEngine &diags,
 
   auto fixItDiag = diags.diagnose(diagLoc,
                                   diag::implicit_init_witness_fix_access,
-                                  decl->getDescriptiveKind(),
+                                  decl,
                                   requiredAccess);
 
   fixItDiag.fixItInsertAfter(typeBraces.Start, FixitString);
@@ -4487,7 +4488,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        proto);
 
         if (ctor && ctor->isSynthesized()) {
-          diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, conformance, diagLoc);
+          diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, diagLoc);
         } else if (decl && decl->isSynthesized()) {
           return;
         } else {
