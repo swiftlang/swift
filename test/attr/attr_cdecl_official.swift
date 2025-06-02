@@ -27,11 +27,18 @@ func noBody(x: inout Int) { } // expected-error{{global function cannot be marke
 
 struct SwiftStruct { var x, y: Int }
 enum SwiftEnum { case A, B }
+
 #if os(Windows) && (arch(x86_64) || arch(arm64))
-@objc enum CEnum: Int32 { case A, B }
+@cdecl("CEnum") enum CEnum: Int32 { case A, B }
 #else
-@objc enum CEnum: Int { case A, B }
+@cdecl("CEnum") enum CEnum: Int { case A, B }
 #endif
+
+@cdecl("CEnumNoRawType") enum CEnumNoRawType { case A, B }
+// expected-error @-1 {{'@cdecl' enum must declare an integer raw type}}
+
+@cdecl("CEnumStringRawType") enum CEnumStringRawType: String { case A, B }
+// expected-error @-1 {{'@cdecl' enum raw type 'String' is not an integer type}}
 
 @cdecl("swiftStruct")
 func swiftStruct(x: SwiftStruct) {}
@@ -39,7 +46,9 @@ func swiftStruct(x: SwiftStruct) {}
 // expected-note @-2 {{Swift structs cannot be represented in C}}
 
 @cdecl("swiftEnum")
-func swiftEnum(x: SwiftEnum) {} // expected-error{{cannot be represented}} expected-note{{non-'@objc' enum}}
+func swiftEnum(x: SwiftEnum) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift enums not marked '@cdecl' cannot be represented in C}}
 
 @cdecl("cEnum")
 func cEnum(x: CEnum) {}
