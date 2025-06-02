@@ -8203,8 +8203,8 @@ ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
       "cannot copy the lifetime of an Escapable type, use "
-      "'@lifetime(borrow %0)' instead",
-      (StringRef))
+      "'@lifetime(%1%0)' instead",
+      (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
