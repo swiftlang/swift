@@ -4496,23 +4496,29 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
         auto *ctor = dyn_cast<ConstructorDecl>(witness);
 
-        auto diagKind = protoForcesAccess
-            ? (ctor && ctor->isSynthesized()) ? diag::implicit_init_witness_not_accessible_proto : diag::witness_not_accessible_proto
-            : diag::witness_not_accessible_type;
-
         SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
-        diags.diagnose(diagLoc,
-                       diagKind, getProtocolRequirementKind(requirement),
-                       witness, isSetter, requiredAccess,
-                       protoAccessScope.accessLevelForDiagnostics(),
-                       proto);
 
-        if (ctor && ctor->isSynthesized()) {
+        if (protoForcesAccess && ctor && ctor->isSynthesized()) {
+          diags.diagnose(diagLoc, diag::implicit_init_witness_not_accessible_proto,
+                         getProtocolRequirementKind(requirement),
+                         ctor, isSetter, requiredAccess,
+                         protoAccessScope.accessLevelForDiagnostics(),
+                         proto);
           diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess, diagLoc);
-        } else if (decl && decl->isSynthesized()) {
-          return;
         } else {
-          
+          auto diagKind = protoForcesAccess
+                            ? diag::witness_not_accessible_proto
+                            : diag::witness_not_accessible_type;
+
+          diags.diagnose(diagLoc,
+                         diagKind, getProtocolRequirementKind(requirement),
+                         witness, isSetter, requiredAccess,
+                         protoAccessScope.accessLevelForDiagnostics(),
+                         proto);
+
+          if (decl && decl->isSynthesized())
+            return;
+
           diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
                                         isSetter);
         }
