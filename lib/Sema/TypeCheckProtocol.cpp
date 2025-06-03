@@ -6688,7 +6688,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   if (!hasDeprecatedUnsafeSendable && SendableConformance) {
     SendableCheck check = SendableCheck::Explicit;
     if (sendableConformancePreconcurrency)
-      check = SendableCheck::ImpliedByStandardProtocol;
+      check = SendableCheck::ImpliedByPreconcurrencyProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)
       check = SendableCheck::Implicit;
