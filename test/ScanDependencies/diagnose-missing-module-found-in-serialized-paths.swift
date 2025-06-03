@@ -12,7 +12,7 @@
 // CHECK: error: Unable to find module dependency: 'C'
 // CHECK: note: a dependency of Swift module 'B': '{{.*}}B.swiftmodule'
 // CHECK: note: a dependency of main module 'deps'
-// CHECK: note: 'C' can be found on search path used to build module 'B': '{{.*}}moreDeps'. These search paths are not inherited by the current compilation.
+// CHECK: note: 'C' can be found on a search path used to build module 'B': '{{.*}}moreDeps'. These search paths are not inherited by the current compilation.
 
 //--- moreDeps/C.swiftinterface
 // swift-interface-format-version: 1.0
