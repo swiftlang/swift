@@ -778,6 +778,13 @@ bool checkIsolatedConformancesInContext(
     Type type, SourceLoc loc, const DeclContext *dc,
     HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
+/// For a protocol conformance that does not have a "raw" isolation, infer its isolation.
+///
+/// - hasKnownIsolatedWitness: indicates when it is known that there is an actor-isolated witness, meaning
+///   that this operation will not look at other witnesses to determine if they are all nonisolated.
+ActorIsolation inferConformanceIsolation(
+    NormalProtocolConformance *conformance, bool hasKnownIsolatedWitness);
+
 } // end namespace swift
 
 namespace llvm {
