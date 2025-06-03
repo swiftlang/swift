@@ -637,12 +637,12 @@ extension Task where Success == Never, Failure == Never {
           continuation: continuation)
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      if #available(SwiftStdlib 6.2, *) {
+      if #available(SwiftStdlibCurrentOS 6.2, *) {
         let executor = Task.currentExecutor
 
         executor.enqueue(ExecutorJob(context: job))
       } else {
-        _enqueueJobGlobal(job)
+        fatalError("we shouldn't get here; if we have, availability is broken")
       }
       #else
       _enqueueJobGlobal(job)
@@ -822,7 +822,7 @@ func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: UnownedJob) {
   return _enqueueJobGlobalWithDelay(delay, task._context)
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlibCurrentOS 5.7, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadline")
 @usableFromInline
 func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
@@ -898,10 +898,10 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
   }
 
   let job = Builtin.convertTaskToJob(theTask)
-  if #available(SwiftStdlib 6.2, *) {
+  if #available(SwiftStdlibCurrentOS 6.2, *) {
     MainActor.executor.enqueue(ExecutorJob(context: job))
   } else {
-    Builtin.unreachable()
+    fatalError("we shouldn't get here; if we have, availability is broken")
   }
 
   _asyncMainDrainQueue()

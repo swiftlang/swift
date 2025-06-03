@@ -515,6 +515,10 @@ class TestDriverArgumentParser(
         with self.assertRaises(ValueError):
             self.parse_default_args(['--watchos-all'])
 
+    def test_swift_stdlib_strict_availability(self):
+        self.parse_default_args('--swift-stdlib-strict-availability')
+        self.parse_default_args('--no-swift-stdlib-strict-availability')
+
     # -------------------------------------------------------------------------
     # Implied defaults tests
 

@@ -464,6 +464,10 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+option(SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY
+       "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code"
+       FALSE)
+
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
        FALSE)
@@ -1406,8 +1410,9 @@ endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Build type:               ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:               ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Strict availability:      ${SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
