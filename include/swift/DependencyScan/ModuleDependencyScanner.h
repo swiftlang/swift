@@ -203,8 +203,10 @@ private:
   /// Assuming the \c `moduleImport` failed to resolve,
   /// iterate over all binary Swift module dependencies with serialized
   /// search paths and attempt to diagnose if the failed-to-resolve module
-  /// can be found on any of them.
-  void attemptToFindResolvingSerializedSearchPath(
+  /// can be found on any of them. Returns the path containing
+  /// the module, if one is found.
+  std::optional<std::pair<ModuleDependencyID, std::string>>
+  attemptToFindResolvingSerializedSearchPath(
       const ScannerImportStatementInfo &moduleImport,
       const ModuleDependenciesCache &cache, const SourceLoc &importLoc);
 
