@@ -145,10 +145,6 @@ diagnoseScannerFailure(const ScannerImportStatementInfo &moduleImport,
         moduleFilePath =
             entryNode->getAsSwiftBinaryModule()->compiledModulePath;
         break;
-      case swift::ModuleDependencyKind::SwiftPlaceholder:
-        moduleFilePath =
-            entryNode->getAsPlaceholderDependencyModule()->compiledModulePath;
-        break;
       case swift::ModuleDependencyKind::Clang:
         moduleFilePath = entryNode->getAsClangModule()->moduleMapFile;
         isClang = true;
@@ -176,8 +172,7 @@ diagnoseScannerFailure(const ScannerImportStatementInfo &moduleImport,
 static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
   return Kind == ModuleDependencyKind::SwiftInterface ||
          Kind == ModuleDependencyKind::SwiftSource ||
-         Kind == ModuleDependencyKind::SwiftBinary ||
-         Kind == ModuleDependencyKind::SwiftPlaceholder;
+         Kind == ModuleDependencyKind::SwiftBinary;
 }
 
 // The Swift compiler does not have a concept of a working directory.
@@ -1427,8 +1422,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
                                     Identifier moduleIdentifier) {
     auto moduleName = moduleIdentifier.str();
     if (cache.hasDependency(moduleName, ModuleDependencyKind::SwiftInterface) ||
-        cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary) ||
-        cache.hasDependency(moduleName, ModuleDependencyKind::SwiftPlaceholder))
+        cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary))
       return;
 
     auto moduleDependencies = withDependencyScanningWorker(
