@@ -98,8 +98,8 @@ add_library(swiftSynchronization
   Cell.swift
   Mutex/Mutex.swift
   $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
-  $<$<PLATFORM_ID:Linux>:Mutex/LinuxImpl.swift>
-  $<$<PLATFORM_ID:WASI>:Mutex/SpinLoopHint.swift>
+  $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
+  $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
   $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
 
 set_target_properties(swiftSynchronization PROPERTIES
