@@ -3005,7 +3005,9 @@ static bool createPrespecialized(StringRef UnspecializedName,
   // module in case some referenced functions have non-public linkage.
   M.linkFunction(SpecializedF, SILModule::LinkingMode::LinkAll);
 
-  SpecializedF->setLinkage(SILLinkage::Public);
+  SpecializedF->setLinkage(M.getSwiftModule()->isStaticLibrary()
+                               ? SILLinkage::Shared
+                               : SILLinkage::Public);
   SpecializedF->setSerializedKind(IsNotSerialized);
   return true;
 }
