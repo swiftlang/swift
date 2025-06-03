@@ -263,6 +263,20 @@ public:
   /// descendants of the iOS domain.
   AvailabilityDomain getRootDomain() const;
 
+  /// Returns the canonical domain that versions in this domain must be remapped
+  /// to before making availability comparisons in the current compilation
+  /// context. Sets \p didRemap to `true` if a remap was required.
+  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx,
+                                             bool &didRemap) const;
+
+  /// Returns the canonical domain that versions in this domain must be remapped
+  /// to before making availability comparisons in the current compilation
+  /// context.
+  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx) const {
+    bool unused;
+    return getRemappedDomain(ctx, unused);
+  }
+
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
   }
@@ -418,6 +432,20 @@ public:
   void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
   void print(llvm::raw_ostream &os) const;
+};
+
+/// Represents an `AvailabilityRange` paired with the `AvailabilityDomain` that
+/// the range applies to.
+class AvailabilityDomainAndRange {
+  AvailabilityDomain domain;
+  AvailabilityRange range;
+
+public:
+  AvailabilityDomainAndRange(AvailabilityDomain domain, AvailabilityRange range)
+      : domain(domain), range(range) {};
+
+  AvailabilityDomain getDomain() const { return domain; }
+  AvailabilityRange getRange() const { return range; }
 };
 
 } // end namespace swift
