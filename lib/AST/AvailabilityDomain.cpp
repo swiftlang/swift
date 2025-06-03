@@ -279,6 +279,18 @@ AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   return *this;
 }
 
+const AvailabilityDomain
+AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
+                                      bool &didRemap) const {
+  if (getPlatformKind() == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts)) {
+    didRemap = true;
+    return AvailabilityDomain::forPlatform(PlatformKind::visionOS);
+  }
+
+  return *this;
+}
+
 void AvailabilityDomain::print(llvm::raw_ostream &os) const {
   os << getNameForAttributePrinting();
 }
