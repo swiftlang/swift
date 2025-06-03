@@ -1114,7 +1114,12 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnosticAt(::getLoc(anchor), *diagnostic, fromType, toType);
+  {
+    auto diag =
+        emitDiagnosticAt(::getLoc(anchor), *diagnostic, fromType, toType);
+    (void)tryFixIts(diag);
+  }
+
   emitNotesForMismatches();
   return true;
 }
