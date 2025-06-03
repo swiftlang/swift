@@ -2360,6 +2360,9 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
+        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
       }
 
     Build-CMakeProject `
@@ -2376,6 +2379,9 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
+        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
       }
 
     Build-CMakeProject `
@@ -2392,6 +2398,9 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
+        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
       }
   }
 }
