@@ -123,6 +123,7 @@ typedef enum swiftide_completion_kind_t: uint32_t {
   SWIFTIDE_COMPLETION_KIND_TYPEPOSSIBLEFUNCTIONPARAMBEGINNING = 42,
   SWIFTIDE_COMPLETION_KIND_TYPEATTRINHERITANCEBEGINNING = 43,
   SWIFTIDE_COMPLETION_KIND_TYPESIMPLEINVERTED = 44,
+  SWIFTIDE_COMPLETION_KIND_USING = 45,
 } swiftide_completion_kind_t;
 
 typedef enum swiftide_completion_item_kind_t: uint32_t {

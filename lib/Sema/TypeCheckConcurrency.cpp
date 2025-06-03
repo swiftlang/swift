@@ -5396,6 +5396,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::EnumElement:
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     return std::nullopt;
 
   case DeclKind::PatternBinding:
@@ -5816,8 +5817,14 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
       return {};
     };
 
+    DefaultIsolation defaultIsolation = ctx.LangOpts.DefaultIsolationBehavior;
+    if (auto *SF = value->getDeclContext()->getParentSourceFile()) {
+      if (auto defaultIsolationInFile = SF->getDefaultIsolation())
+        defaultIsolation = defaultIsolationInFile.value();
+    }
+
     // If we are required to use main actor... just use that.
-    if (ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::MainActor)
+    if (defaultIsolation == DefaultIsolation::MainActor)
       if (auto result =
               globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
         return *result;
@@ -6439,6 +6446,43 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
   }
 
   return requiredIsolation;
+}
+
+std::optional<DefaultIsolation>
+DefaultIsolationInSourceFileRequest::evaluate(Evaluator &evaluator,
+                                              const SourceFile *file) const {
+  llvm::SmallVector<Decl *> usingDecls;
+  llvm::copy_if(file->getTopLevelDecls(), std::back_inserter(usingDecls),
+                [](Decl *D) { return isa<UsingDecl>(D); });
+
+  if (usingDecls.empty())
+    return std::nullopt;
+
+  std::optional<std::pair<Decl *, DefaultIsolation>> isolation;
+
+  auto setIsolation = [&isolation](Decl *D, DefaultIsolation newIsolation) {
+    if (isolation) {
+      D->diagnose(diag::invalid_redecl_of_file_isolation);
+      isolation->first->diagnose(diag::invalid_redecl_of_file_isolation_prev);
+      return;
+    }
+
+    isolation = std::make_pair(D, newIsolation);
+  };
+
+  for (auto *D : usingDecls) {
+    switch (cast<UsingDecl>(D)->getSpecifier()) {
+    case UsingSpecifier::MainActor:
+      setIsolation(D, DefaultIsolation::MainActor);
+      break;
+    case UsingSpecifier::Nonisolated:
+      setIsolation(D, DefaultIsolation::Nonisolated);
+      break;
+    }
+  }
+
+  return isolation.has_value() ? std::optional(isolation->second)
+                               : std::nullopt;
 }
 
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
@@ -7678,6 +7722,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     return true;
 
   case DeclKind::EnumElement:
@@ -7856,6 +7901,17 @@ ActorReferenceResult ActorReferenceResult::forReference(
         (!actorInstance || actorInstance->isSelf())) {
       auto type = fromDC->mapTypeIntoContext(decl->getInterfaceType());
       if (!type->isSendableType()) {
+        // If we have an actor instance and our declIsolation is global actor
+        // isolated, but our context isolation is nonisolated... defer to flow
+        // isolation if this case passes the additional restrictions required by
+        // flow isolation (e.x.: the initializer's nominal type has to be
+        // isolated).
+        if (actorInstance &&
+            declIsolation.isGlobalActor() && contextIsolation.isNonisolated() &&
+            checkedByFlowIsolation(fromDC, *actorInstance, decl, declRefLoc, useKind)) {
+          return forSameConcurrencyDomain(declIsolation, options);
+        }
+
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the
         // Swift 5.9 compiler.

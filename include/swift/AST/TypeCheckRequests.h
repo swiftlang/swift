@@ -5332,6 +5332,23 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
+class DefaultIsolationInSourceFileRequest
+    : public SimpleRequest<DefaultIsolationInSourceFileRequest,
+                           std::optional<DefaultIsolation>(const SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<DefaultIsolation> evaluate(Evaluator &evaluator,
+                                           const SourceFile *file) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

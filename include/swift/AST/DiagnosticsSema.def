@@ -8293,8 +8293,8 @@ ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
       "cannot copy the lifetime of an Escapable type, use "
-      "'@lifetime(borrow %0)' instead",
-      (StringRef))
+      "'@lifetime(%1%0)' instead",
+      (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
@@ -8781,6 +8781,14 @@ ERROR(extensible_attr_on_internal_type,none,
 
 ERROR(pre_enum_extensibility_without_extensible,none,
       "%0 can only be used together with '@extensible' attribute", (DeclAttribute))
+
+//===----------------------------------------------------------------------===//
+// MARK: `using` declaration
+//===----------------------------------------------------------------------===//
+ERROR(invalid_redecl_of_file_isolation,none,
+      "invalid redeclaration of file-level default actor isolation", ())
+NOTE(invalid_redecl_of_file_isolation_prev,none,
+     "default isolation was previously declared here", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

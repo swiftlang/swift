@@ -84,7 +84,7 @@ struct EscapableTrivialSelf {
   @lifetime(self) // OK
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
+  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(&self)' instead}}
   mutating func mutatingMethodNoParamCopy() -> NEImmortal { NEImmortal() }
 
   @lifetime(borrow self)
@@ -106,7 +106,7 @@ struct EscapableTrivialSelf {
   @lifetime(self)
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
+  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(&self)' instead}}
   mutating func mutatingMethodOneParamCopy(_: Int) -> NEImmortal { NEImmortal() }
 
   @lifetime(borrow self)
@@ -138,7 +138,7 @@ struct EscapableNonTrivialSelf {
   @lifetime(self)
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
+  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(&self)' instead}}
   mutating func mutatingMethodNoParamCopy() -> NEImmortal { NEImmortal() }
 
   @lifetime(&self)
@@ -160,7 +160,7 @@ struct EscapableNonTrivialSelf {
   @lifetime(self)
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
+  @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(&self)' instead}}
   mutating func mutatingMethodOneParamCopy(_: Int) -> NEImmortal { NEImmortal() }
 
   @lifetime(&self)
