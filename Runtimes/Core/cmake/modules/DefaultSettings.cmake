@@ -52,6 +52,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "WASM")
   set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
 elseif(LINUX OR ANDROID OR BSD)
   set(SwiftCore_OBJECT_FORMAT_default "elf")
+
+  set(SwiftCore_ENABLE_REFLECTION_default ON)
   set(SwiftCore_ENABLE_FATALERROR_BACKTRACE_default ON)
   if(LINUX)
     set(SwiftCore_THREADING_PACKAGE_default "LINUX")
