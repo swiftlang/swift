@@ -373,7 +373,7 @@ bool AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
   auto potentiallyRemappedIntroducedVersion =
       getRemappedIntroducedVersionForFallbackPlatform(ctx, beforeVersion);
   if (potentiallyRemappedIntroducedVersion.has_value()) {
-    domain = AvailabilityDomain::forPlatform(PlatformKind::visionOS);
+    domain = remappedDomain;
     platformVer = potentiallyRemappedIntroducedVersion.value();
     return true;
   }
