@@ -3891,7 +3891,7 @@ public:
     ctor->setParameters(bodyParams);
 
     SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-    while (auto info = MF.maybeReadLifetimeDependence(bodyParams->size() + 1)) {
+    while (auto info = MF.maybeReadLifetimeDependence()) {
       assert(info.has_value());
       lifetimeDependencies.push_back(*info);
     }
@@ -4493,11 +4493,9 @@ public:
     ParameterList *paramList;
     SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
     fn->setParameters(paramList);
-    auto numParams =
-        fn->hasImplicitSelfDecl() ? paramList->size() + 1 : paramList->size();
 
     SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-    while (auto info = MF.maybeReadLifetimeDependence(numParams)) {
+    while (auto info = MF.maybeReadLifetimeDependence()) {
       assert(info.has_value());
       lifetimeDependencies.push_back(*info);
     }
@@ -7438,8 +7436,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 
-  while (auto lifetimeDependence =
-             MF.maybeReadLifetimeDependence(params.size())) {
+  while (auto lifetimeDependence = MF.maybeReadLifetimeDependence()) {
     lifetimeDependencies.push_back(*lifetimeDependence);
   }
   if (!lifetimeDependencies.empty()) {
@@ -8091,7 +8088,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
 
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 
-  while (auto lifetimeDependence = MF.maybeReadLifetimeDependence(numParams)) {
+  while (auto lifetimeDependence = MF.maybeReadLifetimeDependence()) {
     lifetimeDependencies.push_back(*lifetimeDependence);
   }
 
@@ -9378,7 +9375,7 @@ bool ModuleFile::maybeReadLifetimeDependenceRecord(
 }
 
 std::optional<LifetimeDependenceInfo>
-ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
+ModuleFile::maybeReadLifetimeDependence() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
@@ -9387,28 +9384,29 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   }
 
   unsigned targetIndex;
+  unsigned paramIndicesLength;
   bool isImmortal;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
-      scratch, targetIndex, isImmortal, hasInheritLifetimeParamIndices,
-      hasScopeLifetimeParamIndices, hasAddressableParamIndices,
-      lifetimeDependenceData);
+      scratch, targetIndex, paramIndicesLength, isImmortal,
+      hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices,
+      hasAddressableParamIndices, lifetimeDependenceData);
 
-  SmallBitVector inheritLifetimeParamIndices(numParams, false);
-  SmallBitVector scopeLifetimeParamIndices(numParams, false);
-  SmallBitVector addressableParamIndices(numParams, false);
+  SmallBitVector inheritLifetimeParamIndices(paramIndicesLength, false);
+  SmallBitVector scopeLifetimeParamIndices(paramIndicesLength, false);
+  SmallBitVector addressableParamIndices(paramIndicesLength, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
-    for (unsigned i = 0; i < numParams; i++) {
+    for (unsigned i = 0; i < paramIndicesLength; i++) {
       if (lifetimeDependenceData[startIndex + i]) {
         bits.set(i);
       }
     }
-    startIndex += numParams;
+    startIndex += paramIndicesLength;
   };
 
   if (hasInheritLifetimeParamIndices) {

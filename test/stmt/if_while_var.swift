@@ -64,7 +64,8 @@ if case let x? = nonOptionalEnum() { _ = x } // expected-error{{'?' pattern cann
 if let x { _ = x } // expected-error{{cannot find 'x' in scope}}
 
 if let optional: String { _ = optional }
-if let optional: Int { _ = optional } // expected-error{{cannot convert value of type 'String?' to specified type 'Int?'}}
+if let optional: Int { _ = optional } // expected-error{{cannot assign value of type 'String?' to type 'Int?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('String' and 'Int') are expected to be equal}}
 
 class B {} // expected-note * {{did you mean 'B'?}}
 class D : B {}// expected-note * {{did you mean 'D'?}}

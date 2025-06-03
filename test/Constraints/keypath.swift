@@ -34,7 +34,7 @@ class Demo {
 
 let some = Some(keyPath: \Demo.here)
 // expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((V) -> Void)?>'}}
-// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((V) -> Void)?') are expected to be equal}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('() -> Void' and '(V) -> Void') are expected to be equal}}
 // expected-error@-3 {{generic parameter 'V' could not be inferred}}
 // expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}
 

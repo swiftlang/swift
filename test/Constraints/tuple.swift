@@ -340,6 +340,7 @@ var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot conv
 optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
 // Optional to Optional
 optionalTuple = optionalTuple2 // expected-error {{cannot assign value of type '(Int64, Int)?' to type '(Int, Int)?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(Int64, Int)' and '(Int, Int)') are expected to be equal}}
 
 func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> Void,
                                           fn2: @escaping () -> (x: Int, Int)) {

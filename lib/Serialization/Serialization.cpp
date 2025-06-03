@@ -2734,10 +2734,10 @@ void Serializer::writeLifetimeDependencies(
 
     auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
     LifetimeDependenceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, info.getTargetIndex(), info.isImmortal(),
+        Out, ScratchRecord, abbrCode, info.getTargetIndex(),
+        info.getParamIndicesLength(), info.isImmortal(),
         info.hasInheritLifetimeParamIndices(),
-        info.hasScopeLifetimeParamIndices(),
-        info.hasAddressableParamIndices(),
+        info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();
   }
