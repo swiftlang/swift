@@ -2378,6 +2378,9 @@ NOTE(dependency_as_imported_by_main_module,none,
      "a dependency of main module '%0'", (StringRef))
 NOTE(dependency_as_imported_by, none,
      "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+NOTE(inherited_search_path_resolves_module,none,
+     "'%0' can be found on search path used to build module '%1': '%2'. "
+     "These search paths are not inherited by the current compilation.", (StringRef, StringRef, StringRef))
 ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
 

@@ -190,7 +190,23 @@ private:
   template <typename Function, typename... Args>
   auto withDependencyScanningWorker(Function &&F, Args &&...ArgList);
 
+  /// Use the scanner's ASTContext to construct an `Identifier`
+  /// for a given module name.
   Identifier getModuleImportIdentifier(StringRef moduleName);
+
+  /// Diagnose scanner failure and attempt to reconstruct the dependency
+  /// path from the main module to the missing dependency.
+  void diagnoseScannerFailure(const ScannerImportStatementInfo &moduleImport,
+                              const ModuleDependenciesCache &cache,
+                              std::optional<ModuleDependencyID> dependencyOf);
+
+  /// Assuming the \c `moduleImport` failed to resolve,
+  /// iterate over all binary Swift module dependencies with serialized
+  /// search paths and attempt to diagnose if the failed-to-resolve module
+  /// can be found on any of them.
+  void attemptToFindResolvingSerializedSearchPath(
+      const ScannerImportStatementInfo &moduleImport,
+      const ModuleDependenciesCache &cache, const SourceLoc &importLoc);
 
 private:
   const CompilerInvocation &ScanCompilerInvocation;
