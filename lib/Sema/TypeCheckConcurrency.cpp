@@ -798,7 +798,7 @@ bool SendableCheckContext::warnInMinimalChecking() const {
   case SendableCheck::Explicit:
     return true;
 
-  case SendableCheck::ImpliedByStandardProtocol:
+  case SendableCheck::ImpliedByPreconcurrencyProtocol:
   case SendableCheck::Implicit:
   case SendableCheck::ImplicitForExternallyVisible:
     return false;
