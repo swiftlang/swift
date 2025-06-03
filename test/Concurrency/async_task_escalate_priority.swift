@@ -19,9 +19,6 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=tvos
 
-// rdar://107390341 - Because task escalation tests seem disabled on this platform
-// UNSUPPORTED: CPU=arm64e
-
 import Darwin
 @preconcurrency import Dispatch
 
