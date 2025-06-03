@@ -749,34 +749,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       break;
     }
 
-    case SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE: {
-      if (!hasCurrentModule)
-        llvm::report_fatal_error(
-            "Unexpected SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE record");
-      unsigned compiledModulePathID, moduleDocPathID, moduleSourceInfoPathID;
-      SwiftPlaceholderModuleDetailsLayout::readRecord(
-          Scratch, compiledModulePathID, moduleDocPathID,
-          moduleSourceInfoPathID);
-
-      auto compiledModulePath = getIdentifier(compiledModulePathID);
-      if (!compiledModulePath)
-        llvm::report_fatal_error("Bad compiled module path");
-      auto moduleDocPath = getIdentifier(moduleDocPathID);
-      if (!moduleDocPath)
-        llvm::report_fatal_error("Bad module doc path");
-      auto moduleSourceInfoPath = getIdentifier(moduleSourceInfoPathID);
-      if (!moduleSourceInfoPath)
-        llvm::report_fatal_error("Bad module source info path");
-
-      // Form the dependencies storage object
-      auto moduleDep = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
-          *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath);
-
-      cache.recordDependency(currentModuleName, std::move(moduleDep));
-      hasCurrentModule = false;
-      break;
-    }
-
     case CLANG_MODULE_DETAILS_NODE: {
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
@@ -1011,7 +983,6 @@ ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
   if (encodedIdentifierStringArray) {
     static const std::string textualPrefix("swiftTextual");
     static const std::string binaryPrefix("swiftBinary");
-    static const std::string placeholderPrefix("swiftPlaceholder");
     static const std::string clangPrefix("clang");
     std::vector<ModuleDependencyID> result;
     for (const auto &encodedIdentifierString : *encodedIdentifierStringArray) {
@@ -1026,11 +997,6 @@ ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
         auto moduleName =
             encodedIdentifierString.substr(binaryPrefix.size() + 1);
         id = {moduleName, ModuleDependencyKind::SwiftBinary};
-      } else if (!encodedIdentifierString.compare(0, placeholderPrefix.size(),
-                                                  placeholderPrefix)) {
-        auto moduleName =
-            encodedIdentifierString.substr(placeholderPrefix.size() + 1);
-        id = {moduleName, ModuleDependencyKind::SwiftPlaceholder};
       } else {
         auto moduleName =
             encodedIdentifierString.substr(clangPrefix.size() + 1);
@@ -1266,7 +1232,6 @@ void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
   BLOCK_RECORD(graph_block, SWIFT_INTERFACE_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_SOURCE_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_BINARY_MODULE_DETAILS_NODE);
-  BLOCK_RECORD(graph_block, SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, CLANG_MODULE_DETAILS_NODE);
 }
 
@@ -1664,17 +1629,6 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
         getIdentifier(swiftBinDeps->userModuleVersion));
     break;
   }
-  case swift::ModuleDependencyKind::SwiftPlaceholder: {
-    auto swiftPHDeps = dependencyInfo.getAsPlaceholderDependencyModule();
-    assert(swiftPHDeps);
-    SwiftPlaceholderModuleDetailsLayout::emitRecord(
-        Out, ScratchRecord,
-        AbbrCodes[SwiftPlaceholderModuleDetailsLayout::Code],
-        getIdentifier(swiftPHDeps->compiledModulePath),
-        getIdentifier(swiftPHDeps->moduleDocPath),
-        getIdentifier(swiftPHDeps->sourceInfoPath));
-    break;
-  }
   case swift::ModuleDependencyKind::Clang: {
     auto clangDeps = dependencyInfo.getAsClangModule();
     assert(clangDeps);
@@ -1932,14 +1886,6 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                        [this](auto &sp) { addIdentifier(sp.Path); });
         break;
       }
-      case swift::ModuleDependencyKind::SwiftPlaceholder: {
-        auto swiftPHDeps = dependencyInfo->getAsPlaceholderDependencyModule();
-        assert(swiftPHDeps);
-        addIdentifier(swiftPHDeps->compiledModulePath);
-        addIdentifier(swiftPHDeps->moduleDocPath);
-        addIdentifier(swiftPHDeps->sourceInfoPath);
-        break;
-      }
       case swift::ModuleDependencyKind::SwiftSource: {
         auto swiftSourceDeps = dependencyInfo->getAsSwiftSourceModule();
         assert(swiftSourceDeps);
@@ -2017,7 +1963,6 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<SwiftSourceModuleDetailsLayout>();
   registerRecordAbbr<SwiftInterfaceModuleDetailsLayout>();
   registerRecordAbbr<SwiftBinaryModuleDetailsLayout>();
-  registerRecordAbbr<SwiftPlaceholderModuleDetailsLayout>();
   registerRecordAbbr<ClangModuleDetailsLayout>();
 
   // Make a pass to collect all unique strings and arrays

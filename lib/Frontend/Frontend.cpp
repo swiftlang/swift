@@ -899,14 +899,6 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
         RequireOSSAModules_t(Invocation.getSILOptions()));
-    auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
-    std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
-        std::make_unique<PlaceholderSwiftModuleScanner>(
-            *Context, MLM, mainModuleName,
-            Context->SearchPathOpts.PlaceholderDependencyModuleMap, ASTDelegate,
-            getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-            getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath);
-    Context->addModuleLoader(std::move(PSMS));
   }
 
   return false;

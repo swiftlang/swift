@@ -264,7 +264,6 @@ DependencyScanningTool::DependencyScanningTool()
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
-    const llvm::StringSet<> &PlaceholderModules,
     StringRef WorkingDirectory) {
   // There may be errors as early as in instance initialization, so we must ensure
   // we can catch those.
