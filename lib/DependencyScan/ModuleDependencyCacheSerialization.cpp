@@ -690,6 +690,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       auto moduleDep = ModuleDependencyInfo::forSwiftBinaryModule(
           *compiledModulePath, *moduleDocPath, *moduleSourceInfoPath,
           importStatements, optionalImportStatements, linkLibraries,
+          {}, // TODO: serialized search path serialization
           *headerImport, *definingInterfacePath, isFramework, isStatic,
           *moduleCacheKey, *userModuleVersion);
 

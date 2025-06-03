@@ -101,78 +101,6 @@ findPathToDependency(ModuleDependencyID dependency,
   return dependencyPath;
 }
 
-// Diagnose scanner failure and attempt to reconstruct the dependency
-// path from the main module to the missing dependency.
-static void
-diagnoseScannerFailure(const ScannerImportStatementInfo &moduleImport,
-                       DiagnosticEngine &Diags,
-                       const ModuleDependenciesCache &cache,
-                       std::optional<ModuleDependencyID> dependencyOf) {
-  SourceLoc importLoc = SourceLoc();
-  if (!moduleImport.importLocations.empty()) {
-    auto locInfo = moduleImport.importLocations[0];
-    importLoc = Diags.SourceMgr.getLocFromExternalSource(locInfo.bufferIdentifier,
-                                                         locInfo.lineNumber,
-                                                         locInfo.columnNumber);
-  }
-
-  Diags.diagnose(importLoc, diag::dependency_scan_module_not_found,
-                 moduleImport.importIdentifier);
-  if (dependencyOf.has_value()) {
-    auto path = findPathToDependency(dependencyOf.value(), cache);
-    // We may fail to construct a path in some cases, such as a Swift overlay of
-    // a Clang module dependnecy.
-    if (path.empty())
-      path = {dependencyOf.value()};
-
-    for (auto it = path.rbegin(), end = path.rend(); it != end; ++it) {
-      const auto &entry = *it;
-      auto optionalEntryNode = cache.findDependency(entry);
-      assert(optionalEntryNode.has_value());
-      auto entryNode = optionalEntryNode.value();
-      std::string moduleFilePath = "";
-      bool isClang = false;
-      switch (entryNode->getKind()) {
-      case swift::ModuleDependencyKind::SwiftSource:
-        Diags.diagnose(importLoc, diag::dependency_as_imported_by_main_module,
-                       entry.ModuleName);
-        continue;
-      case swift::ModuleDependencyKind::SwiftInterface:
-        moduleFilePath =
-            entryNode->getAsSwiftInterfaceModule()->swiftInterfaceFile;
-        break;
-      case swift::ModuleDependencyKind::SwiftBinary:
-        moduleFilePath =
-            entryNode->getAsSwiftBinaryModule()->compiledModulePath;
-        break;
-      case swift::ModuleDependencyKind::SwiftPlaceholder:
-        moduleFilePath =
-            entryNode->getAsPlaceholderDependencyModule()->compiledModulePath;
-        break;
-      case swift::ModuleDependencyKind::Clang:
-        moduleFilePath = entryNode->getAsClangModule()->moduleMapFile;
-        isClang = true;
-        break;
-      default:
-        llvm_unreachable("Unexpected dependency kind");
-      }
-
-      Diags.diagnose(importLoc, diag::dependency_as_imported_by,
-                     entry.ModuleName, moduleFilePath, isClang);
-    }
-  }
-
-  if (moduleImport.importLocations.size() > 1) {
-    for (size_t i = 1; i < moduleImport.importLocations.size(); ++i) {
-      auto locInfo = moduleImport.importLocations[i];
-      auto importLoc = Diags.SourceMgr.getLocFromExternalSource(locInfo.bufferIdentifier,
-                                                                locInfo.lineNumber,
-                                                                locInfo.columnNumber);
-      Diags.diagnose(importLoc, diag::unresolved_import_location);
-    }
-  }
-}
-
 static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
   return Kind == ModuleDependencyKind::SwiftInterface ||
          Kind == ModuleDependencyKind::SwiftSource ||
@@ -545,7 +473,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
 
 /// Find all of the imported Clang modules starting with the given module name.
 static void findAllImportedClangModules(StringRef moduleName,
-                                        ModuleDependenciesCache &cache,
+                                        const ModuleDependenciesCache &cache,
                                         std::vector<std::string> &allModules,
                                         llvm::StringSet<> &knownModules) {
   if (!knownModules.insert(moduleName).second)
@@ -560,6 +488,16 @@ static void findAllImportedClangModules(StringRef moduleName,
   for (const auto &dep : cache.getClangDependencies(moduleID))
     findAllImportedClangModules(dep.ModuleName, cache, allModules,
                                 knownModules);
+}
+
+static std::set<ModuleDependencyID>
+collectBinarySwiftDeps(const ModuleDependenciesCache &cache) {
+  std::set<ModuleDependencyID> binarySwiftModuleDepIDs;
+  auto binaryDepsMap = cache.getDependenciesMap(ModuleDependencyKind::SwiftBinary);
+  for (const auto &binaryDepName : binaryDepsMap.keys())
+    binarySwiftModuleDepIDs.insert(ModuleDependencyID{binaryDepName.str(),
+                                                      ModuleDependencyKind::SwiftBinary});
+  return binarySwiftModuleDepIDs;
 }
 
 llvm::ErrorOr<ModuleDependencyInfo>
@@ -1154,7 +1092,7 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
       if (optionalCachedModuleInfo.has_value())
         importedClangDependencies.insert(unresolvedModuleID);
       else
-        diagnoseScannerFailure(unresolvedImport, Diagnostics, cache, moduleID);
+        diagnoseScannerFailure(unresolvedImport, cache, moduleID);
     }
 
     if (!importedClangDependencies.empty())
@@ -1705,4 +1643,172 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
       [&allModules](const ModuleDependencyID &dep) { allModules.insert(dep); });
 
   return llvm::Error::success();
+}
+
+void ModuleDependencyScanner::diagnoseScannerFailure(
+    const ScannerImportStatementInfo &moduleImport,
+    const ModuleDependenciesCache &cache,
+    std::optional<ModuleDependencyID> dependencyOf) {
+  SourceLoc importLoc = SourceLoc();
+  if (!moduleImport.importLocations.empty()) {
+    auto locInfo = moduleImport.importLocations[0];
+    importLoc = Diagnostics.SourceMgr.getLocFromExternalSource(
+        locInfo.bufferIdentifier, locInfo.lineNumber, locInfo.columnNumber);
+  }
+
+  Diagnostics.diagnose(importLoc, diag::dependency_scan_module_not_found,
+                       moduleImport.importIdentifier);
+  if (dependencyOf.has_value()) {
+    auto path = findPathToDependency(dependencyOf.value(), cache);
+    // We may fail to construct a path in some cases, such as a Swift overlay of
+    // a Clang module dependnecy.
+    if (path.empty())
+      path = {dependencyOf.value()};
+
+    for (auto it = path.rbegin(), end = path.rend(); it != end; ++it) {
+      const auto &entry = *it;
+      auto optionalEntryNode = cache.findDependency(entry);
+      assert(optionalEntryNode.has_value());
+      auto entryNode = optionalEntryNode.value();
+      std::string moduleFilePath = "";
+      bool isClang = false;
+      switch (entryNode->getKind()) {
+      case swift::ModuleDependencyKind::SwiftSource:
+        Diagnostics.diagnose(importLoc,
+                             diag::dependency_as_imported_by_main_module,
+                             entry.ModuleName);
+        continue;
+      case swift::ModuleDependencyKind::SwiftInterface:
+        moduleFilePath =
+            entryNode->getAsSwiftInterfaceModule()->swiftInterfaceFile;
+        break;
+      case swift::ModuleDependencyKind::SwiftBinary:
+        moduleFilePath =
+            entryNode->getAsSwiftBinaryModule()->compiledModulePath;
+        break;
+      case swift::ModuleDependencyKind::SwiftPlaceholder:
+        moduleFilePath =
+            entryNode->getAsPlaceholderDependencyModule()->compiledModulePath;
+        break;
+      case swift::ModuleDependencyKind::Clang:
+        moduleFilePath = entryNode->getAsClangModule()->moduleMapFile;
+        isClang = true;
+        break;
+      default:
+        llvm_unreachable("Unexpected dependency kind");
+      }
+
+      Diagnostics.diagnose(importLoc, diag::dependency_as_imported_by,
+                           entry.ModuleName, moduleFilePath, isClang);
+    }
+  }
+
+  if (moduleImport.importLocations.size() > 1) {
+    for (size_t i = 1; i < moduleImport.importLocations.size(); ++i) {
+      auto locInfo = moduleImport.importLocations[i];
+      auto importLoc = Diagnostics.SourceMgr.getLocFromExternalSource(
+          locInfo.bufferIdentifier, locInfo.lineNumber, locInfo.columnNumber);
+      Diagnostics.diagnose(importLoc, diag::unresolved_import_location);
+    }
+  }
+
+  attemptToFindResolvingSerializedSearchPath(moduleImport, cache, importLoc);
+}
+
+static std::string getModuleDefiningPath(const ModuleDependencyInfo &info) {
+  std::string path = "";
+  switch (info.getKind()) {
+  case swift::ModuleDependencyKind::SwiftInterface:
+    path = info.getAsSwiftInterfaceModule()->swiftInterfaceFile;
+    break;
+  case swift::ModuleDependencyKind::SwiftBinary:
+    path = info.getAsSwiftBinaryModule()->compiledModulePath;
+    break;
+  case swift::ModuleDependencyKind::SwiftPlaceholder:
+    path = info.getAsPlaceholderDependencyModule()->compiledModulePath;
+    break;
+  case swift::ModuleDependencyKind::Clang:
+    path = info.getAsClangModule()->moduleMapFile;
+    break;
+  case swift::ModuleDependencyKind::SwiftSource:
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+
+  // Relative to the `module.modulemap` or `.swiftinterface` or `.swiftmodule`,
+  // the defininig path is the parent directory of the file.
+<<<<<<< Updated upstream
+  path = llvm::sys::path::parent_path(path);
+
+  // If the defining path is the top-level `.swiftmodule` directory,
+  // take one more step up.
+  if (llvm::sys::path::extension(path) == ".swiftmodule")
+    path = llvm::sys::path::parent_path(path);
+
+  // If the defining path is under `.framework/Modules/` directory,
+  // return the parent path containing the framework.
+  if (llvm::sys::path::filename(path) == "Modules" && llvm::sys::path::extension(llvm::sys::path::parent_path(path)) == ".framework")
+    path = llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
+
+  return path;
+=======
+  return llvm::sys::path::parent_path(path).str();
+>>>>>>> Stashed changes
+}
+
+void ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
+    const ScannerImportStatementInfo &moduleImport,
+    const ModuleDependenciesCache &cache, const SourceLoc &importLoc) {
+  std::set<ModuleDependencyID> binarySwiftModuleDepIDs =
+      collectBinarySwiftDeps(cache);
+
+  for (const auto &binaryDepID : binarySwiftModuleDepIDs) {
+    auto binaryModInfo =
+        cache.findKnownDependency(binaryDepID).getAsSwiftBinaryModule();
+    assert(binaryModInfo);
+    if (binaryModInfo->serializedSearchPaths.empty())
+      continue;
+
+    // Note: this will permanently mutate this worker with additional search
+    // paths. That's fine because we are diagnosing a scan failure here, but
+    // worth being aware of.
+    withDependencyScanningWorker(
+        [&binaryModInfo, &moduleImport, &cache, &binaryDepID, &importLoc,
+         this](ModuleDependencyScanningWorker *ScanningWorker) {
+          ModuleDependencyVector result;
+          for (const auto &sp : binaryModInfo->serializedSearchPaths)
+            ScanningWorker->workerASTContext->addSearchPath(
+                sp.Path, sp.IsFramework, sp.IsSystem);
+
+          result = ScanningWorker->scanFilesystemForSwiftModuleDependency(
+              getModuleImportIdentifier(moduleImport.importIdentifier),
+              cache.getModuleOutputPath(), cache.getSDKModuleOutputPath(),
+              cache.getScanService().getPrefixMapper());
+          if (!result.empty()) {
+            Diagnostics.diagnose(
+                importLoc, diag::inherited_search_path_resolves_module,
+                moduleImport.importIdentifier, binaryDepID.ModuleName,
+                getModuleDefiningPath(result[0].second));
+          }
+
+          result = ScanningWorker->scanFilesystemForClangModuleDependency(
+              getModuleImportIdentifier(moduleImport.importIdentifier),
+              cache.getModuleOutputPath(), cache.getSDKModuleOutputPath(), {},
+              cache.getScanService().getPrefixMapper());
+<<<<<<< Updated upstream
+          if (!result.empty()) {
+            Diagnostics.diagnose(
+                importLoc, diag::inherited_search_path_resolves_module,
+                moduleImport.importIdentifier, binaryDepID.ModuleName,
+                getModuleDefiningPath(result[0].second));
+          }
+          return result;
+=======
+          if (!result.empty())
+            return std::make_pair(binaryDepID,
+                                  getModuleDefiningPath(result[0].second));
+          return std::nullopt;
+>>>>>>> Stashed changes
+        });
+  }
 }
