@@ -1477,7 +1477,13 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
     // If the textual interface was built without C++ interop, do not query
     // the C++ Standard Library Swift overlay for its compilation.
-    if (llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") ==
+    //
+    // FIXME: We always declare the 'Darwin' module as formally having been built
+    // without C++Interop, for compatibility with prior versions. Once we are certain
+    // that we are only building against modules built with support of
+    // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
+    if (moduleID.ModuleName != "Darwin" &&
+        llvm::find(commandLine, "-formal-cxx-interoperability-mode=off") ==
         commandLine.end()) {
       for (const auto &clangDepName : allClangDependencies) {
         // If this Clang module is a part of the C++ stdlib, and we haven't
