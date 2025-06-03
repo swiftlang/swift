@@ -4039,6 +4039,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       getConstraintLocator(locator, {LocatorPathElt::GenericType(type1),
           LocatorPathElt::GenericType(type2)});
 
+    // Optionals have a lot of special diagnostics and only one
+    // generic argument so if we're dealing with one, let's allow
+    // `repairFailures` to take care of it.
+    if (bound1->getDecl()->isOptionalDecl())
+      return matchDeepTypeArguments(*this, subflags, args1, args2, baseLoc);
+
     auto argMatchingFlags = subflags;
     // Allow the solver to produce separate fixes while matching
     // key path's root/value to a contextual type instead of the
@@ -4048,13 +4054,6 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       argMatchingFlags |= TMF_ApplyingFix;
       argMatchingFlags |= TMF_MatchingGenericArguments;
     }
-
-    // Optionals have a lot of special diagnostics and only one
-    // generic argument so if we' re dealing with one, don't produce generic
-    // arguments mismatch fixes.
-    if (bound1->getDecl()->isOptionalDecl())
-      return matchDeepTypeArguments(*this, argMatchingFlags, args1, args2,
-                                    baseLoc);
 
     SmallVector<unsigned, 4> mismatches;
     auto result = matchDeepTypeArguments(
@@ -6943,12 +6942,19 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
 
     ConstraintFix *fix = nullptr;
-    if (!path.empty() && path.back().is<LocatorPathElt::AnyRequirement>()) {
+    auto *fixLoc = getConstraintLocator(anchor, path);
+
+    if (fixLoc->isLastElement<LocatorPathElt::AnyRequirement>()) {
       fix = fixRequirementFailure(*this, fromType, toType, anchor, path);
+    } else if (fixLoc->isLastElement<LocatorPathElt::TupleElement>()) {
+      return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
+                            fixLoc);
+    } else if (!lhs->mayHaveSuperclass() && rhs->isAnyObject()) {
+      fix = AllowNonClassTypeToConvertToAnyObject::create(*this, fromType,
+                                                          fixLoc);
     } else {
       fix = GenericArgumentsMismatch::create(
-          *this, fromType, toType, {genericArgElt.getIndex()},
-          getConstraintLocator(anchor, path));
+          *this, fromType, toType, {genericArgElt.getIndex()}, fixLoc);
     }
 
     if (!fix)
@@ -15688,7 +15694,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowFunctionSpecialization:
   case FixKind::IgnoreGenericSpecializationArityMismatch:
   case FixKind::IgnoreKeyPathSubscriptIndexMismatch:
-  case FixKind::AllowMemberRefOnExistential: {
+  case FixKind::AllowMemberRefOnExistential:
+  case FixKind::AllowNonClassTypeToConvertToAnyObject: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -15696,6 +15703,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     unsigned impact = 1;
     if (type1->isMarkerExistential() || type2->isMarkerExistential())
       ++impact;
+
+    // If generic arguments mismatch ends up being recorded on the result
+    // of the chain or a try expression it means that there is a contextual 
+    // conversion mismatch.
+    //
+    // For optional conversions the solver currently generates a disjunction
+    // with two choices - bind and optional-to-optional conversion which is
+    // anchored on the contextual expression. If we can get a fix recorded
+    // there that would result in a better diagnostic. It's only possible
+    // for optional-to-optional choice because it doesn't bind the
+    // variable immediately, so we need to downgrade direct fixes to prevent
+    // `bind` choice from considered better.
+    if (fix->directlyAt<OptionalEvaluationExpr>() ||
+        fix->directlyAt<AnyTryExpr>())
+      impact += 2;
+
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -15923,7 +15946,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::DefaultGenericArgument:
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
-  case FixKind::AllowNonClassTypeToConvertToAnyObject:
   case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
