@@ -1877,19 +1877,19 @@ extension ASTGenVisitor {
   ///   ```
   func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
     guard
-      var arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
+      let arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
     else {
       // TODO: Diagnose
       return nil
     }
-    var exported: Bool?
-    var kind: BridgedSpecializationKind? = nil
+    let exported: Bool? = nil
+    let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
-    var targetFunction: BridgedDeclNameRef? = nil
-    var spiGroups: [BridgedIdentifier] = []
-    var availableAttrs: [BridgedAvailableAttr] = []
+    let targetFunction: BridgedDeclNameRef? = nil
+    let spiGroups: [BridgedIdentifier] = []
+    let availableAttrs: [BridgedAvailableAttr] = []
 
-    whereClause =  self.generate(genericWhereClause: arg.genericWhereClause)
+    whereClause = self.generate(genericWhereClause: arg.genericWhereClause)
 
     return .createParsed(
       self.ctx,
@@ -1925,7 +1925,7 @@ extension ASTGenVisitor {
     while let arg = args.popFirst() {
       switch arg {
       case .genericWhereClause(let arg):
-        whereClause =  self.generate(genericWhereClause: arg)
+        whereClause = self.generate(genericWhereClause: arg)
       case .specializeTargetFunctionArgument(let arg):
         if targetFunction != nil {
           // TODO: Diangose.
