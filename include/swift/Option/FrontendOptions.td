@@ -1187,6 +1187,10 @@ def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-
 def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
 
+def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
+  MetaVarName<"<value>">,
+  HelpText<"Overrides the target's least valid pointer value.'">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,
