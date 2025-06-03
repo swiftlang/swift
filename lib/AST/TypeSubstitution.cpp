@@ -753,7 +753,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     const DeclContext *dc,
     GenericEnvironment *genericEnv) {
-  if (dc == getAnyNominal() && genericEnv == nullptr)
+  auto *nominal = getAnyNominal();
+  if (dc == nominal && !isa<ProtocolDecl>(nominal) &&
+      genericEnv == nullptr)
     return getContextSubstitutionMap();
 
   auto genericSig = dc->getGenericSignatureOfContext();
