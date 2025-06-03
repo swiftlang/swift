@@ -78,21 +78,6 @@ using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckDeclPrimary"
 
-static Type containsParameterizedProtocolType(Type inheritedTy) {
-  if (inheritedTy->is<ParameterizedProtocolType>()) {
-    return inheritedTy;
-  }
-
-  if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
-    for (auto memberTy : compositionTy->getMembers()) {
-      if (auto paramTy = containsParameterizedProtocolType(memberTy))
-        return paramTy;
-    }
-  }
-
-  return Type();
-}
-
 class CheckRepressions {
   llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion;
   ASTContext &ctx;
@@ -301,14 +286,6 @@ static void checkInheritanceClause(
 
       // Note that we saw inheritance from 'AnyObject'.
       inheritedAnyObject = { i, inherited.getSourceRange() };
-    }
-
-    if (auto paramTy = containsParameterizedProtocolType(inheritedTy)) {
-      if (!isa<ProtocolDecl>(decl)) {
-        decl->diagnose(diag::inheritance_from_parameterized_protocol,
-                       paramTy);
-      }
-      continue;
     }
 
     if (inheritedTy->isConstraintType()) {
