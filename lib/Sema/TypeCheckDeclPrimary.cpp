@@ -1777,6 +1777,33 @@ static TypeRepr *unwrapAttributedRepr(TypeRepr *repr) {
   return repr;
 }
 
+static void collectProtocolsFromInheritedEntry(
+    const InheritedEntry &entry,
+    Type inheritedTy,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &protocolsWithRetroactiveAttr,
+    SmallVectorImpl<ProtocolDecl *> &protos) {
+
+  if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
+    auto *proto = protoTy->getDecl();
+
+    // As a fallback, to support previous language versions, also allow
+    // this through if the protocol has been explicitly module-qualified.
+    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
+    if (isModuleQualified(repr, proto->getParentModule())) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
+
+    protos.push_back(proto);
+  } else if (auto *pct = inheritedTy->getAs<ProtocolCompositionType>()) {
+    for (auto member : pct->getMembers()) {
+      collectProtocolsFromInheritedEntry(entry, member,
+                                         protocolsWithRetroactiveAttr, protos);
+    }
+  } else if (auto *ppt = inheritedTy->getAs<ParameterizedProtocolType>()) {
+    protos.push_back(ppt->getProtocol());
+  }
+}
+
 /// Determines if this extension declares a conformance of a type declared
 /// outside this module to a protocol declared outside this module (but only
 /// in library evolution mode)
@@ -1813,7 +1840,7 @@ static void diagnoseRetroactiveConformances(
   // At this point, we know we're extending a type declared outside this module.
   // We better only be conforming it to protocols declared within this module.
   llvm::SmallMapVector<ProtocolDecl *, bool, 8> protocols;
-  llvm::SmallSet<ProtocolDecl *, 8> protocolsWithRetroactiveAttr;
+  llvm::SmallPtrSet<ProtocolDecl *, 2> protocolsWithRetroactiveAttr;
 
   for (auto *conformance : ext->getLocalConformances()) {
     auto *proto = conformance->getProtocol();
@@ -1841,27 +1868,8 @@ static void diagnoseRetroactiveConformances(
     }
 
     SmallVector<ProtocolDecl *, 2> protos;
-    if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
-      auto *proto = protoTy->getDecl();
-
-      // As a fallback, to support previous language versions, also allow
-      // this through if the protocol has been explicitly module-qualified.
-      TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
-      if (isModuleQualified(repr, proto->getParentModule())) {
-        protocolsWithRetroactiveAttr.insert(proto);
-        continue;
-      }
-
-      protos.push_back(proto);
-    } else if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
-      for (auto memberTy : compositionTy->getMembers()) {
-        if (auto *protoTy = memberTy->getAs<ProtocolType>()) {
-          protos.push_back(protoTy->getDecl());
-        }
-      }
-    } else {
-      continue;
-    }
+    collectProtocolsFromInheritedEntry(entry, inheritedTy,
+                                       protocolsWithRetroactiveAttr, protos);
 
     for (auto *proto : protos) {
       proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
