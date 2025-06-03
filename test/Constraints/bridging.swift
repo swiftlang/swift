@@ -283,13 +283,17 @@ func rdar19831698() {
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
 func rdar19836341(_ ns: NSString?, vns: NSString?) {
   var vns = vns
-  let _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{22-22= as String?}}
-  var _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{22-22= as String?}}
+  let _: String? = ns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{22-22= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
+  var _: String? = ns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{22-22= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
 
   // Important part about below diagnostic is that from-type is described as
   // 'NSString?' and not '@lvalue NSString?':
-  let _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{23-23= as String?}}
-  var _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{23-23= as String?}}
+  let _: String? = vns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{23-23= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
+  var _: String? = vns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{23-23= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
 
   vns = ns
 }
@@ -300,7 +304,8 @@ func rdar20029786(_ ns: NSString?) {
   // expected-error@-1 {{cannot convert value of type 'NSString?' to expected argument type 'String?'}} {{21-21= as String?}}
   var s2 = ns ?? "str" as String as String // expected-error {{binary operator '??' cannot be applied to operands of type 'NSString?' and 'String'}}
 
-  let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}{{39-39= as NSString?}}
+  let s3: NSString? = "str" as String? // expected-error {{cannot assign value of type 'String?' to type 'NSString?'}}{{39-39= as NSString?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('String' and 'NSString') are expected to be equal}}
 
   var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{20-20=(}} {{31-31=) as String}}
   var s5: String = (ns ?? "str") as String // fixed version
@@ -308,7 +313,8 @@ func rdar20029786(_ ns: NSString?) {
 
 // Make sure more complicated cast has correct parenthesization
 func castMoreComplicated(anInt: Int?) {
-  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot convert value of type 'Int?' to specified type '(any NSObject & NSCopying)?'}}{{41-41= as (any NSObject & NSCopying)?}}
+  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot assign value of type 'Int?' to type '(any NSObject & NSCopying)?'}}{{41-41= as (any NSObject & NSCopying)?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int' and 'any NSObject & NSCopying') are expected to be equal}}
 }
 
 
