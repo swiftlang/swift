@@ -731,7 +731,7 @@ bool Parser::parseSpecializeAttributeArguments(
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc, endLoc;
     SmallVector<RequirementRepr, 4> requirements;
-    auto status = parseGenericWhereClause(whereLoc, endLoc, requirements,
+    parseGenericWhereClause(whereLoc, endLoc, requirements,
                             /* AllowLayoutConstraints */ !isPublic);
     TrailingWhereClause =
         TrailingWhereClause::create(Context, whereLoc, endLoc, requirements);
