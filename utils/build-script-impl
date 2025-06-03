@@ -216,6 +216,7 @@ KNOWN_SETTINGS=(
     swift-runtime-enable-leak-checker             "0"               "Enable leaks checking routines in the runtime"
     swift-stdlib-enable-assertions                "1"               "enable assertions in Swift"
     swift-stdlib-enable-debug-preconditions-in-release "0"          "Enable _debugPrecondition checks in the stdlib in Release configurations"
+    swift-stdlib-enable-strict-availability       "0"               "enable strict availability checking in the stdlib"
     swift-tools-enable-lto                        ""                "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
@@ -1759,6 +1760,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE=$(true_false "${SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE}")
+                    -DSWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY}")
                     -DSWIFT_ENABLE_DISPATCH:BOOL=$(true_false "${SWIFT_ENABLE_DISPATCH}")
                     -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT:BOOL=$(true_false "${SWIFT_IMPLICIT_CONCURRENCY_IMPORT}")
                     -DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT}")
@@ -1937,6 +1939,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 if [ "${SWIFT_FREESTANDING_TRIPLE_NAME}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_FREESTANDING_TRIPLE_NAME:STRING="${SWIFT_FREESTANDING_TRIPLE_NAME}"
+                    )
+                fi
+
+                if [ "${SWIFT_FREESTANDING_AVAILABILITY_NAME}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_FREESTANDING_TRIPLE_NAME:STRING="${SWIFT_FREESTANDING_TRIPLE_NAME}"

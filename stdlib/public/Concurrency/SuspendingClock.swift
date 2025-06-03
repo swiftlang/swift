@@ -20,7 +20,7 @@ import Swift
 /// only comparable on the same machine in the same booted session.
 ///
 /// This clock is suitable for high resolution measurements of execution.
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlibCurrentOS 5.7, *)
 @_unavailableInEmbedded
 public struct SuspendingClock: Sendable {
   public struct Instant: Sendable {
@@ -35,12 +35,12 @@ public struct SuspendingClock: Sendable {
 }
 
 #if !$Embedded
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlibCurrentOS 5.7, *)
 extension SuspendingClock.Instant: Codable {
 }
 #endif
 
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlibCurrentOS 5.7, *)
 @_unavailableInEmbedded
 extension Clock where Self == SuspendingClock {
   /// A clock that measures time that always increments but stops incrementing
@@ -48,21 +48,21 @@ extension Clock where Self == SuspendingClock {
   ///
   ///       try await Task.sleep(until: .now + .seconds(3), clock: .suspending)
   ///
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlibCurrentOS 5.7, *)
   public static var suspending: SuspendingClock { return SuspendingClock() }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlibCurrentOS 5.7, *)
 @_unavailableInEmbedded
 extension SuspendingClock: Clock {
   /// The current instant accounting for machine suspension.
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlibCurrentOS 5.7, *)
   public var now: SuspendingClock.Instant {
     SuspendingClock.now
   }
 
   /// The current instant accounting for machine suspension.
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlibCurrentOS 5.7, *)
   public static var now: SuspendingClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
@@ -76,7 +76,7 @@ extension SuspendingClock: Clock {
   }
 
   /// The minimum non-zero resolution between any two calls to `now`.
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlibCurrentOS 5.7, *)
   public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
@@ -88,7 +88,7 @@ extension SuspendingClock: Clock {
   }
 
   /// The suspending clock is monotonic
-  @available(SwiftStdlib 6.2, *)
+  @available(SwiftStdlibCurrentOS 6.2, *)
   public var traits: ClockTraits {
     return [.monotonic]
   }
@@ -103,21 +103,20 @@ extension SuspendingClock: Clock {
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlibCurrentOS 5.7, *)
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(SwiftStdlib 6.2, *) {
+    if #available(SwiftStdlibCurrentOS 6.2, *) {
       try await Task._sleep(until: deadline,
                             tolerance: tolerance,
                             clock: self)
     } else {
-      // Should never see this
-      Builtin.unreachable()
+      fatalError("we shouldn't get here; if we have, availability is broken")
     }
   }
 #else
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlibCurrentOS 5.7, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
@@ -127,70 +126,59 @@ extension SuspendingClock: Clock {
 #endif
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlibCurrentOS 5.7, *)
 @_unavailableInEmbedded
 extension SuspendingClock.Instant: InstantProtocol {
-  @available(SwiftStdlib 5.7, *)
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
 
-  @available(SwiftStdlib 5.7, *)
   public func advanced(by duration: Swift.Duration) -> SuspendingClock.Instant {
     SuspendingClock.Instant(_value: _value + duration)
   }
 
-  @available(SwiftStdlib 5.7, *)
   public func duration(to other: SuspendingClock.Instant) -> Swift.Duration {
     other._value - _value
   }
 
-  @available(SwiftStdlib 5.7, *)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_value)
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func == (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Bool {
     return lhs._value == rhs._value
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func < (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Bool {
     return lhs._value < rhs._value
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func + (
     _ lhs: SuspendingClock.Instant, _ rhs: Swift.Duration
   ) -> SuspendingClock.Instant {
     lhs.advanced(by: rhs)
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func += (
     _ lhs: inout SuspendingClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: rhs)
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func - (
     _ lhs: SuspendingClock.Instant, _ rhs: Swift.Duration
   ) -> SuspendingClock.Instant {
     lhs.advanced(by: .zero - rhs)
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func -= (
     _ lhs: inout SuspendingClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
 
-  @available(SwiftStdlib 5.7, *)
   public static func - (
     _ lhs: SuspendingClock.Instant, _ rhs: SuspendingClock.Instant
   ) -> Swift.Duration {
