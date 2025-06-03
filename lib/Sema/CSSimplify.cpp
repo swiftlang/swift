@@ -4039,6 +4039,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       getConstraintLocator(locator, {LocatorPathElt::GenericType(type1),
           LocatorPathElt::GenericType(type2)});
 
+    // Optionals have a lot of special diagnostics and only one
+    // generic argument so if we're dealing with one, let's allow
+    // `repairFailures` to take care of it.
+    if (bound1->getDecl()->isOptionalDecl())
+      return matchDeepTypeArguments(*this, subflags, args1, args2, baseLoc);
+
     auto argMatchingFlags = subflags;
     // Allow the solver to produce separate fixes while matching
     // key path's root/value to a contextual type instead of the
@@ -4048,13 +4054,6 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       argMatchingFlags |= TMF_ApplyingFix;
       argMatchingFlags |= TMF_MatchingGenericArguments;
     }
-
-    // Optionals have a lot of special diagnostics and only one
-    // generic argument so if we' re dealing with one, don't produce generic
-    // arguments mismatch fixes.
-    if (bound1->getDecl()->isOptionalDecl())
-      return matchDeepTypeArguments(*this, argMatchingFlags, args1, args2,
-                                    baseLoc);
 
     SmallVector<unsigned, 4> mismatches;
     auto result = matchDeepTypeArguments(
