@@ -1606,6 +1606,7 @@ inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::UncheckedAddrCastInst:
   // Casting to RawPointer does not affect the AccessPath. When converting
@@ -1652,7 +1653,6 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::BeginBorrowInst:
-  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
 }
