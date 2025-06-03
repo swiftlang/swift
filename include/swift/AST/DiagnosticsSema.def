@@ -3616,8 +3616,6 @@ ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
 ERROR(inheritance_from_anyobject,none,
   "only protocols can inherit from 'AnyObject'", ())
-ERROR(inheritance_from_parameterized_protocol,none,
-  "cannot inherit from protocol type with generic argument %0", (Type))
 ERROR(superclass_not_first,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
 ERROR(superclass_not_open,none,
