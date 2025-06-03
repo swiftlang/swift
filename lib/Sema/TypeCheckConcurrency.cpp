@@ -7978,6 +7978,14 @@ bool swift::diagnoseNonSendableFromDeinit(
       refLoc, diag::non_sendable_from_deinit, var);
 }
 
+std::optional<ActorIsolation> ProtocolConformance::getRawIsolation() const {
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  auto conformance = const_cast<ProtocolConformance *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, RawConformanceIsolationRequest{conformance},
+      ActorIsolation());
+}
+
 ActorIsolation ProtocolConformance::getIsolation() const {
   ASTContext &ctx = getDeclContext()->getASTContext();
   auto conformance = const_cast<ProtocolConformance *>(this);
@@ -7986,8 +7994,10 @@ ActorIsolation ProtocolConformance::getIsolation() const {
       ActorIsolation());
 }
 
-ActorIsolation
-ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const {
+std::optional<ActorIsolation>
+RawConformanceIsolationRequest::evaluate(
+    Evaluator &evaluator, ProtocolConformance *conformance
+) const {
   // Only normal protocol conformances can be isolated.
   auto rootNormal =
       dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
@@ -7995,7 +8005,7 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
     return ActorIsolation::forNonisolated(false);
 
   if (conformance != rootNormal)
-    return rootNormal->getIsolation();
+    return rootNormal->getRawIsolation();
 
   // If the conformance is explicitly non-isolated, report that.
   if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
@@ -8045,9 +8055,15 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (rootNormal->isPreconcurrency())
     return ActorIsolation::forNonisolated(false);
 
+  return std::nullopt;
+}
 
-  // Isolation inference rules follow. If we aren't inferring isolated conformances,
-  // we're done.
+ActorIsolation swift::inferConformanceIsolation(
+    NormalProtocolConformance *conformance, bool hasKnownIsolatedWitness) {
+  auto dc = conformance->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+
+  // If we aren't inferring isolated conformances, we're done.
   if (!ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances))
     return ActorIsolation::forNonisolated(false);
 
@@ -8065,6 +8081,12 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   // If all of the value witnesses are nonisolated, then we should not infer
   // global actor isolation.
+  if (hasKnownIsolatedWitness) {
+    // The caller told us we have an isolated value witness, so infer
+    // the nominal isolation.
+    return nominalIsolation;
+  }
+
   bool anyIsolatedWitness = false;
   auto protocol = conformance->getProtocol();
   for (auto requirement : protocol->getMembers()) {
@@ -8091,6 +8113,29 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   }
 
   return nominalIsolation;
+}
+
+ActorIsolation
+ConformanceIsolationRequest::evaluate(
+    Evaluator &evaluator, ProtocolConformance *conformance
+) const {
+  // If there is raw isolation, use that.
+  if (auto rawIsolation = conformance->getRawIsolation())
+    return *rawIsolation;
+
+  // Otherwise, we may infer isolation.
+
+  // Only normal protocol conformances can be isolated.
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return ActorIsolation::forNonisolated(false);
+
+  if (conformance != rootNormal)
+    return rootNormal->getIsolation();
+
+  return inferConformanceIsolation(
+      rootNormal, /*hasKnownIsolatedWitness=*/false);
 }
 
 namespace {
