@@ -3506,6 +3506,21 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.DebugInfoForProfiling |= Args.hasArg(OPT_debug_info_for_profiling);
 
+
+  if (const Arg *A = Args.getLastArg(OPT_min_valid_pointer_value)) {
+    // The LeastValidPointerValue is hard-coded in the runtime. Therefore it
+    // can only safely customized in embedded swift - which doesn't have a runtime.
+    if (!LangOpts.hasFeature(Feature::Embedded)) {
+      Diags.diagnose(SourceLoc(), diag::min_ptr_value_without_embedded);
+      return true;
+    }
+    if (StringRef(A->getValue()).getAsInteger(0, Opts.CustomLeastValidPointerValue)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  }
+
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
   // Always producing all outputs when caching is enabled.
   Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files) ||
