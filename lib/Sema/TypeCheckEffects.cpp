@@ -3645,9 +3645,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   }
 
   /// Find the top location where we should put the await
-  static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
-                            bool isInterpolatedString,
-                            bool stopAtAutoClosure) {
+  Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
+                     InterpolatedStringLiteralExpr *interpolatedString,
+                     bool stopAtAutoClosure, EffectKind effect) {
     llvm::SmallPtrSet<Expr *, 4> visited;
     Expr *parent = e;
     Expr *lastParent = e;
@@ -3662,8 +3662,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     if (parent && !isAnchorTooEarly(parent)) {
       return parent;
     }
-    if (isInterpolatedString) {
+    if (interpolatedString) {
       assert(parent == nullptr && "Expected to be at top of expression");
+
+      // If the last parent we found is a call to appendInterpolation, adjust
+      // the anchor location to the interpolated string itself.
+      if (effect == EffectKind::Unsafe) {
+        if (auto callExpr = dyn_cast<CallExpr>(lastParent)) {
+          if (auto calleeDecl = callExpr->getCalledValue()) {
+            if (calleeDecl->getName().matchesRef(Ctx.Id_appendInterpolation))
+              return interpolatedString;
+          }
+        }
+      }
+
       if (ArgumentList *args = lastParent->getArgs()) {
         if (Expr *unaryArg = args->getUnlabeledUnaryExpr())
           return unaryArg;
@@ -4322,8 +4334,9 @@ private:
                  Flags.has(ContextFlags::InAsyncLet))) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
-                                    CurContext.isWithinInterpolatedString(),
-                                    /*stopAtAutoClosure=*/true);
+                                    CurContext.getInterpolatedString(),
+                                    /*stopAtAutoClosure=*/true,
+                                    EffectKind::Async);
         if (Flags.has(ContextFlags::StmtExprCoversAwait))
           classification.setDowngradeToWarning(true);
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
@@ -4348,8 +4361,9 @@ private:
       if (!Flags.has(ContextFlags::IsUnsafeCovered)) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
-                                    CurContext.isWithinInterpolatedString(),
-                                    /*stopAtAutoClosure=*/false);
+                                    CurContext.getInterpolatedString(),
+                                    /*stopAtAutoClosure=*/false,
+                                    EffectKind::Unsafe);
 
         // We don't diagnose uncovered unsafe uses within the next/nextElement
         // call, because they're handled already by the for-in loop checking.
