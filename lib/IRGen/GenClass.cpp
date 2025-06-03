@@ -2051,6 +2051,7 @@ namespace {
 
         // Otherwise, we should have a normal stored property.
         auto ivar = field.getVarDecl();
+
         // If the field offset is fixed relative to the start of the superclass,
         // reference the global from the ivar metadata so that the Objective-C
         // runtime will slide it down.
@@ -2066,6 +2067,11 @@ namespace {
       }
 
       StringRef name = field.getName();
+      std::string typeEnc;
+      if (field.getKind() == Field::Var &&
+          requiresObjCPropertyDescriptor(IGM, field.getVarDecl())) {
+        getObjCEncodingForType(IGM, field.getVarDecl(), typeEnc);
+      }
       const TypeInfo &storageTI = pair.second.getType();
       auto fields = ivars.beginStruct();
 
@@ -2078,7 +2084,7 @@ namespace {
       fields.add(IGM.getAddrOfGlobalString(name));
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(""));
+      fields.add(IGM.getAddrOfGlobalString(typeEnc));
 
       Size size;
       Alignment alignment;

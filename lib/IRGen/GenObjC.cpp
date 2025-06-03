@@ -1258,6 +1258,13 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
     methodTy->getFormalCSemanticResult(IGM.getSILModule()).getASTType());
 }
 
+void irgen::getObjCEncodingForType(IRGenModule &IGM, VarDecl *property,
+                                   std::string &s) {
+  auto t = getObjCPropertyType(IGM, property);
+  if (t)
+    IGM.getClangASTContext().getObjCEncodingForType(t, s);
+}
+
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
                                            VarDecl *property, std::string &s) {
   // FIXME: Property encoding differs in slight ways that aren't publicly
