@@ -417,12 +417,6 @@ DeclAttributes Decl::getExpandedAttrs() const {
   return getAttrs();
 }
 
-DeclAttributes Decl::getSemanticAttrs() const {
-  (void)evaluateOrDefault(getASTContext().evaluator,
-                          SemanticDeclAttrsRequest{this}, {});
-  return getAttrs();
-}
-
 void Decl::attachParsedAttrs(DeclAttributes attrs) {
   ASSERT(getAttrs().isEmpty() && "attaching when there are already attrs?");
 

@@ -728,7 +728,7 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
 
   ModuleDecl *MD = D->getModuleContext();
   for (auto *customAttr :
-       D->getSemanticAttrs().getAttributes<CustomAttr, true>()) {
+       D->getExpandedAttrs().getAttributes<CustomAttr, true>()) {
     SourceFile *SF =
         MD->getSourceFileContainingLocation(customAttr->getLocation());
     ASTNode expansion = SF ? SF->getMacroExpansion() : nullptr;
