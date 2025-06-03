@@ -6763,55 +6763,20 @@ static bool checkSendableInstanceStorage(
         }
       }
 
-      // Check that the property type is Sendable.
-      SendableCheckContext context(dc, check);
-      diagnoseNonSendableTypes(
-          propertyType, context,
-          /*inDerivedConformance*/Type(), property->getLoc(),
-          [&](Type type, DiagnosticBehavior behavior) {
-            auto preconcurrency = context.preconcurrencyBehavior(type);
-            if (isImplicitSendableCheck(check)) {
-              // If this is for an externally-visible conformance, fail.
-              if (check == SendableCheck::ImplicitForExternallyVisible) {
-                invalid = true;
-                return true;
-              }
-
-              // If we are to ignore this diagnostic, just continue.
-              if (behavior == DiagnosticBehavior::Ignore ||
-                  preconcurrency == DiagnosticBehavior::Ignore)
-                return true;
-
-              invalid = true;
-              return true;
-            }
-
-            if (preconcurrency)
-              behavior = preconcurrency.value();
-
-            property
-                ->diagnose(diag::non_concurrent_type_member, propertyType,
-                           false, property->getName(), nominal)
-                .limitBehaviorWithPreconcurrency(behavior,
-                                                 preconcurrency.has_value());
-            return false;
-          });
-
-      if (invalid) {
-        // For implicit checks, bail out early if anything failed.
-        if (isImplicitSendableCheck(check))
-          return true;
-      }
-
-      return false;
+      return checkSendabilityOfMemberType(property, propertyType);
     }
 
     /// Handle an enum associated value.
     bool operator()(EnumElementDecl *element, Type elementType) override {
-      SendableCheckContext context (dc, check);
+      return checkSendabilityOfMemberType(element, elementType);
+    }
+
+  private:
+    bool checkSendabilityOfMemberType(ValueDecl *member, Type memberType) {
+      SendableCheckContext context(dc, check);
       diagnoseNonSendableTypes(
-          elementType, context,
-          /*inDerivedConformance*/Type(), element->getLoc(),
+          memberType, context,
+          /*inDerivedConformance*/ Type(), member->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
             auto preconcurrency = context.preconcurrencyBehavior(type);
             if (isImplicitSendableCheck(check)) {
@@ -6833,9 +6798,10 @@ static bool checkSendableInstanceStorage(
             if (preconcurrency)
               behavior = preconcurrency.value();
 
-            element
-                ->diagnose(diag::non_concurrent_type_member, type, true,
-                           element->getName(), nominal)
+            member
+                ->diagnose(diag::non_concurrent_type_member, type,
+                           isa<EnumElementDecl>(member), member->getName(),
+                           nominal)
                 .limitBehaviorWithPreconcurrency(behavior,
                                                  preconcurrency.has_value());
             return false;
@@ -6849,6 +6815,7 @@ static bool checkSendableInstanceStorage(
 
       return false;
     }
+
   } visitor(nominal, dc, check);
 
   return visitor.visit(nominal, dc) || visitor.invalid;
