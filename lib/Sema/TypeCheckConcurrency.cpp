@@ -6768,11 +6768,16 @@ static bool checkSendableInstanceStorage(
         if (property->supportsMutation() && isolation.isUnspecified()) {
           auto behavior =
               SendableCheckContext(dc, check).defaultDiagnosticBehavior();
+          // If Sendable came from a `@preconcurrency` protocol the error
+          // should be downgraded even with strict concurrency checking to
+          // allow clients time to address the new requirement.
+          auto preconcurrency =
+              check == SendableCheck::ImpliedByPreconcurrencyProtocol;
           if (behavior != DiagnosticBehavior::Ignore) {
             property
                 ->diagnose(diag::concurrent_value_class_mutable_property,
                            property->getName(), nominal)
-                .limitBehaviorUntilSwiftVersion(behavior, 6);
+                .limitBehaviorWithPreconcurrency(behavior, preconcurrency);
           }
           invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
           return true;
@@ -6798,7 +6803,7 @@ static bool checkSendableInstanceStorage(
           memberType, context,
           /*inDerivedConformance*/ Type(), member->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
-            auto preconcurrency = context.preconcurrencyBehavior(type);
+            auto preconcurrencyBehavior = context.preconcurrencyBehavior(type);
             if (isImplicitSendableCheck(check)) {
               // If this is for an externally-visible conformance, fail.
               if (check == SendableCheck::ImplicitForExternallyVisible) {
@@ -6808,22 +6813,29 @@ static bool checkSendableInstanceStorage(
 
               // If we are to ignore this diagnostic, just continue.
               if (behavior == DiagnosticBehavior::Ignore ||
-                  preconcurrency == DiagnosticBehavior::Ignore)
+                  preconcurrencyBehavior == DiagnosticBehavior::Ignore)
                 return true;
 
               invalid = true;
               return true;
             }
 
-            if (preconcurrency)
-              behavior = preconcurrency.value();
+            // If Sendable came from a `@preconcurrency` protocol the error
+            // should be downgraded even with strict concurrency checking to
+            // allow clients time to address the new requirement.
+            bool fromPreconcurrencyConformance =
+                check == SendableCheck::ImpliedByPreconcurrencyProtocol;
+
+            if (preconcurrencyBehavior)
+              behavior = preconcurrencyBehavior.value();
 
             member
                 ->diagnose(diag::non_concurrent_type_member, type,
                            isa<EnumElementDecl>(member), member->getName(),
                            nominal)
-                .limitBehaviorWithPreconcurrency(behavior,
-                                                 preconcurrency.has_value());
+                .limitBehaviorWithPreconcurrency(
+                    behavior, fromPreconcurrencyConformance ||
+                                  preconcurrencyBehavior.has_value());
             return false;
           });
 
