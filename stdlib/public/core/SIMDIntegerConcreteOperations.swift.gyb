@@ -23,6 +23,11 @@ compares = [
   (">=", "ge", "greater than or equal to"),
   (">",  "gt", "greater than")
 ]
+bitwise = [
+  ("&", "and", "and"),
+  ("^", "xor", "exclusive or"),
+  ("|", "or", "inclusive or"),
+]
 }%
 
 %for int in all_integer_types(word_bits):
@@ -170,37 +175,166 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
 %  end
+  /// Bitwise not
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = ~a[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static prefix func ~(a: Self) -> Self {
+    a ^ Self(repeating: ~0)
+  }
+
+%  for (op, bi, description) in bitwise:
+  /// Bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = a[i] ${op} b[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}(a: Self, b: Self) -> Self {
+    Self(Builtin.${bi}_${Builtin}(a._storage._value, b._storage._value))
+  }
+  
+  /// Bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = a[i] ${op} b
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}(a: Self, b: Scalar) -> Self {
+    a ${op} Self(repeating: b)
+  }
+  
+  /// Bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = a ${op} b[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}(a: Scalar, b: Self) -> Self {
+    Self(repeating: a) ${op} b
+  }
+  
+  /// In-place bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in 0..<${n} {
+  ///   a[i] ${op}= b[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}=(a: inout Self, b: Self) {
+    a = a ${op} b
+  }
+  
+  /// In-place bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in 0..<${n} {
+  ///   a[i] ${op}= b
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}=(a: inout Self, b: Scalar) {
+    a = a ${op} b
+  }
+  
+%  end
+    
+  /// Replaces elements of this vector with elements of `other` in the lanes
+  /// where `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in indices {
+  ///   if mask[i] { self[i] = other[i] }
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public mutating func replace(
+    with other: Self,
+    where mask: SIMDMask<MaskStorage>
+  ) {
+    self = replacing(with: other, where: mask)
+  }
+    
+  /// Returns a copy of this vector, with elements replaced by elements of
+  /// `other` in the lanes where `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in indices {
+  ///   result[i] = mask[i] ? other[i] : self[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public func replacing(
+    with other: Self,
+    where mask: SIMDMask<MaskStorage>
+  ) -> Self {
+#if hasFeature(BuiltinSelect)
+    return Self(Builtin.select_Vec${storageN}xInt1_${Builtin}(
+      Builtin.trunc_${Builtin}_Vec${storageN}xInt1(mask._storage._storage._value),
+      other._storage._value,
+      self._storage._value
+    ))
+#else
+    let maskAsSelf = unsafe unsafeBitCast(mask._storage, to: Self.self)
+    return self & ~maskAsSelf | other & maskAsSelf
+#endif
+  }
+  
   /// The wrapping sum of two vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &+(a: Self, b: Self) -> Self {
     Self(Builtin.add_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The wrapping difference of two vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &-(a: Self, b: Self) -> Self {
     Self(Builtin.sub_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The pointwise wrapping product of two vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &*(a: Self, b: Self) -> Self {
     Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
   }
         
   /// Updates the left hand side with the wrapping sum of the two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &+=(a: inout Self, b: Self) { a = a &+ b }
     
   /// Updates the left hand side with the wrapping difference of the two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &-=(a: inout Self, b: Self) { a = a &- b }
     
   /// Updates the left hand side with the pointwise wrapping product of two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &*=(a: inout Self, b: Self) { a = a &* b }
 }
 

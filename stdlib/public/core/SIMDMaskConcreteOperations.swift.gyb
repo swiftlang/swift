@@ -15,6 +15,11 @@ from SwiftIntTypes import all_signed_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]
 vectorscalarCounts = storagescalarCounts + [3]
+logical = [
+  ("&", "&&", "and"),
+  ("^", "!=", "exclusive or"),
+  ("|", "||", "inclusive or"),
+]
 }%
 
 %for int in all_signed_types(word_bits):
@@ -42,7 +47,7 @@ extension SIMDMask where Storage == ${Vector} {
     return zero .== zero
   }
   
-  /// A vector mask that is the pointwise logical negation of the input.
+  /// Pointwise logical negation
   ///
   /// Equivalent to:
   /// ```
@@ -51,108 +56,45 @@ extension SIMDMask where Storage == ${Vector} {
   ///   result[i] = !a[i]
   /// }
   /// ```
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static prefix func .!(a: Self) -> Self {
-    a .^ .allTrue
+    Self(~a._storage)
   }
     
-  /// A vector mask that is the pointwise logical conjunction of the inputs.
+%  for (op, scalarOp, description) in logical:
+  /// Pointwise logical ${description}.
   ///
   /// Equivalent to:
   /// ```
   /// var result = SIMDMask<${Vector}>()
   /// for i in result.indices {
-  ///   result[i] = a[i] && b[i]
+  ///   result[i] = a[i] ${scalarOp} b[i]
   /// }
   /// ```
   ///
-  /// Note that unlike the scalar `&&` operator, the SIMD `.&` operator
-  /// always fully evaluates both arguments.
-  @_alwaysEmitIntoClient
-  public static func .&(a: Self, b: Self) -> Self {
-    Self(${Vector}(Builtin.and_${Builtin}(
-      a._storage._storage._value,
-      b._storage._storage._value
-    )))
+  /// Note that unlike the scalar `&&` and `||` operators, the SIMD logical
+  /// operators `.&`, `.|`, and `.^` always fully evaluate both sides of the
+  /// expression.
+  @_alwaysEmitIntoClient @_transparent
+  public static func .${op}(a: Self, b: Self) -> Self {
+    Self(a._storage ${op} b._storage)
   }
-    
-  /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
+  
+  /// In-place pointwise logical ${description}.
   ///
   /// Equivalent to:
   /// ```
-  /// for i in a.indices {
-  ///   a[i] = a[i] && b[i]
-  /// }
-  /// ```
-  @_alwaysEmitIntoClient
-  public static func .&=(a: inout Self, b: Self) {
-    a = a .& b
-  }
-      
-  /// A vector mask that is the pointwise exclusive or of the inputs.
-  ///
-  /// Equivalent to:
-  /// ```
-  /// var result = SIMDMask<${Vector}>()
   /// for i in result.indices {
-  ///   result[i] = a[i] != b[i]
+  ///   a[i] ${scalarOp}= b[i]
   /// }
   /// ```
-  @_alwaysEmitIntoClient
-  public static func .^(a: Self, b: Self) -> Self {
-    Self(${Vector}(Builtin.xor_${Builtin}(
-      a._storage._storage._value,
-      b._storage._storage._value
-    )))
+  @_alwaysEmitIntoClient @_transparent
+  public static func .${op}=(a: inout Self, b: Self) {
+    a = a .${op} b
   }
-    
-  /// Replaces `a` with the pointwise exclusive or of `a` and `b`.
-  ///
-  /// Equivalent to:
-  /// ```
-  /// for i in a.indices {
-  ///   a[i] = a[i] != b[i]
-  /// }
-  /// ```
-  @_alwaysEmitIntoClient
-  public static func .^=(a: inout Self, b: Self) {
-    a = a .^ b
-  }
-      
-  /// A vector mask that is the pointwise logical disjunction of the inputs.
-  ///
-  /// Equivalent to:
-  /// ```
-  /// var result = SIMDMask<${Vector}>()
-  /// for i in result.indices {
-  ///   result[i] = a[i] || b[i]
-  /// }
-  /// ```
-  ///
-  /// Note that unlike the scalar `||` operator, the SIMD `.|` operator
-  /// always fully evaluates both arguments.
-  @_alwaysEmitIntoClient
-  public static func .|(a: Self, b: Self) -> Self {
-    Self(${Vector}(Builtin.or_${Builtin}(
-      a._storage._storage._value,
-      b._storage._storage._value
-    )))
-  }
-    
-  /// Replaces `a` with the pointwise logical disjunction of `a` and `b`.
-  ///
-  /// Equivalent to:
-  /// ```
-  /// for i in a.indices {
-  ///   a[i] = a[i] || b[i]
-  /// }
-  /// ```
-  @_alwaysEmitIntoClient
-  public static func .|=(a: inout Self, b: Self) {
-    a = a .| b
-  }
-    
-  /// A vector mask with the result of a pointwise equality comparison.
+  
+%  end
+  /// Pointwise compare equal to.
   ///
   /// Equivalent to:
   /// ```
@@ -161,12 +103,12 @@ extension SIMDMask where Storage == ${Vector} {
   ///   result[i] = a[i] == b[i]
   /// }
   /// ```
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func .==(a: Self, b: Self) -> Self {
     .!(a .^ b)
   }
   
-  /// A vector mask with the result of a pointwise inequality comparison.
+  /// Pointwise compare not equal to.
   ///
   /// Equivalent to:
   /// ```
@@ -175,7 +117,7 @@ extension SIMDMask where Storage == ${Vector} {
   ///   result[i] = a[i] != b[i]
   /// }
   /// ```
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func .!=(a: Self, b: Self) -> Self {
     a .^ b
   }
@@ -189,7 +131,7 @@ extension SIMDMask where Storage == ${Vector} {
   ///   if mask[i] { self[i] = other[i] }
   /// }
   /// ```
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public mutating func replace(with other: Self, where mask: Self) {
     self = replacing(with: other, where: mask)
   }
@@ -204,7 +146,7 @@ extension SIMDMask where Storage == ${Vector} {
   ///   result[i] = mask[i] ? other[i] : self[i]
   /// }
   /// ```
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public func replacing(with other: Self, where mask: Self) -> Self {
     (self .& .!mask) .| (other .& mask)
   }

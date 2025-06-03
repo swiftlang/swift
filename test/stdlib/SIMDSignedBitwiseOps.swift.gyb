@@ -1,0 +1,158 @@
+//===--- SIMDSignedBitwiseOps.swift.gyb ----------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/SIMDSignedBitwiseOps.swift
+// RUN: %target-swift-frontend -primary-file %t/SIMDSignedBitwiseOps.swift -S | %FileCheck %t/SIMDSignedBitwiseOps.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
+// RUN: %target-swift-frontend -primary-file %t/SIMDSignedBitwiseOps.swift -S -O | %FileCheck %t/SIMDSignedBitwiseOps.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
+
+import Swift
+
+%for bits in [8,16,32,64]:
+% for totalBits in [64,128]:
+%  n = totalBits // bits
+%  if n != 1:
+%   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
+%   sseSuffix = {8:'b',16:'w',32:'d',64:'q'}[bits]
+func not${n}x${bits}(_ a: SIMD${n}<Int${bits}>) -> SIMD${n}<Int${bits}> {
+  ~a
+}
+// CHECK: not${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: mvn.${totalBits//8}b
+// CHECKOnone-arm64: ret
+
+func and${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>,
+  _ b: SIMD${n}<Int${bits}>
+) -> SIMD${n}<Int${bits}> {
+  a & b
+}
+// CHECK: and${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: and.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: and.${totalBits//8}b
+// CHECKOnone-arm64: ret
+%  end
+% end
+%end
+
+func and${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>,
+  scalar b: Int${bits}
+) -> SIMD${n}<Int${bits}> {
+  a & b
+}
+// CHECK: and${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: and.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: and.${totalBits//8}b
+// CHECKOnone-arm64: ret
+
+func and${n}x${bits}(
+  scalar a: Int${bits},
+  _ b: SIMD${n}<Int${bits}>
+) -> SIMD${n}<Int${bits}> {
+  a & b
+}
+// CHECK: and${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: and.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: and.${totalBits//8}b
+// CHECKOnone-arm64: ret
+
+func or${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>,
+  _ b: SIMD${n}<Int${bits}>
+) -> SIMD${n}<Int${bits}> {
+  a | b
+}
+// CHECK: or${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: orr.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: orr.${totalBits//8}b
+// CHECKOnone-arm64: ret
+%  end
+% end
+%end
+
+func or${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>,
+  scalar b: Int${bits}
+) -> SIMD${n}<Int${bits}> {
+  a | b
+}
+// CHECK: or${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: orr.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: orr.${totalBits//8}b
+// CHECKOnone-arm64: ret
+
+func or${n}x${bits}(
+  scalar a: Int${bits},
+  _ b: SIMD${n}<Int${bits}>
+) -> SIMD${n}<Int${bits}> {
+  a | b
+}
+// CHECK: or${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: orr.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: orr.${totalBits//8}b
+// CHECKOnone-arm64: ret
+
+func xor${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>,
+  _ b: SIMD${n}<Int${bits}>
+) -> SIMD${n}<Int${bits}> {
+  a ^ b
+}
+// CHECK: xor${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: eor.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: eor.${totalBits//8}b
+// CHECKOnone-arm64: ret
+%  end
+% end
+%end
+
+func xor${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>,
+  scalar b: Int${bits}
+) -> SIMD${n}<Int${bits}> {
+  a ^ b
+}
+// CHECK: xor${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: eor.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: eor.${totalBits//8}b
+// CHECKOnone-arm64: ret
+
+func xor${n}x${bits}(
+  scalar a: Int${bits},
+  _ b: SIMD${n}<Int${bits}>
+) -> SIMD${n}<Int${bits}> {
+  a ^ b
+}
+// CHECK: xor${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: eor.${totalBits//8}b v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: eor.${totalBits//8}b
+// CHECKOnone-arm64: ret
+%  end
+% end
+%end
