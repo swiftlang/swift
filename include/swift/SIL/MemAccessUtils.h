@@ -1688,6 +1688,22 @@ inline bool isAccessStorageCast(SingleValueInstruction *svi) {
   return isAccessStorageTypeCast(svi) || isAccessStorageIdentityCast(svi);
 }
 
+// Strip access markers and casts that preserve the access storage.
+//
+// Compare to stripAccessAndIdentityCasts.  This function strips cast that
+// change the type.
+inline SILValue stripAccessAndAccessStorageCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndAccessStorageCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageCast(svi)) {
+      return stripAccessAndAccessStorageCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
+}
+
 /// Abstract CRTP class for a visiting instructions that are part of the use-def
 /// chain from an accessed address up to the storage base.
 ///
