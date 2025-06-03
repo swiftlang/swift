@@ -3757,13 +3757,23 @@ public:
   /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
-  /// Returns the effective introduction range indicated by this attribute.
-  /// This may correspond to the version specified by the `introduced:`
-  /// component (remapped or canonicalized if necessary) or it may be "always"
-  /// for an attribute indicating availability in a version-less domain. Returns
-  /// `std::nullopt` if the attribute does not indicate introduction.
+  /// See `getIntroducedDomainAndRange()`.
   std::optional<AvailabilityRange>
-  getIntroducedRange(const ASTContext &Ctx) const;
+  getIntroducedRange(const ASTContext &ctx) const {
+    if (auto domainAndRange = getIntroducedDomainAndRange(ctx))
+      return domainAndRange->getRange();
+    return std::nullopt;
+  }
+
+  /// Returns the effective introduction range indicated by this attribute,
+  /// along with the domain that it applies to (which may be different than the
+  /// domain which the attribute was written with if a remap is required). This
+  /// may correspond to the version specified by the `introduced:` component
+  /// (remapped or canonicalized if necessary) or it may be "always" for an
+  /// attribute indicating availability in a version-less domain. Returns
+  /// `std::nullopt` if the attribute does not indicate introduction.
+  std::optional<AvailabilityDomainAndRange>
+  getIntroducedDomainAndRange(const ASTContext &ctx) const;
 
   /// The version tuple for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const;
@@ -3771,13 +3781,23 @@ public:
   /// The source range of the `deprecated:` version component.
   SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
 
-  /// Returns the effective deprecation range indicated by this attribute.
-  /// This may correspond to the version specified by the `deprecated:`
-  /// component (remapped or canonicalized if necessary) or it may be "always"
-  /// for an unconditional deprecation attribute. Returns `std::nullopt` if the
-  /// attribute does not indicate deprecation.
+  /// See `getDeprecatedDomainAndRange()`.
   std::optional<AvailabilityRange>
-  getDeprecatedRange(const ASTContext &Ctx) const;
+  getDeprecatedRange(const ASTContext &ctx) const {
+    if (auto domainAndRange = getDeprecatedDomainAndRange(ctx))
+      return domainAndRange->getRange();
+    return std::nullopt;
+  }
+
+  /// Returns the effective deprecation range indicated by this attribute, along
+  /// with the domain that it applies to (which may be different than the domain
+  /// which the attribute was written with if a remap is required). This may
+  /// correspond to the version specified by the `deprecated:` component
+  /// (remapped or canonicalized if necessary) or it may be "always" for an
+  /// unconditional deprecation attribute. Returns `std::nullopt` if the
+  /// attribute does not indicate deprecation.
+  std::optional<AvailabilityDomainAndRange>
+  getDeprecatedDomainAndRange(const ASTContext &ctx) const;
 
   /// The version tuple for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const;
@@ -3785,13 +3805,23 @@ public:
   /// The source range of the `obsoleted:` version component.
   SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
 
-  /// Returns the effective obsoletion range indicated by this attribute.
-  /// This always corresponds to the version specified by the `obsoleted:`
-  /// component (remapped or canonicalized if necessary). Returns `std::nullopt`
-  /// if the attribute does not indicate obsoletion (note that unavailability is
-  /// separate from obsoletion.
+  /// See `getObsoletedDomainAndRange()`.
   std::optional<AvailabilityRange>
-  getObsoletedRange(const ASTContext &Ctx) const;
+  getObsoletedRange(const ASTContext &ctx) const {
+    if (auto domainAndRange = getObsoletedDomainAndRange(ctx))
+      return domainAndRange->getRange();
+    return std::nullopt;
+  }
+
+  /// Returns the effective obsoletion range indicated by this attribute, along
+  /// with the domain that it applies to (which may be different than the domain
+  /// which the attribute was written with if a remap is required). This always
+  /// corresponds to the version specified by the `obsoleted:` component
+  /// (remapped or canonicalized if necessary). Returns `std::nullopt` if the
+  /// attribute does not indicate obsoletion (note that unavailability is
+  /// separate from obsoletion.
+  std::optional<AvailabilityDomainAndRange>
+  getObsoletedDomainAndRange(const ASTContext &ctx) const;
 
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }

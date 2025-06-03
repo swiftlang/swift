@@ -18,16 +18,20 @@
 
 using namespace swift;
 
-std::optional<AvailabilityRange>
-AvailabilityConstraint::getPotentiallyUnavailableRange(
-    const ASTContext &ctx) const {
+AvailabilityDomainAndRange
+AvailabilityConstraint::getDomainAndRange(const ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::UnconditionallyUnavailable:
+    // Technically, unconditional unavailability doesn't have an associated
+    // range. However, if you view it as a special case of obsoletion, then an
+    // unconditionally unavailable declaration is "always obsoleted."
+    return AvailabilityDomainAndRange(getDomain().getRemappedDomain(ctx),
+                                      AvailabilityRange::alwaysAvailable());
   case Reason::Obsoleted:
+    return getAttr().getObsoletedDomainAndRange(ctx).value();
   case Reason::UnavailableForDeployment:
-    return std::nullopt;
   case Reason::PotentiallyUnavailable:
-    return getAttr().getIntroducedRange(ctx);
+    return getAttr().getIntroducedDomainAndRange(ctx).value();
   }
 }
 
