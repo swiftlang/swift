@@ -37,6 +37,14 @@ swiftscan_string_ref_t create_clone(const char *string) {
   return str;
 }
 
+static swiftscan_string_ref_t create_clone(llvm::StringRef strRef) {
+  swiftscan_string_ref_t str;
+  size_t length = strRef.size();
+  str.data = strndup(strRef.data(), length);
+  str.length = length;
+  return str;
+}
+
 swiftscan_string_set_t *create_set(const std::vector<std::string> &strings) {
   swiftscan_string_set_t *set = new swiftscan_string_set_t;
   set->count = strings.size();
@@ -58,6 +66,16 @@ swiftscan_string_set_t *create_set(int count, const char **strings) {
 swiftscan_string_set_t *create_empty_set() {
   swiftscan_string_set_t *set = new swiftscan_string_set_t;
   set->count = 0;
+  return set;
+}
+
+swiftscan_string_set_t *
+create_set(const std::vector<llvm::StringRef> &stringRefs) {
+  swiftscan_string_set_t *set = new swiftscan_string_set_t;
+  set->count = stringRefs.size();
+  set->strings = new swiftscan_string_ref_t[set->count];
+  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
+    set->strings[SI] = create_clone(stringRefs[SI]);
   return set;
 }
 

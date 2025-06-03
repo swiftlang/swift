@@ -664,6 +664,21 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   return false;
 }
 
+std::vector<StringRef>
+SwiftDependencyScanningService::getInvalidNegativeStatCachedPaths() {
+  assert(ClangScanningService &&
+         "Cannot check for invalid negative stat cached paths if the clang "
+         "scanning service is not initialized!");
+  const auto &sharedCache = ClangScanningService->getSharedCache();
+
+  // Note to reviewers: is it sufficient to check the underlying physical
+  // file system?
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
+      llvm::vfs::createPhysicalFileSystem();
+
+  return sharedCache.getInvalidNegativeStatCachedPaths(*baseFileSystem);
+}
+
 ModuleDependenciesCache::ModuleDependenciesCache(
     const std::string &mainScanModuleName, const std::string &scannerContextHash)
     : mainScanModuleName(mainScanModuleName),

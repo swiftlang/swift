@@ -811,7 +811,8 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
                 cache.getSwiftOverlayDependencies(moduleID))),
             /*sourceImportedDependencies*/ create_set({}),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
-            /*bridgingHeaderBuildCommand*/ create_set({}),
+            /*bridgingHeaderBuildCommand*/
+            create_set(std::vector<std::string>()),
             create_clone(swiftTextualDeps->contextHash.c_str()),
             swiftTextualDeps->isFramework,
             swiftTextualDeps->isStatic,
