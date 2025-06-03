@@ -115,12 +115,12 @@ def main():
     print(f"[Toolchain URL] {toolchain_url}")
 
     if not args.dry_run:
-      output_path = download_toolchain(toolchain_url, args.output_dir)
-      print(f"[Toolchain] {output_path}")
+        output_path = download_toolchain(toolchain_url, args.output_dir)
+        print(f"[Toolchain] {output_path}")
 
-      if args.untar:
-          untar_toolchain(args.output_dir, output_path)
-          print(f"[Extracted] {args.output_dir}/usr")
+        if args.untar:
+            untar_toolchain(args.output_dir, output_path)
+            print(f"[Extracted] {args.output_dir}/usr")
 
 
 if __name__ == "__main__":
