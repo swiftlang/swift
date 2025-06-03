@@ -85,22 +85,28 @@ do {
 
     // FIXME: No fix-it. Could be 'int_o.map { Mask(rawValue: UInt64($0)) }'.
     let _: Mask? = int_o
-    // expected-error@-1:20 {{cannot convert value of type 'Int?' to specified type 'Mask?'}}{{none}}
+    // expected-error@-1:20 {{cannot assign value of type 'Int?' to type 'Mask?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Mask') are expected to be equal}}
     takeMask_o(int_o)
     // expected-error@-1:16 {{cannot convert value of type 'Int?' to expected argument type 'Mask?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Mask') are expected to be equal}}
 
     // FIXME: No fix-it. Could be 'uint64_o.map(Mask(rawValue:))' or 'uint64_o.map { Mask(rawValue: $0) }'.
     let _: Mask? = uint64_o
-    // expected-error@-1:20 {{cannot convert value of type 'UInt64?' to specified type 'Mask?'}}{{none}}
+    // expected-error@-1:20 {{cannot assign value of type 'UInt64?' to type 'Mask?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('UInt64' and 'Mask') are expected to be equal}}
     takeMask_o(uint64_o)
     // expected-error@-1:16 {{cannot convert value of type 'UInt64?' to expected argument type 'Mask?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('UInt64' and 'Mask') are expected to be equal}}
 
     // FIXME: No fix-it. Could be '(anything as? Int).map { Mask(rawValue: UInt64($0)) }'.
     let anything: Any
     let _: Mask? = anything as? Int
-    // expected-error@-1:29 {{cannot convert value of type 'Int?' to specified type 'Mask?'}}{{none}}
+    // expected-error@-1:29 {{cannot assign value of type 'Int?' to type 'Mask?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Mask') are expected to be equal}}
     takeMask_o(anything as? Int)
     // expected-error@-1:25 {{cannot convert value of type 'Int?' to expected argument type 'Mask?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Mask') are expected to be equal}}
   }
 
   // Try a nested OptionSet.
@@ -162,15 +168,18 @@ do {
 
     // FIXME: No fix-it. Could be 'mask_o.map { Int($0.rawValue) }'.
     let _: Int? = mask_o
-    // expected-error@-1:19 {{cannot convert value of type 'Mask?' to specified type 'Int?'}}{{none}}
+    // expected-error@-1:19 {{cannot assign value of type 'Mask?' to type 'Int?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Mask' and 'Int') are expected to be equal}}
     takeInt_o(mask_o)
     // expected-error@-1:15 {{cannot convert value of type 'Mask?' to expected argument type 'Int?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Mask' and 'Int') are expected to be equal}}
 
     // FIXME: No fix-it. Could be 'mask_o?.rawValue' or 'mask_o.map { $0.rawValue }'.
     let _: UInt64? = mask_o
     // expected-error@-1:22 {{cannot convert value of type 'Mask?' to specified type 'UInt64?'}}{{28-28=?.rawValue}}
     takeUInt64_o(mask_o)
     // expected-error@-1:18 {{cannot convert value of type 'Mask?' to expected argument type 'UInt64?'}}{{none}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Mask' and 'UInt64') are expected to be equal}}
   }
 }
 
@@ -202,7 +211,7 @@ do {
     takeAnyObject(iuo)
     // expected-error@-1:19 {{argument type 'ClassWrapper?' expected to be an instance of a class or class-constrained type}}{{none}}
     takeAnyObjectOpt(iuo)
-    // expected-error@-1:22 {{argument type 'ClassWrapper' expected to be an instance of a class or class-constrained type}}{{none}}
+    // expected-error@-1:22 {{argument type 'ClassWrapper?' expected to be an instance of a class or class-constrained type}}{{none}}
 
     let _: ClassWrapper = subClass
     // expected-error@-1:27 {{cannot convert value of type 'SubClass' to specified type 'ClassWrapper'}}{{27-27=ClassWrapper(rawValue: }} {{35-35=) ?? <#default value#>}}
