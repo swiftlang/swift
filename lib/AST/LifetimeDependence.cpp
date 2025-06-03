@@ -665,8 +665,18 @@ protected:
   case ParsedLifetimeDependenceKind::Inherit:
     // @lifetime(copy x) is only invalid for Escapable types.
     if (type->isEscapable()) {
-      diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
-               descriptor.getString());
+      if (loweredOwnership == ValueOwnership::Shared) {
+        diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
+                 descriptor.getString(), "borrow ");
+      } else if (loweredOwnership == ValueOwnership::InOut) {
+        diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
+                 descriptor.getString(), "&");
+      } else {
+        diagnose(
+            loc,
+            diag::lifetime_dependence_cannot_use_default_escapable_consuming,
+            getOwnershipSpelling(loweredOwnership));
+      }
       return std::nullopt;
     }
     return LifetimeDependenceKind::Inherit;

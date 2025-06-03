@@ -69,3 +69,18 @@ func inoutLifetimeDependence(_ ne: inout NE) -> NE {
   ne
 }
 
+@lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(&k)' instead}}
+func dependOnEscapable(_ k: inout Klass) -> NE {
+  NE()
+}
+
+@lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow k)' instead}}
+func dependOnEscapable(_ k: borrowing Klass) -> NE { 
+  NE()
+}
+
+@lifetime(copy k) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
+func dependOnEscapable(_ k: consuming Klass) -> NE { 
+  NE()
+}
+
