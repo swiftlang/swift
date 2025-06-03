@@ -1656,8 +1656,27 @@ void ModuleDependencyScanner::diagnoseScannerFailure(
         locInfo.bufferIdentifier, locInfo.lineNumber, locInfo.columnNumber);
   }
 
-  Diagnostics.diagnose(importLoc, diag::dependency_scan_module_not_found,
-                       moduleImport.importIdentifier);
+  // Attempt to determine if any of the binary Swift module dependencies contain
+  // serialized search paths where the missing module may be found. If yes,
+  // emit a specialized diagnostic letting the user know which search path
+  // is missing in current compilation.
+  auto resolvedModuleDefiningPath = attemptToFindResolvingSerializedSearchPath(
+      moduleImport, cache, importLoc);
+  if (resolvedModuleDefiningPath) {
+    Diagnostics.diagnose(
+        importLoc,
+        diag::dependency_scan_module_not_found_on_specified_search_paths,
+        moduleImport.importIdentifier);
+    Diagnostics.diagnose(importLoc, diag::inherited_search_path_resolves_module,
+                         moduleImport.importIdentifier,
+                         resolvedModuleDefiningPath->first.ModuleName,
+                         resolvedModuleDefiningPath->second);
+  } else
+    Diagnostics.diagnose(importLoc, diag::dependency_scan_module_not_found,
+                         moduleImport.importIdentifier);
+
+  // Emit notes for every link in the dependency chain from the root
+  // module-under-scan to the module whose import failed to resolve.
   if (dependencyOf.has_value()) {
     auto path = findPathToDependency(dependencyOf.value(), cache);
     // We may fail to construct a path in some cases, such as a Swift overlay of
@@ -1703,6 +1722,8 @@ void ModuleDependencyScanner::diagnoseScannerFailure(
     }
   }
 
+  // Emit notes for every other location where the failed-to-resolve
+  // module is imported.
   if (moduleImport.importLocations.size() > 1) {
     for (size_t i = 1; i < moduleImport.importLocations.size(); ++i) {
       auto locInfo = moduleImport.importLocations[i];
@@ -1711,8 +1732,6 @@ void ModuleDependencyScanner::diagnoseScannerFailure(
       Diagnostics.diagnose(importLoc, diag::unresolved_import_location);
     }
   }
-
-  attemptToFindResolvingSerializedSearchPath(moduleImport, cache, importLoc);
 }
 
 static std::string getModuleDefiningPath(const ModuleDependencyInfo &info) {
@@ -1737,31 +1756,17 @@ static std::string getModuleDefiningPath(const ModuleDependencyInfo &info) {
 
   // Relative to the `module.modulemap` or `.swiftinterface` or `.swiftmodule`,
   // the defininig path is the parent directory of the file.
-<<<<<<< Updated upstream
-  path = llvm::sys::path::parent_path(path);
-
-  // If the defining path is the top-level `.swiftmodule` directory,
-  // take one more step up.
-  if (llvm::sys::path::extension(path) == ".swiftmodule")
-    path = llvm::sys::path::parent_path(path);
-
-  // If the defining path is under `.framework/Modules/` directory,
-  // return the parent path containing the framework.
-  if (llvm::sys::path::filename(path) == "Modules" && llvm::sys::path::extension(llvm::sys::path::parent_path(path)) == ".framework")
-    path = llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
-
-  return path;
-=======
   return llvm::sys::path::parent_path(path).str();
->>>>>>> Stashed changes
 }
 
-void ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
+std::optional<std::pair<ModuleDependencyID, std::string>>
+ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
     const ScannerImportStatementInfo &moduleImport,
     const ModuleDependenciesCache &cache, const SourceLoc &importLoc) {
   std::set<ModuleDependencyID> binarySwiftModuleDepIDs =
       collectBinarySwiftDeps(cache);
 
+  std::optional<std::pair<ModuleDependencyID, std::string>> result;
   for (const auto &binaryDepID : binarySwiftModuleDepIDs) {
     auto binaryModInfo =
         cache.findKnownDependency(binaryDepID).getAsSwiftBinaryModule();
@@ -1772,9 +1777,10 @@ void ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
     // Note: this will permanently mutate this worker with additional search
     // paths. That's fine because we are diagnosing a scan failure here, but
     // worth being aware of.
-    withDependencyScanningWorker(
-        [&binaryModInfo, &moduleImport, &cache, &binaryDepID, &importLoc,
-         this](ModuleDependencyScanningWorker *ScanningWorker) {
+    result = withDependencyScanningWorker(
+        [&binaryModInfo, &moduleImport, &cache, this,
+         &binaryDepID](ModuleDependencyScanningWorker *ScanningWorker)
+            -> std::optional<std::pair<ModuleDependencyID, std::string>> {
           ModuleDependencyVector result;
           for (const auto &sp : binaryModInfo->serializedSearchPaths)
             ScanningWorker->workerASTContext->addSearchPath(
@@ -1784,31 +1790,22 @@ void ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
               getModuleImportIdentifier(moduleImport.importIdentifier),
               cache.getModuleOutputPath(), cache.getSDKModuleOutputPath(),
               cache.getScanService().getPrefixMapper());
-          if (!result.empty()) {
-            Diagnostics.diagnose(
-                importLoc, diag::inherited_search_path_resolves_module,
-                moduleImport.importIdentifier, binaryDepID.ModuleName,
-                getModuleDefiningPath(result[0].second));
-          }
+          if (!result.empty())
+            return std::make_pair(binaryDepID,
+                                  getModuleDefiningPath(result[0].second));
 
           result = ScanningWorker->scanFilesystemForClangModuleDependency(
               getModuleImportIdentifier(moduleImport.importIdentifier),
               cache.getModuleOutputPath(), cache.getSDKModuleOutputPath(), {},
               cache.getScanService().getPrefixMapper());
-<<<<<<< Updated upstream
-          if (!result.empty()) {
-            Diagnostics.diagnose(
-                importLoc, diag::inherited_search_path_resolves_module,
-                moduleImport.importIdentifier, binaryDepID.ModuleName,
-                getModuleDefiningPath(result[0].second));
-          }
-          return result;
-=======
           if (!result.empty())
             return std::make_pair(binaryDepID,
                                   getModuleDefiningPath(result[0].second));
           return std::nullopt;
->>>>>>> Stashed changes
         });
+    if (result)
+      break;
   }
+
+  return result;
 }
