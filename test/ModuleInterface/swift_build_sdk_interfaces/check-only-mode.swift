@@ -1,4 +1,7 @@
 // RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/sdk/usr/lib)
+// RUN: cp -r %test-resource-dir %t/sdk/usr/lib
+// RUN: rm -rf %t/sdk/usr/lib/swift/host
 // RUN: mkdir -p %t/sdk/usr/lib/swift/Normal.swiftmodule
 // RUN: mkdir -p %t/sdk/System/Library/Frameworks/FMWK.framework/Modules/FMWK.swiftmodule
 
@@ -6,8 +9,6 @@
 // RUN: echo 'public func flat() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Flat.swiftinterface -emit-module -o /dev/null -module-name Flat
 // RUN: echo 'public func fmwk() {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/System/Library/Frameworks/FMWK.framework/Modules/FMWK.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name FMWK
 
-// RUN: cp -r %test-resource-dir/shims %t/sdk/usr/lib/swift
-// RUN: ln -s %platform-module-dir %t/sdk/usr/lib/swift
 // RUN: %swift_build_sdk_interfaces -sdk %t/sdk -Fsystem %t/sdk/System/Library/Frameworks -v -o %t/prebuilt -check-only
 // RUN: ls %t/prebuilt | %FileCheck %s
 // CHECK-DAG: Normal.swiftmodule
