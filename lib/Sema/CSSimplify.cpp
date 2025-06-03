@@ -15693,6 +15693,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     unsigned impact = 1;
     if (type1->isMarkerExistential() || type2->isMarkerExistential())
       ++impact;
+
+    // If generic arguments mismatch ends up being recorded on the result
+    // of the chain or a try expression it means that there is a contextual 
+    // conversion mismatch.
+    //
+    // For optional conversions the solver currently generates a disjunction
+    // with two choices - bind and optional-to-optional conversion which is
+    // anchored on the contextual expression. If we can get a fix recorded
+    // there that would result in a better diagnostic. It's only possible
+    // for optional-to-optional choice because it doesn't bind the
+    // variable immediately, so we need to downgrade direct fixes to prevent
+    // `bind` choice from considered better.
+    if (fix->directlyAt<OptionalEvaluationExpr>() ||
+        fix->directlyAt<AnyTryExpr>())
+      impact += 2;
+
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
