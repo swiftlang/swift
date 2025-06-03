@@ -123,7 +123,7 @@ case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conf
 }
 
 struct S: Sendable {
-  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-Sendable type '([any Q.Type], Int)'}}
+  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-Sendable type 'any Q.Type'}}
 }
 
 extension Q {
