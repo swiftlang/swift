@@ -58,7 +58,7 @@ template <typename Runtime> struct ConcurrentHashMap {
 
 template <typename Runtime> struct ConformanceCacheEntry {
   typename Runtime::StoredPointer Type;
-  typename Runtime::StoredPointer Proto;
+  typename Runtime::StoredSignedPointer Proto;
   typename Runtime::StoredPointer Witness;
 };
 
