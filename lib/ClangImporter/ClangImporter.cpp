@@ -4354,7 +4354,14 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getOverlayModule(this);
+
+    ModuleDecl *overlay = nullptr;
+    // During compilation of a textual interface with no formal C++ interop mode,
+    // i.e. it was built without C++ interop, avoid querying the 'CxxStdlib' overlay
+    // for it, since said overlay was not used during compilation of this module.
+    if (!importer::isCxxStdModule(clangModule) || Ctx.LangOpts.FormalCxxInteropMode)
+      overlay = Ctx.getOverlayModule(this);
+
     if (overlay) {
       Ctx.addLoadedModule(overlay);
     } else {
@@ -4374,7 +4381,8 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // If this Clang module is a part of the C++ stdlib, and we haven't loaded
     // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
     // Load the CxxStdlib overlay explicitly.
-    if (!overlay && importer::isCxxStdModule(clangModule)) {
+    if (!overlay && importer::isCxxStdModule(clangModule) &&
+        Ctx.LangOpts.FormalCxxInteropMode) {
       ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
       overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }

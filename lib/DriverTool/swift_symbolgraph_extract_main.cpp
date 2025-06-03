@@ -214,7 +214,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     Options.AvailabilityIsBlockList = A->getOption().matches(OPT_block_availability_platforms);
   }
 
-  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
+                                                    Invocation.getFrontendOptions());
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
