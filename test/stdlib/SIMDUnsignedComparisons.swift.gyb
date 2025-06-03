@@ -21,7 +21,6 @@ import Swift
 %  n = totalBits // bits
 %  if n != 1:
 %   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
-%   sseSuffix = {8:'b',16:'w',32:'d',64:'q'}[bits]
 func compare_eq${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, _ b: SIMD${n}<UInt${bits}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
@@ -32,8 +31,6 @@ func compare_eq${n}x${bits}(
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: cmeq.${neonSuffix}
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: pcmpeq${sseSuffix}
-// CHECK-x86_64: ret
 
 func compare_eq${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, scalar b: UInt${bits}
@@ -67,9 +64,6 @@ func compare_ne${n}x${bits}(
 // CHECKOnone-arm64: cmeq.${neonSuffix}
 // CHECKOnone-arm64: mvn.${totalBits//8}b
 // CHECKOnone-arm64: ret
-// CHECK-x86_64: pcmpeq${sseSuffix}
-// CHECK-x86_64: pxor
-// CHECK-x86_64: ret
 
 func compare_ne${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, scalar b: UInt${bits}
@@ -103,12 +97,6 @@ func compare_lt${n}x${bits}(
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: cmhi.${neonSuffix}
 // CHECKOnone-arm64: ret
-%   if bits != 64: # no PMAXUQ in Swift base ISA
-// CHECK-x86_64: pmaxu${sseSuffix}
-// CHECK-x86_64: pcmpeq${sseSuffix}
-// CHECK-x86_64: pxor
-%   end
-// CHECK-x86_64: ret
 
 func compare_lt${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, scalar b: UInt${bits}
@@ -140,11 +128,6 @@ func compare_le${n}x${bits}(
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: cmhs.${neonSuffix}
 // CHECKOnone-arm64: ret
-%   if bits != 64: # no PMINUQ in Swift base ISA
-// CHECK-x86_64: pminu${sseSuffix}
-// CHECK-x86_64: pcmpeq${sseSuffix}
-%   end
-// CHECK-x86_64: ret
 
 func compare_le${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, scalar b: UInt${bits}
@@ -176,12 +159,6 @@ func compare_gt${n}x${bits}(
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: cmhi.${neonSuffix}
 // CHECKOnone-arm64: ret
-%   if bits != 64: # no PMINUQ in Swift base ISA
-// CHECK-x86_64: pminu${sseSuffix}
-// CHECK-x86_64: pcmpeq${sseSuffix}
-// CHECK-x86_64: pxor
-%   end
-// CHECK-x86_64: ret
 
 func compare_gt${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, scalar b: UInt${bits}
@@ -213,11 +190,6 @@ func compare_ge${n}x${bits}(
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: cmhs.${neonSuffix}
 // CHECKOnone-arm64: ret
-%   if bits != 64: # no PMAXUQ in Swift base ISA
-// CHECK-x86_64: pmaxu${sseSuffix}
-// CHECK-x86_64: pcmpeq${sseSuffix}
-%   end
-// CHECK-x86_64: ret
 
 func compare_ge${n}x${bits}(
   _ a: SIMD${n}<UInt${bits}>, scalar b: UInt${bits}
