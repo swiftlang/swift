@@ -173,6 +173,10 @@ static bool shouldCreateMissingConformances(Type type, ProtocolDecl *proto) {
     return true;
   }
 
+  // SendableMetatype behaves similarly to Sendable.
+  if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype))
+    return true;
+
   return false;
 }
 
