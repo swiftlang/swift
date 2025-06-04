@@ -7,6 +7,8 @@
 // RUN: %FileCheck %s --input-file %t/PlatformAgnostic.symbols.json --check-prefix CHECK-SO
 // RUN: %FileCheck %s --input-file %t/PlatformAgnostic.symbols.json --check-prefix CHECK-FT
 
+// REQUIRES: swift_feature_SwiftToolchainAvailability
+
 // CHECK-FS: FutureSwift
 // CHECK-FS:      "availability": [
 // CHECK-FS-NEXT:        {
