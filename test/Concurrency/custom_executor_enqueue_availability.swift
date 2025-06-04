@@ -28,7 +28,7 @@ final class OldExecutorOldStdlib: SerialExecutor {
 final class BothExecutorOldStdlib: SerialExecutor {
   func enqueue(_ job: UnownedJob) {}
 
-  // This no longer warns, because of the use of SwiftStdlibCurrentOS in the
+  // This no longer warns, because of the use of StdlibDeploymentTarget in the
   // runtime.
   @available(SwiftStdlib 5.9, *)
   func enqueue(_ job: __owned ExecutorJob) {}

@@ -1005,13 +1005,13 @@ function(add_swift_target_library_single target name)
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
 
     if("${def}" MATCHES "SwiftStdlib .*")
-      # For each SwiftStdlib x.y, also define SwiftStdlibCurrentOS x.y, which,
+      # For each SwiftStdlib x.y, also define StdlibDeploymentTarget x.y, which,
       # will expand to the current `-target` platform if the macro defines a
       # newer platform as its availability.
       #
       # There is a setting, SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY, which if set
       # ON will cause us to use the "proper" availability instead.
-      string(REPLACE "SwiftStdlib" "SwiftStdlibCurrentOS" current "${def}")
+      string(REPLACE "SwiftStdlib" "StdlibDeploymentTarget" current "${def}")
       if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY AND SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME)
         if(SWIFTLIB_SINGLE_SDK STREQUAL "OSX" AND SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR STREQUAL "ios-like")
           string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" platform_version "${def}")

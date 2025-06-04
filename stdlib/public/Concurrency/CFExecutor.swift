@@ -43,7 +43,7 @@ enum CoreFoundation {
 
 // .. Main Executor ............................................................
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
   override public func run() throws {
@@ -58,7 +58,7 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
 // .. Task Executor ............................................................
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public final class CFTaskExecutor: DispatchGlobalTaskExecutor,
                                    @unchecked Sendable {
 
