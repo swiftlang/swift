@@ -144,6 +144,8 @@ PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
      "Mandatory remove short-lived immutable temporary copies")
 PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
+PASS(TempLValueElimination, "temp-lvalue-elimination",
+     "Remove short-lived immutable temporary l-values")
 
 // NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
 PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
@@ -406,8 +408,6 @@ LEGACY_PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 LEGACY_PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
-LEGACY_PASS(TempLValueOpt, "temp-lvalue-opt",
-     "Remove short-lived immutable temporary l-values")
 LEGACY_PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
 LEGACY_PASS(SendNonSendable, "send-non-sendable",
