@@ -3320,8 +3320,15 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 static void diagnoseMissingConformance(
     SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC,
     bool preconcurrency) {
-  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, fromDC, preconcurrency);
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+         proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype));
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    diagnoseMissingSendableConformance(loc, type, fromDC, preconcurrency);
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype))
+    diagnoseMissingSendableMetatypeConformance(loc, type, fromDC,
+                                               preconcurrency);
 }
 
 bool
