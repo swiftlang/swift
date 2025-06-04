@@ -1260,8 +1260,7 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
 
 void irgen::getObjCEncodingForType(IRGenModule &IGM, VarDecl *property,
                                    std::string &s) {
-  auto t = getObjCPropertyType(IGM, property);
-  if (t)
+  if (auto t = getObjCPropertyType(IGM, property))
     IGM.getClangASTContext().getObjCEncodingForType(t, s);
 }
 
