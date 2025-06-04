@@ -990,8 +990,8 @@ public:
     }
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit)
       return true;
@@ -1004,9 +1004,12 @@ public:
     if (D->isUnavailable())
       return true;
 
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
     auto &SM = D->getASTContext().SourceMgr;
     if (D == D->getASTContext().getOptionalNoneDecl() &&
-        SM.extractText(Range, BufferID) == "nil") {
+        SM.extractText(CharRange, BufferID) == "nil") {
       // If a 'nil' literal occurs in a swift-case statement, it gets replaced
       // by a reference to 'Optional.none' in the AST. We want to continue
       // highlighting 'nil' as a keyword and not as an enum element.
@@ -1015,11 +1018,11 @@ public:
 
     if (CtorTyRef)
       D = CtorTyRef;
-    annotate(D, /*IsRef=*/true, Range);
+    annotate(D, /*IsRef=*/true, CharRange);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally

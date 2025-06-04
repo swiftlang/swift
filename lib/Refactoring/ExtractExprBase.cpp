@@ -26,8 +26,8 @@ struct ReferenceCollector : public SourceEntityWalker {
   SmallVector<ValueDecl *, 4> References;
 
   ReferenceCollector(Expr *E) { walk(E); }
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
     References.emplace_back(D);
     return true;
