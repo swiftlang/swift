@@ -14,12 +14,12 @@ import SizedByLifetimeboundClang
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func complexExpr(_ len: Int32, _ offset: Int32, _ len2: Int32, _ p: RawSpan) -> RawSpan
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) -> RawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_ len: Int32, _ p: RawSpan) -> RawSpan
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_ len: Int32, _ p: RawSpan) -> RawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -29,33 +29,33 @@ import SizedByLifetimeboundClang
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_ len: Int32, _ p: RawSpan) -> RawSpan
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ len: Int32, _ p: RawSpan) -> RawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func nullable(_ len: Int32, _ p: RawSpan?) -> RawSpan?
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ len: Int32, _ p: RawSpan?) -> RawSpan?
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func opaque(_ len: Int32, _ p: RawSpan) -> RawSpan
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_ len: Int32, _ p: RawSpan) -> RawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int32, _ p: RawSpan) -> RawSpan
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p: RawSpan) -> RawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_ len: Int32, _ p: RawSpan) -> RawSpan
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ len: Int32, _ p: RawSpan) -> RawSpan
 
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callComplexExpr(_ p: RawSpan) {
-  let _: RawSpan = complexExpr(73, 37, 42, p)
+  let _: RawSpan = complexExpr(73, 37, p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -79,7 +79,7 @@ public func callNullable(_ p: RawSpan?) {
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callShared(_ p: RawSpan) {
-  let _: RawSpan = shared(CInt(p.byteCount), p)
+  let _: RawSpan = shared(p)
 }
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
