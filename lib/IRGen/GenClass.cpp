@@ -2067,10 +2067,10 @@ namespace {
 
       StringRef name = field.getName();
       std::string typeEnc;
-      if (field.getKind() == Field::Var &&
-          requiresObjCPropertyDescriptor(IGM, field.getVarDecl())) {
-        getObjCEncodingForType(IGM, field.getVarDecl(), typeEnc);
-      }
+      auto *varDecl = field.getVarDecl();
+      if (field.getKind() == Field::Var && varDecl->isObjC() &&
+          varDecl->hasStorage())
+        getObjCEncodingForPropertyType(IGM, varDecl, typeEnc);
       const TypeInfo &storageTI = pair.second.getType();
       auto fields = ivars.beginStruct();
 

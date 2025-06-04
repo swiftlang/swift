@@ -170,9 +170,6 @@ namespace irgen {
                                          llvm::Function *impl,
                                          bool isDestroyer);
 
-  /// Get the type encoding for an ObjC ivar.
-  void getObjCEncodingForType(IRGenModule &IGM, VarDecl *property, std::string &s);
-
   /// Get the type encoding for an ObjC property.
   void getObjCEncodingForPropertyType(IRGenModule &IGM, VarDecl *property,
                                       std::string &s);
