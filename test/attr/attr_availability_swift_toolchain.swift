@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature SwiftToolchainAvailability
 
+// REQUIRES: swift_feature_SwiftToolchainAvailability
+
 @available(_SwiftToolchain 3.0)
 func foo() {
 }

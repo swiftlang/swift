@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -typecheck -verify -enable-experimental-feature SwiftToolchainAvailability -I %t %s 2>&1
 // RUN: %target-swift-ide-test -print-module -module-to-print SwiftToolchain -enable-experimental-feature SwiftToolchainAvailability -source-filename x -I %t | %FileCheck %S/Inputs/SwiftToolchain.swift
 
+// REQUIRES: swift_feature_SwiftToolchainAvailability
+
 import SwiftToolchain
 
 // This won't emit a diagnostic because _SwiftToolchain availability is always inactive.
