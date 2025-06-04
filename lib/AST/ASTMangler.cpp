@@ -1006,7 +1006,7 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (!Decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !prefix && !Decl->isInvalid())
     verify(Storage.str(), Flavor);
   return finalize();
 }
@@ -1026,7 +1026,7 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (!decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !decl->isInvalid())
     verify(Storage.str().drop_front(USRPrefix.size()), Flavor);
   return finalize();
 }
