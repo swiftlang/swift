@@ -10,6 +10,9 @@ import SizedByClang
 
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func aliasedBytesized(_  p: UnsafeMutableRawBufferPointer)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_  size: Int{{.*}}) -> UnsafeMutableRawBufferPointer
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -29,6 +32,9 @@ import SizedByClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_  p: UnsafeRawBufferPointer)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func opaqueptr(_  p: UnsafeRawBufferPointer)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeMutableRawBufferPointer
@@ -68,6 +74,11 @@ public func callOpaque(_ p: UnsafeRawBufferPointer) {
 }
 
 @inlinable
+public func callOpaqueptr(_ p: UnsafeRawBufferPointer) {
+  unsafe opaqueptr(p)
+}
+
+@inlinable
 public func callReturnPointer() {
   let _: UnsafeMutableRawBufferPointer? = returnPointer(4) // call wrapper
   let _: UnsafeMutableRawPointer? = returnPointer(4) // call unsafe interop
@@ -96,4 +107,9 @@ public func callCharsized(_ p: UnsafeMutableRawBufferPointer) {
 @inlinable
 public func callBytesized() {
   let _: UnsafeMutableRawBufferPointer = bytesized(37)
+}
+
+@inlinable
+public func callAliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {
+  unsafe aliasedBytesized(p)
 }

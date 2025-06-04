@@ -9145,7 +9145,8 @@ struct CountedByExpressionValidator
 };
 } // namespace
 
-// don't try to transform any Swift types that _SwiftifyImport doesn't know how to handle
+// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
+// to handle.
 static bool SwiftifiableCountedByPointerType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
