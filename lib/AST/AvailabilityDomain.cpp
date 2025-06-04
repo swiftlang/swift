@@ -436,6 +436,14 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     return std::nullopt;
   }
 
+  if (domain->isSwiftToolchain() &&
+      !ctx.LangOpts.hasFeature(Feature::SwiftToolchainAvailability) &&
+      !declContext->isInSwiftinterface()) {
+    diags.diagnose(loc, diag::attr_availability_requires_toolchain_availability,
+                   *domain);
+    return std::nullopt;
+  }
+
   return domain;
 }
 

@@ -6953,6 +6953,9 @@ WARNING(attr_availability_expected_version_spec, none,
 ERROR(attr_availability_requires_custom_availability, none,
       "%0 requires '-enable-experimental-feature CustomAvailability'",
       (AvailabilityDomain))
+ERROR(attr_availability_requires_toolchain_availability, none,
+      "%0 requries '-enable-experimental-feature SwiftToolchainAvailability'",
+      (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
