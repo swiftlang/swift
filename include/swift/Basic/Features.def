@@ -525,6 +525,10 @@ EXPERIMENTAL_FEATURE(ModuleSelector, false)
 /// in a file scope.
 EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 
+/// Allow use of `_SwiftToolchain` availability domain for indicating when a
+/// symbol was introduced in terms of the toolchain version.
+EXPERIMENTAL_FEATURE(SwiftToolchainAvailability, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

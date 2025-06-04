@@ -641,6 +641,8 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
 
+  list(APPEND swift_flags "-enable-experimental-feature" "SwiftToolchainAvailability")
+
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
