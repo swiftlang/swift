@@ -1826,7 +1826,7 @@ public:
     auto adjSrc = getAdjointBuffer(bb, uccai->getSrc());
     auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
     builder.createUnconditionalCheckedCastAddr(
-        uccai->getLoc(), uccai->getIsolatedConformances(),
+        uccai->getLoc(), uccai->getCheckedCastOptions(),
         adjDest, adjDest->getType().getASTType(), castBuf,
         adjSrc->getType().getASTType());
     addToAdjointBuffer(bb, uccai->getSrc(), castBuf, uccai->getLoc());

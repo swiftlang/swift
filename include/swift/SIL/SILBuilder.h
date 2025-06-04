@@ -1554,33 +1554,33 @@ public:
 
   UnconditionalCheckedCastInst *
   createUnconditionalCheckedCast(SILLocation Loc,
-                                 CastingIsolatedConformances isolatedConformances,
+                                 CheckedCastInstOptions options,
                                  SILValue op,
                                  SILType destLoweredTy,
                                  CanType destFormalTy) {
-    return createUnconditionalCheckedCast(Loc, isolatedConformances, op,
+    return createUnconditionalCheckedCast(Loc, options, op,
                                           destLoweredTy, destFormalTy,
                                           op->getOwnershipKind());
   }
 
   UnconditionalCheckedCastInst *
   createUnconditionalCheckedCast(SILLocation Loc,
-                                 CastingIsolatedConformances isolatedConformances,
+                                 CheckedCastInstOptions options,
                                  SILValue op,
                                  SILType destLoweredTy, CanType destFormalTy,
                                  ValueOwnershipKind forwardingOwnershipKind) {
     return insert(UnconditionalCheckedCastInst::create(
-        getSILDebugLocation(Loc), isolatedConformances, op, destLoweredTy,
+        getSILDebugLocation(Loc), options, op, destLoweredTy,
         destFormalTy, getFunction(), forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastAddrInst *
   createUnconditionalCheckedCastAddr(SILLocation Loc,
-                                     CastingIsolatedConformances isolatedConformances,
+                                     CheckedCastInstOptions options,
                                      SILValue src, CanType sourceFormalType,
                                      SILValue dest, CanType targetFormalType) {
     return insert(UnconditionalCheckedCastAddrInst::create(
-        getSILDebugLocation(Loc), isolatedConformances, src, sourceFormalType,
+        getSILDebugLocation(Loc), options, src, sourceFormalType,
         dest, targetFormalType, getFunction()));
   }
 
@@ -2779,7 +2779,7 @@ public:
 
   CheckedCastBranchInst *
   createCheckedCastBranch(SILLocation Loc, bool isExact,
-                          CastingIsolatedConformances isolatedConformances,
+                          CheckedCastInstOptions options,
                           SILValue op,
                           CanType srcFormalTy, SILType destLoweredTy,
                           CanType destFormalTy, SILBasicBlock *successBB,
@@ -2789,7 +2789,7 @@ public:
 
   CheckedCastBranchInst *
   createCheckedCastBranch(SILLocation Loc, bool isExact,
-                          CastingIsolatedConformances isolatedConformances,
+                          CheckedCastInstOptions options,
                           SILValue op,
                           CanType srcFormalTy, SILType destLoweredTy,
                           CanType destFormalTy, SILBasicBlock *successBB, 
@@ -2800,7 +2800,7 @@ public:
 
   CheckedCastAddrBranchInst *
   createCheckedCastAddrBranch(SILLocation Loc,
-                              CastingIsolatedConformances isolatedConformances,
+                              CheckedCastInstOptions options,
                               CastConsumptionKind consumption,
                               SILValue src, CanType sourceFormalType,
                               SILValue dest, CanType targetFormalType,
@@ -2809,7 +2809,7 @@ public:
                               ProfileCounter Target1Count = ProfileCounter(),
                               ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(CheckedCastAddrBranchInst::create(
-        getSILDebugLocation(Loc), isolatedConformances, consumption, src,
+        getSILDebugLocation(Loc), options, consumption, src,
         sourceFormalType, dest, targetFormalType, successBB, failureBB,
         Target1Count, Target2Count, getFunction()));
   }

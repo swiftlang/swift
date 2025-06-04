@@ -309,14 +309,14 @@ public:
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(
       SILLocation loc,
-      CastingIsolatedConformances isolatedConformances,
+      CheckedCastInstOptions options,
       ManagedValue op,
       SILType destLoweredTy,
       CanType destFormalTy);
 
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
-                               CastingIsolatedConformances isolatedConformances,
+                               CheckedCastInstOptions options,
                                ManagedValue op,
                                CanType sourceFormalTy,
                                SILType destLoweredTy,

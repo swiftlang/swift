@@ -949,7 +949,7 @@ public:
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
-       loc, uccai->getIsolatedConformances(),
+       loc, uccai->getCheckedCastOptions(),
         tanSrc, tanSrc->getType().getASTType(),
         tanDest, tanDest->getType().getASTType());
   }
