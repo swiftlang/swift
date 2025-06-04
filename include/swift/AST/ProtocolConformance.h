@@ -148,7 +148,7 @@ protected:
       Kind : bitmax(NumProtocolConformanceKindBits, 8),
 
       /// Whether the "raw" conformance isolation is "inferred", which applies to most conformances.
-      IsRawConformanceInferred : 1,
+      IsRawIsolationInferred : 1,
 
       /// Whether the computed actor isolation is nonisolated.
       IsComputedNonisolated : 1
@@ -205,16 +205,16 @@ protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : ConformingType(conformingType) {
     Bits.ProtocolConformance.Kind = unsigned(kind);
-    Bits.ProtocolConformance.IsRawConformanceInferred = false;
+    Bits.ProtocolConformance.IsRawIsolationInferred = false;
     Bits.ProtocolConformance.IsComputedNonisolated = false;
   }
 
-  bool isRawConformanceInferred() const {
-    return Bits.ProtocolConformance.IsRawConformanceInferred;
+  bool isRawIsolationInferred() const {
+    return Bits.ProtocolConformance.IsRawIsolationInferred;
   }
 
   void setRawConformanceInferred(bool value = true) {
-    Bits.ProtocolConformance.IsRawConformanceInferred = value;
+    Bits.ProtocolConformance.IsRawIsolationInferred = value;
   }
 
   bool isComputedNonisolated() const {
