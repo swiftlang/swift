@@ -13,11 +13,11 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(SwiftStdlibCurrentOS 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
   var clockID: _ClockID
-  if #available(SwiftStdlibCurrentOS 6.2, *) {
+  if #available(StdlibDeploymentTarget 6.2, *) {
     if clock.traits.contains(.continuous) {
       clockID = .continuous
     } else {
@@ -34,7 +34,7 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
                   clock: clockID.rawValue)
 
   let delta: Swift.Duration
-  if #available(SwiftStdlibCurrentOS 6.2, *) {
+  if #available(StdlibDeploymentTarget 6.2, *) {
     delta = clock.convert(from: clock.now.duration(to: instant))!
   } else {
     fatalError("we shouldn't get here; if we have, availability is broken")
@@ -54,10 +54,10 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
           nanoseconds: Int64(nanoseconds))
 }
 
-@available(SwiftStdlibCurrentOS 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
-  @available(SwiftStdlibCurrentOS 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   internal static func _sleep<C: Clock>(
     until instant: C.Instant,
     tolerance: C.Duration?,
@@ -97,7 +97,7 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(SwiftStdlibCurrentOS 6.2, *) {
+              if #available(StdlibDeploymentTarget 6.2, *) {
                 #if !$Embedded
                 if let executor = Task.currentSchedulableExecutor {
                   executor.enqueue(ExecutorJob(context: job),
@@ -117,7 +117,7 @@ extension Task where Success == Never, Failure == Never {
                                                               clock: clock)
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
-              if #available(SwiftStdlibCurrentOS 6.2, *) {
+              if #available(StdlibDeploymentTarget 6.2, *) {
                 if let tolerance = tolerance,
                    let components = clock.convert(from: tolerance)?.components {
                   toleranceSeconds = components.seconds
@@ -130,7 +130,7 @@ extension Task where Success == Never, Failure == Never {
                 fatalError("we shouldn't get here; if we have, availability is broken")
               }
 
-              if #available(SwiftStdlibCurrentOS 5.9, *) {
+              if #available(StdlibDeploymentTarget 5.9, *) {
                 _enqueueJobGlobalWithDeadline(
                   seconds, nanoseconds,
                   toleranceSeconds, toleranceNanoseconds,

@@ -5715,7 +5715,7 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-Sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
-ERROR(non_sendable_metatype_capture,none,
+GROUPED_ERROR(non_sendable_metatype_capture,SendableMetatypes,none,
       "capture of non-Sendable type %0 in an isolated "
       "%select{local function|closure}1",
       (Type, bool))
