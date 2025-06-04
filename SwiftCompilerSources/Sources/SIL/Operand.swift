@@ -191,6 +191,12 @@ extension Value {
   public var users: LazyMapSequence<UseList, Instruction> { uses.users }
 }
 
+extension Instruction {
+  public func isUsing(_ value: Value) -> Bool {
+    return operands.contains { $0.value == value }
+  }
+}
+
 extension Operand {
   /// Return true if this operation will store a full value into this
   /// operand's address.
