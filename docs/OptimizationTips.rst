@@ -9,11 +9,11 @@ high-performance Swift code. The intended audience of this document is compiler
 and standard library developers.
 
 Some of the tips in this document can help improve the quality of your Swift
-program and make your code less error prone and more readable. Explicitly
-marking final-classes and class-protocols are two obvious examples. However some
-of the tips described in this document are unprincipled, twisted and come to
+program and make your code less error-prone and more readable. Explicitly
+marking final classes and class protocols are two obvious examples. However, some
+of the tips described in this document are unprincipled, twisted, and come to
 solve a specific temporary limitation of the compiler or the language. Many of
-the recommendations in this document come with trade offs for things like
+the recommendations in this document come with trade-offs for things like
 program runtime, binary size, code readability, etc.
 
 
@@ -116,9 +116,9 @@ Advice: Use 'final' when you know the declaration does not need to be overridden
 
 The ``final`` keyword is a restriction on a declaration of a class, a method, or
 a property such that the declaration cannot be overridden. This implies that the
-compiler can emit direct function calls instead of indirect calls. For instance
-in the following ``C.array1`` and ``D.array1`` will be accessed directly
-[#]_. In contrast, ``D.array2`` will be called via a vtable:
+compiler can emit direct function calls instead of indirect calls. For instance,
+in the following, ``C.array1`` and ``D.array1`` will be accessed directly [#]_.
+In contrast, ``D.array2`` will be called via a vtable:
 
 .. code-block:: swift
 
@@ -143,16 +143,16 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
     d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
 
-Advice: Use 'private' and 'fileprivate' when declaration does not need to be accessed outside of file
+Advice: Use 'private' and 'fileprivate' when the declaration does not need to be accessed outside of the file
 -----------------------------------------------------------------------------------------------------
 
 Applying the ``private`` or ``fileprivate`` keywords to a declaration restricts
 the visibility of the declaration to the file in which it is declared. This
-allows the compiler to be able to ascertain all other potentially overriding
-declarations. Thus the absence of any such declarations enables the compiler to
+allows the compiler to ascertain all other potentially overriding
+declarations. Thus, the absence of any such declarations enables the compiler to
 infer the ``final`` keyword automatically and remove indirect calls for methods
-and field accesses accordingly. For instance in the following,
-``e.doSomething()`` and ``f.myPrivateVar``, will be able to be accessed directly
+and field accesses accordingly. For instance, in the following,
+``e.doSomething()`` and ``f.myPrivateVar`` will be able to be accessed directly,
 assuming ``E``, ``F`` do not have any overriding declarations in the same file:
 
 .. code-block:: swift
@@ -201,9 +201,9 @@ Advice: Use value types in Array
 
 In Swift, types can be divided into two different categories: value types
 (structs, enums, tuples) and reference types (classes). A key distinction is
-that value types cannot be included inside an NSArray. Thus when using value
+that value types cannot be included inside an NSArray. Thus, when using value
 types, the optimizer can remove most of the overhead in Array that is necessary
-to handle the possibility of the array being backed an NSArray.
+to handle the possibility of the array being backed by an NSArray.
 
 Additionally, in contrast to reference types, value types only need reference
 counting if they contain, recursively, a reference type. By using value types
@@ -236,7 +236,7 @@ bridged to NSArray, use ContiguousArray instead of Array:
   class C { ... }
   var a: ContiguousArray<C> = [C(...), C(...), ..., C(...)]
 
-Advice: Use inplace mutation instead of object-reassignment
+Advice: Use in-place mutation instead of object-reassignment
 -----------------------------------------------------------
 
 All standard library containers in Swift are value types that use COW
@@ -295,7 +295,7 @@ allowing the operation to wrap around is correct.
 Advice: Use wrapping integer arithmetic when you can prove that overflow cannot occur
 ---------------------------------------------------------------------------------------
 
-In performance-critical code you can use wrapping arithmetic to avoid overflow
+In performance-critical code, you can use wrapping arithmetic to avoid overflow
 checks if you know it is safe.
 
 .. code-block:: swift
@@ -418,7 +418,7 @@ semantics of the value remains.
 Advice: Use copy-on-write semantics for large values
 ----------------------------------------------------
 
-To eliminate the cost of copying large values adopt copy-on-write behavior.  The
+To eliminate the cost of copying large values, adopt copy-on-write behavior. The
 easiest way to implement copy-on-write is to compose existing copy-on-write data
 structures, such as Array. Swift arrays are values, but the content of the array
 is not copied around every time the array is passed as an argument because it
@@ -443,7 +443,7 @@ There are two obvious disadvantages of using Array for COW semantics. The first
 problem is that Array exposes methods like "append" and "count" that don't make
 any sense in the context of a value wrapper. These methods can make the use of
 the reference wrapper awkward. It is possible to work around this problem by
-creating a wrapper struct that will hide the unused APIs and the optimizer will
+creating a wrapper struct that will hide the unused APIs, and the optimizer will
 remove this overhead, but this wrapper will not solve the second problem.  The
 Second problem is that Array has code for ensuring program safety and
 interaction with Objective-C. Swift checks if indexed accesses fall within the
@@ -511,7 +511,7 @@ Advice: Use unmanaged references to avoid reference counting overhead
 ---------------------------------------------------------------------
 
 Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not a public API and will go
-away in the future. Therefore, don't use it in code that you can not change in
+away in the future. Therefore, don't use it in code that you cannot change in
 the future.
 
 In performance-critical code you can choose to use unmanaged references. The
@@ -519,7 +519,7 @@ In performance-critical code you can choose to use unmanaged references. The
 counting for a specific reference.
 
 When you do this, you need to make sure that there exists another reference to
-instance held by the ``Unmanaged`` struct instance for the duration of the use
+the instance held by the ``Unmanaged`` struct instance for the duration of the use
 of ``Unmanaged`` (see `Unmanaged.swift`_ for more details) that keeps the instance
 alive.
 
@@ -576,11 +576,11 @@ protocols as class-only protocols to get better runtime performance.
 The Cost of Let/Var when Captured by Escaping Closures
 ======================================================
 
-While one may think that the distinction in between let/var is just
+While one may think that the distinction between let/var is just
 about language semantics, there are also performance
 considerations. Remember that any time one creates a binding for a
 closure, one is forcing the compiler to emit an escaping closure,
-e.x.:
+e.g.:
 
 .. code-block:: swift
 
