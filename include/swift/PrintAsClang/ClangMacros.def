@@ -207,6 +207,15 @@ CLANG_MACRO_BODY("SWIFT_ENUM_TAG", \
     "#  define SWIFT_ENUM_TAG\n" \
     "# endif")
 
+CLANG_MACRO_BODY("SWIFT_ENUM_FWD_DECL", \
+    "# if (defined(__cplusplus) && __cplusplus >= 201103L) || " \
+    "     (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L) || " \
+    "     __has_feature(objc_fixed_enum)\n" \
+    "#  define SWIFT_ENUM_FWD_DECL(_type, _name) enum _name : _type _name;\n" \
+    "# else\n" \
+    "#  define SWIFT_ENUM_FWD_DECL(_type, _name) _type _name;\n" \
+    "# endif")
+
 CLANG_MACRO("SWIFT_UNAVAILABLE", , "__attribute__((unavailable))")
 CLANG_MACRO("SWIFT_UNAVAILABLE_MSG", "(msg)", "__attribute__((unavailable(msg)))")
 
