@@ -49,6 +49,17 @@ struct Holder {
   var c: C? = nil
 }
 
+// Generic non-Escapable for indirect values.
+struct GNE<T> : ~Escapable {
+  let t: T
+  @lifetime(borrow t)
+  init(t: borrowing T) { self.t = copy t }
+}  
+
+@_silgen_name("forward")
+@lifetime(copy arg)
+func forward<T>(_ arg: GNE<T>) -> GNE<T>
+
 @_silgen_name("getGeneric")
 @lifetime(borrow holder)
 func getGeneric<T: ~Escapable>(_ holder: borrowing Holder, _: T.Type) -> T
@@ -155,4 +166,27 @@ func testClosureCapture1(_ a: HasMethods) {
     // future-note  @-3{{this use causes the lifetime-dependent value to escape}}
     }
    */
+}
+
+// =============================================================================
+// Indirect ~Escapable results
+// =============================================================================
+
+@lifetime(copy arg1)
+func testIndirectForwardedResult<T>(arg1: GNE<T>) -> GNE<T> {
+  forward(arg1)
+}
+
+@lifetime(copy arg1)
+func testIndirectNonForwardedResult<T>(arg1: GNE<T>, arg2: GNE<T>) -> GNE<T> {
+  // expected-error @-1{{lifetime-dependent variable 'arg2' escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of argument 'arg2'}}
+  forward(arg2) // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+func testIndirectClosureResult<T>(f: () -> GNE<T>) -> GNE<T> {
+  f()
+  // expected-error @-1{{lifetime-dependent variable '$return_value' escapes its scope}}
+  // expected-note  @-3{{it depends on the lifetime of argument '$return_value'}}
+  // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
 }
