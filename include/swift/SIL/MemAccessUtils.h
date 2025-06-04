@@ -1606,6 +1606,7 @@ inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::UncheckedAddrCastInst:
   // Casting to RawPointer does not affect the AccessPath. When converting
@@ -1652,7 +1653,6 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::BeginBorrowInst:
-  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
 }
@@ -1686,6 +1686,22 @@ inline SILValue stripAccessAndIdentityCasts(SILValue v) {
 /// which we can't do if those operations are behind access projections.
 inline bool isAccessStorageCast(SingleValueInstruction *svi) {
   return isAccessStorageTypeCast(svi) || isAccessStorageIdentityCast(svi);
+}
+
+// Strip access markers and casts that preserve the access storage.
+//
+// Compare to stripAccessAndIdentityCasts.  This function strips cast that
+// change the type.
+inline SILValue stripAccessAndAccessStorageCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndAccessStorageCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageCast(svi)) {
+      return stripAccessAndAccessStorageCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
 }
 
 /// Abstract CRTP class for a visiting instructions that are part of the use-def

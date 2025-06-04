@@ -164,6 +164,20 @@ protected:
   bool visitStore(Operand *use) override { return recordUser(use->getUser()); }
 
   bool visitDestroy(Operand *use) override {
+    // An init_enum_data_addr is viewed as an "identity projection", rather than
+    // a proper projection like a struct_element_addr.  As a result, its
+    // destroys are passed directly to visitors.  But such addresses aren't
+    // quite equivalent to the original address.  Specifically, a destroy of an
+    // init_enum_data_addr cannot in general be replaced with a destroy of the
+    // whole enum.  The latter destroy is only equivalent to the former if there
+    // has been an `inject_enum_addr`.
+    //
+    // Handle a destroy of such a projection just like we handle the destroy of
+    // a struct_element_addr: by bailing out.
+    if (isa<InitEnumDataAddrInst>(
+            stripAccessAndAccessStorageCasts(use->get()))) {
+      return false;
+    }
     originalDestroys.insert(use->getUser());
     return true;
   }
