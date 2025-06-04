@@ -23,7 +23,7 @@ import Swift
 
 // .. Main Executor ............................................................
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   var threaded = false
 
@@ -43,7 +43,7 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   }
 }
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -57,7 +57,7 @@ extension DispatchMainExecutor: SerialExecutor {
   }
 }
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SchedulableExecutor {
   public var asSchedulable: SchedulableExecutor? {
     return self
@@ -85,12 +85,12 @@ extension DispatchMainExecutor: SchedulableExecutor {
   }
 }
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
                                          @unchecked Sendable {
   public init() {}
@@ -130,7 +130,7 @@ public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
 ///
 /// It is used to help convert instants and durations from arbitrary `Clock`s
 /// to Dispatch's time base.
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 protocol DispatchExecutorProtocol: Executor {
 
   /// Convert an `Instant` from the specified clock to a tuple identifying
@@ -158,7 +158,7 @@ enum DispatchClockID: CInt {
   case suspending = 2
 }
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchExecutorProtocol {
 
   func clamp(_ components: (seconds: Int64, attoseconds: Int64))
@@ -201,11 +201,11 @@ extension DispatchExecutorProtocol {
 
 }
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 }
 
-@available(SwiftStdlibCurrentOS 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: DispatchExecutorProtocol {
 }
 

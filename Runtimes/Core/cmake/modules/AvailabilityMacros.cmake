@@ -7,13 +7,13 @@ foreach(def ${availability_defs})
   add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -define-availability -Xfrontend \"${def}\">")
 
   if("${def}" MATCHES "SwiftStdlib .*")
-    # For each SwiftStdlib x.y, also define SwiftStdlibCurrentOS x.y, which,
+    # For each SwiftStdlib x.y, also define StdlibDeploymentTarget x.y, which,
     # will expand to the current `-target` platform if the macro defines a
     # newer platform as its availability.
     #
     # There is a setting, SwiftCore_ENABLE_STRICT_AVAILABILITY, which if set
     # ON will cause us to use the "proper" availability instead.
-    string(REPLACE "SwiftStdlib" "SwiftStdlibCurrentOS" current "${def}")
+    string(REPLACE "SwiftStdlib" "StdlibDeploymentTarget" current "${def}")
     if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND SwiftCore_SWIFT_AVAILABILITY_PLATFORM)
       if("${SwiftCore_SWIFT_AVAILABILITY_PLATFORM}" STREQUAL "macOS" AND "${SwiftCore_VARIANT_AVAILABILITY_PLATFORM}" STREQUAL "iOS")
         string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" ios_platform_version "${def}")
