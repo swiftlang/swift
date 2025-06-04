@@ -1640,6 +1640,12 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
+      if(sdk STREQUAL "OSX" AND SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION VERSION_LESS "10.15")
+        set(build_concurrency NO)
+      else()
+        set(build_concurrency YES)
+      endif()
+
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
@@ -1665,7 +1671,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
-          -DSwiftCore_ENABLE_CONCURRENCY=YES)
+          -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
