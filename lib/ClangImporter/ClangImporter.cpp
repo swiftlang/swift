@@ -682,6 +682,9 @@ void importer::getNormalInvocationArguments(
     }
   }
 
+  if (LangOpts.UseStaticStandardLibrary)
+    invocationArgStrs.push_back("-DSWIFT_STATIC_STDLIB");
+
   // If we support SendingArgsAndResults, set the -D flag to signal that it
   // is supported.
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
