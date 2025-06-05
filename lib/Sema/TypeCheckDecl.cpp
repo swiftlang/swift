@@ -3026,9 +3026,7 @@ AllMembersRequest::evaluate(
 }
 
 static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
-                                            NominalTypeDecl *nominal) {
-  bool isInferredType = false;
-
+                                      NominalTypeDecl *nominal) {
   if (!nominal->isGeneric()){
     return false;
   }
@@ -3047,15 +3045,12 @@ static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
       continue;
     }
 
-    if (!typealiasBoundGenericType->hasTypeParameter()) {
-      isInferredType = true;
-    } else {
-      isInferredType = false;
-      break;
+    if (typealiasBoundGenericType->hasTypeParameter()) {
+      return false;
     }
   }
 
-  return isInferredType;
+  return true;
 }
 
 bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
