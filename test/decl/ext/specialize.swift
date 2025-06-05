@@ -106,14 +106,14 @@ struct S12<T> {
 extension S12<Int>.A1 {
   func foo1() {
     let int: Int
-    let _: T = int // OK
+    let _: T = int
   }
 }
 
 extension S12.A2 {
   func foo2() {
     let int: Int
-    let _: T = int // OK
+    let _: T = int
   }
 }
 
