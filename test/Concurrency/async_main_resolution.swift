@@ -63,12 +63,12 @@ extension MainProtocol {
 #endif
 
 // CHECK-IS-SYNC-LABEL: "MyMain" interface_type="MyMain.Type"
-// CHECK-IS-SYNC: (func_decl {{.*}}implicit "$main()" interface_type="(MyMain.Type) -> () -> ()"
+// CHECK-IS-SYNC: (func_decl {{.*}}implicit range={{.*}} "$main()" interface_type="(MyMain.Type) -> () -> ()"
 // CHECK-IS-SYNC:       (declref_expr implicit type="(MyMain.Type) -> () -> ()"
 
 // CHECK-IS-ASYNC-LABEL: "MyMain" interface_type="MyMain.Type"
-// CHECK-IS-ASYNC: (func_decl {{.*}}implicit "$main()" interface_type="(MyMain.Type) -> () async -> ()"
+// CHECK-IS-ASYNC: (func_decl {{.*}}implicit range={{.*}} "$main()" interface_type="(MyMain.Type) -> () async -> ()"
 // CHECK-IS-ASYNC:       (declref_expr implicit type="(MyMain.Type) -> () async -> ()"
 
-// CHECK-IS-ERROR1: error: 'MyMain' is annotated with @main and must provide a main static function of type {{\(\) -> Void or \(\) throws -> Void|\(\) -> Void, \(\) throws -> Void, \(\) async -> Void, or \(\) async throws -> Void}}
+// CHECK-IS-ERROR1: error: 'MyMain' is annotated with '@main' and must provide a main static function of type {{\(\) -> Void or \(\) throws -> Void|\(\) -> Void, \(\) throws -> Void, \(\) async -> Void, or \(\) async throws -> Void}}
 // CHECK-IS-ERROR2: error: ambiguous use of 'main'

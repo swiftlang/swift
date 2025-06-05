@@ -18,6 +18,7 @@
 #include "CFTypeInfo.h"
 #include "ClangClassTemplateNamePrinter.h"
 #include "ClangDiagnosticConsumer.h"
+#include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
@@ -62,19 +63,26 @@ using namespace importer;
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
-static const char *getOperatorName(clang::OverloadedOperatorKind Operator) {
-  switch (Operator) {
+Identifier importer::getOperatorName(ASTContext &ctx,
+                                     clang::OverloadedOperatorKind op) {
+  switch (op) {
   case clang::OO_None:
   case clang::NUM_OVERLOADED_OPERATORS:
-    return nullptr;
-
+    return Identifier{};
 #define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
   case clang::OO_##Name:                                                       \
-    return #Name;
+    return ctx.getIdentifier("__operator" #Name);
 #include "clang/Basic/OperatorKinds.def"
   }
+}
 
-  llvm_unreachable("Invalid OverloadedOperatorKind!");
+Identifier importer::getOperatorName(ASTContext &ctx, Identifier op) {
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+  if (op.str() == Spelling)                                                    \
+    return ctx.getIdentifier("__operator" #Name);
+#include "clang/Basic/OperatorKinds.def"
+
+  return Identifier{};
 }
 
 /// Determine whether the given Clang selector matches the given
@@ -1870,15 +1878,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // imported into Swift to avoid having two types with the same name, which
   // cause subtle name lookup issues.
   if (swiftCtx.LangOpts.EnableCXXInterop &&
-      isUnavailableInSwift(D, nullptr, true)) {
-    auto loc = D->getEndLoc();
-    if (loc.isMacroID()) {
-      StringRef macroName =
-          clangSema.getPreprocessor().getImmediateMacroName(loc);
-      if (isCFOptionsMacro(macroName))
-        return ImportedName();
-    }
-  }
+      isUnavailableInSwift(D, nullptr, true) &&
+      isCFOptionsMacro(D, clangSema.getPreprocessor()))
+    return ImportedName();
 
   /// Whether the result is a function name.
   bool isFunction = false;
@@ -1960,10 +1962,19 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_GreaterEqual:
     case clang::OverloadedOperatorKind::OO_AmpAmp:
     case clang::OverloadedOperatorKind::OO_PipePipe: {
-      auto operatorName = isa<clang::CXXMethodDecl>(functionDecl)
-                              ? "__operator" + std::string{getOperatorName(op)}
-                              : clang::getOperatorSpelling(op);
-      baseName = swiftCtx.getIdentifier(operatorName).str();
+      // If the operator has a parameter that is an rvalue reference, it would
+      // cause name lookup collision with an overload that has lvalue reference
+      // parameter, if it exists.
+      for (auto paramDecl : functionDecl->parameters()) {
+        if (paramDecl->getType()->isRValueReferenceType())
+          return ImportedName();
+      }
+
+      auto operatorName =
+          isa<clang::CXXMethodDecl>(functionDecl)
+              ? getOperatorName(swiftCtx, op)
+              : swiftCtx.getIdentifier(clang::getOperatorSpelling(op));
+      baseName = operatorName.str();
       isFunction = true;
       addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
@@ -2258,11 +2269,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   if (auto classTemplateSpecDecl =
           dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
-    /// Symbolic specializations get imported as the symbolic class template
-    /// type.
-    if (importSymbolicCXXDecls)
-      return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
-                            version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
                                                        swiftCtx, this, version);

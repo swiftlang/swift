@@ -376,6 +376,19 @@ public:
   /// the given protocol.
   bool requiresProtocol(Type type, ProtocolDecl *proto) const;
 
+  /// Determine whether a conformance requirement of the given type to the
+  /// given protocol prohibits the use of an isolated conformance.
+  ///
+  /// The use of an isolated conformance to satisfy a requirement T: P is
+  /// prohibited when T is a type parameter and T, or some type that can be
+  /// used to reach T, also conforms to Sendable or SendableMetatype. In that
+  /// case, the conforming type and the protocol (Sendable or SendableMetatype)
+  /// is returned.
+  ///
+  /// If there is no such requirement, returns std::nullopt.
+  std::optional<std::pair<Type, ProtocolDecl *>>
+  prohibitsIsolatedConformance(Type type) const;
+
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type) const;
 
@@ -603,6 +616,23 @@ using GenericSignatureErrors = OptionSet<GenericSignatureErrorFlags>;
 /// above set of error flags.
 using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 3,
                                                        GenericSignatureErrors>;
+
+/// Build a generic signature from the given requirements, which are not
+/// required to be minimal or canonical, and may contain unresolved
+/// DependentMemberTypes. The generic signature is returned with the
+/// error flags (if any) that were raised while building the signature.
+///
+/// \param baseSignature if non-null, the new parameters and requirements
+///// are added on; existing requirements of the base signature might become
+///// redundant. Otherwise if null, build a new signature from scratch.
+/// \param allowInverses if true, default requirements to Copyable/Escapable are
+/// expanded for generic parameters.
+GenericSignatureWithError buildGenericSignatureWithError(
+    ASTContext &ctx,
+    GenericSignature baseSignature,
+    SmallVector<GenericTypeParamType *, 2> addedParameters,
+    SmallVector<Requirement, 2> addedRequirements,
+    bool allowInverses);
 
 } // end namespace swift
 

@@ -382,3 +382,30 @@ func acceptInt(_ x: Int) {}
 func postfixOpIsNotAMemberChain() {
   acceptInt(.implicit.another^)
 }
+
+// Ensure that base type doesn't get bound to a protocol type too eagerly
+do {
+  struct V : Hashable {
+    static let v1: V = V()
+    static let v2: V = V()
+  }
+
+  let _: Set = [V.v1, .v2] // Ok
+
+  struct Elements : RandomAccessCollection {
+    init() {}
+    init(_ elements: [Int]) {}
+
+    var startIndex: Int { 0 }
+    var endIndex: Int { 0 }
+    subscript(index: Int) -> Int { 0 }
+  }
+
+  struct TestNilCoalescing {
+    var data: Elements?
+
+    func test() {
+      for _ in self.data ?? .init() {} // Ok
+    }
+  }
+}

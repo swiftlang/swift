@@ -6791,6 +6791,17 @@ public:
   }
 };
 
+class VectorBaseAddrInst
+    : public UnaryInstructionBase<SILInstructionKind::VectorBaseAddrInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  VectorBaseAddrInst(SILDebugLocation debugLoc, SILValue vector, SILType resultTy)
+      : UnaryInstructionBase(debugLoc, vector, resultTy) {}
+public:
+  SILValue getVector() const { return getOperand(); }
+};
+
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst final : public InstructionBaseWithTrailingOperands<
                             SILInstructionKind::TupleInst, TupleInst,
@@ -7821,6 +7832,7 @@ public:
   }
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
+  void setAccessKind(OpenedExistentialAccess kind) { ForAccess = kind; }
 
   CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
@@ -8077,20 +8089,6 @@ class InitExistentialMetatypeInst final
          SILFunction *parent);
 
 public:
-  /// Return the object type which was erased.  That is, if this
-  /// instruction erases Decoder<T>.Type.Type to Printable.Type.Type,
-  /// this method returns Decoder<T>.
-  CanType getFormalErasedObjectType() const {
-    auto exType = getType().getASTType();
-    auto concreteType = getOperand()->getType().getASTType();
-    while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
-      exType = exMetatype->getExistentialInstanceType()->getCanonicalType();
-      concreteType = cast<MetatypeType>(concreteType).getInstanceType();
-    }
-    assert(exType.isExistentialType());
-    return concreteType;
-  }
-
   ArrayRef<ProtocolConformanceRef> getConformances() const;
 };
 
@@ -9592,6 +9590,14 @@ public:
   void setKeepUnique(bool keepUnique = true) {
     sharedUInt8().EndCOWMutationInst.keepUnique = keepUnique;
   }
+};
+class EndCOWMutationAddrInst
+    : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationAddrInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  EndCOWMutationAddrInst(SILDebugLocation debugLoc, SILValue address)
+      : UnaryInstructionBase(debugLoc, address) {}
 };
 
 /// Given an escaping closure return true iff it has a non-nil context and the

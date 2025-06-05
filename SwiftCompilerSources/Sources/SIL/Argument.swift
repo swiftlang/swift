@@ -34,9 +34,14 @@ public class Argument : Value, Hashable {
 
   public var isLexical: Bool { false }
 
-  public var varDecl: VarDecl? { bridged.getVarDecl().getAs(VarDecl.self) }
+  public func findVarDecl() -> VarDecl? {
+    if let varDecl = bridged.getVarDecl().getAs(VarDecl.self) {
+      return varDecl
+    }
+    return findVarDeclFromDebugUsers()
+  }
 
-  public var sourceLoc: SourceLoc? { varDecl?.nameLoc }
+  public var sourceLoc: SourceLoc? { findVarDecl()?.nameLoc }
 
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
@@ -54,6 +59,10 @@ final public class FunctionArgument : Argument {
 
   public override var isLexical: Bool {
     bridged.FunctionArgument_isLexical()
+  }
+
+  public var isClosureCapture: Bool {
+    bridged.FunctionArgument_isClosureCapture()
   }
 
   public var isSelf: Bool {
@@ -192,6 +201,22 @@ public struct Phi {
   }
 }
 
+extension Phi {
+  /// Return true of this phi is directly returned with no side effects between the phi and the return.
+  public var isReturnValue: Bool {
+    if let singleUse = value.uses.singleUse, let ret = singleUse.instruction as? ReturnInst,
+       ret.parentBlock == successor {
+      for inst in successor.instructions {
+        if inst.mayHaveSideEffects {
+          return false
+        }
+      }
+      return true
+    }
+    return false
+  }
+}
+
 extension Operand {
   public var forwardingBorrowedFromUser: BorrowedFromInst? {
     if let bfi = instruction as? BorrowedFromInst, index == 0 {
@@ -260,7 +285,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     if let paramIdx = parameterIndex(for: argumentIndex) {
       return convention.parameters[paramIdx].convention
     }
-    let resultInfo = convention.indirectSILResults[argumentIndex]
+    let resultInfo = convention.indirectSILResult(at: argumentIndex)
     return ArgumentConvention(result: resultInfo.convention)
   }
 
@@ -268,7 +293,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
     if parameterIndex(for: argumentIndex) != nil {
       return nil
     }
-    return convention.indirectSILResults[argumentIndex]
+    return convention.indirectSILResult(at: argumentIndex)
   }
 
   public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
@@ -587,19 +612,6 @@ public enum ArgumentConvention : CustomStringConvertible {
       return "packGuaranteed"
     case .packOut:
       return "packOut"
-    }
-  }
-}
-
-extension BeginAccessInst.AccessKind {
-  public func isCompatible(with convention: ArgumentConvention) -> Bool {
-    switch self {
-    case .`init`, .deinit:
-      return false
-    case .read:
-      return convention.isIndirectIn
-    case .modify:
-      return convention.isInout
     }
   }
 }

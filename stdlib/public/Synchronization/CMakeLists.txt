@@ -37,8 +37,13 @@ set(SWIFT_SYNCHRONIZATION_GYB_SOURCES
 
 set(SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES)
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-  set(SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES Darwin)
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # This library imports Darwin from the SDK, which re-exports
+  # _Builtin_float which is part of this build.
+  list(APPEND SWIFT_SYNCHRONIZATION_DARWIN_DEPENDENCIES _Builtin_float)
 endif()
 
 set(SWIFT_SYNCHRONIZATION_DARWIN_SOURCES
@@ -152,7 +157,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     if("${arch}" MATCHES "avr")
       continue()
     endif()
-    
+
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")

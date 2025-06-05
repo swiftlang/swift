@@ -19,6 +19,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -48,6 +49,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
     LLVM_FALLTHROUGH;
 
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyObjCMembers:
@@ -81,6 +83,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   switch (reason) {
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyObjCMembers:
@@ -132,6 +135,7 @@ void ObjCReason::describe(const Decl *D) const {
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
   case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyUnderscoreCDecl:
   case ObjCReason::ExplicitlyDynamic:
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyObjCMembers:
@@ -166,17 +170,19 @@ void ObjCReason::setAttrInvalid() const {
 static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                                Type T,
                                                SourceRange TypeRange,
-                                               DiagnosticBehavior behavior) {
+                                               DiagnosticBehavior behavior,
+                                               ObjCReason reason) {
   auto &diags = DC->getASTContext().Diags;
+  auto language = reason.getForeignLanguage();
 
   // Special diagnostic for tuples.
   if (T->is<TupleType>()) {
     if (T->isVoid())
-      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple)
+      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple, language)
           .highlight(TypeRange)
           .limitBehavior(behavior);
     else
-      diags.diagnose(TypeRange.Start, diag::not_objc_tuple)
+      diags.diagnose(TypeRange.Start, diag::not_objc_tuple, language)
           .highlight(TypeRange)
           .limitBehavior(behavior);
     return;
@@ -184,6 +190,12 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for classes.
   if (auto *CD = T->getClassOrBoundGenericClass()) {
+    if (language == ForeignLanguage::C) {
+      diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
+          .limitBehavior(behavior);
+      return;
+    }
+
     if (!CD->isObjC())
       diags.diagnose(TypeRange.Start, diag::not_objc_swift_class)
           .highlight(TypeRange)
@@ -195,12 +207,14 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   if (auto *SD = T->getStructOrBoundGenericStruct()) {
     if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
       // This can be a non-trivial C++ record.
-      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class)
+      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class,
+                     language)
           .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
-    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
+    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct,
+                   language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
     return;
@@ -216,6 +230,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for protocols and protocol compositions.
   if (T->isExistentialType()) {
+    // No protocol is representable in C.
+    if (language == ForeignLanguage::C) {
+      diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_protocols)
+          .limitBehavior(behavior);
+      return;
+    }
+
     if (T->isAny()) {
       // Any is not @objc.
       diags.diagnose(TypeRange.Start,
@@ -263,7 +284,8 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (T->is<ArchetypeType>() || T->isTypeParameter()) {
-    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
+    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param,
+                   language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
     return;
@@ -271,20 +293,23 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   if (auto fnTy = T->getAs<FunctionType>()) {
     if (fnTy->getExtInfo().isAsync()) {
-      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async,
+                     language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
       return;
     }
 
     if (fnTy->getExtInfo().isThrowing()) {
-      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing,
+                     language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
       return;
     }
 
-    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param)
+    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param,
+                   language)
       .highlight(TypeRange)
       .limitBehavior(behavior);
     return;
@@ -295,16 +320,19 @@ static void diagnoseFunctionParamNotRepresentable(
     const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
   auto behavior = behaviorLimitForObjCReason(Reason, AFD->getASTContext());
+  auto language = Reason.getForeignLanguage();
 
   if (NumParams == 1) {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
-                    getObjCDiagnosticAttrKind(Reason))
+                    AFD, getObjCDiagnosticAttrKind(Reason),
+                    language)
           .limitBehavior(behavior));
   } else {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_param_type,
-                    ParamIndex + 1, getObjCDiagnosticAttrKind(Reason))
+                    AFD, ParamIndex + 1, getObjCDiagnosticAttrKind(Reason),
+                    language)
           .limitBehavior(behavior));
   }
   SourceRange SR;
@@ -312,22 +340,24 @@ static void diagnoseFunctionParamNotRepresentable(
   if (P->hasAttachedPropertyWrapper()) {
     auto wrapperTy = P->getPropertyWrapperBackingPropertyType();
     SR = P->getOutermostAttachedPropertyWrapper()->getRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior);
+    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior, Reason);
   } else {
     if (auto typeRepr = P->getTypeRepr())
       SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR, behavior);
+    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR,
+                                       behavior, Reason);
   }
   Reason.describe(AFD);
 }
 
-static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                                           const ParameterList *PL,
-                                           ObjCReason Reason) {
+static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
+                                               const ParameterList *PL,
+                                               ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
+  auto language = Reason.getForeignLanguage();
   bool IsObjC = true;
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ++ParamIndex) {
@@ -337,7 +367,7 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
     if (param->isVariadic()) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
-                       getObjCDiagnosticAttrKind(Reason))
+                       AFD, getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -349,7 +379,8 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
     if (param->isInOut()) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
-                       getObjCDiagnosticAttrKind(Reason))
+                       AFD, getObjCDiagnosticAttrKind(Reason),
+                       language)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -362,11 +393,11 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
 
     if (param->hasAttachedPropertyWrapper()) {
       if (param->getPropertyWrapperBackingPropertyType()->isRepresentableIn(
-          ForeignLanguage::ObjectiveC,
+          language,
           const_cast<AbstractFunctionDecl *>(AFD)))
         continue;
     } else if (param->getTypeInContext()->isRepresentableIn(
-          ForeignLanguage::ObjectiveC,
+          language,
           const_cast<AbstractFunctionDecl *>(AFD))) {
       continue;
     }
@@ -401,19 +432,20 @@ static bool checkObjCWithGenericParams(const ValueDecl *VD, ObjCReason Reason) {
   assert(GC);
   if (GC->getGenericParams()) {
     softenIfAccessNote(VD, Reason.getAttr(),
-      VD->diagnose(diag::objc_invalid_with_generic_params,
-                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
-          .limitBehavior(behavior));
+                       VD->diagnose(diag::objc_invalid_with_generic_params, VD,
+                                    getObjCDiagnosticAttrKind(Reason))
+                           .limitBehavior(behavior));
     Reason.describe(VD);
 
     return true;
   }
 
   if (GC->getTrailingWhereClause()) {
-    softenIfAccessNote(VD, Reason.getAttr(),
-      VD->diagnose(diag::objc_invalid_with_generic_requirements,
-                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
-          .limitBehavior(behavior));
+    softenIfAccessNote(
+        VD, Reason.getAttr(),
+        VD->diagnose(diag::objc_invalid_with_generic_requirements, VD,
+                     getObjCDiagnosticAttrKind(Reason))
+            .limitBehavior(behavior));
     Reason.describe(VD);
 
     return true;
@@ -448,9 +480,8 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
     break;
 
   case ClassDecl::ForeignKind::RuntimeOnly:
-    VD->diagnose(diag::objc_in_objc_runtime_visible,
-                 VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                 clazz->getName())
+    VD->diagnose(diag::objc_in_objc_runtime_visible, VD,
+                 getObjCDiagnosticAttrKind(Reason), clazz)
         .limitBehavior(behavior);
     Reason.describe(VD);
     break;
@@ -586,8 +617,7 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           softenIfAccessNote(value, reason.getAttr(),
                              value
                                  ->diagnose(diag::objc_in_resilient_extension,
-                                            value->getDescriptiveKind(),
-                                            ancestor->getName(),
+                                            value, ancestor,
                                             ctx.getTargetAvailabilityDomain(),
                                             stubAvailability)
                                  .limitBehavior(behavior));
@@ -646,14 +676,14 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
-bool swift::isRepresentableInObjC(
+bool swift::isRepresentableInLanguage(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention) {
   auto abiRole = ABIRoleInfo(AFD);
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
-    return isRepresentableInObjC(abiRole.getCounterpart(), Reason,
-                                 asyncConvention, errorConvention);
+    return isRepresentableInLanguage(abiRole.getCounterpart(), Reason,
+                                     asyncConvention, errorConvention);
 
   // Clear out the async and error conventions. They will be added later if
   // needed.
@@ -663,7 +693,7 @@ bool swift::isRepresentableInObjC(
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
-
+  auto language = Reason.getForeignLanguage();
 
   if (checkObjCInForeignClassContext(AFD, Reason))
     return false;
@@ -689,6 +719,7 @@ bool swift::isRepresentableInObjC(
     auto storage = accessor->getStorage();
     bool storageIsObjC = storage->isObjC()
         || Reason == ObjCReason::ExplicitlyCDecl
+        || Reason == ObjCReason::ExplicitlyUnderscoreCDecl
         || Reason == ObjCReason::WitnessToObjC
         || Reason == ObjCReason::MemberOfObjCProtocol;
 
@@ -698,8 +729,7 @@ bool swift::isRepresentableInObjC(
       // willSet/didSet implementations are never exposed to objc, they are
       // always directly dispatched from the synthesized setter.
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
-                            diag::objc_observing_accessor,
-                            accessor->getDescriptiveKind())
+                            diag::objc_observing_accessor, accessor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;
@@ -775,9 +805,9 @@ bool swift::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamListRepresentableInObjC(AFD,
-                                      AFD->getParameters(),
-                                      Reason)) {
+      !isParamListRepresentableInLanguage(AFD,
+                                          AFD->getParameters(),
+                                          Reason)) {
     return false;
   }
 
@@ -787,15 +817,16 @@ bool swift::isRepresentableInObjC(
         !ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
-        !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
+        !ResultType->isRepresentableIn(language,
                                        const_cast<FuncDecl *>(FD))) {
       softenIfAccessNote(AFD, Reason.getAttr(),
        AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                      getObjCDiagnosticAttrKind(Reason))
+                     FD, getObjCDiagnosticAttrKind(Reason),
+                     language)
             .limitBehavior(behavior));
       diagnoseTypeNotRepresentableInObjC(FD, ResultType,
                                          FD->getResultTypeSourceRange(),
-                                         behavior);
+                                         behavior, Reason);
       Reason.describe(FD);
       return false;
     }
@@ -807,9 +838,9 @@ bool swift::isRepresentableInObjC(
     auto FD = dyn_cast<FuncDecl>(AFD);
     if (!FD) {
       softenIfAccessNote(AFD, Reason.getAttr(),
-        AFD->diagnose(diag::not_objc_function_async, AFD->getDescriptiveKind())
-          .highlight(AFD->getAsyncLoc())
-          .limitBehavior(behavior));
+                         AFD->diagnose(diag::not_objc_function_async, AFD)
+                             .highlight(AFD->getAsyncLoc())
+                             .limitBehavior(behavior));
       Reason.describe(AFD);
 
       return false;
@@ -844,15 +875,15 @@ bool swift::isRepresentableInObjC(
       completionHandlerParams.push_back(AnyFunctionType::Param(type));
 
       // Make sure that the parameter type is representable in Objective-C.
-      if (!type->isRepresentableIn(
-              ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
+      if (!type->isRepresentableIn(language, const_cast<FuncDecl *>(FD))) {
         softenIfAccessNote(AFD, Reason.getAttr(),
           AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                        getObjCDiagnosticAttrKind(Reason))
+                        FD, getObjCDiagnosticAttrKind(Reason),
+                        language)
               .limitBehavior(behavior));
         diagnoseTypeNotRepresentableInObjC(FD, type,
                                            FD->getResultTypeSourceRange(),
-                                           behavior);
+                                           behavior, Reason);
         Reason.describe(FD);
 
         return true;
@@ -1141,9 +1172,8 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // to mark them as @objc
   if (VD->getEffectfulGetAccessor()) {
     softenIfAccessNote(VD, Reason.getAttr(),
-      VD->diagnose(diag::effectful_not_representable_objc,
-                   VD->getDescriptiveKind())
-          .limitBehavior(behavior));
+                       VD->diagnose(diag::effectful_not_representable_objc, VD)
+                           .limitBehavior(behavior));
     Reason.describe(VD);
     return false;
   }
@@ -1160,7 +1190,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
           .limitBehavior(behavior));
     diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
                                        VD->getInterfaceType(),
-                                       TypeRange, behavior);
+                                       TypeRange, behavior, Reason);
     Reason.describe(VD);
   }
 
@@ -1188,19 +1218,18 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // to mark them as @objc
   if (SD->getEffectfulGetAccessor()) {
     softenIfAccessNote(SD, Reason.getAttr(),
-      SD->diagnose(diag::effectful_not_representable_objc,
-                   SD->getDescriptiveKind())
-          .limitBehavior(behavior));
+                       SD->diagnose(diag::effectful_not_representable_objc, SD)
+                           .limitBehavior(behavior));
     Reason.describe(SD);
     return false;
   }
 
   // ObjC doesn't support class subscripts.
   if (!SD->isInstanceMember()) {
-    softenIfAccessNote(SD, Reason.getAttr(),
-      SD->diagnose(diag::objc_invalid_on_static_subscript,
-                   SD->getDescriptiveKind(), Reason)
-          .limitBehavior(behavior));
+    softenIfAccessNote(
+        SD, Reason.getAttr(),
+        SD->diagnose(diag::objc_invalid_on_static_subscript, SD, Reason)
+            .limitBehavior(behavior));
     Reason.describe(SD);
     Reason.setAttrInvalid();
     return true;
@@ -1249,7 +1278,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
                                        !IndexResult ? IndexType
                                                     : ElementType,
-                                       TypeRange, behavior);
+                                       TypeRange, behavior, Reason);
     Reason.describe(SD);
   }
 
@@ -1264,8 +1293,9 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     std::optional<ForeignAsyncConvention> asyncConvention;
     std::optional<ForeignErrorConvention> errorConvention;
-    return isRepresentableInObjC(func, ObjCReason::MemberOfObjCMembersClass,
-                                 asyncConvention, errorConvention);
+    return isRepresentableInLanguage(func,
+                                     ObjCReason::MemberOfObjCMembersClass,
+                                     asyncConvention, errorConvention);
   }
 
   if (auto var = dyn_cast<VarDecl>(decl))
@@ -1629,18 +1659,18 @@ static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
       .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
                    suggestFinal ? "final " : "@nonobjc ");
 
-    VD->diagnose(diag::make_decl_objc, VD->getDescriptiveKind())
-      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+    VD->diagnose(diag::make_decl_objc, VD)
+        .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
   } else {
     ASSERT(currentlyObjC.has_value());
 
     VD->diagnose(diag::objc_implementation_will_become_nonobjc, VD)
       .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
 
-    VD->diagnose(diag::fixit_add_nonobjc_or_final_for_objc_implementation,
-                 VD->getDescriptiveKind(), suggestFinal)
-      .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
-                   suggestFinal ? "final " : "@nonobjc ");
+    VD->diagnose(diag::fixit_add_nonobjc_or_final_for_objc_implementation, VD,
+                 suggestFinal)
+        .fixItInsert(VD->getAttributeInsertionLoc(suggestFinal),
+                     suggestFinal ? "final " : "@nonobjc ");
   }
 
   implAttr->setHasInvalidImplicitLangAttrs();
@@ -1653,8 +1683,7 @@ static void diagnoseInvalidObjCName(ValueDecl *VD, ObjCAttr *attr) {
   if (attr && !attr->getNameLocs().empty()) {
     // Locate the diagnostic on the name itself if it was explicitly provided.
     VD->getDiags().diagnose(attr->getNameLocs().front(),
-                            diag::objc_name_not_valid_identifier,
-                            VD->getDescriptiveKind());
+                            diag::objc_name_not_valid_identifier, VD);
   } else {
     switch (VD->getDescriptiveKind()) {
     case DescriptiveDeclKind::Getter:
@@ -1665,8 +1694,7 @@ static void diagnoseInvalidObjCName(ValueDecl *VD, ObjCAttr *attr) {
       // diagnostics for the getter/setter.
       break;
     default:
-      VD->diagnose(diag::objc_cannot_infer_name_raw_identifier,
-                   VD->getDescriptiveKind());
+      VD->diagnose(diag::objc_cannot_infer_name_raw_identifier, VD);
     }
   }
 }
@@ -1839,9 +1867,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
           proto->diagnose(diag::objc_protocol_inherits_non_objc_protocol,
                           proto->getDeclaredInterfaceType(),
                           inherited->getDeclaredInterfaceType());
-          inherited->diagnose(diag::kind_declname_declared_here,
-                              DescriptiveDeclKind::Protocol,
-                              inherited->getName());
+          inherited->diagnose(diag::decl_declared_here_with_kind, inherited);
           isObjC = std::nullopt;
         }
       }
@@ -1873,7 +1899,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   } else if (isa<DestructorDecl>(VD)) {
     // Destructors need no additional checking.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
-    if (!isRepresentableInObjC(
+    if (!isRepresentableInLanguage(
             func, *isObjC, asyncConvention, errorConvention)) {
       isObjC->setAttrInvalid();
       return false;
@@ -3938,9 +3964,9 @@ private:
     }
 
     case MatchOutcome::WrongStaticness: {
-      auto diag = diagnose(cand,
-                           diag::objc_implementation_class_or_instance_mismatch,
-                           cand, req->getDescriptiveKind());
+      auto diag =
+          diagnose(cand, diag::objc_implementation_class_or_instance_mismatch,
+                   cand, req);
       fixDeclarationStaticSpelling(diag, cand, getStaticSpelling(req));
       return;
     }
@@ -3953,8 +3979,7 @@ private:
       return;
 
     case MatchOutcome::WrongDeclKind:
-      diagnose(cand, diag::objc_implementation_wrong_decl_kind,
-               cand, req->getDescriptiveKind());
+      diagnose(cand, diag::objc_implementation_wrong_decl_kind, cand, req);
       return;
 
     case MatchOutcome::WrongType:
@@ -3963,17 +3988,16 @@ private:
       return;
 
     case MatchOutcome::WrongWritability:
-      diagnose(cand, diag::objc_implementation_must_be_settable,
-               cand, req->getDescriptiveKind());
+      diagnose(cand, diag::objc_implementation_must_be_settable, cand, req);
       return;
 
     case MatchOutcome::WrongRequiredAttr: {
       bool shouldBeRequired = cast<ConstructorDecl>(req)->isRequired();
 
       auto diag =
-        diagnose(cand, diag::objc_implementation_required_attr_mismatch,
-                 cand, req->getDescriptiveKind(),  shouldBeRequired);
-      
+          diagnose(cand, diag::objc_implementation_required_attr_mismatch, cand,
+                   req, shouldBeRequired);
+
       if (shouldBeRequired)
         diag.fixItInsert(cand->getAttributeInsertionLoc(/*forModifier=*/true),
                          "required ");
@@ -4048,18 +4072,46 @@ private:
 
 public:
   void diagnoseUnmatchedRequirements() {
+    auto ext = dyn_cast<ExtensionDecl>(decl);
+    if (!ext)
+      return;
+
+    llvm::SmallString<128> stubs;
+    llvm::raw_svector_ostream stubStream(stubs);
+
+    unsigned numEmitted = 0;
+
     for (auto req : unmatchedRequirements) {
       // Ignore `@optional` protocol requirements.
       if (isOptionalObjCProtocolRequirement(req))
         continue;
 
-      auto ext = cast<IterableDeclContext>(req->getDeclContext()->getAsDecl())
-                        ->getImplementationContext();
+      if (numEmitted == 0) {
+        // Emit overall diagnostic for all the notes to attach to.
+        diagnose(ext, diag::objc_implementation_missing_impls,
+                 getCategoryName(req->getDeclContext()));
+      }
 
-      diagnose(ext->getDecl(), diag::objc_implementation_missing_impl,
-               getCategoryName(req->getDeclContext()), req);
+      numEmitted += 1;
 
-      // FIXME: Should give fix-it to add stub implementation
+      // Emit different diagnostic if there's an async alternative.
+      if (auto asyncAlternative = getAsyncAlternative(req)) {
+        diagnose(ext, diag::objc_implementation_missing_impl_either,
+                 asyncAlternative, req);
+        req = asyncAlternative;
+      } else {
+        diagnose(ext, diag::objc_implementation_missing_impl, req);
+      }
+
+      // Append stub for this requirement into eventual fix-it.
+      swift::printRequirementStub(req, ext, ext->getSelfInterfaceType(),
+                                  ext->getStartLoc(), stubStream,
+                                  /*objCAttr=*/true);
+    }
+
+    if (!stubs.empty()) {
+      diagnose(ext, diag::objc_implementation_missing_impls_fixit, numEmitted)
+        .fixItInsertAfter(ext->getBraces().Start, stubs);
     }
   }
 
@@ -4080,9 +4132,8 @@ public:
                cand, cand->getDeclContext()->getSelfClassDecl());
 
       if (canBeRepresentedInObjC(cand)) {
-        auto diagnostic =
-            diagnose(cand, diag::fixit_add_private_for_objc_implementation,
-                     cand->getDescriptiveKind());
+        auto diagnostic = diagnose(
+            cand, diag::fixit_add_private_for_objc_implementation, cand);
         if (auto modifier = cand->getAttrs().getAttribute<AccessControlAttr>())
           diagnostic.fixItReplace(modifier->getRange(), "private");
         else
@@ -4093,7 +4144,7 @@ public:
       // Initializers can't be 'final', but they can be '@nonobjc'
       bool suggestFinal = !isa<ConstructorDecl>(cand);
       diagnose(cand, diag::fixit_add_nonobjc_or_final_for_objc_implementation,
-               cand->getDescriptiveKind(), suggestFinal)
+               cand, suggestFinal)
           .fixItInsert(cand->getAttributeInsertionLoc(suggestFinal),
                        suggestFinal ? "final " : "@nonobjc ");
     }
@@ -4153,4 +4204,36 @@ evaluate(Evaluator &evaluator, Decl *D) const {
   checker.diagnoseEarlyAdopterDeprecation();
 
   return evaluator::SideEffect();
+}
+
+evaluator::SideEffect
+TypeCheckCDeclAttributeRequest::evaluate(Evaluator &evaluator,
+                                         FuncDecl *FD,
+                                         CDeclAttr *attr) const {
+  auto &ctx = FD->getASTContext();
+
+  auto lang = FD->getCDeclKind();
+  assert(lang && "missing @cdecl?");
+  auto kind = lang == ForeignLanguage::ObjectiveC
+                      ? ObjCReason::ExplicitlyUnderscoreCDecl
+                      : ObjCReason::ExplicitlyCDecl;
+  ObjCReason reason(kind, attr);
+
+  std::optional<ForeignAsyncConvention> asyncConvention;
+  std::optional<ForeignErrorConvention> errorConvention;
+  if (isRepresentableInLanguage(FD, reason, asyncConvention, errorConvention)) {
+    if (FD->hasAsync()) {
+      FD->setForeignAsyncConvention(*asyncConvention);
+      ctx.Diags.diagnose(attr->getLocation(), diag::attr_decl_async,
+                         attr, FD);
+    } else if (FD->hasThrows()) {
+      FD->setForeignErrorConvention(*errorConvention);
+      ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_throws,
+                         attr);
+    }
+  } else {
+    reason.setAttrInvalid();
+  }
+
+  return {};
 }

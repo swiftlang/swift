@@ -250,7 +250,7 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName) {
   return new (cContext.unbridged())
       CDeclAttr(cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
-                /*Implicit=*/false);
+                /*Implicit=*/false, /*Underscored*/true);
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(
@@ -470,10 +470,12 @@ unbridged(BridgedParsedLifetimeDependenceKind kind) {
   switch (kind) {
   case BridgedParsedLifetimeDependenceKindDefault:
     return swift::ParsedLifetimeDependenceKind::Default;
-  case BridgedParsedLifetimeDependenceKindScope:
-    return swift::ParsedLifetimeDependenceKind::Scope;
+  case BridgedParsedLifetimeDependenceKindBorrow:
+    return swift::ParsedLifetimeDependenceKind::Borrow;
   case BridgedParsedLifetimeDependenceKindInherit:
     return swift::ParsedLifetimeDependenceKind::Inherit;
+  case BridgedParsedLifetimeDependenceKindInout:
+    return swift::ParsedLifetimeDependenceKind::Inout;
   }
   llvm_unreachable("unhandled enum value");
 }
@@ -625,12 +627,45 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
       NonSendableAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
+static NonIsolatedModifier unbridged(BridgedNonIsolatedModifier modifier) {
+  switch (modifier) {
+  case BridgedNonIsolatedModifierNone:
+    return NonIsolatedModifier::None;
+  case BridgedNonIsolatedModifierUnsafe:
+    return NonIsolatedModifier::Unsafe;
+  case BridgedNonIsolatedModifierNonSending:
+    return NonIsolatedModifier::NonSending;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange, bool isUnsafe) {
+                                    BridgedSourceRange cRange,
+                                    BridgedNonIsolatedModifier modifier) {
   return new (cContext.unbridged()) NonisolatedAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), isUnsafe, /*implicit=*/false);
+      cAtLoc.unbridged(), cRange.unbridged(), unbridged(modifier),
+      /*implicit=*/false);
+}
+
+static InheritActorContextModifier
+unbridged(BridgedInheritActorContextModifier modifier) {
+  switch (modifier) {
+  case BridgedInheritActorContextModifierNone:
+    return InheritActorContextModifier::None;
+  case BridgedInheritActorContextModifierAlways:
+    return InheritActorContextModifier::Always;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedInheritActorContextAttr BridgedInheritActorContextAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedInheritActorContextModifier modifier) {
+  return new (cContext.unbridged()) InheritActorContextAttr(
+      cAtLoc.unbridged(), cRange.unbridged(), unbridged(modifier),
+      /*implicit=*/false);
 }
 
 BridgedObjCAttr
@@ -807,9 +842,9 @@ static SpecializeAttr::SpecializationKind
 unbridge(BridgedSpecializationKind kind) {
   switch (kind) {
   case BridgedSpecializationKindFull:
-    return SpecializeAttr::SpecializationKind::Full;
+    return AbstractSpecializeAttr::SpecializationKind::Full;
   case BridgedSpecializationKindPartial:
-    return SpecializeAttr::SpecializationKind::Partial;
+    return AbstractSpecializeAttr::SpecializationKind::Partial;
   }
   llvm_unreachable("unhandled kind");
 }
@@ -828,6 +863,25 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     availableAttrs.push_back(bridging.unbridged());
 
   return SpecializeAttr::create(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
+      cWhereClause.unbridged(), exported, unbridge(cKind),
+      cTargetFunction.unbridged(), spiGroups, availableAttrs);
+}
+
+BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
+    bool exported, BridgedSpecializationKind cKind,
+    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
+  SmallVector<Identifier, 2> spiGroups;
+  for (auto bridging : cSPIGroups.unbridged<BridgedIdentifier>())
+    spiGroups.push_back(bridging.unbridged());
+  SmallVector<AvailableAttr *, 2> availableAttrs;
+  for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
+    availableAttrs.push_back(bridging.unbridged());
+
+  return SpecializedAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       cWhereClause.unbridged(), exported, unbridge(cKind),
       cTargetFunction.unbridged(), spiGroups, availableAttrs);
@@ -883,22 +937,4 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
   return new (cContext.unbridged())
       UnavailableFromAsyncAttr(cMessage.unbridged(), cAtLoc.unbridged(),
                                cRange.unbridged(), /*implicit=*/false);
-}
-
-static ExecutionKind unbridged(BridgedExecutionKind kind) {
-  switch (kind) {
-  case BridgedExecutionKindConcurrent:
-    return ExecutionKind::Concurrent;
-  case BridgedExecutionKindCaller:
-    return ExecutionKind::Caller;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
-BridgedExecutionAttr BridgedExecutionAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc atLoc,
-    BridgedSourceRange range, BridgedExecutionKind behavior) {
-  return new (cContext.unbridged())
-      ExecutionAttr(atLoc.unbridged(), range.unbridged(),
-                    unbridged(behavior), /*implicit=*/false);
 }

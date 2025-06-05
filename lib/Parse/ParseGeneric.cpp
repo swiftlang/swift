@@ -351,6 +351,8 @@ ParserStatus Parser::parseGenericWhereClause(
         if (!AllowLayoutConstraints && !isInSILMode()) {
           diagnose(LayoutLoc,
                    diag::layout_constraints_only_inside_specialize_attr);
+          Status.setIsParseError();
+          break;
         } else {
           // Add the layout requirement.
           Requirements.push_back(RequirementRepr::getLayoutConstraint(

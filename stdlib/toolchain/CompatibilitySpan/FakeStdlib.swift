@@ -59,11 +59,26 @@ internal func _overrideLifetime<
   dependent
 }
 
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(&source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T,
+  mutating source: inout U
+) -> T {
+  dependent
+}
+
 extension Range {
-    @_alwaysEmitIntoClient
-	internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
-	    self.init(uncheckedBounds: bounds)
-	}
+  @unsafe
+  @_alwaysEmitIntoClient
+  internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
+    self.init(uncheckedBounds: bounds)
+  }
 }
 
 extension Optional {

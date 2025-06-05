@@ -91,6 +91,11 @@ static llvm::StructType *createStructType(IRGenModule &IGM,
                                   name, packed);
 }
 
+llvm::StructType *IRGenModule::createTransientStructType(
+    StringRef name, std::initializer_list<llvm::Type *> types, bool packed) {
+  return createStructType(*this, name, types, packed);
+}
+
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                       llvm::LLVMContext &LLVMContext,
                                                       const IRGenOptions &Opts,
@@ -187,9 +192,8 @@ static void checkPointerAuthAssociatedTypeDiscriminator(IRGenModule &IGM, ArrayR
   auto &schema = IGM.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions;
   if (!schema.isEnabled()) return;
 
-  auto decl = dyn_cast_or_null<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
-  assert(decl && "decl not found");
-  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, AssociatedType(decl));
+  auto decl = cast<AssociatedTypeDecl>(lookupSimple(IGM.getSwiftModule(), declPath));
+  auto discriminator = PointerAuthInfo::getOtherDiscriminator(IGM, schema, decl);
   assert(discriminator->getZExtValue() == expected && "discriminator value doesn't match");
 }
 
@@ -705,7 +709,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
-    IntPtrTy              // Task.Status
   });
 
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
@@ -1167,10 +1170,15 @@ llvm::Constant *swift::getRuntimeFn(
 
     if (IGM && useDllStorage(IGM->Triple) && IsExternal) {
       bool bIsImported = true;
+      swift::ASTContext &Context = IGM->Context;
       if (IGM->getSwiftModule()->getPublicModuleName(true).str() == ModuleName)
         bIsImported = false;
-      else if (ModuleDecl *MD = IGM->Context.getModuleByName(ModuleName))
+      else if (ModuleDecl *MD = Context.getModuleByName(ModuleName))
         bIsImported = !MD->isStaticLibrary();
+      else if (strcmp(ModuleName, "BlocksRuntime") == 0)
+        bIsImported =
+            !static_cast<ClangImporter *>(Context.getClangModuleLoader())
+                ->getCodeGenOpts().StaticClosure;
 
       if (bIsImported)
         fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
@@ -1230,9 +1238,9 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
 }
 
 llvm::Constant *IRGenModule::
-    getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer() {
+    getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
-             LinkEntity::forKnownAsyncFunctionPointer(
+             LinkEntity::forKnownCoroFunctionPointer(
                  "swift_deletedCalleeAllocatedCoroutineMethodError"))
       .getValue();
 }

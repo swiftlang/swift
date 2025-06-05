@@ -19,6 +19,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
@@ -224,9 +225,6 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::STRICT_MEMORY_SAFETY:
       extendedInfo.setStrictMemorySafety(true);
       break;
-    case options_block::EXTENSIBLE_ENUMS:
-      extendedInfo.setSupportsExtensibleEnums(true);
-      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -394,7 +392,7 @@ static ValidationInfo validateControlBlock(
       // env var is set (for testing).
       static const char* forceDebugPreSDKRestriction =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_PER_SDK");
-      if (!version::isCurrentCompilerTagged() &&
+      if (version::getCurrentCompilerSerializationTag().empty() &&
           !forceDebugPreSDKRestriction) {
         break;
       }
@@ -435,10 +433,12 @@ static ValidationInfo validateControlBlock(
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
       StringRef moduleRevision = blobData;
+      StringRef serializationTag =
+          version::getCurrentCompilerSerializationTag();
       if (forcedDebugRevision ||
-          (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
-        StringRef compilerRevision = forcedDebugRevision ?
-          forcedDebugRevision : version::getCurrentCompilerSerializationTag();
+          (requiresRevisionMatch && !serializationTag.empty())) {
+        StringRef compilerRevision =
+            forcedDebugRevision ? forcedDebugRevision : serializationTag;
         if (moduleRevision != compilerRevision) {
           // The module versions are mismatching, record it and diagnose later.
           result.problematicRevision = moduleRevision;
@@ -697,23 +697,19 @@ std::string ModuleFileSharedCore::Dependency::getPrettyPrintedPath() const {
 }
 
 void ModuleFileSharedCore::fatal(llvm::Error error) const {
-  llvm::SmallString<0> errorStr;
-  llvm::raw_svector_ostream out(errorStr);
-
-  out << "*** DESERIALIZATION FAILURE ***\n";
-  out << "*** If any module named here was modified in the SDK, please delete the ***\n";
-  out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
-  outputDiagnosticInfo(out);
-  out << "\n";
-  if (error) {
-    handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
-      ei.log(out);
-      out << "\n";
-    });
-  }
-
-  llvm::PrettyStackTraceString trace(errorStr.c_str());
-  abort();
+  ABORT([&](auto &out) {
+    out << "*** DESERIALIZATION FAILURE ***\n";
+    out << "*** If any module named here was modified in the SDK, please delete the ***\n";
+    out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
+    outputDiagnosticInfo(out);
+    out << "\n";
+    if (error) {
+      handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
+        ei.log(out);
+        out << "\n";
+      });
+    }
+  });
 }
 
 void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
@@ -1508,7 +1504,6 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
-      Bits.SupportsExtensibleEnums = extInfo.supportsExtensibleEnums();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

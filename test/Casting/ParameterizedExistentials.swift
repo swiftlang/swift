@@ -46,7 +46,10 @@ struct GenericHolder<T>: Holder {
   init(value: T) { self.value = value}
 }
 
-protocol PairType<T, U> {
+protocol PairType<
+  T,
+  U,
+> {
   associatedtype T
   associatedtype U
 

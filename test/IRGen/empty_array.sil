@@ -15,11 +15,11 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-32-LABEL: define{{( protected)?}} void @empty_array(%swift.opaque* noalias nocapture) {{.*}} {
+// CHECK-32-LABEL: define{{( protected)?}} void @empty_array(%swift.opaque* noalias {{(nocapture|captures\(none\))}}) {{.*}} {
 // CHECK-32:         %1 = bitcast %swift.opaque* %0 to i8*
 // CHECK-32:         %2 = getelementptr inbounds i8, i8* %1, i32 0
 
-// CHECK-64-LABEL: define{{( protected)?}} void @empty_array(%swift.opaque* noalias nocapture) {{.*}} {
+// CHECK-64-LABEL: define{{( protected)?}} void @empty_array(%swift.opaque* noalias {{(nocapture|captures\(none\))}}) {{.*}} {
 // CHECK-64:         %1 = bitcast %swift.opaque* %0 to i8*
 // CHECK-64:         %2 = getelementptr inbounds i8, i8* %1, i64 0
 

@@ -145,7 +145,7 @@ public:
     if (!hasOneNonDebugUse(next))
       return false;
 
-    assert(rest.empty() || getSingleNonDebugUser(rest.back()) == next);
+    assert(rest.empty() || getSingleNonDebugUser(next) == rest.back());
     rest.push_back(next);
     return true;
   }
@@ -216,23 +216,6 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
     }
   }
 
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
-  // These are always safe to perform due to interior pointer ownership
-  // requirements being transitive along addresses.
-
-  Builder.setCurrentDebugScope(UADCI->getDebugScope());
-
-  // (unchecked_addr_cast (unchecked_addr_cast x X->Y) Y->Z)
-  //   ->
-  // (unchecked_addr_cast x X->Z)
-  if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
-    return Builder.createUncheckedAddrCast(UADCI->getLoc(),
-                                           OtherUADCI->getOperand(),
-                                           UADCI->getType());
   return nullptr;
 }
 

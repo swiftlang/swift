@@ -131,7 +131,7 @@ extension AddressUseVisitor {
          is DestroyAddrInst, is DeallocStackInst, 
          is DeinitExistentialAddrInst,
          is IsUniqueInst, is MarkFunctionEscapeInst,
-         is PackElementSetInst:
+         is PackElementSetInst, is EndCOWMutationAddrInst:
       return leafAddressUse(of: operand)
 
     case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
@@ -159,7 +159,7 @@ extension AddressUseVisitor {
            .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
-           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer,
+           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer, .PrepareInitialization,
            .GetEnumTag, .InjectEnumTag:
         return leafAddressUse(of: operand)
       default:
@@ -501,6 +501,11 @@ enum AddressOwnershipLiveRange : CustomStringConvertible {
     }
   }
 
+  /// Return the live range of the addressable value that reaches 'begin', not including 'begin', which may itself be an
+  /// access of the address.
+  ///
+  /// The range ends at the destroy or reassignment of the addressable value.
+  ///
   /// Return nil if the live range is unknown.
   static func compute(for address: Value, at begin: Instruction,
                       _ localReachabilityCache: LocalVariableReachabilityCache,
@@ -624,7 +629,7 @@ extension AddressOwnershipLiveRange {
     var reachableUses = Stack<LocalVariableAccess>(context)
     defer { reachableUses.deinitialize() }
 
-    localReachability.gatherKnownReachableUses(from: assignment, in: &reachableUses)
+    localReachability.gatherKnownLifetimeUses(from: assignment, in: &reachableUses)
 
     let assignmentInst = assignment.instruction ?? allocation.parentFunction.entryBlock.instructions.first!
     var range = InstructionRange(begin: assignmentInst, context)

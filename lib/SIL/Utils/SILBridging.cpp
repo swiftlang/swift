@@ -50,8 +50,10 @@ bool swiftModulesInitialized() {
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
   if (nodeMetatypesInitialized && !metatype) {
-    llvm::errs() << "Instruction " << getSILInstructionName((SILInstructionKind)kind) << " not registered\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Instruction " << getSILInstructionName((SILInstructionKind)kind)
+          << " not registered";
+    });
   }
   return metatype;
 }
@@ -103,16 +105,18 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
     prefixedName = std::string("SIL") + std::string(className);
     iter = valueNamesToKind.find(prefixedName);
     if (iter == valueNamesToKind.end()) {
-      llvm::errs() << "Unknown bridged node class " << className << '\n';
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unknown bridged node class " << className;
+      });
     }
     className = prefixedName;
   }
   SILNodeKind kind = iter->second;
   SwiftMetatype existingTy = nodeMetatypes[(unsigned)kind];
   if (existingTy) {
-    llvm::errs() << "Double registration of class " << className << '\n';
-    abort();
+    ABORT([&](auto &out) {
+      out << "Double registration of class " << className;
+    });
   }
   nodeMetatypes[(unsigned)kind] = metatype;
 }
@@ -197,15 +201,44 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
-BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const {
+BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubstitutions,
+                                                               BridgedCanType selfType) const {
   swift::SILFunction *f = getFunction();
   swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
 
   if (!genericSig || genericSig->areAllParamsConcrete())
     return swift::SubstitutionMap();
 
+  SubstitutionMap contextSubs = contextSubstitutions.unbridged();
+  if (selfType.unbridged() &&
+      contextSubs.getGenericSignature().getGenericParams().size() + 1 == genericSig.getGenericParams().size()) {
+
+    // If this is a default witness methods (`selfType` != nil) it has generic self type. In this case
+    // the generic self parameter is at depth 0 and the actual generic parameters of the substitution map
+    // are at depth + 1, e.g:
+    // ```
+    //     @convention(witness_method: P) <τ_0_0><τ_1_0 where τ_0_0 : GenClass<τ_1_0>.T>
+    //                                       ^      ^
+    //                                    self      params of substitution map at depth + 1
+    // ```
+    return swift::SubstitutionMap::get(genericSig,
+      [&](SubstitutableType *type) -> Type {
+        GenericTypeParamType *genericParam = cast<GenericTypeParamType>(type);
+        // The self type is τ_0_0
+        if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+          return selfType.unbridged();
+
+        // Lookup the substitution map types at depth - 1.
+        auto *depthMinus1Param = GenericTypeParamType::getType(genericParam->getDepth() - 1,
+                                                               genericParam->getIndex(),
+                                                               genericParam->getASTContext());
+        return swift::QuerySubstitutionMap{contextSubs}(depthMinus1Param);
+      },
+      swift::LookUpConformanceInModule());
+
+  }
   return swift::SubstitutionMap::get(genericSig,
-                                     swift::QuerySubstitutionMap{contextSubs.unbridged()},
+                                     swift::QuerySubstitutionMap{contextSubs},
                                      swift::LookUpConformanceInModule());
 }
 

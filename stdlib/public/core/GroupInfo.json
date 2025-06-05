@@ -182,9 +182,12 @@
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
-      "SIMDConcreteOperations.swift",
+      "SIMDIntegerConcreteOperations.swift",
+      "SIMDFloatConcreteOperations.swift",
+      "SIMDMaskConcreteOperations.swift",
       "SIMDVector.swift",
-      "SIMDVectorTypes.swift"]}
+      "SIMDVectorTypes.swift"
+    ]}
   ],
   "Optional": [
     "Optional.swift"
@@ -204,6 +207,15 @@
     "MutableSpan.swift",
     "RawSpan.swift",
     "Span.swift"
+  ],
+  "UTF8Span": [ 
+    "UTF8EncodingError.swift",
+    "UTF8Span.swift",
+    "UTF8SpanBits.swift",
+    "UTF8SpanComparisons.swift",
+    "UTF8SpanFundamentals.swift",
+    "UTF8SpanInternalHelpers.swift",
+    "UTF8SpanIterators.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -260,8 +272,7 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift",
-    "SwiftSettings.swift"
+    "InlineArray.swift"
   ],
   "Result": [
     "Result.swift"

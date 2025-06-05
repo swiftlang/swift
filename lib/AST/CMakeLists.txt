@@ -45,6 +45,7 @@ add_swift_host_library(swiftAST STATIC
   DeclContext.cpp
   DeclContextDumper.cpp
   DeclNameLoc.cpp
+  DiagnosticArgument.cpp
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
@@ -94,6 +95,7 @@ add_swift_host_library(swiftAST STATIC
   RawComment.cpp
   Requirement.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ApplyInverses.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/Diagnostics.cpp

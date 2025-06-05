@@ -24,6 +24,13 @@
 #include "swift/Config.h"
 
 namespace swift {
+  class AccessorDecl;
+  class ConstructorDecl;
+  class MacroDecl;
+  class SubscriptDecl;
+  class SwitchStmt;
+  class TypeAliasDecl;
+
   template<typename ...ArgTypes>
   struct Diag;
 
@@ -48,6 +55,7 @@ namespace swift {
   } // end namespace detail
 
   enum class StaticSpellingKind : uint8_t;
+  enum class ForeignLanguage : uint8_t;
 
   namespace diag {
 

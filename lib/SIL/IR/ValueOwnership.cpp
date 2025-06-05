@@ -125,6 +125,7 @@ CONSTANT_OWNERSHIP_INST(None, PreviousDynamicFunctionRef)
 CONSTANT_OWNERSHIP_INST(None, GlobalAddr)
 CONSTANT_OWNERSHIP_INST(None, BaseAddrForOffset)
 CONSTANT_OWNERSHIP_INST(None, HasSymbol)
+CONSTANT_OWNERSHIP_INST(None, VectorBaseAddr)
 CONSTANT_OWNERSHIP_INST(None, IndexAddr)
 CONSTANT_OWNERSHIP_INST(None, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(None, InitEnumDataAddr)
@@ -183,6 +184,27 @@ CONSTANT_OWNERSHIP_INST(None, TypeValue)
 
 #undef CONSTANT_OWNERSHIP_INST
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitStructExtractInst(StructExtractInst *sei) {
+  if (sei->getType().isTrivial(*sei->getFunction()) ||
+      // A struct value can have "none" ownership even if its type is not trivial.
+      // This happens when the struct/tuple contains a non-trivial enum, but it's initialized with
+      // a trivial enum case (e.g. with `Optional.none`).
+      sei->getOperand()->getOwnershipKind() == OwnershipKind::None) {
+    return OwnershipKind::None;
+  }
+  return OwnershipKind::Guaranteed;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitTupleExtractInst(TupleExtractInst *tei) {
+  if (tei->getType().isTrivial(*tei->getFunction()) ||
+      // A tuple value can have "none" ownership even if its type is not trivial.
+      // This happens when the struct/tuple contains a non-trivial enum, but it's initialized with
+      // a trivial enum case (e.g. with `Optional.none`).
+      tei->getOperand()->getOwnershipKind() == OwnershipKind::None)
+    return OwnershipKind::None;
+  return OwnershipKind::Guaranteed;
+}
+
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
@@ -192,8 +214,6 @@ CONSTANT_OWNERSHIP_INST(None, TypeValue)
     }                                                                          \
     return OwnershipKind::OWNERSHIP;                                           \
   }
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, StructExtract)
-CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TuplePackExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
@@ -658,6 +678,7 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(CmpXChg)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(AtomicLoad)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ExtractElement)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(InsertElement)
+UNOWNED_OR_NONE_DEPENDING_ON_RESULT(Select)
 UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
 #undef UNOWNED_OR_NONE_DEPENDING_ON_RESULT
 
@@ -673,6 +694,7 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(ShuffleVector)
 // fields. The initialized value is immediately consumed by an assignment, so it
 // must be owned.
 OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
+OWNED_OR_NONE_DEPENDING_ON_RESULT(PrepareInitialization)
 #undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)

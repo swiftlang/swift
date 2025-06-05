@@ -543,7 +543,9 @@ public:
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
       : insertPoint(insertPoint)
-    {}
+    {
+      ASSERT(insertPoint && "null insertion point provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
       : insertPoint(other.insertPoint)
@@ -877,7 +879,7 @@ public:
   FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
 
   /// A helper method that calls getFunctionTypeInfo that also marks global
-  /// actor isolated async closures that are not sendable as sendable.
+  /// actor-isolated async closures that are not sendable as sendable.
   FunctionTypeInfo getClosureTypeInfo(AbstractClosureExpr *expr);
 
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
@@ -2034,6 +2036,7 @@ public:
       PreparedArguments &&optionalSubscripts,
       SILType addressType, bool isOnSelfParameter);
 
+  bool canUnwindAccessorDeclRef(SILDeclRef accessorRef);
   CleanupHandle emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
                                       SubstitutionMap substitutions,
                                       ArgumentSource &&optionalSelfValue,
@@ -2301,8 +2304,9 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
-  CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
-                               SubstitutionMap subs, ArrayRef<ManagedValue> args,
+  CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn, bool canUnwind,
+                               SubstitutionMap subs,
+                               ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,
                                ApplyOptions options,
                                SmallVectorImpl<ManagedValue> &yields);
@@ -2315,7 +2319,8 @@ public:
   std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
              CleanupHandle>
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
-                            SubstitutionMap subs, ArrayRef<SILValue> args,
+                            bool canUnwind, SubstitutionMap subs,
+                            ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc,
                                MultipleValueInstructionResult *token,
@@ -2603,8 +2608,17 @@ public:
 
   enum class ThunkGenFlag {
     None,
-    ConvertingToNonIsolatedCaller,
-    ConvertingFromNonIsolatedCaller,
+
+    /// Set if the thunk has an implicit isolated parameter.
+    ///
+    /// The implication is that we shouldn't forward that parameter into the
+    /// callee as a normal parameter (if the callee has an implicit param, we
+    /// handle it through a different code path).
+    ThunkHasImplicitIsolatedParam = 0x1,
+
+    /// Set if the callee has an implicit isolated parameter that we need to
+    /// find the appropriate value for when we call it from the thunk.
+    CalleeHasImplicitIsolatedParam = 0x2,
   };
   using ThunkGenOptions = OptionSet<ThunkGenFlag>;
 
@@ -2612,8 +2626,7 @@ public:
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
-      ThunkGenOptions options = {});
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

@@ -197,13 +197,13 @@ extension Cond: Copyable where T: Copyable {}
 struct FullyGenericArg<T: ~Escapable & ~Copyable> {}
 
 // CHECK-LABEL: StructDecl name=FullyGenericArg
-// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Copyable")
-// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Escapable")
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Copyable"{{.*}})
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Escapable"{{.*}})
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
 // CHECK: Generic signature: <T>
 // CHECK-NEXT: Canonical generic signature: <τ_0_0>
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
-// CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty")
+// CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty"{{.*}})
 extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}

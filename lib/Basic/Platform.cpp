@@ -140,6 +140,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
   return false;
 }
 
+bool swift::tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple) {
+  return triple.isOSOpenBSD() && triple.getArch() == llvm::Triple::aarch64;
+}
+
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isiOS()) {
     if (triple.isTvOS()) {
@@ -287,6 +291,13 @@ StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
       break;
     }
   }
+
+  if (Triple.isOSOpenBSD()) {
+    if (Triple.getArchName() == "amd64") {
+      return "x86_64";
+    }
+  }
+
   return Triple.getArchName();
 }
 
@@ -416,6 +427,11 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
   if (triple.isOSFreeBSD()) {
     return swift::getUnversionedTriple(triple);
+  }
+
+  if (triple.isOSOpenBSD()) {
+    StringRef arch = swift::getMajorArchitectureName(triple);
+    return llvm::Triple(arch, triple.getVendorName(), triple.getOSName());
   }
 
   // Other platforms get no normalization.

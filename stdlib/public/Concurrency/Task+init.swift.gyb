@@ -1,0 +1,415 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import Swift
+
+% for (METHOD_VARIANTS, ALL_AVAILABILITY, PARAMS) in [
+%   # ==== -------------------------------------------------------------------------------------------------------------
+%   # ==== Without task executor, but available ever since 5.1
+%   ([ # METHOD_VARIANT
+%      'init',
+%      'init/*throws*/',
+%   ],
+%   [ # ALL_AVAILABILITY
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 5.1, *)',
+%   ],
+%   [ # PARAMS
+%     'name: String? = nil',
+%     'priority: TaskPriority? = nil',
+%     '@_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success',
+%   ]),
+%   # ==== --------------------------------------------------------------------
+%   ([ # METHOD_VARIANT
+%      'static func detached',
+%      'static func detached/*throws*/',
+%   ],
+%   [
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 5.1, *)',
+%   ],
+%   [ # PARAMS
+%     'name: String? = nil',
+%     'priority: TaskPriority? = nil',
+%     'operation: sending @escaping @isolated(any) () async throws -> Success',
+%   ]),
+%   # ==== -------------------------------------------------------------------------------------------------------------
+%   # ==== With task executor, but available only since 6.0
+%   ([ # METHOD_VARIANT
+%      'init',
+%      'init/*throws*/',
+%   ],
+%   [ # ALL_AVAILABILITY
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 6.0, *)',
+%   ],
+%   [ # PARAMS
+%     'name: String? = nil',
+%     'executorPreference taskExecutor: (any TaskExecutor)?',
+%     'priority: TaskPriority? = nil',
+%     'operation: sending @escaping () async throws -> Success',
+%   ]),
+%   # ==== --------------------------------------------------------------------
+%   ([ # METHOD_VARIANT
+%      'static func detached',
+%      'static func detached/*throws*/',
+%   ],
+%   [
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 6.0, *)',
+%   ],
+%   [ # PARAMS
+%     'name: String? = nil',
+%     'executorPreference taskExecutor: (any TaskExecutor)?',
+%     'priority: TaskPriority? = nil',
+%     'operation: sending @escaping () async throws -> Success',
+%   ]),
+%   # !!!! -------------------------------------------------------------------------------------------------------------
+%   # !!!! Legacy / Source Compatibility "Shims"
+%   # !!!!
+%   # !!!! These legacy APIs technically did not have @isolated(any) but since they're all emit-into-client,
+%   # !!!! we just allow them to become slightly better here. It makes source generation simpler, and doesn't really hurt.
+%   # !!!! -------------------------------------------------------------------------------------------------------------
+%   # ==== Legacy API: Global 'detach' function
+%   ([ # METHOD_VARIANT
+%      'func detach<Success>',
+%      'func detach<Success>/*throws*/',
+%   ],
+%   [ # ALL_AVAILABILITY
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 5.1, *)',
+%     '@available(*, deprecated, message: "`detach` was replaced by `Task.detached` and will be removed shortly.")',
+%   ],
+%   [ # PARAMS
+%     'priority: TaskPriority? = nil',
+%     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
+%   ]),
+%   # ==== Legacy API: runDetached
+%   ([ # METHOD_VARIANT
+%      'static func runDetached',
+%      'static func runDetached/*throws*/',
+%   ],
+%   [ # ALL_AVAILABILITY
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 5.1, *)',
+%     '@available(*, deprecated, message: "`Task.runDetached` was replaced by `Task.detached` and will be removed shortly.")',
+%   ],
+%   [ # PARAMS
+%     'priority: TaskPriority? = nil',
+%     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
+%   ]),
+%   # ==== Legacy API: asyncDetached
+%   ([ # METHOD_VARIANT
+%      'func asyncDetached<Success>',
+%      'func asyncDetached<Success>/*throws*/',
+%   ],
+%   [ # ALL_AVAILABILITY
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 5.1, *)',
+%     '@available(*, deprecated, message: "`asyncDetached` was replaced by `Task.detached` and will be removed shortly.")',
+%   ],
+%   [ # PARAMS
+%     'priority: TaskPriority? = nil',
+%     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
+%   ]),
+%   # ==== Legacy API: async
+%   ([ # METHOD_VARIANT
+%      'func async<Success>',
+%      'func async<Success>/*throws*/',
+%   ],
+%   [ # ALL_AVAILABILITY
+%     '@_alwaysEmitIntoClient',
+%     '@available(SwiftStdlib 5.1, *)',
+%     '@available(*, deprecated, message: "`async` was replaced by `Task.init` and will be removed shortly.")',
+%   ],
+%   [ # PARAMS
+%     'priority: TaskPriority? = nil',
+%     '@_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success',
+%   ]),
+% ]:
+% for METHOD_VARIANT in METHOD_VARIANTS:
+
+% IS_TOP_LEVEL_FUNC = (not ('init' in METHOD_VARIANT)) and (not ('static' in METHOD_VARIANT))
+% IS_INIT = 'init' in METHOD_VARIANT
+% IS_DETACHED = 'detach' in METHOD_VARIANT.lower()
+% IS_THROWING = 'throws' in METHOD_VARIANT
+% 
+% HAS_TASK_PRIORITY = any('priority:' in param for param in PARAMS)
+% HAS_TASK_NAME = any('name:' in param for param in PARAMS)
+% HAS_TASK_EXECUTOR = any('taskExecutor:' in param for param in PARAMS)
+% HAS_ISOLATED_ANY = any('@isolated(any)' in param for param in PARAMS)
+% IS_DEPRECATED = any('deprecated' in a for a in ALL_AVAILABILITY)
+%
+% if IS_THROWING:
+%   FAILURE_TYPE = 'Error'
+% else:
+%   FAILURE_TYPE = 'Never'
+% end
+
+%{
+
+def adjust_params_for_kind(params):
+  res = []
+  for p in params:
+    np = p
+    if not IS_THROWING:
+      np = np.replace("throws", "")
+    res.append(np)
+  return res
+
+def adjust_availability(avails):
+  res = []
+  for av in avails:
+    adjusted = av
+    if HAS_TASK_EXECUTOR:
+      adjusted = adjusted.replace("SwiftStdlib 5.1", "SwiftStdlib 6.0")
+    res.append(adjusted)
+  return res
+
+if IS_INIT:
+  ARROW_RETURN_TYPE = '' # init does not spell out return type
+else:
+  ARROW_RETURN_TYPE = f'-> Task<Success, {FAILURE_TYPE}>'
+
+}%
+
+% # ====================================================================================================================
+% if not IS_TOP_LEVEL_FUNC:
+extension Task where Failure == ${FAILURE_TYPE} {
+% end
+
+% # --------------------------------------------------------------------------------------------------------------------
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
+  public ${METHOD_VARIANT}(
+      ${",\n    ".join(adjust_params_for_kind(PARAMS))}
+    ) ${ARROW_RETURN_TYPE}{
+    fatalError("Unavailable in task-to-thread concurrency model.")
+  }
+
+% # --------------------------------------------------------------------------------------------------------------------
+% if not HAS_TASK_EXECUTOR:
+#elseif $Embedded
+  @discardableResult
+  @_alwaysEmitIntoClient
+  ${"  \n".join(adjust_availability(['@available(SwiftStdlib 5.1, *)']))}
+  public ${METHOD_VARIANT}(
+      ${",\n    ".join(adjust_params_for_kind(PARAMS))}
+    ) ${ARROW_RETURN_TYPE}{
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      inheritContext: true,
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
+
+    % if IS_INIT:
+    self._task = task
+    % else:
+    return Task(task)
+    % end
+  }
+% end # not HAS_TASK_EXECUTOR
+
+% # --------------------------------------------------------------------------------------------------------------------
+#else
+
+% if IS_DEPRECATED:
+/// Deprecated, available only for source compatibility reasons.
+% else:
+% # We skip documentation for the legacy APIs which are just here for source compatibility reasons.
+% if IS_THROWING:
+  /// Runs the given throwing operation asynchronously
+% else:
+  /// Runs the given nonthrowing operation asynchronously
+% end
+% if IS_DETACHED:
+  /// as part of a new _unstructured_ _detached_ top-level task.
+% else:
+  /// as part of a new _unstructured_ top-level task.
+% end
+  ///
+% if IS_THROWING:
+  /// If the `operation` throws an error, it is caught by the `Task` and will be
+  /// rethrown only when the task's `value` is awaited. Take care to not accidentally
+  /// dismiss errors by not awaiting on the task's resulting value.
+% end
+  ///
+% if IS_DETACHED:
+  /// Don't use a detached unstructured task if it's possible
+  /// to model the operation using structured concurrency features like child tasks.
+  /// Child tasks inherit the parent task's priority and task-local storage,
+  /// and canceling a parent task automatically cancels all of its child tasks.
+  /// You need to handle these considerations manually with a detached task.
+% end
+  ///
+  /// You need to keep a reference to the task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  % if HAS_TASK_NAME:
+  ///   - name: Human readable name of the task.
+  % end
+  % if HAS_TASK_EXECUTOR:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to no preference,
+  ///      and effectively means to inherit the outer context's executor preference.
+  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  % end
+  ///   - priority: The priority of the operation task.
+  % if IS_DETACHED:
+  ///       Omit this parameter or pass `nil` to inherit the enclosing context's base priority.
+  % end
+  ///   - operation: The operation to perform.
+  ///
+  /// - Returns: A reference to the task.
+% end # IS_DEPRECATED
+  ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
+  @discardableResult
+  public ${METHOD_VARIANT}( // Task ${METHOD_VARIANT}
+    ${",\n    ".join(adjust_params_for_kind(PARAMS))}
+  ) ${ARROW_RETURN_TYPE}{
+
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: ${'true' if not IS_DETACHED else 'false'},
+      inheritContext: ${'true' if not IS_DETACHED else 'false'},
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+
+% if HAS_ISOLATED_ANY:
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+% end # HAS_ISOLATED_ANY
+
+    var task: Builtin.NativeObject?
+% if HAS_TASK_NAME:
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      % if HAS_TASK_EXECUTOR:
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            % if HAS_ISOLATED_ANY:
+            initialSerialExecutor: builtinSerialExecutor,
+            % end
+            % if HAS_TASK_EXECUTOR:
+            initialTaskExecutorConsuming: taskExecutor,
+            % end
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            % if HAS_ISOLATED_ANY:
+            initialSerialExecutor: builtinSerialExecutor,
+            % end
+            initialTaskExecutor: executorBuiltin,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      % else: # if no TASK_EXECUTOR
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            % if HAS_ISOLATED_ANY:
+            initialSerialExecutor: builtinSerialExecutor,
+            % end
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      % end # if no HAS_TASK_EXECUTOR
+    } // let name
+    #endif // $BuiltinCreateAsyncTaskName
+% end # HAS_TASK_NAME
+
+% if HAS_TASK_EXECUTOR:
+    // Task name was not set, or task name createTask is unavailable
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        % if HAS_ISOLATED_ANY:
+        initialSerialExecutor: builtinSerialExecutor,
+        % end
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = Builtin.createTask(
+        flags: flags,
+        % if HAS_ISOLATED_ANY:
+        initialSerialExecutor: builtinSerialExecutor,
+        % end
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+% end # HAS_TASK_EXECUTOR
+
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+      flags: flags,
+      % if HAS_ISOLATED_ANY:
+      initialSerialExecutor: builtinSerialExecutor,
+      % end
+      operation: operation).0
+    }
+
+% if IS_INIT:
+    self._task = task!
+% else:
+    return Task(task!)
+% end
+  }
+
+#endif
+
+% if not IS_TOP_LEVEL_FUNC:
+} // extension Task ...
+% end
+
+% end
+% end
+
+// =====================================================================================================================
+// =====================================================================================================================

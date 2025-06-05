@@ -13,11 +13,12 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Config/config.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 using namespace swift;
@@ -63,9 +64,9 @@ static StringRef pluginModuleNameStringFromPath(StringRef path) {
 
 static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 getPluginLoadingFS(ASTContext &Ctx) {
-  // If there is a clang include tree FS, using real file system to load plugin
+  // If there is an immutable file system, using real file system to load plugin
   // as the FS in SourceMgr doesn't support directory iterator.
-  if (Ctx.ClangImporterOpts.HasClangIncludeTreeRoot)
+  if (Ctx.CASOpts.HasImmutableFileSystem)
     return llvm::vfs::getRealFileSystem();
   return Ctx.SourceMgr.getFileSystem();
 }
@@ -96,8 +97,44 @@ PluginLoader::getPluginMap() {
     map[moduleNameIdentifier] = {libPath, execPath};
   };
 
+  std::optional<llvm::PrefixMapper> mapper;
+  if (!PathRemap.empty()) {
+    SmallVector<llvm::MappedPrefix, 4> prefixes;
+    llvm::MappedPrefix::transformJoinedIfValid(PathRemap, prefixes);
+    mapper.emplace();
+    mapper->addRange(prefixes);
+    mapper->sort();
+  }
+  auto remapPath = [&mapper](StringRef path) {
+    if (!mapper)
+      return path.str();
+    return mapper->mapToString(path);
+  };
+
   auto fs = getPluginLoadingFS(Ctx);
   std::error_code ec;
+
+  auto validateLibrary = [&](StringRef path) -> llvm::Expected<std::string> {
+    auto remappedPath = remapPath(path);
+    if (!Ctx.SearchPathOpts.ResolvedPluginVerification || path.empty())
+      return remappedPath;
+
+    auto currentStat = fs->status(remappedPath);
+    if (!currentStat)
+      return llvm::createFileError(remappedPath, currentStat.getError());
+
+    auto goldStat = Ctx.SourceMgr.getFileSystem()->status(path);
+    if (!goldStat)
+      return llvm::createStringError(
+          "cannot open gold reference library to compare");
+
+    // Compare the size for difference for now.
+    if (currentStat->getSize() != goldStat->getSize())
+      return llvm::createStringError(
+          "plugin has changed since dependency scanning");
+
+    return remappedPath;
+  };
 
   for (auto &entry : Ctx.SearchPathOpts.PluginSearchOpts) {
     switch (entry.getKind()) {
@@ -156,9 +193,17 @@ PluginLoader::getPluginMap() {
       // Respect resolved plugin config above other search path, and it can
       // overwrite plugins found by other options or previous resolved
       // configuration.
-      for (auto &moduleName : val.ModuleNames)
-        try_emplace(moduleName, val.LibraryPath, val.ExecutablePath,
+      for (auto &moduleName : val.ModuleNames) {
+        auto libPath = validateLibrary(val.LibraryPath);
+        if (!libPath) {
+          Ctx.Diags.diagnose(SourceLoc(), diag::resolved_macro_changed,
+                             remapPath(val.LibraryPath),
+                             toString(libPath.takeError()));
+          continue;
+        }
+        try_emplace(moduleName, *libPath, remapPath(val.ExecutablePath),
                     /*overwrite*/ true);
+      }
       continue;
     }
     }

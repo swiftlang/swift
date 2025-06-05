@@ -75,10 +75,10 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TrailingComma, to: .trailingComma)
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
-    mapFeature(.ABIAttribute, to: .abiAttribute)
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
     mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
     mapFeature(.InlineArrayTypeSugar, to: .inlineArrayTypeSugar)
+    mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
   }
 }
 

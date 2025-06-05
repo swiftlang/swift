@@ -32,6 +32,13 @@ struct Money {
   }
 }
 
+actor OtherActorBackingActor { }
+
+@globalActor
+struct OtherActor {
+  static let shared = OtherActorBackingActor()
+}
+
 @available(SwiftStdlib 5.1, *)
 func takeBob(_ b: Bob) {}
 
@@ -128,7 +135,7 @@ actor Demons {
   }
 
   deinit {
-    let _ = self.ns // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    let _ = self.ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -161,13 +168,13 @@ actor ExampleFromProposal {
   deinit {
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // ok
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
 
     f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
 
     _ = self.immutableSendable  // ok
     _ = self.mutableSendable    // expected-warning {{cannot access property 'mutableSendable' here in deinitializer; this is an error in the Swift 6 language mode}}
-    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable        // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 
   nonisolated func f() {}
@@ -199,7 +206,7 @@ class CheckGAIT1 {
   }
 
   deinit {
-    _ = ns // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    _ = ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
     f()     // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
     _ = silly // expected-warning {{cannot access property 'silly' here in deinitializer; this is an error in the Swift 6 language mode}}
 
@@ -733,8 +740,8 @@ actor OhBrother {
 class CheckDeinitFromClass: AwesomeUIView {
   var ns: NonSendableType?
   deinit {
-    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
-    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -742,8 +749,8 @@ class CheckDeinitFromClass: AwesomeUIView {
 actor CheckDeinitFromActor {
   var ns: NonSendableType?
   deinit {
-    ns?.f() // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
-    ns = nil // expected-warning {{cannot access property 'ns' with a non-sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
   }
 }
 
@@ -832,17 +839,78 @@ func testActorWithInitAccessorInit() {
 
 @available(SwiftStdlib 5.1, *)
 actor TestNonisolatedUnsafe {
-  private nonisolated(unsafe) var child: OtherActor!
+  private nonisolated(unsafe) var child: MyOtherActor!
   init() {
-    child = OtherActor(parent: self)
+    child = MyOtherActor(parent: self)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-actor OtherActor {
+actor MyOtherActor {
   unowned nonisolated let parent: any Actor
 
   init(parent: any Actor) {
     self.parent = parent
+  }
+}
+
+func globalActorNonIsolatedInitializerTests() {
+  @MainActor
+  class C {
+    let ns: NonSendableType
+
+    nonisolated init() {
+      self.ns = NonSendableType()
+    }
+
+    nonisolated init(x: NonSendableType) {
+      self.ns = x
+    }
+
+    nonisolated func doSomething() {}
+
+    nonisolated init(x2 x: NonSendableType) {
+      self.ns = x
+      doSomething() // expected-note {{after calling instance method 'doSomething()', only nonisolated properties of 'self' can be accessed from this init}}
+      print(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer}}
+    }
+  }
+
+  // Make sure this does not apply in cases where self is not actor isolated.
+  class D {
+    @MainActor let ns: NonSendableType // expected-note {{mutation of this property is only permitted within the actor}}
+
+    nonisolated init() {
+      self.ns = NonSendableType() // expected-warning {{main actor-isolated property 'ns' can not be mutated from a nonisolated context}}
+    }
+  }
+
+  actor A {
+    @MainActor let ns: NonSendableType
+
+    init() {
+      self.ns = NonSendableType()
+    }
+  }
+
+  @MainActor
+  class C2 {
+    @OtherActor let ns: NonSendableType
+
+    nonisolated init() {
+      self.ns = NonSendableType()
+    }
+
+    nonisolated init(_ x: NonSendableType) {
+      self.ns = x
+    }
+
+    nonisolated func doSomething() {}
+
+    nonisolated init(x2 x: NonSendableType) {
+      self.ns = x
+      doSomething() // expected-note {{after calling instance method 'doSomething()', only nonisolated properties of 'self' can be accessed from this init}}
+      print(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer}}
+    }
   }
 }

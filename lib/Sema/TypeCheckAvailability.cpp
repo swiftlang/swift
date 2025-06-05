@@ -276,16 +276,18 @@ static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
   return false;
 }
 
-// Utility function to help determine if noasync diagnostics are still
-// appropriate even if a `DeclContext` returns `false` from `isAsyncContext()`.
-static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
-  if (auto *D = DC->getAsDecl())
-    if (auto *FD = dyn_cast<FuncDecl>(D))
+/// Retrieve the innermost DeclContext that should be consulted for noasync
+/// checking.
+static const DeclContext *
+getInnermostDeclContextForNoAsync(const DeclContext *DC) {
+  if (auto *D = DC->getAsDecl()) {
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (FD->isDeferBody())
         // If this is a defer body, we should delegate to its parent.
-        return shouldTreatDeclContextAsAsyncForDiagnostics(DC->getParent());
-
-  return DC->isAsyncContext();
+        return getInnermostDeclContextForNoAsync(DC->getParent());
+    }
+  }
+  return DC;
 }
 
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
@@ -655,9 +657,9 @@ static void fixAvailabilityForDecl(
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
-  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
-  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
-    KindForDiagnostic = D->getDescriptiveKind();
+  const auto *DeclForDiagnostic = ConcDecl;
+  if (isa<PatternBindingDecl>(DeclForDiagnostic)) {
+    DeclForDiagnostic = D;
   }
 
   SourceLoc InsertLoc =
@@ -668,7 +670,7 @@ static void fixAvailabilityForDecl(
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
 
-  D->diagnose(diag::availability_add_attribute, KindForDiagnostic)
+  D->diagnose(diag::availability_add_attribute, DeclForDiagnostic)
       .fixItInsert(InsertLoc, diag::insert_available_attr,
                    Domain.getNameForAttributePrinting(),
                    RequiredAvailability.getVersionString(), OriginalIndent);
@@ -1725,7 +1727,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto domain = constraint.getDomain();
+  auto domainAndRange = constraint.getDomainAndRange(ctx);
   auto attr = constraint.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
@@ -1736,8 +1738,8 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
   EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                shouldHideDomainNameForConstraintDiagnostic(constraint), domain,
-                EncodedMessage.Message)
+                shouldHideDomainNameForConstraintDiagnostic(constraint),
+                domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
@@ -1750,12 +1752,13 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domain, attr.getIntroducedRange(ctx).value());
+                   type, proto, domainAndRange.getDomain(),
+                   domainAndRange.getRange());
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domain, attr.getObsoletedRange(ctx).value())
+                  domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(attr.getParsedAttr()->getRange());
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -2113,7 +2116,7 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  auto domain = constraint.getDomain();
+  auto domainAndRange = constraint.getDomainAndRange(ctx);
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -2149,14 +2152,11 @@ bool diagnoseExplicitUnavailability(
     // Skip the note emitted below.
     return true;
   } else {
-    auto unavailableDiagnosticDomain = domain;
-    AvailabilityInference::updateAvailabilityDomainForFallback(
-        Attr, ctx, unavailableDiagnosticDomain);
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
                   shouldHideDomainNameForConstraintDiagnostic(constraint),
-                  unavailableDiagnosticDomain, EncodedMessage.Message)
+                  domainAndRange.getDomain(), EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
   }
@@ -2169,14 +2169,14 @@ bool diagnoseExplicitUnavailability(
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags
-        .diagnose(D, diag::availability_introduced_in_version, D, domain,
-                  Attr.getIntroducedRange(ctx).value())
+        .diagnose(D, diag::availability_introduced_in_version, D,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
-        .diagnose(D, diag::availability_obsoleted, D, domain,
-                  Attr.getObsoletedRange(ctx).value())
+        .diagnose(D, diag::availability_obsoleted, D,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -2697,6 +2697,7 @@ diagnoseDeclUnsafe(ConcreteDeclRef declRef, SourceRange R,
 
   SourceLoc diagLoc = call ? call->getLoc() : R.Start;
   enumerateUnsafeUses(declRef, diagLoc, call != nullptr,
+                      /*skipTypeCheck=*/false,
                       [&](UnsafeUse unsafeUse) {
     unsafeUses->push_back(unsafeUse);
     return false;
@@ -2758,7 +2759,8 @@ static bool
 diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &Where) {
   // If we are not in an (effective) async context, don't check it
-  if (!shouldTreatDeclContextAsAsyncForDiagnostics(Where.getDeclContext()))
+  auto *noAsyncDC = getInnermostDeclContextForNoAsync(Where.getDeclContext());
+  if (!noAsyncDC->isAsyncContext())
     return false;
 
   ASTContext &ctx = Where.getDeclContext()->getASTContext();
@@ -2774,14 +2776,27 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     }
   }
 
+  // In Swift 6 we previously didn't coerce macro arguments to parameter types,
+  // so closure arguments may be treated as async in cases where they weren't in
+  // Swift 6. As such we need to warn if the use is within a closure macro
+  // argument until the next language mode.
+  auto shouldWarnUntilFutureVersion = [&]() {
+    auto *CE = dyn_cast<ClosureExpr>(noAsyncDC);
+    return CE && CE->isMacroArgument();
+  };
+
   // @available(noasync) spelling
   if (auto attr = D->getNoAsyncAttr()) {
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->getMessage());
-    diag.warnUntilSwiftVersion(6);
-    diag.limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
-                                         D->preconcurrency());
+    if (D->preconcurrency()) {
+      diag.limitBehavior(DiagnosticBehavior::Warning);
+    } else if (shouldWarnUntilFutureVersion()) {
+      diag.warnUntilFutureSwiftVersion();
+    } else {
+      diag.warnUntilSwiftVersion(6);
+    }
 
     if (!attr->getRename().empty()) {
       fixItAvailableAttrRename(diag, R, D, attr->getRename(), call);
@@ -2797,10 +2812,16 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
   // @_unavailableFromAsync spelling
   const UnavailableFromAsyncAttr *attr =
       D->getAttrs().getAttribute<UnavailableFromAsyncAttr>();
-  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
-  ctx.Diags
-      .diagnose(diagLoc, diag::async_unavailable_decl, D, attr->Message)
-      .warnUntilSwiftVersion(6);
+  {
+    SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+    auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
+                                   attr->Message);
+    if (shouldWarnUntilFutureVersion()) {
+      diag.warnUntilFutureSwiftVersion();
+    } else {
+      diag.warnUntilSwiftVersion(6);
+    }
+  }
   D->diagnose(diag::decl_declared_here, D);
   return true;
 }
@@ -2868,23 +2889,25 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto domain = constraint->getDomain();
-  auto requiredRange = constraint->getPotentiallyUnavailableRange(ctx);
-  if (!requiredRange)
+  if (!constraint->isPotentiallyAvailable())
     return false;
+
+  auto domainAndRange = constraint->getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto requiredRange = domainAndRange.getRange();
 
   if (Flags.contains(
           DeclAvailabilityFlag::
               AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(domain, *requiredRange, ctx))
+      requiresDeploymentTargetOrEarlier(domain, requiredRange, ctx))
     return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
     diagnosePotentialAccessorUnavailability(accessor, R, DC, domain,
-                                            *requiredRange, forInout);
+                                            requiredRange, forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, domain, *requiredRange))
+    if (!diagnosePotentialUnavailability(D, R, DC, domain, requiredRange))
       return false;
   }
 
@@ -3389,11 +3412,11 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       }
 
       // Diagnose (and possibly signal) for potential unavailability
-      if (auto requiredRange =
-              constraint->getPotentiallyUnavailableRange(ctx)) {
+      if (constraint->isPotentiallyAvailable()) {
+        auto domainAndRange = constraint->getDomainAndRange(ctx);
         if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                            constraint->getDomain(),
-                                            *requiredRange)) {
+                                            domainAndRange.getDomain(),
+                                            domainAndRange.getRange())) {
           maybeEmitAssociatedTypeNote();
           return true;
         }
@@ -3511,6 +3534,11 @@ void swift::checkExplicitAvailability(Decl *decl) {
       !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
   if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+    // Skip extensions that extend non-public types.
+    auto extended = extension->getExtendedNominal();
+    if (!extended || !extended->getFormalAccessScope().isPublic())
+      return;
+
     // Skip extensions when none of their members need availability.
     auto members = extension->getMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
@@ -3521,7 +3549,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    if (!hasMembers && !isExported(extension))
+    if (!hasMembers && !hasConformancesToPublicProtocols(extension))
       return;
   } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
     // Check the first var instead.

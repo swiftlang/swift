@@ -95,7 +95,7 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE-NEXT:  strong_retain [[V2]]
 // NOPEEPHOLE-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[V2]]
 // NOPEEPHOLE-NEXT:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[V2]]
-// NOPEEPHOLE-NEXT:  [[MDI:%.*]] = mark_dependence [[CVT]] : $@noescape @callee_guaranteed () -> () on [[SOME]] : $Optional<@callee_guaranteed () -> ()>
+// NOPEEPHOLE-NEXT:  [[MDI:%.*]] = mark_dependence [[CVT]] : $@noescape @callee_guaranteed () -> () on [[V2]]
 // NOPEEPHOLE-NEXT:  [[NOESCAPE_SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
 // NOPEEPHOLE-NEXT:  strong_release [[V2]]
 // NOPEEPHOLE-NEXT:  br bb2([[NOESCAPE_SOME]] : $Optional<{{.*}}>, [[SOME]] : $Optional<{{.*}}>, [[SOME]] : $Optional<{{.*}}>)

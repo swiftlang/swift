@@ -79,10 +79,14 @@ public extension NoReflectionChildren {
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, NoReflectionChildren {
+public struct StringRef : CustomStringConvertible, NoReflectionChildren, ExpressibleByStringLiteral {
   public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
+
+  public init(stringLiteral: StaticString) {
+    self._bridged = BridgedStringRef(data: stringLiteral.utf8Start, count: stringLiteral.utf8CodeUnitCount)
+  }
 
   public var string: String { String(_bridged)  }
   public var description: String { string }
@@ -94,6 +98,16 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
   public subscript(index: Int) -> UInt8 {
     let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: count)
     return buffer[index]
+  }
+
+  public func startsWith(_ prefix: StaticString) -> Bool {
+    return prefix.withUTF8Buffer { (prefixBuffer: UnsafeBufferPointer<UInt8>) in
+      if count < prefixBuffer.count {
+        return false
+      }
+      let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: prefixBuffer.count)
+      return buffer.elementsEqual(prefixBuffer, by: ==)
+    }
   }
 
   public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {

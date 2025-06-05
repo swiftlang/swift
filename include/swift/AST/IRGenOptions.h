@@ -19,6 +19,7 @@
 #define SWIFT_AST_IRGENOPTIONS_H
 
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
@@ -565,6 +566,9 @@ public:
   /// Pointer authentication.
   PointerAuthOptions PointerAuth;
 
+  // If not 0, this overrides the value defined by the target.
+  uint64_t CustomLeastValidPointerValue = 0;
+
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {
     All,
@@ -646,7 +650,7 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
+        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false),
         MergeableTraps(false),
@@ -655,11 +659,7 @@ public:
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {
-#ifndef NDEBUG
-    DisableRoundTripDebugTypes = false;
-#else
-    DisableRoundTripDebugTypes = true;
-#endif
+    DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 
   /// Appends to \p os an arbitrary string representing all options which

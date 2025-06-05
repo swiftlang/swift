@@ -75,7 +75,6 @@ class Connection {
   std::shared_ptr<CodeCompletionCache> completionCache;
   std::string swiftExecutablePath;
   std::string runtimeResourcePath;
-  std::string diagnosticsDocumentationPath;
   std::shared_ptr<SourceKit::RequestTracker> requestTracker;
 
 public:
@@ -87,7 +86,6 @@ public:
         completionCache(std::make_shared<CodeCompletionCache>()),
         swiftExecutablePath(getSwiftExecutablePath()),
         runtimeResourcePath(getRuntimeResourcesPath()),
-        diagnosticsDocumentationPath(getDiagnosticDocumentationPath()),
         requestTracker(new SourceKit::RequestTracker()),
         sessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
     if (ideInspectionInstance == nullptr) {
@@ -371,8 +369,8 @@ void Connection::codeComplete(
   std::string compilerInvocationError;
   bool creatingInvocationFailed = initCompilerInvocation(
       invocation, args, FrontendOptions::ActionType::Typecheck, diags, path,
-      fileSystem, swiftExecutablePath, runtimeResourcePath,
-      diagnosticsDocumentationPath, sessionTimestamp, compilerInvocationError);
+      fileSystem, swiftExecutablePath, runtimeResourcePath, sessionTimestamp,
+      compilerInvocationError);
   if (creatingInvocationFailed) {
     callback(ResultType::failure(compilerInvocationError));
     return;
@@ -491,6 +489,8 @@ swiftide_completion_result_get_kind(swiftide_completion_response_t _response) {
     return SWIFTIDE_COMPLETION_KIND_NONE;
   case CompletionKind::Import:
     return SWIFTIDE_COMPLETION_KIND_IMPORT;
+  case CompletionKind::Using:
+    return SWIFTIDE_COMPLETION_KIND_USING;
   case CompletionKind::UnresolvedMember:
     return SWIFTIDE_COMPLETION_KIND_UNRESOLVEDMEMBER;
   case CompletionKind::DotExpr:

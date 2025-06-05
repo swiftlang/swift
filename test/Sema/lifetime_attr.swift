@@ -63,3 +63,24 @@ do {
 // rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
 @lifetime(span: borrow holder)
 func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter must be 'inout'}}
+
+@lifetime(&ne)
+func inoutLifetimeDependence(_ ne: inout NE) -> NE {
+  ne
+}
+
+@lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(&k)' instead}}
+func dependOnEscapable(_ k: inout Klass) -> NE {
+  NE()
+}
+
+@lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow k)' instead}}
+func dependOnEscapable(_ k: borrowing Klass) -> NE { 
+  NE()
+}
+
+@lifetime(copy k) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
+func dependOnEscapable(_ k: consuming Klass) -> NE { 
+  NE()
+}
+

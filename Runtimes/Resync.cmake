@@ -96,6 +96,9 @@ endforeach()
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
 copy_files("" "Core" FILES "Info.plist.in")
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Synchronization/Info.plist.in")
+copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
+
 # Platform Overlays
 
 # Copy magic linker symbols
@@ -104,11 +107,35 @@ copy_library_sources("linker-support" "" "Overlay")
 message(STATUS "Clang[${StdlibSources}/public/ClangOverlays] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/clang")
 copy_files(public/ClangOverlays Overlay/clang FILES float.swift.gyb)
 
+# Android Overlay
+message(STATUS "Android modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Android/clang")
+copy_files(public/Platform Overlay/Android/clang
+  FILES
+    android.modulemap
+    posix_filesystem.apinotes
+    spawn.apinotes
+    SwiftAndroidNDK.h
+    SwiftBionic.h)
+
+message(STATUS "Android Android[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Android/Android")
+copy_files(public/Platform Overlay/Android/Android
+  FILES
+    Android.swift
+    Platform.swift
+    POSIXError.swift
+    TiocConstants.swift
+    tgmath.swift.gyb)
+
+message(STATUS "Android Math[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Android/Math")
+copy_files(public/Platform Overlay/Android/Math
+  FILES
+    Math.swift)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
 
-message(STATUS "Windows Modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang")
+message(STATUS "Windows modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang")
 copy_files(public/Platform Overlay/Windows/clang
   FILES
     ucrt.modulemap
@@ -129,6 +156,8 @@ copy_files(public/Platform Overlay/Windows/CRT
 # libraries, and test support libraries.
 
 # Supplemental Libraries
+copy_library_sources("Synchronization" "public" "Supplemental")
+
 
 # Copy StringProcessing, RegexParser, RegexBuilder
 if(NOT DEFINED StringProcessing_ROOT_DIR)

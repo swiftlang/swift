@@ -26,10 +26,14 @@ public struct FunctionConvention : CustomStringConvertible {
   let functionType: CanonicalType
   let hasLoweredAddresses: Bool
 
-  init(for functionType: CanonicalType, in function: Function) {
+  public init(for functionType: CanonicalType, in function: Function) {
+    self.init(for: functionType, hasLoweredAddresses: function.hasLoweredAddresses)
+  }
+
+  public init(for functionType: CanonicalType, hasLoweredAddresses: Bool) {
     assert(!functionType.hasTypeParameter, "requires contextual type")
     self.functionType = functionType
-    self.hasLoweredAddresses = function.hasLoweredAddresses
+    self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   /// All results including the error.
@@ -53,11 +57,15 @@ public struct FunctionConvention : CustomStringConvertible {
     : SILFunctionType_getNumPackResults(functionType.bridged)
   }
 
-  /// Indirect results including the error.
-  public var indirectSILResults: LazyFilterSequence<Results> {
-    hasLoweredAddresses
-    ? results.lazy.filter { $0.isSILIndirect }
-    : results.lazy.filter { $0.convention == .pack }
+  /// Returns the indirect result - including the error - at `index`.
+  public func indirectSILResult(at index: Int) -> ResultInfo {
+    let indirectResults = results.lazy.filter {
+      hasLoweredAddresses ? $0.isSILIndirect : $0.convention == .pack
+    }
+    // Note that subscripting a LazyFilterCollection (with the base index, e.g. `Int`) does not work
+    // as expected, because it returns the nth element of the base collection!
+    // Therefore we need to implement the subscript "manually".
+    return indirectResults.enumerated().first{ $0.offset == index }!.element
   }
 
   public var parameters: Parameters {
@@ -209,7 +217,7 @@ public struct ParameterInfo : CustomStringConvertible {
 }
 
 extension FunctionConvention {
-  public struct Parameters : Collection {
+  public struct Parameters : RandomAccessCollection {
     let bridged: BridgedParameterInfoArray
     let hasLoweredAddresses: Bool
 

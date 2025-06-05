@@ -323,23 +323,16 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
-      overridden.insert(overrides);
-
-      // Because initializers from Objective-C base classes have greater
-      // visibility than initializers written in Swift classes, we can
-      // have a "break" in the set of declarations we found, where
-      // C.init overrides B.init overrides A.init, but only C.init and
-      // A.init are in the chain. Make sure we still remove A.init from the
-      // set in this case.
-      if (decl->getBaseName().isConstructor()) {
-        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
-        ///        cause instead (incomplete circularity detection).
-        assert(decl != overrides && "Circular class inheritance?");
-        decl = overrides;
-        continue;
+      if (!overridden.insert(overrides).second) {
+        // If we've already seen a decl then there's no need to visit the decls
+        // that it overrides since they should already be in the set. This also
+        // prevents infinite loops in the case that the AST contains an
+        // override chain with a cycle due to circular inheritance.
+        break;
       }
 
-      break;
+      DEBUG_ASSERT(decl != overrides && "Circular class inheritance?");
+      decl = overrides;
     }
   }
 
@@ -2317,6 +2310,13 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (!ObjCMethodLookup && !createObjCMethodLookup())
     return;
 
+  // Only record API decls.
+  Decl *abiRoleDecl = method;
+  if (auto accessor = dyn_cast<AccessorDecl>(method))
+    abiRoleDecl = accessor->getStorage();
+  if (!ABIRoleInfo(abiRoleDecl).providesAPI())
+    return;
+
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
@@ -2371,7 +2371,9 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
 /// the given context.
 static bool shouldRequireImportsInContext(const DeclContext *lookupContext) {
   auto &ctx = lookupContext->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return false;
 
   // Code outside of the main module (which is often synthesized) isn't subject
@@ -2388,6 +2390,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
                                      ValueDecl *decl,
                                      bool onlyCompleteObjectInits,
                                      bool requireImport) {
+  auto &ctx = dc->getASTContext();
+
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -2405,19 +2409,43 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl) &&
-      !dc->getASTContext().isAccessControlDisabled()) {
+  if (!(options & NL_IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
     bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
   }
 
-  // Check that there is some import in the originating context that makes this
-  // decl visible.
-  if (requireImport && !(options & NL_IgnoreMissingImports))
-    if (!dc->isDeclImported(decl))
-      return false;
+  if (requireImport) {
+    // Check that there is some import in the originating context that makes
+    // this decl visible.
+    if (!(options & NL_IgnoreMissingImports)) {
+      if (!dc->isDeclImported(decl))
+        return false;
+    }
+
+    // Unlike in Swift, Obj-C allows method overrides to be declared in
+    // extensions (categories), even outside of the module that defines the
+    // type that is being extended. When MemberImportVisibility is enabled,
+    // if these overrides are not filtered out they can hijack name
+    // lookup and cause the compiler to insist that the module that defines
+    // the extension be imported, contrary to developer expectations.
+    //
+    // Filter results belonging to these extensions out, even when ignoring
+    // missing imports, if we're in a context that requires imports to access
+    // member declarations.
+    if (decl->getOverriddenDecl()) {
+      if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+        if (auto *nominal = extension->getExtendedNominal()) {
+          auto extensionMod = extension->getModuleContext();
+          auto nominalMod = nominal->getModuleContext();
+          if (!extensionMod->isSameModuleLookingThroughOverlays(nominalMod) &&
+              !dc->isDeclImported(extension))
+            return false;
+        }
+      }
+    }
+  }
 
   // Check that it has the appropriate ABI role.
   if (!ABIRoleInfo(decl).matchesOptions(options))
@@ -2710,6 +2738,18 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
         if (auto superclassDecl = classDecl->getSuperclassDecl())
           if (visited.insert(superclassDecl).second)
             stack.push_back(superclassDecl);
+      }
+    }
+
+    // Qualified name lookup can find generic value parameters.
+    auto gpList = current->getGenericParams();
+
+    // .. But not in type contexts (yet)
+    if (!(options & NL_OnlyTypes) && gpList && !member.isSpecial()) {
+      auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
+
+      if (gp && gp->isValue()) {
+        decls.push_back(gp);
       }
     }
 
@@ -3183,6 +3223,12 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                        isolated->getBase(), dc, options);
   }
 
+  case TypeReprKind::CallerIsolated: {
+    auto callerIsolated = cast<CallerIsolatedTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       callerIsolated->getBase(), dc, options);
+  }
+
   case TypeReprKind::Composition: {
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
@@ -3547,7 +3593,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   // inaccessible due to missing imports. The missing imports will be diagnosed
   // elsewhere.
   if (referenced.first.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
                                              ext->getParent(), options);
@@ -3953,9 +4000,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                 .diagnose(loc, diag::warn_property_wrapper_module_scope, name,
                           moduleName)
                 .fixItInsert(loc, moduleName.str().str() + ".");
-            ctx.Diags.diagnose(assocType, diag::kind_declname_declared_here,
-                               assocType->getDescriptiveKind(),
-                               assocType->getName());
+            ctx.Diags.diagnose(assocType, diag::decl_declared_here_with_kind,
+                               assocType);
 
             auto *baseTR = UnqualifiedIdentTypeRepr::create(
                 ctx, nameLoc, DeclNameRef(moduleName));

@@ -1510,3 +1510,21 @@ bb0:
   dealloc_stack %0 : $*X
   return %4 : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: Escape information for test_vector_base_addr_escaping:
+// CHECK:       return[]:   %1 = alloc_ref $X
+// CHECK:       End function test_vector_base_addr_escaping
+sil @test_vector_base_addr_escaping : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_stack $Builtin.FixedArray<10, X>
+  %1 = alloc_ref $X
+  %2 = vector_base_addr %0
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = index_addr %2, %3
+  store %1 to %4
+  %6 = vector_base_addr %0
+  %7 = index_addr %6, %3
+  %8 = load %4
+  dealloc_stack %0
+  return %8
+}

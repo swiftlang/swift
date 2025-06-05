@@ -770,6 +770,7 @@ Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
 Added: _$sSBsE5radixSivpZMV
 Added: _$sSFsE8ulpOfOnexvpZMV
 Added: _$sSUsE8isSignedSbvpZMV
@@ -795,31 +796,128 @@ Added: _$sSS5IndexVs28CustomDebugStringConvertiblesWP
 Added: _$ss4SpanVMa
 Added: _$ss4SpanVMn
 Added: _$ss4SpanVsRi_zrlE6_countSivg
-Added: _$ss4SpanVsRi_zrlE6_countSivpMV
 Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvg
-Added: _$ss4SpanVsRi_zrlE8_pointerSVSgvpMV
-Added: _$ss4SpanVsRi_zrlE5countSivpMV
-Added: _$ss4SpanVsRi_zrlE7indicesSnySiGvpMV
-Added: _$ss4SpanVsRi_zrlE7isEmptySbvpMV
-Added: _$ss4SpanVss15BitwiseCopyableRzlE9uncheckedxSi_tcipMV
-Added: _$ss4SpanVss15BitwiseCopyableRzlEyxSicipMV
-Added: _$ss7RawSpanV11byteOffsetsSnySiGvpMV
 Added: _$ss7RawSpanV6_countSivg
-Added: _$ss7RawSpanV6_countSivpMV
-Added: _$ss7RawSpanV7isEmptySbvpMV
 Added: _$ss7RawSpanV8_pointerSVSgvg
-Added: _$ss7RawSpanV8_pointerSVSgvpMV
-Added: _$ss7RawSpanV9byteCountSivpMV
 Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
+
+// SE-0464 UTF8Span
+Added: _$sSS7copyingSSs8UTF8SpanV_tcfC
+Added: _$sSS8utf8Spans04UTF8B0Vvg
+Added: _$sSs8utf8Spans04UTF8B0Vvg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvM
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvpMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV11byteOffsetsSnySiGvs
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV11descriptionSSvg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV11descriptionSSvpMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV2eeoiySbAF_AFtFZ
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV11descriptionSSvg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV11descriptionSSvpMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV15truncatedScalarAHvpZMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV20overlongEncodingByteAHvpZMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV22surrogateCodePointByteAHvpZMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV26unexpectedContinuationByteAHvpZMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV32invalidNonSurrogateCodePointByteAHvpZMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValueAHSgs5UInt8V_tcfC
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvM
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8VvpMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindV8rawValues5UInt8Vvs
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVMa
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVMn
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVN
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVSHsMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVSHsWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVSQsMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVSQsWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVSYsMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVSYsWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVs0D0sMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVs0D0sWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVs23CustomStringConvertiblesMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4KindVs23CustomStringConvertiblesWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4hash4intoys6HasherVz_tF
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvM
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvpMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV4kindAF4KindVvs
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV9hashValueSivg
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorV9hashValueSivpMV
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVMa
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVMn
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVN
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVSHsMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVSHsWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVSQsMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVSQsWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVs0D0sMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVs0D0sWP
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVs23CustomStringConvertiblesMc
+Added: _$ss7UnicodeO4UTF8O15ValidationErrorVs23CustomStringConvertiblesWP
+Added: _$ss7UnicodeO4UTF8O15_checkAllErrorsySayAD15ValidationErrorVGxSTRzs5UInt8V7ElementRtzlFZ
+Added: _$ss8UTF8SpanV9unchecked12isKnownASCIIABs0B0Vys5UInt8VG_SbtcfC
+Added: _$ss8UTF8SpanV10validatingABs0B0Vys5UInt8VG_ts7UnicodeO0A0O15ValidationErrorVYKcfC
+Added: _$ss8UTF8SpanV11checkForNFC10quickCheckS2b_tF
+Added: _$ss8UTF8SpanV13checkForASCIISbyF
+Added: _$ss8UTF8SpanV14_countAndFlagss6UInt64VvM
+Added: _$ss8UTF8SpanV14_countAndFlagss6UInt64Vvg
+Added: _$ss8UTF8SpanV14_countAndFlagss6UInt64Vvs
+Added: _$ss8UTF8SpanV17CharacterIteratorV11skipForward2byS2i_tF
+Added: _$ss8UTF8SpanV17CharacterIteratorV11skipForwardSiyF
+Added: _$ss8UTF8SpanV17CharacterIteratorV21currentCodeUnitOffsetSivg
+Added: _$ss8UTF8SpanV17CharacterIteratorV4nextSJSgyF
+Added: _$ss8UTF8SpanV17CharacterIteratorV5reset20roundingForwardsFromySi_tF
+Added: _$ss8UTF8SpanV17CharacterIteratorV5reset21roundingBackwardsFromySi_tF
+Added: _$ss8UTF8SpanV17CharacterIteratorV5reset11toUncheckedySi_tF
+Added: _$ss8UTF8SpanV17CharacterIteratorV6prefixAByF
+Added: _$ss8UTF8SpanV17CharacterIteratorV6suffixAByF
+Added: _$ss8UTF8SpanV17CharacterIteratorV8previousSJSgyF
+Added: _$ss8UTF8SpanV17CharacterIteratorV8skipBack2byS2i_tF
+Added: _$ss8UTF8SpanV17CharacterIteratorV8skipBackSiyF
+Added: _$ss8UTF8SpanV17CharacterIteratorV9codeUnitsABvg
+Added: _$ss8UTF8SpanV17CharacterIteratorVMa
+Added: _$ss8UTF8SpanV17CharacterIteratorVMn
+Added: _$ss8UTF8SpanV17CharacterIteratorVN
+Added: _$ss8UTF8SpanV17CharacterIteratorVyAdBcfC
+Added: _$ss8UTF8SpanV18_unsafeBaseAddressSVSgvM
+Added: _$ss8UTF8SpanV18_unsafeBaseAddressSVSgvg
+Added: _$ss8UTF8SpanV18_unsafeBaseAddressSVSgvs
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV11skipForward2byS2i_tF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV11skipForwardSiyF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV21currentCodeUnitOffsetSivg
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV4nexts0C0O0D0VSgyF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV5reset20roundingForwardsFromySi_tF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV5reset21roundingBackwardsFromySi_tF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV5reset11toUncheckedySi_tF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV6prefixAByF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV6suffixAByF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV8previouss0C0O0D0VSgyF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV8skipBack2byS2i_tF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV8skipBackSiyF
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorV9codeUnitsABvg
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorVMa
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorVMn
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorVN
+Added: _$ss8UTF8SpanV21UnicodeScalarIteratorVyAdBcfC
+Added: _$ss8UTF8SpanV21isCanonicallyLessThanySbABF
+Added: _$ss8UTF8SpanV21makeCharacterIteratorAB0dE0VyF
+Added: _$ss8UTF8SpanV23isCanonicallyEquivalent2toSbAB_tF
+Added: _$ss8UTF8SpanV25makeUnicodeScalarIteratorAB0deF0VyF
+Added: _$ss8UTF8SpanV4spans0B0Vys5UInt8VGvg
+Added: _$ss8UTF8SpanV7isEmptySbvg
+Added: _$ss8UTF8SpanVMa
+Added: _$ss8UTF8SpanVMn
+Added: _$ss8UTF8SpanVN
+
 
 // SE-0467 MutableSpan and MutableRawSpan
 Added: _$ss11MutableSpanVMa
 Added: _$ss11MutableSpanVMn
 Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
 Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
-Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
 Added: _$ss14MutableRawSpanV6_countSivg
 Added: _$ss14MutableRawSpanV8_pointerSvSgvg
 Added: _$ss14MutableRawSpanVMa
@@ -827,21 +925,15 @@ Added: _$ss14MutableRawSpanVMn
 Added: _$ss14MutableRawSpanVN
 
 // SE-0456 Span-providing properties
-Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
-Added: _$sSW5bytess7RawSpanVvpMV
-Added: _$sSa4spans4SpanVyxGvpMV
-Added: _$sSrsRi_zrlE4spans4SpanVyxGvpMV
-Added: _$sSw5bytess7RawSpanVvpMV
-Added: _$ss10ArraySliceV4spans4SpanVyxGvpMV
-Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
-Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
-Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
-Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
 
 // SE-0467 mutableSpan properties
 Added: _$sSa11mutableSpans07MutableB0VyxGvr
 Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
 Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
+Added: _$ss11InlineArrayVsRi__rlE11mutableSpans07MutableD0Vyq_Gvr
+Added: _$ss15CollectionOfOneV11mutableSpans07MutableE0VyxGvr
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
@@ -881,9 +973,6 @@ Added: _$ss11InlineArrayVMa
 
 // InlineArray nominal type descriptor
 Added: _$ss11InlineArrayVMn
-
-// InlineArray.count property descriptor
-Added: _$ss11InlineArrayVsRi__rlE5countSivpZMV
 
 // InlineArray._storage _read accessor
 Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvr
@@ -934,12 +1023,6 @@ Added: _swift_ConformanceExecutionContextSize
 Added: _swift_conformsToProtocolWithExecutionContext
 Added: _swift_isInConformanceExecutionContext
 
-// Swift Settings
-Added: _$ss12SwiftSettingVABycfC
-Added: _$ss12SwiftSettingVMa
-Added: _$ss12SwiftSettingVMn
-Added: _$ss12SwiftSettingVN
-
 // EnumeratedSequence Collection conformances
 Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
 Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc
@@ -962,3 +1045,43 @@ Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
 
 // Indirect tagged string creation
 Added: __swift_stdlib_CreateIndirectTaggedPointerString
+
+// Span backward deployment
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
+
+// Duration.nanoseconds(_:)
+Added: _$ss8DurationV11nanosecondsyABSdFZ
+
+// var InlineArray._storage
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvM
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvs
+
+// rdar://151628396: Retroactively give property descriptors to conditionally-copyable/escapable properties
+Added: _$ss11InlineArrayVsRi__rlE10startIndexSivpMV
+Added: _$ss11InlineArrayVsRi__rlE5countSivpMV
+Added: _$ss11InlineArrayVsRi__rlE7_bufferSRyq_GvpMV
+Added: _$ss11InlineArrayVsRi__rlE7indicesSnySiGvpMV
+Added: _$ss11InlineArrayVsRi__rlE7isEmptySbvpMV
+Added: _$ss11InlineArrayVsRi__rlE8_addressSPyq_GvpMV
+Added: _$ss11InlineArrayVsRi__rlE8endIndexSivpMV
+Added: _$ss8UTF8SpanV10_countMasks6UInt64VvpZMV
+Added: _$ss8UTF8SpanV10_flagsMasks6UInt64VvpZMV
+Added: _$ss8UTF8SpanV7_nfcBits6UInt64VvpZMV
+Added: _$ss8UTF8SpanV9_asciiBits6UInt64VvpZMV

@@ -1566,7 +1566,9 @@ public:
   /// This may be true either because the type is structurally addressable for
   /// dependencies, or because it was explicitly marked as `@_addressable`
   /// in its declaration.
-  bool isFunctionParamAddressable(TypeConverter &TC, unsigned index) const;
+  bool isFunctionParamAddressable(unsigned index) const;
+  
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
   /// Given that the value being abstracted is a function type, and that
   /// this is not an opaque abstraction pattern, return the number of

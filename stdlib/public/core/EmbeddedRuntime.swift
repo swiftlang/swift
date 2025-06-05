@@ -157,7 +157,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
   } else {
     alignment = alignMask + 1
   }
-  return unsafe alignedAlloc(size: size, alignment: alignment)
+  return alignedAlloc(size: size, alignment: alignment)
 }
 
 @_cdecl("swift_slowDealloc")
@@ -171,7 +171,7 @@ public func swift_allocObject(metadata: Builtin.RawPointer, requiredSize: Int, r
 }
 
 func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: Int, requiredAlignmentMask: Int) -> UnsafeMutablePointer<HeapObject> {
-  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+  let p = swift_slowAlloc(requiredSize, requiredAlignmentMask)!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   unsafe object.pointee.refcount = 1
@@ -236,6 +236,15 @@ func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object
   return unsafe object
 }
 
+@unsafe
+public var _emptyBoxStorage: (Int, Int) = (/*isa*/0, /*refcount*/-1)
+
+@_cdecl("swift_allocEmptyBox")
+public func swift_allocEmptyBox() -> Builtin.RawPointer {
+  let box = unsafe Builtin.addressof(&_emptyBoxStorage)
+  swift_retain(object: box)
+  return box
+}
 
 
 /// Refcounting
@@ -307,6 +316,7 @@ func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<Heap
 }
 
 @_cdecl("swift_retain")
+@discardableResult
 public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
   if !isValidPointerForNativeRetain(object: object) { return object }
 
@@ -335,6 +345,7 @@ func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> Uns
 }
 
 @_cdecl("swift_bridgeObjectRetain")
+@discardableResult
 public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawPointer {
   return swift_bridgeObjectRetain_n(object: object, n: 1)
 }

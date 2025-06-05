@@ -181,16 +181,19 @@ std::optional<Version> Version::getEffectiveLanguageVersion() const {
     static_assert(SWIFT_VERSION_MAJOR == 6,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
-  case 7:
-    // Allow version '7' in asserts compilers *only* so that we can start
-    // testing changes planned for after Swift 6. Note that it's still not
-    // listed in `Version::getValidEffectiveVersions()`.
-    // FIXME: When Swift 7 becomes real, remove 'REQUIRES: swift7' from tests
-    //        using '-swift-version 7'.
+
+  // FIXME: When Swift 7 becomes real, remove 'REQUIRES: swift7' from tests
+  //        using '-swift-version 7'.
+
+  case Version::getFutureMajorLanguageVersion():
+    // Allow the future language mode version in asserts compilers *only* so
+    // that we can start testing changes planned for after the current latest
+    // language mode. Note that it'll not be listed in
+    // `Version::getValidEffectiveVersions()`.
 #ifdef NDEBUG
     LLVM_FALLTHROUGH;
 #else
-    return Version{7};
+    return Version{Version::getFutureMajorLanguageVersion()};
 #endif
   default:
     return std::nullopt;
@@ -301,17 +304,9 @@ StringRef getSwiftRevision() {
 #endif
 }
 
-bool isCurrentCompilerTagged() {
-#ifdef SWIFT_COMPILER_VERSION
-  return true;
-#else
-  return false;
-#endif
-}
-
 StringRef getCurrentCompilerTag() {
-#ifdef SWIFT_COMPILER_VERSION
-  return SWIFT_COMPILER_VERSION;
+#ifdef SWIFT_TOOLCHAIN_VERSION
+  return SWIFT_TOOLCHAIN_VERSION;
 #else
   return StringRef();
 #endif

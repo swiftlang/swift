@@ -87,6 +87,7 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
 
   public var `class`: ClassDecl { bridged.getClass().getAs(ClassDecl.self) }
 
+  /// Returns the concrete class type if this is a specialized vTable.
   public var specializedClassType: Type? { bridged.getSpecializedClassType().typeOrNil }
 
   public var isSpecialized: Bool { specializedClassType != nil }

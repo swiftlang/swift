@@ -73,7 +73,7 @@ View getViewFromEither(View view1 [[clang::lifetimebound]], View view2 [[clang::
 struct SWIFT_NONESCAPABLE TestAnnotationTranslation {
     TestAnnotationTranslation() : member(nullptr) {}
     TestAnnotationTranslation(const int *p [[clang::lifetimebound]]) : member(p) {}
-    TestAnnotationTranslation(const TestAnnotationTranslation& [[clang::lifetimebound]]) = default;
+    TestAnnotationTranslation(const TestAnnotationTranslation& other [[clang::lifetimebound]]) = default;
 private:
     const int *member;
 };
@@ -109,6 +109,12 @@ struct SWIFT_NONESCAPABLE AggregateView {
     const int *member;
 };
 
+namespace NS {
+    View getView(const Owner& owner [[clang::lifetimebound]]) {
+        return View(&owner.data);
+    }
+}
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
@@ -123,6 +129,7 @@ struct SWIFT_NONESCAPABLE AggregateView {
 // CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned CaptureView
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil [clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 
 //--- test.swift
 
@@ -144,6 +151,7 @@ public func test() {
     var cv = getCaptureView(o)
     cv.captureView(v1)
     cv.handOut(&v1)
+    var _ = NS.getView(o)
 }
 
 public func test2(_ x: AggregateView) {

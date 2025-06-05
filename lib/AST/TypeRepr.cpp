@@ -484,7 +484,7 @@ void InlineArrayTypeRepr::printImpl(ASTPrinter &Printer,
                                     const PrintOptions &Opts) const {
   Printer << "[";
   printTypeRepr(getCount(), Printer, Opts);
-  Printer << " x ";
+  Printer << " of ";
   printTypeRepr(getElement(), Printer, Opts);
   Printer << "]";
 }
@@ -921,6 +921,11 @@ StringRef OwnershipTypeRepr::getSpecifierSpelling() const {
 
 ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
   return ParamDecl::getValueOwnershipForSpecifier(getSpecifier());
+}
+
+void CallerIsolatedTypeRepr::printImpl(ASTPrinter &Printer,
+                                       const PrintOptions &Opts) const {
+  Printer.printKeyword("nonisolated(nonsending)", Opts);
 }
 
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,

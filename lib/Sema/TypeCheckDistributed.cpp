@@ -565,8 +565,7 @@ bool CheckDistributedFunctionRequest::evaluate(
         if (checkConformance(paramTy, req).isInvalid()) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
-              param->getArgumentName().str(), param->getInterfaceType(),
-              func->getDescriptiveKind(),
+              param->getArgumentName(), param->getInterfaceType(), func,
               serializationRequirementIsCodable ? "Codable"
                                                 : req->getNameStr());
 
@@ -709,6 +708,18 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   // without it there's no reason to check the decl in more detail anyway.
   if (!swift::ensureDistributedModuleLoaded(nominal))
     return;
+
+  auto &C = nominal->getASTContext();
+  auto loc = nominal->getLoc();
+  recordRequiredImportAccessLevelForDecl(
+    C.getDistributedActorDecl(), nominal, nominal->getEffectiveAccess(),
+    [&](AttributedImport<ImportedModule> attributedImport) {
+  ModuleDecl *importedVia = attributedImport.module.importedModule,
+             *sourceModule = nominal->getModuleContext();
+  C.Diags.diagnose(loc, diag::module_api_import, nominal, importedVia,
+                         sourceModule, importedVia == sourceModule,
+                         /*isImplicit*/ false);
+});
 
   // ==== Constructors
   // --- Get the default initializer

@@ -340,7 +340,7 @@ bool replayCachedCompilerOutputs(
         createCompileJobCacheKeyForOutput(CAS, BaseKey, InputIndex);
 
     if (!OutputKey) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
+      Diag.diagnose(SourceLoc(), diag::error_cas, "output cache key creation",
                     toString(OutputKey.takeError()));
       return std::nullopt;
     }
@@ -348,7 +348,7 @@ bool replayCachedCompilerOutputs(
     auto OutID = CAS.getID(*OutputKey);
     auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
     if (!OutputRef) {
-      Diag.diagnose(SourceLoc(), diag::error_cas,
+      Diag.diagnose(SourceLoc(), diag::error_cas, "cache key lookup",
                     toString(OutputRef.takeError()));
       return std::nullopt;
     }
@@ -403,20 +403,24 @@ std::unique_ptr<llvm::MemoryBuffer>
 loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
                                     DiagnosticEngine &Diag, StringRef CacheKey,
                                     file_types::ID Kind, StringRef Filename) {
-  auto failure = [&](Error Err) {
-    Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
+  auto failure = [&](StringRef Stage, Error Err) {
+    Diag.diagnose(SourceLoc(), diag::error_cas, Stage,
+                  toString(std::move(Err)));
     return nullptr;
   };
   auto ID = CAS.parseID(CacheKey);
-  if (!ID)
-    return failure(ID.takeError());
+  if (!ID) {
+    Diag.diagnose(SourceLoc(), diag::error_invalid_cas_id, CacheKey,
+                  toString(ID.takeError()));
+    return nullptr;
+  }
   auto Ref = CAS.getReference(*ID);
   if (!Ref)
     return nullptr;
 
   auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
   if (!OutputRef)
-    return failure(OutputRef.takeError());
+    return failure("lookup cache key", OutputRef.takeError());
 
   if (!*OutputRef)
     return nullptr;
@@ -435,7 +439,7 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
             Buffer = Proxy->getMemoryBuffer(Filename);
             return Error::success();
           }))
-    return failure(std::move(Err));
+    return failure("loading cached results", std::move(Err));
 
   return Buffer;
 }
@@ -445,53 +449,14 @@ static llvm::Error createCASObjectNotFoundError(const llvm::cas::CASID &ID) {
                            "CASID missing from Object Store " + ID.toString());
 }
 
-static Expected<ObjectRef> mergeCASFileSystem(ObjectStore &CAS,
-                                              ArrayRef<std::string> FSRoots) {
-  llvm::cas::HierarchicalTreeBuilder Builder;
-  for (auto &Root : FSRoots) {
-    auto ID = CAS.parseID(Root);
-    if (!ID)
-      return ID.takeError();
-
-    auto Ref = CAS.getReference(*ID);
-    if (!Ref)
-      return createCASObjectNotFoundError(*ID);
-    Builder.pushTreeContent(*Ref, "");
-  }
-
-  auto NewRoot = Builder.create(CAS);
-  if (!NewRoot)
-    return NewRoot.takeError();
-
-  return NewRoot->getRef();
-}
-
 Expected<IntrusiveRefCntPtr<vfs::FileSystem>>
-createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
-                    ArrayRef<std::string> IncludeTrees,
-                    ArrayRef<std::string> IncludeTreeFileList) {
-  assert(!FSRoots.empty() || !IncludeTrees.empty() ||
+createCASFileSystem(ObjectStore &CAS, const std::string &IncludeTree,
+                    const std::string &IncludeTreeFileList) {
+  assert(!IncludeTree.empty() ||
          !IncludeTreeFileList.empty() && "no root ID provided");
-  if (FSRoots.size() == 1 && IncludeTrees.empty()) {
-    auto ID = CAS.parseID(FSRoots.front());
-    if (!ID)
-      return ID.takeError();
-    return createCASFileSystem(CAS, *ID);
-  }
 
-  auto NewRoot = mergeCASFileSystem(CAS, FSRoots);
-  if (!NewRoot)
-    return NewRoot.takeError();
-
-  auto FS = createCASFileSystem(CAS, CAS.getID(*NewRoot));
-  if (!FS)
-    return FS.takeError();
-
-  auto CASFS = makeIntrusiveRefCnt<vfs::OverlayFileSystem>(std::move(*FS));
-  std::vector<clang::cas::IncludeTree::FileList::FileEntry> Files;
-  // Push all Include File System onto overlay.
-  for (auto &Tree : IncludeTrees) {
-    auto ID = CAS.parseID(Tree);
+  if (!IncludeTree.empty()) {
+    auto ID = CAS.parseID(IncludeTree);
     if (!ID)
       return ID.takeError();
 
@@ -506,47 +471,33 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
     if (!ITF)
       return ITF.takeError();
 
-    auto Err = ITF->forEachFile(
-        [&](clang::cas::IncludeTree::File File,
-            clang::cas::IncludeTree::FileList::FileSizeTy Size) -> llvm::Error {
-          Files.push_back({File.getRef(), Size});
-          return llvm::Error::success();
-        });
+    auto ITFS = clang::cas::createIncludeTreeFileSystem(*ITF);
+    if (!ITFS)
+      return ITFS.takeError();
 
-    if (Err)
-      return std::move(Err);
+    return *ITFS;
   }
 
-  for (auto &List: IncludeTreeFileList) {
-    auto ID = CAS.parseID(List);
+  if (!IncludeTreeFileList.empty()) {
+    auto ID = CAS.parseID(IncludeTreeFileList);
     if (!ID)
       return ID.takeError();
 
     auto Ref = CAS.getReference(*ID);
     if (!Ref)
       return createCASObjectNotFoundError(*ID);
-    auto IT = clang::cas::IncludeTree::FileList::get(CAS, *Ref);
-    if (!IT)
-      return IT.takeError();
+    auto ITF = clang::cas::IncludeTree::FileList::get(CAS, *Ref);
+    if (!ITF)
+      return ITF.takeError();
 
-    auto Err = IT->forEachFile(
-        [&](clang::cas::IncludeTree::File File,
-            clang::cas::IncludeTree::FileList::FileSizeTy Size) -> llvm::Error {
-          Files.push_back({File.getRef(), Size});
-          return llvm::Error::success();
-        });
+    auto ITFS = clang::cas::createIncludeTreeFileSystem(*ITF);
+    if (!ITFS)
+      return ITFS.takeError();
 
-    if (Err)
-      return std::move(Err);
+    return *ITFS;
   }
 
-  auto ITFS = clang::cas::createIncludeTreeFileSystem(CAS, Files);
-  if (!ITFS)
-    return ITFS.takeError();
-
-  CASFS->pushOverlay(std::move(*ITFS));
-
-  return CASFS;
+  return nullptr;
 }
 
 std::vector<std::string> remapPathsFromCommandLine(

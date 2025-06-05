@@ -38,8 +38,9 @@ class SILResultInfo;
 
 enum class ParsedLifetimeDependenceKind : uint8_t {
   Default = 0,
-  Scope,
-  Inherit // Only used with deserialized decls
+  Borrow,
+  Inherit, // Only used with deserialized decls
+  Inout
 };
 
 enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
@@ -182,6 +183,7 @@ public:
          ArrayRef<LifetimeDescriptor> sources,
          std::optional<LifetimeDescriptor> targetDescriptor = std::nullopt);
 
+  std::string getString() const;
   SourceLoc getLoc() const { return startLoc; }
   SourceLoc getStartLoc() const { return startLoc; }
   SourceLoc getEndLoc() const { return endLoc; }
@@ -192,35 +194,6 @@ public:
 
   std::optional<LifetimeDescriptor> getTargetDescriptor() const {
     return targetDescriptor;
-  }
-
-  std::string getString() const {
-    std::string result = "@lifetime(";
-    if (targetDescriptor.has_value()) {
-      result += targetDescriptor->getString();
-      result += ": ";
-    }
-
-    bool firstElem = true;
-    for (auto source : getSources()) {
-      if (!firstElem) {
-        result += ", ";
-      }
-      switch (source.getParsedLifetimeDependenceKind()) {
-      case ParsedLifetimeDependenceKind::Scope:
-        result += "borrow ";
-        break;
-      case ParsedLifetimeDependenceKind::Inherit:
-        result += "copy ";
-        break;
-      default:
-        break;
-      }
-      result += source.getString();
-      firstElem = false;
-    }
-    result += ")";
-    return result;
   }
 };
 
@@ -247,17 +220,32 @@ public:
         targetIndex(targetIndex) {
     assert(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
-    // FIXME: This assert can trigger when Optional/Result support ~Escapable use (rdar://147765187)
-    // assert(!inheritLifetimeParamIndices ||
-    //        !inheritLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices && inheritLifetimeParamIndices->isEmpty()) {
-      inheritLifetimeParamIndices = nullptr;
-    }
-    assert(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
+    ASSERT(!inheritLifetimeParamIndices ||
+           !inheritLifetimeParamIndices->isEmpty());
+    ASSERT(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
     assert((!addressableParamIndices
             || !conditionallyAddressableParamIndices
             || conditionallyAddressableParamIndices->isDisjointWith(
               addressableParamIndices)));
+
+    if (CONDITIONAL_ASSERT_enabled()) {
+      // Ensure inherit/scope/addressable param indices are of the same length
+      // or 0.
+      unsigned paramIndicesLength = 0;
+      if (inheritLifetimeParamIndices) {
+        paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
+      }
+      if (scopeLifetimeParamIndices) {
+        assert(paramIndicesLength == 0 ||
+               paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
+        paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
+      }
+      if (addressableParamIndices) {
+        assert(paramIndicesLength == 0 ||
+               paramIndicesLength == addressableParamIndices->getCapacity());
+        paramIndicesLength = addressableParamIndices->getCapacity();
+      }
+    }
   }
 
   operator bool() const { return !empty(); }
@@ -279,6 +267,19 @@ public:
   }
   bool hasAddressableParamIndices() const {
     return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+  }
+
+  unsigned getParamIndicesLength() const {
+    if (hasInheritLifetimeParamIndices()) {
+      return getInheritIndices()->getCapacity();
+    }
+    if (hasScopeLifetimeParamIndices()) {
+      return getScopeIndices()->getCapacity();
+    }
+    if (hasAddressableParamIndices()) {
+      return getAddressableIndices()->getCapacity();
+    }
+    return 0;
   }
 
   IndexSubset *getInheritIndices() const { return inheritLifetimeParamIndices; }
@@ -316,11 +317,6 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
-  bool checkAddressable(int index) const {
-    return hasAddressableParamIndices()
-      && getAddressableIndices()->contains(index);
-  }
-
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
@@ -354,6 +350,21 @@ public:
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
                          unsigned index);
+
+/// Helper to remove lifetime dependencies whose target references an
+/// Escapable type.
+///
+/// Returns true if the set of output lifetime dependencies is different from
+/// the set of input lifetime dependencies, false if there was no change.
+bool
+filterEscapableLifetimeDependencies(GenericSignature sig,
+        ArrayRef<LifetimeDependenceInfo> inputs,
+        SmallVectorImpl<LifetimeDependenceInfo> &outputs,
+        llvm::function_ref<Type (unsigned targetIndex)> getSubstTargetType);
+
+StringRef
+getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind);
+
 } // namespace swift
 
 #endif

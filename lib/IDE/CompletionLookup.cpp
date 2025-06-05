@@ -104,12 +104,18 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   llvm_unreachable("Unhandled CodeCompletionLiteralKind in switch.");
 }
 
-/// Whether funcType has a single argument (not including defaulted arguments)
-/// that is of type () -> ().
-static bool hasTrivialTrailingClosure(const FuncDecl *FD,
-                                      AnyFunctionType *funcType) {
-  ParameterListInfo paramInfo(funcType->getParams(), FD,
-                              /*skipCurriedSelf*/ FD->hasCurriedSelf());
+/// Whether the provided type has a single argument (not including defaulted
+/// arguments) that is of type () -> ().
+static bool hasTrivialTrailingClosure(const ValueDecl *VD, Type type) {
+  if (!VD->hasParameterList())
+    return false;
+
+  auto *funcType = type->getAs<AnyFunctionType>();
+  if (!funcType)
+    return false;
+
+  ParameterListInfo paramInfo(funcType->getParams(), VD,
+                              /*skipCurriedSelf*/ VD->hasCurriedSelf());
 
   if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
@@ -378,6 +384,23 @@ void CompletionLookup::addImportModuleNames() {
     }
 
     addModuleName(MD, Reason);
+  }
+}
+
+void CompletionLookup::addUsingSpecifiers() {
+  for (unsigned i = 0,
+                n = static_cast<unsigned>(UsingSpecifier::LastSpecifier) + 1;
+       i != n; ++i) {
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Keyword, SemanticContextKind::None);
+    switch (static_cast<UsingSpecifier>(i)) {
+    case UsingSpecifier::MainActor:
+      Builder.addTextChunk("@MainActor");
+      break;
+    case UsingSpecifier::Nonisolated:
+      Builder.addTextChunk("nonisolated");
+      break;
+    }
   }
 }
 
@@ -1946,6 +1969,36 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
   return {stash.data(), stash.size()};
 }
 
+void CompletionLookup::addMacroCallArguments(const MacroDecl *MD,
+                                             DeclVisibilityKind Reason,
+                                             bool forTrivialTrailingClosure) {
+  CodeCompletionResultBuilder Builder =
+      makeResultBuilder(CodeCompletionResultKind::Declaration,
+                        getSemanticContext(MD, Reason, DynamicLookupInfo()));
+  Builder.setAssociatedDecl(MD);
+
+  addValueBaseName(Builder, MD->getBaseIdentifier());
+
+  if (forTrivialTrailingClosure) {
+    Builder.addBraceStmtWithCursor(" { code }");
+  } else if (MD->parameterList && MD->parameterList->size() > 0) {
+    auto *macroTy = MD->getInterfaceType()->castTo<AnyFunctionType>();
+    Builder.addLeftParen();
+    addCallArgumentPatterns(Builder, macroTy, MD->parameterList,
+                            MD->getGenericSignature());
+    Builder.addRightParen();
+  }
+
+  auto roles = MD->getMacroRoles();
+  if (roles.containsOnly(MacroRole::Expression)) {
+    addTypeAnnotation(Builder, MD->getResultInterfaceType(),
+                      MD->getGenericSignature());
+  } else {
+    llvm::SmallVector<char, 0> stash;
+    Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
+  }
+}
+
 void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
                                          DeclVisibilityKind Reason) {
   if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
@@ -1962,30 +2015,10 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
       return;
   }
 
-  CodeCompletionResultBuilder Builder =
-      makeResultBuilder(CodeCompletionResultKind::Declaration,
-                        getSemanticContext(MD, Reason, DynamicLookupInfo()));
-  Builder.setAssociatedDecl(MD);
+  if (hasTrivialTrailingClosure(MD, MD->getInterfaceType()))
+    addMacroCallArguments(MD, Reason, /*forTrivialTrailingClosure*/ true);
 
-  addValueBaseName(Builder, MD->getBaseIdentifier());
-
-  Type macroType = MD->getInterfaceType();
-  if (MD->parameterList && MD->parameterList->size() > 0) {
-    Builder.addLeftParen();
-    addCallArgumentPatterns(Builder, macroType->castTo<AnyFunctionType>(),
-                            MD->parameterList,
-                            MD->getGenericSignature());
-    Builder.addRightParen();
-  }
-
-  auto roles = MD->getMacroRoles();
-  if (roles.containsOnly(MacroRole::Expression)) {
-    addTypeAnnotation(Builder, MD->getResultInterfaceType(),
-                      MD->getGenericSignature());
-  } else {
-    llvm::SmallVector<char, 0> stash;
-    Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
-  }
+  addMacroCallArguments(MD, Reason);
 }
 
 void CompletionLookup::addKeyword(StringRef Name, Type TypeAnnotation,
@@ -3139,6 +3172,10 @@ void CompletionLookup::getAttributeDeclParamCompletions(
     break;
   case ParameterizedDeclAttributeKind::Nonisolated:
     addDeclAttrParamKeyword("unsafe", /*Parameters=*/{}, "", false);
+    addDeclAttrParamKeyword("nonsending", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::InheritActorContext:
+    addDeclAttrParamKeyword("always", /*Parameters=*/{}, "", false);
     break;
   case ParameterizedDeclAttributeKind::AccessControl:
     addDeclAttrParamKeyword("set", /*Parameters=*/{}, "", false);
@@ -3500,54 +3537,23 @@ void CompletionLookup::lookupExternalModuleDecls(
 }
 
 void CompletionLookup::getStmtLabelCompletions(SourceLoc Loc, bool isContinue) {
-  class LabelFinder : public ASTWalker {
-    SourceManager &SM;
-    SourceLoc TargetLoc;
-    bool IsContinue;
+  auto *SF = CurrDeclContext->getParentSourceFile();
+  llvm::SmallPtrSet<Identifier, 4> labels;
+  for (auto *LS : ASTScope::lookupLabeledStmts(SF, Loc)) {
+    if (isContinue && !LS->isPossibleContinueTarget())
+      continue;
 
-  public:
-    SmallVector<Identifier, 2> Result;
+    auto labelInfo = LS->getLabelInfo();
+    if (!labelInfo)
+      continue;
 
-    /// Walk only the arguments of a macro.
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
+    auto label = labelInfo.Name;
+    if (!labels.insert(label).second)
+      continue;
 
-    LabelFinder(SourceManager &SM, SourceLoc TargetLoc, bool IsContinue)
-        : SM(SM), TargetLoc(TargetLoc), IsContinue(IsContinue) {}
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      if (SM.isBeforeInBuffer(S->getEndLoc(), TargetLoc))
-        return Action::SkipNode(S);
-
-      if (LabeledStmt *LS = dyn_cast<LabeledStmt>(S)) {
-        if (LS->getLabelInfo()) {
-          if (!IsContinue || LS->isPossibleContinueTarget()) {
-            auto label = LS->getLabelInfo().Name;
-            if (!llvm::is_contained(Result, label))
-              Result.push_back(label);
-          }
-        }
-      }
-
-      return Action::Continue(S);
-    }
-
-    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
-      return Action::Stop();
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (SM.isBeforeInBuffer(E->getEndLoc(), TargetLoc))
-        return Action::SkipNode(E);
-      return Action::Continue(E);
-    }
-  } Finder(CurrDeclContext->getASTContext().SourceMgr, Loc, isContinue);
-  const_cast<DeclContext *>(CurrDeclContext)->walkContext(Finder);
-  for (auto name : Finder.Result) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Pattern, SemanticContextKind::Local);
-    Builder.addTextChunk(name.str());
+    Builder.addTextChunk(label.str());
   }
 }
 

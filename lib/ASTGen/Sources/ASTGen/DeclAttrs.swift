@@ -117,8 +117,6 @@ extension ASTGenVisitor {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
       switch attrKind {
-      case .execution:
-        return handle(self.generateExecutionAttr(attribute: node)?.asDeclAttribute)
       case .ABI:
         return handle(self.generateABIAttr(attribute: node)?.asDeclAttribute)
       case .alignment:
@@ -181,6 +179,8 @@ extension ASTGenVisitor {
         return handle(self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute)
       case .specialize:
         return handle(self.generateSpecializeAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
+      case .specialized:
+        return handle(self.generateSpecializedAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .spiAccessControl:
         return handle(self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute)
       case .storageRestrictions:
@@ -197,6 +197,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atReasync))
       case .rethrows:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atRethrows))
+      case .concurrent:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .concurrent))
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -228,6 +230,8 @@ extension ASTGenVisitor {
         .dynamicCallable,
         .eagerMove,
         .exported,
+        .extensible,
+        .preEnumExtensibility,
         .discardableResult,
         .disfavoredOverload,
         .dynamicMemberLookup,
@@ -247,7 +251,6 @@ extension ASTGenVisitor {
         .ibSegueAction,
         .implementationOnly,
         .implicitSelfCapture,
-        .inheritActorContext,
         .inheritsConvenienceInitializers,
         .inlinable,
         .isolated,
@@ -310,6 +313,9 @@ extension ASTGenVisitor {
       case .referenceOwnership:
         // TODO: Diagnose.
         return handle(self.generateReferenceOwnershipAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
+      case .inheritActorContext:
+        return handle(self.generateInheritActorContextAttr(attribute: node)?.asDeclAttribute)
+
       case .async,
         .consuming,
         .borrowing,
@@ -356,33 +362,6 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
-  }
-
-  /// E.g.:
-  ///   ```
-  ///   @execution(concurrent)
-  ///   @execution(caller)
-  ///   ```
-  func generateExecutionAttr(attribute node: AttributeSyntax) -> BridgedExecutionAttr? {
-    let behavior: BridgedExecutionKind? = self.generateSingleAttrOption(
-      attribute: node,
-      {
-        switch $0.rawText {
-        case "concurrent": return .concurrent
-        case "caller": return .caller
-        default: return nil
-        }
-      }
-    )
-    guard let behavior else {
-      return nil
-    }
-    return .createParsed(
-      self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
-      behavior: behavior
-    )
   }
 
   /// E.g.:
@@ -1104,8 +1083,11 @@ extension ASTGenVisitor {
       lifetimeDependenceKind = .inherit
       descriptorExpr = copyExpr.expression
     } else if let borrowExpr = node.as(BorrowExprSyntax.self) {
-      lifetimeDependenceKind = .scope
+      lifetimeDependenceKind = .borrow
       descriptorExpr = borrowExpr.expression
+    } else if let inoutExpr = node.as(InOutExprSyntax.self) {
+      lifetimeDependenceKind = .inout
+      descriptorExpr = inoutExpr.expression
     } else {
       lifetimeDependenceKind = .default
       descriptorExpr = node
@@ -1411,27 +1393,47 @@ extension ASTGenVisitor {
 
   // FIXME: This is a decl modifier
   func generateNonisolatedAttr(attribute node: AttributeSyntax) -> BridgedNonisolatedAttr? {
-    let isUnsafe = self.generateSingleAttrOption(
+    let modifier: BridgedNonIsolatedModifier? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {
-        case "unsafe":
-          return true
-        default:
-          // FIXME: Diagnose.
-          return nil
+        case "unsafe": return .unsafe
+        case "nonsending": return .nonSending
+        default: return nil
         }
       },
-      valueIfOmitted: false
+      valueIfOmitted: BridgedNonIsolatedModifier.none
     )
-    guard let isUnsafe else {
+    guard let modifier else {
       return nil
     }
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      isUnsafe: isUnsafe
+      modifier: modifier
+    )
+  }
+
+  func generateInheritActorContextAttr(attribute node: AttributeSyntax) -> BridgedInheritActorContextAttr? {
+    let modifier: BridgedInheritActorContextModifier? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "always": return .always
+        default: return nil
+        }
+      },
+      valueIfOmitted: BridgedInheritActorContextModifier.none
+    )
+    guard let modifier else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      modifier: modifier
     )
   }
 
@@ -1871,7 +1873,40 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
-  ///   @_specialize(exporeted: true, T == Int)
+  ///   @specialized(T == Int)
+  ///   ```
+  func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
+    guard
+      let arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
+    else {
+      // TODO: Diagnose
+      return nil
+    }
+    let exported: Bool? = nil
+    let kind: BridgedSpecializationKind? = nil
+    var whereClause: BridgedTrailingWhereClause? = nil
+    let targetFunction: BridgedDeclNameRef? = nil
+    let spiGroups: [BridgedIdentifier] = []
+    let availableAttrs: [BridgedAvailableAttr] = []
+
+    whereClause = self.generate(genericWhereClause: arg.genericWhereClause)
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      whereClause: whereClause.asNullable,
+      exported: exported ?? false,
+      kind: kind ?? .full,
+      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      spiGroups: spiGroups.lazy.bridgedArray(in: self),
+      availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_specialize(exported: true, T == Int)
   ///   ```
   func generateSpecializeAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializeAttr? {
     guard
@@ -1880,7 +1915,6 @@ extension ASTGenVisitor {
       // TODO: Diagnose
       return nil
     }
-
     var exported: Bool?
     var kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
@@ -1891,7 +1925,7 @@ extension ASTGenVisitor {
     while let arg = args.popFirst() {
       switch arg {
       case .genericWhereClause(let arg):
-        whereClause =  self.generate(genericWhereClause: arg)
+        whereClause = self.generate(genericWhereClause: arg)
       case .specializeTargetFunctionArgument(let arg):
         if targetFunction != nil {
           // TODO: Diangose.
@@ -2405,12 +2439,14 @@ extension ASTGenVisitor {
   }
 
   func generateNonisolatedAttr(declModifier node: DeclModifierSyntax) -> BridgedNonisolatedAttr? {
-    let isUnsafe: Bool
+    let modifier: BridgedNonIsolatedModifier
     switch node.detail?.detail.rawText {
     case "unsafe":
-      isUnsafe = true
+      modifier = .unsafe
+    case "nonsending":
+      modifier = .nonSending
     case nil:
-      isUnsafe = false
+      modifier = .none
     case let text?:
       // TODO: Diagnose
       _ = text
@@ -2421,7 +2457,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: nil,
       range: self.generateSourceRange(node),
-      isUnsafe: isUnsafe
+      modifier: modifier
     )
   }
 

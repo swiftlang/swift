@@ -84,10 +84,10 @@ let optionalIntArray: Array<_> = [42]
 
 @available(SwiftStdlib 9999, *)
 func testInlineArray() {
-  let _: [3 x Int] = [1, 2, 3]
-  let _: [_ x _] = [1, 2]
-  let _ = [3 x Int](repeating: 0)
-  let _ = [3 x _](repeating: 0)
+  let _: [3 of Int] = [1, 2, 3]
+  let _: [_ of _] = [1, 2]
+  let _ = [3 of Int](repeating: 0)
+  let _ = [3 of _](repeating: 0)
 }
 
 func testNamedOpaqueReturnTy() -> <T> T { return () }

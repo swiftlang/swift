@@ -37,6 +37,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <shellapi.h>
+#pragma comment(lib, "shell32.lib")
 #endif
 
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
@@ -135,7 +136,11 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
       }
     }
 
+#if defined(_WIN32)
+    argv[argc] = _strdup(arg);
+#else
     argv[argc] = strdup(arg);
+#endif
     argc += 1;
   });
 

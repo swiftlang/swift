@@ -142,7 +142,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     for (unsigned i = 0; i < opaqueReprs.size(); ++i) {
       auto *currentRepr = opaqueReprs[i];
 
-      if( auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr) ) {
+      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)) {
         // Usually, we resolve the opaque constraint and bail if it isn't a class
         // or existential type (see below). However, in this case we know we will
         // fail, so we can bail early and provide a better diagnostic.
@@ -163,13 +163,13 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      auto *paramType = GenericTypeParamType::getType(opaqueSignatureDepth, i,
-                                                      ctx);
+      auto *paramType = GenericTypeParamType::getOpaqueResultType(
+          opaqueSignatureDepth, i, ctx);
       genericParamTypes.push_back(paramType);
     
       TypeRepr *constraint = currentRepr;
       
-      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)){
+      if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)) {
         constraint = opaqueReturn->getConstraint();
       }
       // Try to resolve the constraint repr in the parent decl context. It
@@ -313,31 +313,15 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
   }
 }
 
-/// All generic parameters of a generic function must be referenced in the
-/// declaration's type, otherwise we have no way to infer them.
-void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
-  // Don't do this check for accessors: they're not used directly, so we
-  // never need to infer their generic arguments.  This is mostly a
-  // compile-time optimization, but it also avoids problems with accessors
-  // like 'read' and 'modify' that would arise due to yields not being
-  // part of the formal type.
-  if (isa<AccessorDecl>(dc))
-    return;
-
-  auto *genericParams = dc->getGenericParams();
-  auto genericSig = dc->getGenericSignatureOfContext();
-  if (!genericParams)
-    return;
-
-  auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
+void TypeChecker::collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced) {
 
   // A helper class to collect referenced generic type parameters
   // and dependent member types.
   class ReferencedGenericTypeWalker : public TypeWalker {
-    SmallPtrSet<CanType, 4> ReferencedGenericParams;
+    SmallPtrSet<CanType, 4> &ReferencedGenericParams;
 
   public:
-    ReferencedGenericTypeWalker() {}
+    ReferencedGenericTypeWalker(SmallPtrSet<CanType, 4> &referenced) : ReferencedGenericParams(referenced) {}
     Action walkToTypePre(Type ty) override {
       // Find generic parameters or dependent member types.
       // Once such a type is found, don't recurse into its children.
@@ -368,24 +352,39 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
       return Action::Continue;
     }
-
-    SmallPtrSetImpl<CanType> &getReferencedGenericParams() {
-      return ReferencedGenericParams;
-    }
   };
 
-  // Collect all generic params referenced in parameter types and
-  // return type.
-  ReferencedGenericTypeWalker paramsAndResultWalker;
-  auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
-  for (const auto &param : funcTy->getParams())
-    param.getPlainType().walk(paramsAndResultWalker);
-  funcTy->getResult().walk(paramsAndResultWalker);
+  ty.walk(ReferencedGenericTypeWalker(referenced));
+}
+
+/// All generic parameters of a generic function must be referenced in the
+/// declaration's type, otherwise we have no way to infer them.
+void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
+  // Don't do this check for accessors: they're not used directly, so we
+  // never need to infer their generic arguments.  This is mostly a
+  // compile-time optimization, but it also avoids problems with accessors
+  // like 'read' and 'modify' that would arise due to yields not being
+  // part of the formal type.
+  if (isa<AccessorDecl>(dc))
+    return;
+
+  auto *genericParams = dc->getGenericParams();
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (!genericParams)
+    return;
+
+  auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
 
   // Set of generic params referenced in parameter types,
   // return type or requirements.
-  auto &referencedGenericParams =
-      paramsAndResultWalker.getReferencedGenericParams();
+  SmallPtrSet<CanType, 4> referencedGenericParams;
+
+  // Collect all generic params referenced in parameter types and
+  // return type.
+  auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
+  for (const auto &param : funcTy->getParams())
+    collectReferencedGenericParams(param.getPlainType(), referencedGenericParams);
+  collectReferencedGenericParams(funcTy->getResult(), referencedGenericParams);
 
   // Check if at least one of the generic params in the requirement refers
   // to an already referenced generic parameter. If this is the case,
@@ -409,13 +408,11 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     }
 
     // Collect generic parameter types referenced by types used in a requirement.
-    ReferencedGenericTypeWalker walker;
+    SmallPtrSet<CanType, 4> genericParamsUsedByRequirementTypes;
     if (first && first->hasTypeParameter())
-      first.walk(walker);
+      collectReferencedGenericParams(first, genericParamsUsedByRequirementTypes);
     if (second && second->hasTypeParameter())
-      second.walk(walker);
-    auto &genericParamsUsedByRequirementTypes =
-        walker.getReferencedGenericParams();
+      collectReferencedGenericParams(second, genericParamsUsedByRequirementTypes);
 
     // If at least one of the collected generic types or a root generic
     // parameter of dependent member types is known to be referenced by
@@ -1064,17 +1061,19 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
       break;
     }
 
-    if (!isolatedConformances.empty()) {
+    if (!isolatedConformances.empty() && signature) {
       // Dig out the original type parameter for the requirement.
       // FIXME: req might not be the right pre-substituted requirement,
       // if this came from a conditional requirement.
-      if (auto failedProtocol =
-              typeParameterProhibitsIsolatedConformance(req.getFirstType(),
-                                                        signature)) {
-          return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
-            req, substReq,
-            TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
-            *failedProtocol);
+      for (const auto &isolatedConformance : isolatedConformances) {
+        (void)isolatedConformance;
+        if (auto failed =
+                signature->prohibitsIsolatedConformance(req.getFirstType())) {
+            return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
+              req, substReq,
+              TinyPtrVector<ProtocolConformanceRef>(isolatedConformances),
+              failed->second);
+        }
       }
     }
   }
@@ -1180,29 +1179,4 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   return TypeAliasType::get(typeAlias, parent, genericArgs, result);
-}
-
-std::optional<ProtocolDecl *> swift::typeParameterProhibitsIsolatedConformance(
-    Type type, GenericSignature signature) {
-  if (!type->isTypeParameter())
-    return std::nullopt;
-
-  // An isolated conformance cannot be used in a context where the type
-  // parameter can escape the isolation domain in which the conformance
-  // was formed. To establish this, we look for Sendable or SendableMetatype
-  // requirements on the type parameter itself.
-  ASTContext &ctx = type->getASTContext();
-  auto sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
-  auto sendableMetatypeProto =
-      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-
-  if (sendableProto &&
-      signature->requiresProtocol(type, sendableProto))
-    return sendableProto;
-
-  if (sendableMetatypeProto &&
-          signature->requiresProtocol(type, sendableMetatypeProto))
-    return sendableMetatypeProto;
-
-  return std::nullopt;
 }

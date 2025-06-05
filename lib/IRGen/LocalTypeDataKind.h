@@ -117,19 +117,19 @@ public:
   /// same function.
   static LocalTypeDataKind
   forAbstractProtocolWitnessTable(ProtocolDecl *protocol) {
-    assert(protocol && "protocol reference may not be null");
+    ASSERT(protocol && "protocol reference may not be null");
     return LocalTypeDataKind(uintptr_t(protocol) | Kind_Decl);
   }
 
   /// A reference to a protocol witness table for a concrete type.
   static LocalTypeDataKind
   forConcreteProtocolWitnessTable(ProtocolConformance *conformance) {
-    assert(conformance && "conformance reference may not be null");
+    ASSERT(conformance && "conformance reference may not be null");
     return LocalTypeDataKind(uintptr_t(conformance) | Kind_Conformance);
   }
 
   static LocalTypeDataKind forProtocolWitnessTablePack(PackConformance *pack) {
-    assert(pack && "pack conformance reference may not be null");
+    ASSERT(pack && "pack conformance reference may not be null");
     return LocalTypeDataKind(uintptr_t(pack) | Kind_PackConformance);
   }
 

@@ -197,10 +197,13 @@ EXPECTED_DEFAULTS = {
     'enable_ubsan': False,
     'export_compile_commands': False,
     'extra_cmake_options': [],
+    'extra_llvm_cmake_options': [],
     'extra_swift_args': [],
+    'extra_swift_cmake_options': [],
     'swift_debuginfo_non_lto_args': None,
     'force_optimized_typechecker': False,
     'foundation_build_variant': 'Debug',
+    'foundation_tests_build_variant': 'Debug',
     'host_cc': None,
     'host_cxx': None,
     'host_libtool': None,
@@ -231,6 +234,7 @@ EXPECTED_DEFAULTS = {
     'lldb_build_variant': 'Debug',
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
+    'llvm_build_compiler_rt_with_use_runtimes': True,
     'llvm_build_variant': 'Debug',
     'llvm_cmake_options': [],
     'llvm_enable_modules': False,
@@ -270,6 +274,7 @@ EXPECTED_DEFAULTS = {
     'swift_profile_instr_use': None,
     'swift_runtime_fixed_backtracer_path': None,
     'swift_stdlib_assertions': True,
+    'swift_stdlib_strict_availability': False,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
     'swift_tools_max_parallel_lto_link_jobs':
@@ -549,6 +554,10 @@ EXPECTED_OPTIONS = [
     SetOption('--skip-test-early-swift-driver',
               dest='test_early_swift_driver', value=False),
 
+    SetOption('--swift-stdlib-strict-availability', value=True),
+    SetOption('--no-swift-stdlib-strict-availability',
+              dest='swift_stdlib_strict_availability', value=False),
+
     SetFalseOption('--no-llvm-include-tests', dest='llvm_include_tests'),
 
     SetTrueOption('--install-back-deploy-concurrency',
@@ -782,6 +791,8 @@ EXPECTED_OPTIONS = [
                   choices=['false', 'not-merged', 'merged']),
     ChoicesOption('--android-arch',
                   choices=['armv7', 'aarch64', 'x86_64']),
+    ChoicesOption('--foundation-tests-build-type',
+                  dest='foundation_tests_build_variant', choices=['Debug', 'Release']),
 
     StrOption('--android-api-level'),
     StrOption('--build-args'),
@@ -802,6 +813,7 @@ EXPECTED_OPTIONS = [
     StrOption('--swift-darwin-module-archs'),
     StrOption('--swift-darwin-supported-archs'),
     SetTrueOption('--swift-freestanding-is-darwin'),
+    AppendOption('--extra-swift-cmake-options'),
 
     StrOption('--linux-archs'),
     StrOption('--linux-static-archs'),
@@ -852,6 +864,8 @@ EXPECTED_OPTIONS = [
     AppendOption('--llvm-ninja-targets'),
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
     AppendOption('--llvm-cmake-options'),
+    AppendOption('--extra-llvm-cmake-options'),
+    EnableOption('--llvm-build-compiler-rt-with-use-runtimes'),
     AppendOption('--darwin-symroot-path-filters'),
 
     UnsupportedOption('--build-jobs'),

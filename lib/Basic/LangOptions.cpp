@@ -298,15 +298,14 @@ bool LangOptions::FeatureState::isEnabled() const {
   return state == FeatureState::Kind::Enabled;
 }
 
-bool LangOptions::FeatureState::isEnabledForAdoption() const {
-  ASSERT(isFeatureAdoptable(feature) &&
-         "You forgot to make the feature adoptable!");
+bool LangOptions::FeatureState::isEnabledForMigration() const {
+  ASSERT(feature.isMigratable() && "You forgot to make the feature migratable!");
 
-  return state == FeatureState::Kind::EnabledForAdoption;
+  return state == FeatureState::Kind::EnabledForMigration;
 }
 
 LangOptions::FeatureStateStorage::FeatureStateStorage()
-    : states(numFeatures(), FeatureState::Kind::Off) {}
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
 
 void LangOptions::FeatureStateStorage::setState(Feature feature,
                                                 FeatureState::Kind state) {
@@ -327,7 +326,7 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   if (state.isEnabled())
     return state;
 
-  if (auto version = getFeatureLanguageVersion(feature)) {
+  if (auto version = feature.getLanguageVersion()) {
     if (isSwiftVersionAtLeast(*version)) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
@@ -336,12 +335,18 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   return state;
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (featureStates.getState(feature).isEnabled())
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
-  if (auto version = getFeatureLanguageVersion(feature))
-    return isSwiftVersionAtLeast(*version);
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version))
+      return true;
+  }
+
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }
@@ -358,13 +363,18 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   return false;
 }
 
-void LangOptions::enableFeature(Feature feature, bool forAdoption) {
-  if (forAdoption) {
-    ASSERT(isFeatureAdoptable(feature));
-    featureStates.setState(feature, FeatureState::Kind::EnabledForAdoption);
-  } else {
-    featureStates.setState(feature, FeatureState::Kind::Enabled);
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
+}
+
+void LangOptions::enableFeature(Feature feature, bool forMigration) {
+  if (forMigration) {
+    ASSERT(feature.isMigratable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForMigration);
+    return;
   }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
 }
 
 void LangOptions::disableFeature(Feature feature) {

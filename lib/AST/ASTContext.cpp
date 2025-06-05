@@ -520,7 +520,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
   /// Macro discriminators per context.
-  llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
+  llvm::DenseMap<std::pair<const void *, DeclBaseName>, unsigned>
       NextMacroDiscriminator;
 
   /// Local and closure discriminators per context.
@@ -817,6 +817,8 @@ ASTContext::ASTContext(
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
       TheUnconstrainedAnyType(
           ProtocolCompositionType::theUnconstrainedAnyType(*this)),
+      TheSelfType(CanGenericTypeParamType(
+          GenericTypeParamType::getType(0, 0, *this))),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -849,18 +851,16 @@ ASTContext::ASTContext(
   registerNameLookupRequestFunctions(evaluator);
 
   // Register canImport module info.
-  for (auto &info: SearchPathOpts.CanImportModuleInfo) {
-    addSucceededCanImportModule(info.ModuleName, false, info.Version);
-    addSucceededCanImportModule(info.ModuleName, true, info.UnderlyingVersion);
-  }
+  for (auto &info: SearchPathOpts.CanImportModuleInfo)
+    addSucceededCanImportModule(info.ModuleName, info.Version, info.UnderlyingVersion);
 
   // Provide a default OnDiskOutputBackend if user didn't supply one.
   if (!OutputBackend)
     OutputBackend = llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+
   // Insert all block list config paths.
-  for (auto path: langOpts.BlocklistConfigFilePaths) {
+  for (auto path: langOpts.BlocklistConfigFilePaths)
     blockListConfig.addConfigureFilePath(path);
-  }
 }
 
 void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
@@ -1680,7 +1680,7 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   }
 
   auto *ctx = const_cast<ASTContext *>(this);
-  witness = builtinConformance.getWitnessByName(type, initName(*ctx));
+  witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
     assert(false && "Missing required witness");
     witness = ConcreteDeclRef();
@@ -2153,15 +2153,14 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
-void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+void ASTContext::setModuleAliases(
+    const llvm::StringMap<std::string> &aliasMap) {
   // This setter should be called only once after ASTContext has been initialized
   assert(ModuleAliasMap.empty());
-  
-  for (auto k: aliasMap.keys()) {
-    auto v = aliasMap.lookup(k);
-    if (!v.empty()) {
-      addModuleAlias(k, v);
-    }
+
+  for (auto &entry : aliasMap) {
+    if (!entry.getValue().empty())
+      addModuleAlias(entry.getKey(), entry.getValue());
   }
 }
 
@@ -2199,59 +2198,6 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
 
   // Otherwise return the value found (whether the key is an alias or real name)
   return value.first;
-}
-
-namespace {
-  static StringRef pathStringFromSearchPath(
-      const SearchPathOptions::SearchPath &next) {
-    return next.Path;
-  }
-}
-
-std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
-const {
-  assert(LangOpts.Target.isOSDarwin());
-  return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
-}
-
-llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
-const {
-  llvm::StringSet<> result;
-
-  // Import and framework paths are "special", they contain more than path
-  // strings, but path strings are all we care about here.
-  using SearchPathView = ArrayRefView<SearchPathOptions::SearchPath, StringRef,
-                                      pathStringFromSearchPath>;
-
-  SearchPathView importPathsOnly{SearchPathOpts.getImportSearchPaths()};
-  result.insert(importPathsOnly.begin(), importPathsOnly.end());
-
-  SearchPathView frameworkPathsOnly{SearchPathOpts.getFrameworkSearchPaths()};
-  result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
-
-  if (LangOpts.Target.isOSDarwin()) {
-    auto implicitFrameworkSearchPaths = getDarwinImplicitFrameworkSearchPaths();
-    result.insert(implicitFrameworkSearchPaths.begin(),
-                  implicitFrameworkSearchPaths.end());
-  }
-  result.insert(SearchPathOpts.RuntimeLibraryImportPaths.begin(),
-                SearchPathOpts.RuntimeLibraryImportPaths.end());
-
-  // ClangImporter special-cases the path for SwiftShims, so do the same here
-  // If there are no shims in the resource dir, add a search path in the SDK.
-  SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
-  llvm::sys::path::append(shimsPath, "shims");
-  if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = SearchPathOpts.getSDKPath();
-    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-  }
-  result.insert(shimsPath.str());
-
-  // Clang system modules are found in the SDK root
-  SmallString<128> clangSysRootPath(SearchPathOpts.getSDKPath());
-  llvm::sys::path::append(clangSysRootPath, "usr", "include");
-  result.insert(clangSysRootPath.str());
-  return result;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -2340,8 +2286,8 @@ unsigned ASTContext::getNextMacroDiscriminator(
     MacroDiscriminatorContext context,
     DeclBaseName baseName
 ) {
-  std::pair<const void *, Identifier> key(
-      context.getOpaqueValue(), baseName.getIdentifier());
+  std::pair<const void *, DeclBaseName> key(
+      context.getOpaqueValue(), baseName);
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
@@ -2655,34 +2601,25 @@ static bool isClangModuleVersion(const ModuleLoader::ModuleVersionInfo &info) {
   }
 }
 
-static StringRef
-getModuleVersionKindString(const ModuleLoader::ModuleVersionInfo &info) {
-  switch (info.getSourceKind()) {
-  case ModuleLoader::ModuleVersionSourceKind::ClangModuleTBD:
-    return "Clang";
-  case ModuleLoader::ModuleVersionSourceKind::SwiftBinaryModule:
-  case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
-    return "Swift";
-  }
-}
-
 void ASTContext::addSucceededCanImportModule(
-    StringRef moduleName, bool underlyingVersion,
-    const llvm::VersionTuple &versionInfo) {
+    StringRef moduleName,
+    const llvm::VersionTuple &versionInfo,
+    const llvm::VersionTuple &underlyingVersionInfo) {
+  // We have previously recorded a successful canImport
+  // information for this module.
+  if (CanImportModuleVersions.count(moduleName.str()))
+    return;
+
   auto &entry = CanImportModuleVersions[moduleName.str()];
-  if (!versionInfo.empty()) {
-    if (underlyingVersion)
-      entry.UnderlyingVersion = versionInfo;
-    else
-      entry.Version = versionInfo;
-  }
+  entry.Version = versionInfo;
+  entry.UnderlyingVersion = underlyingVersionInfo;
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
-                                     SourceLoc loc, llvm::VersionTuple version,
-                                     bool underlyingVersion,
-                                     bool updateFailingList,
-                                     llvm::VersionTuple &foundVersion) const {
+bool ASTContext::canImportModuleImpl(
+    ImportPath::Module ModuleName, SourceLoc loc, llvm::VersionTuple version,
+    bool underlyingVersion, bool isSourceCanImport,
+    llvm::VersionTuple &foundVersion,
+    llvm::VersionTuple &foundUnderlyingClangVersion) const {
   SmallString<64> FullModuleName;
   ModuleName.getString(FullModuleName);
   auto ModuleNameStr = FullModuleName.str().str();
@@ -2690,6 +2627,20 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
+
+  auto missingVersion = [this, &loc, &ModuleName,
+                                 &underlyingVersion]() -> bool {
+    // The module version could not be parsed from the preferred source for
+    // this query. Diagnose and return `true` to indicate that the unversioned module
+    // will satisfy the query.
+    auto mID = ModuleName[0];
+    auto diagLoc = mID.Loc;
+    if (mID.Loc.isInvalid())
+      diagLoc = loc;
+    Diags.diagnose(diagLoc, diag::cannot_find_project_version, mID.Item.str(),
+                   underlyingVersion);
+    return true;
+  };
 
   // If this module has already been checked or there is information for the
   // module from commandline, use that information instead of loading the
@@ -2699,35 +2650,95 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
     if (version.empty())
       return true;
 
-    if (underlyingVersion) {
-      if (!Found->second.UnderlyingVersion.empty())
-        return version <= Found->second.UnderlyingVersion;
-    } else {
-      if (!Found->second.Version.empty())
-        return version <= Found->second.Version;
+    const auto &foundComparisonVersion = underlyingVersion
+                                      ? Found->second.UnderlyingVersion
+                                      : Found->second.Version;
+    if (!foundComparisonVersion.empty())
+      return version <= foundComparisonVersion;
+    else
+      return missingVersion();
+  }
+
+  // When looking up a module, each module importer will report back
+  // if it finds a module with a specified version. This routine verifies
+  // whether said version is valid and if it superceeds the best
+  // previously-discovered version of this module found.
+  auto validateVersion =
+      [](const ModuleLoader::ModuleVersionInfo &bestVersionInfo,
+         const ModuleLoader::ModuleVersionInfo &versionInfo,
+         bool underlyingVersion) {
+        if (!versionInfo.isValid())
+          return false; // The loader didn't attempt to parse a version.
+
+        if (underlyingVersion && !isClangModuleVersion(versionInfo))
+          return false; // We're only matching Clang module versions.
+
+        if (bestVersionInfo.isValid() &&
+            versionInfo.getSourceKind() <= bestVersionInfo.getSourceKind())
+          return false; // This module version's source is lower priority.
+
+        return true;
+      };
+
+  // For each module loader, attempt to discover queried module,
+  // along the way record the discovered module's version as well as
+  // the discovered module's underlying Clang module's version.
+  auto lookupVersionedModule =
+      [&](ModuleLoader::ModuleVersionInfo &bestVersionInfo,
+          ModuleLoader::ModuleVersionInfo &bestUnderlyingVersionInfo) -> bool {
+    for (auto &importer : getImpl().ModuleLoaders) {
+      ModuleLoader::ModuleVersionInfo versionInfo;
+      if (!importer->canImportModule(ModuleName, loc, &versionInfo))
+        continue; // The loader can't find the module.
+
+      if (validateVersion(bestVersionInfo, versionInfo,
+                          /* underlyingVersion */ false))
+        bestVersionInfo = versionInfo;
+      if (validateVersion(bestUnderlyingVersionInfo, versionInfo,
+                          /* underlyingVersion */ true))
+        bestUnderlyingVersionInfo = versionInfo;
     }
 
-    // If the canImport information is coming from the command-line, then no
-    // need to continue the search, return false. For checking modules that are
-    // not passed from command-line, allow fallback to the module loading since
-    // this is not in a canImport request context that has already been resolved
-    // by scanner.
-    if (!SearchPathOpts.CanImportModuleInfo.empty())
+    if (!underlyingVersion && !bestVersionInfo.isValid())
       return false;
-  }
+
+    if (underlyingVersion && !bestUnderlyingVersionInfo.isValid())
+      return false;
+
+    foundVersion = bestVersionInfo.getVersion();
+    foundUnderlyingClangVersion = bestUnderlyingVersionInfo.getVersion();
+    return true;
+  };
+
+  // For queries which do not care about any kind of module information
+  // such as e.g. `testImportModule`, simply return `true` as soon
+  // as *any* loader can find the queried module.
+  auto lookupModule = [&]() -> bool {
+    for (auto &importer : getImpl().ModuleLoaders) {
+      ModuleLoader::ModuleVersionInfo versionInfo;
+      if (!importer->canImportModule(ModuleName, loc, &versionInfo))
+        continue; // The loader can't find the module.
+      return true;
+    }
+    return false;
+  };
 
   if (version.empty()) {
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
+    
+    if (!isSourceCanImport)
+      return lookupModule();
 
-    // Otherwise, ask whether any module loader can load the module.
-    for (auto &importer : getImpl().ModuleLoaders) {
-      if (importer->canImportModule(ModuleName, loc, nullptr))
-        return true;
-    }
+    // Otherwise, ask whether any module loader can load the module,
+    // and record the module version that the succeeding loader
+    // observed.
+    ModuleLoader::ModuleVersionInfo versionInfo, underlyingVersionInfo;
+    if (lookupVersionedModule(versionInfo, underlyingVersionInfo))
+      return true;
 
-    if (updateFailingList)
+    if (isSourceCanImport)
       FailedModuleImportNames.insert(ModuleNameStr);
 
     return false;
@@ -2736,43 +2747,15 @@ bool ASTContext::canImportModuleImpl(ImportPath::Module ModuleName,
   // We need to check whether the version of the module is high enough.
   // Retrieve a module version from each module loader that can find the module
   // and use the best source available for the query.
-  ModuleLoader::ModuleVersionInfo bestVersionInfo;
-  for (auto &importer : getImpl().ModuleLoaders) {
-    ModuleLoader::ModuleVersionInfo versionInfo;
-
-    if (!importer->canImportModule(ModuleName, loc, &versionInfo))
-      continue; // The loader can't find the module.
-
-    if (!versionInfo.isValid())
-      continue; // The loader didn't attempt to parse a version.
-
-    if (underlyingVersion && !isClangModuleVersion(versionInfo))
-      continue; // We're only matching Clang module versions.
-
-    if (bestVersionInfo.isValid() &&
-        versionInfo.getSourceKind() <= bestVersionInfo.getSourceKind())
-      continue; // This module version's source is lower priority.
-
-    bestVersionInfo = versionInfo;
-  }
-
-  if (!bestVersionInfo.isValid())
+  ModuleLoader::ModuleVersionInfo versionInfo, underlyingVersionInfo;
+  if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
     return false;
 
-  if (bestVersionInfo.getVersion().empty()) {
-    // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and treat the query as if it succeeded.
-    auto mID = ModuleName[0];
-    auto diagLoc = mID.Loc;
-    if (mID.Loc.isInvalid())
-      diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_project_version,
-                   getModuleVersionKindString(bestVersionInfo), mID.Item.str());
-    return true;
-  }
+  const auto &queryVersion = underlyingVersion ? underlyingVersionInfo : versionInfo;
+  if (queryVersion.getVersion().empty())
+    return missingVersion();
 
-  foundVersion = bestVersionInfo.getVersion();
-  return version <= bestVersionInfo.getVersion();
+  return version <= queryVersion.getVersion();
 }
 
 void ASTContext::forEachCanImportVersionCheck(
@@ -2787,13 +2770,15 @@ bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
+  llvm::VersionTuple underlyingVersionInfo;
   if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
-                           versionInfo))
+                           versionInfo, underlyingVersionInfo))
     return false;
 
   SmallString<64> fullModuleName;
   moduleName.getString(fullModuleName);
-  addSucceededCanImportModule(fullModuleName, underlyingVersion, versionInfo);
+  
+  addSucceededCanImportModule(fullModuleName, versionInfo, underlyingVersionInfo);
   return true;
 }
 
@@ -2801,8 +2786,10 @@ bool ASTContext::testImportModule(ImportPath::Module ModuleName,
                                   llvm::VersionTuple version,
                                   bool underlyingVersion) const {
   llvm::VersionTuple versionInfo;
+  llvm::VersionTuple underlyingVersionInfo;
   return canImportModuleImpl(ModuleName, SourceLoc(), version,
-                             underlyingVersion, false, versionInfo);
+                             underlyingVersion, false, versionInfo,
+                             underlyingVersionInfo);
 }
 
 ModuleDecl *
@@ -3504,6 +3491,12 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   auto &ctx = underlying->getASTContext();
   auto arena = getArena(properties);
 
+  // Typealiases can't meaningfully be unsafe; it's the underlying type that
+  // matters.
+  properties.removeIsUnsafe();
+  if (underlying->isUnsafe())
+    properties |= RecursiveTypeProperties::IsUnsafe;
+
   // Profile the type.
   llvm::FoldingSetNodeID id;
   TypeAliasType::Profile(id, typealias, parent, genericArgs, underlying);
@@ -3685,8 +3678,9 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
   IntegerType::Profile(id, value, isNegative);
 
   void *insertPos;
-  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos))
+  if (auto intType = ctx.getImpl().IntegerTypes.FindNodeOrInsertPos(id, insertPos)) {
     return intType;
+  }
 
   auto strCopy = ctx.AllocateCopy(value);
 
@@ -3885,7 +3879,7 @@ PackElementType::PackElementType(Type packType, unsigned level,
     packType(packType), level(level) {
   assert(packType->isParameterPack() ||
          packType->is<PackArchetypeType>() ||
-         packType->is<TypeVariableType>());
+         packType->isTypeVariableOrMember());
   assert(level > 0);
 }
 
@@ -4150,6 +4144,54 @@ void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(Parent.getPointer());
 }
 
+/// The safety of a parent type does not have an impact on a nested type within
+/// it. This produces the recursive properties of a given type that should
+/// be propagated to a nested type, which won't include any "IsUnsafe" bit
+/// determined based on the declaration itself.
+static RecursiveTypeProperties getRecursivePropertiesAsParent(Type type) {
+  if (!type)
+    return RecursiveTypeProperties();
+
+  // We only need to do anything interesting at all for unsafe types.
+  auto properties = type->getRecursiveProperties();
+  if (!properties.isUnsafe())
+    return properties;
+
+  if (auto nominal = type->getAnyNominal()) {
+    // If the nominal wasn't itself unsafe, then we got the unsafety from
+    // something else (e.g., a generic argument), so it won't change.
+    if (nominal->getExplicitSafety() != ExplicitSafety::Unsafe)
+      return properties;
+  }
+
+  // Drop the "unsafe" bit. We have to recompute it without considering the
+  // enclosing nominal type.
+  properties.removeIsUnsafe();
+
+  // Check generic arguments of parent types.
+  while (type) {
+    // Merge from the generic arguments.
+    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+      for (auto genericArg : boundGeneric->getGenericArgs())
+        properties |= genericArg->getRecursiveProperties();
+    }
+
+    if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>()) {
+      type = nominalOrBound->getParent();
+      continue;
+    }
+
+    if (auto unbound = type->getAs<UnboundGenericType>()) {
+      type = unbound->getParent();
+      continue;
+    }
+
+    break;
+  };
+
+  return properties;
+}
+
 UnboundGenericType *UnboundGenericType::
 get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID ID;
@@ -4158,7 +4200,7 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
 
   auto arena = getArena(properties);
 
@@ -4212,7 +4254,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   RecursiveTypeProperties properties;
   if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
   }
@@ -4295,7 +4337,7 @@ EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
@@ -4313,7 +4355,7 @@ StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
@@ -4331,7 +4373,7 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).ClassTypes[{D, Parent}];
@@ -5005,8 +5047,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
                                                 Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
-                                name);
+  GenericTypeParamType::Profile(id, paramKind, depth, index, /*weight=*/0,
+                                valueType, name);
 
   void *insertPos;
   if (auto gpTy = ctx.getImpl().GenericParamTypes.FindNodeOrInsertPos(id, insertPos))
@@ -5016,8 +5058,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
   if (paramKind == GenericTypeParamKind::Pack)
     props |= RecursiveTypeProperties::HasParameterPack;
 
-  auto canType = GenericTypeParamType::get(paramKind, depth, index, valueType,
-                                           ctx);
+  auto canType = GenericTypeParamType::get(paramKind, depth, index, /*weight=*/0,
+                                           valueType, ctx);
 
   auto result = new (ctx, AllocationArena::Permanent)
       GenericTypeParamType(name, canType, ctx);
@@ -5036,10 +5078,10 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param) {
 
 GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
                                                 unsigned depth, unsigned index,
-                                                Type valueType,
+                                                unsigned weight, Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
+  GenericTypeParamType::Profile(id, paramKind, depth, index, weight, valueType,
                                 Identifier());
 
   void *insertPos;
@@ -5051,7 +5093,7 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
     props |= RecursiveTypeProperties::HasParameterPack;
 
   auto result = new (ctx, AllocationArena::Permanent)
-      GenericTypeParamType(paramKind, depth, index, valueType, props, ctx);
+      GenericTypeParamType(paramKind, depth, index, weight, valueType, props, ctx);
   ctx.getImpl().GenericParamTypes.InsertNode(result, insertPos);
   return result;
 }
@@ -5060,14 +5102,21 @@ GenericTypeParamType *GenericTypeParamType::getType(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
+}
+
+GenericTypeParamType *GenericTypeParamType::getOpaqueResultType(unsigned depth,
+                                                                unsigned index,
+                                                                const ASTContext &ctx) {
+  return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
+                                   /*weight=*/1, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getPack(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Pack, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
@@ -5075,7 +5124,7 @@ GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
                                                      Type valueType,
                                                      const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Value, depth, index,
-                                   valueType, ctx);
+                                   /*weight=*/0, valueType, ctx);
 }
 
 ArrayRef<GenericTypeParamType *>
@@ -5498,7 +5547,7 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).ProtocolTypes[{D, Parent}];
@@ -5770,9 +5819,10 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
     break;
 
   default:
-    llvm::errs() << "Abstract conformance with bad subject type:\n";
-    conformingType->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Abstract conformance with bad subject type:\n";
+      conformingType->dump(out);
+    });
   }
 
   // Figure out which arena this should go in.
@@ -5826,11 +5876,11 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 }
 
 const CustomAvailabilityDomain *
-CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
-                              const ASTContext &ctx) {
+CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
+                              Decl *decl, const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
-  CustomAvailabilityDomain::Profile(id, identifier, mod, kind);
+  CustomAvailabilityDomain::Profile(id, identifier, mod);
 
   auto &foldingSet = ctx.getImpl().CustomAvailabilityDomains;
   void *insertPos;
@@ -5840,7 +5890,8 @@ CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
 
   void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
                            alignof(CustomAvailabilityDomain));
-  auto *newNode = ::new (mem) CustomAvailabilityDomain(identifier, mod, kind);
+  auto *newNode =
+      ::new (mem) CustomAvailabilityDomain(identifier, kind, mod, decl);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -6447,7 +6498,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = type;
 
     // Find the Objective-C class type we bridge to.
-    Type witnessTy = conformance.getTypeWitnessByName(type, Id_ObjectiveCType);
+    Type witnessTy = conformance.getTypeWitnessByName(Id_ObjectiveCType);
     // If Objective-C import is broken, witness type would be a dependent member
     // with `<<error type>>` base.
     return (witnessTy && !witnessTy->hasError()) ? witnessTy : Type();
@@ -6481,13 +6532,16 @@ const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionTypeRepresentation trueRep) {
-  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+  return getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+      params, resultTy, trueRep);
 }
 
 const clang::Type *ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
-  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  auto *ty =
+      getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+          params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
@@ -6544,8 +6598,7 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
 
-  auto param = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, *this);
-  auto sig = GenericSignature::get(param, { });
+  auto sig = GenericSignature::get({TheSelfType}, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;

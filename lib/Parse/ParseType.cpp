@@ -59,6 +59,10 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
+  if (CallerIsolatedLoc.isValid()) {
+    ty = new (p.Context) CallerIsolatedTypeRepr(ty, CallerIsolatedLoc);
+  }
+
   if (lifetimeEntry) {
     ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntry);
   }
@@ -163,9 +167,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (isParameterSpecifier() &&
-      !(!Context.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-        Tok.isContextualKeyword("isolated"))) {
+  if (isParameterSpecifier()) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
@@ -740,6 +742,10 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
       // Parse the comma, if the list continues.
       if (!consumeIf(tok::comma))
         break;
+      
+      // If the comma was a trailing comma, finish parsing the list of types
+      if (startsWithGreater(Tok))
+        break;
     }
   }
 
@@ -1159,7 +1165,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   SmallVector<TupleTypeReprElement, 8> ElementsR;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
-                                  /*AllowSepAfterLast=*/false,
+                                  /*AllowSepAfterLast=*/true,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
     TupleTypeReprElement element;
@@ -1316,13 +1322,13 @@ ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
 
   ParserStatus status;
 
-  // 'isStartOfInlineArrayTypeBody' means we should at least have a type and 'x'
-  // to start with.
+  // 'isStartOfInlineArrayTypeBody' means we should at least have a type and
+  // 'of' to start with.
   auto count = parseTypeOrValue();
   auto *countTy = count.get();
   status |= count;
 
-  // 'x'
+  // 'of'
   consumeToken(tok::identifier);
 
   // Allow parsing a value for better recovery, Sema will diagnose any
@@ -1603,7 +1609,8 @@ bool Parser::canParseGenericArguments() {
     if (!canParseType())
       return false;
     // Parse the comma, if the list continues.
-  } while (consumeIf(tok::comma));
+    // This could be the trailing comma.
+  } while (consumeIf(tok::comma) && !startsWithGreater(Tok));
 
   if (!startsWithGreater(Tok)) {
     return false;
@@ -1730,12 +1737,52 @@ bool Parser::canParseTypeSimpleOrComposition() {
   return true;
 }
 
+bool Parser::canParseNonisolatedAsTypeModifier() {
+  assert(Tok.isContextualKeyword("nonisolated"));
+
+  BacktrackingScope scope(*this);
+
+  // Consume 'nonisolated'
+  consumeToken();
+
+  // Something like:
+  //
+  // nonisolated
+  //  (42)
+  if (Tok.isAtStartOfLine())
+    return false;
+
+  // Always requires `(nonsending)`, together
+  // we don't want eagerly interpret something
+  // like `nonisolated(0)` as a modifier.
+
+  if (!consumeIf(tok::l_paren))
+    return false;
+
+  if (!Tok.isContextualKeyword("nonsending"))
+    return false;
+
+  consumeToken();
+
+  return consumeIf(tok::r_paren);
+}
+
 bool Parser::canParseTypeScalar() {
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
 
   if (Tok.isContextualKeyword("sending"))
     consumeToken();
+
+  if (Tok.isContextualKeyword("nonisolated")) {
+    if (!canParseNonisolatedAsTypeModifier())
+      return false;
+
+    // consume 'nonisolated'
+    consumeToken();
+    // skip '(nonsending)'
+    skipSingle();
+  }
 
   if (!canParseTypeSimpleOrComposition())
     return false;
@@ -1780,16 +1827,16 @@ bool Parser::canParseStartOfInlineArrayType() {
   if (!Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar))
     return false;
 
-  // We must have at least '[<type> x', which cannot be any other kind of
+  // We must have at least '[<type> of', which cannot be any other kind of
   // expression or type. We specifically look for any type, not just integers
-  // for better recovery in e.g cases where the user writes '[Int x 2]'. We
-  // only do type-scalar since variadics would be ambiguous e.g 'Int...x'.
+  // for better recovery in e.g cases where the user writes '[Int of 2]'. We
+  // only do type-scalar since variadics would be ambiguous e.g 'Int...of'.
   if (!canParseTypeScalar())
     return false;
 
   // For now we don't allow multi-line since that would require
   // disambiguation.
-  if (Tok.isAtStartOfLine() || !Tok.isContextualKeyword("x"))
+  if (Tok.isAtStartOfLine() || !Tok.isContextualKeyword("of"))
     return false;
 
   consumeToken();

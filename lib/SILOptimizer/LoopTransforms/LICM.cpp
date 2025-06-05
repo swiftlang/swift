@@ -714,10 +714,13 @@ bool LoopTreeOptimization::isSafeReadOnlyApply(BasicCalleeAnalysis *BCA, ApplyIn
 
 static void checkSideEffects(swift::SILInstruction &Inst,
                       InstSet &SideEffectInsts,
-                      SmallVectorImpl<SILInstruction *> &sideEffectsInBlock) {
+                      SmallVectorImpl<SILInstruction *> &sideEffectsInBlock,
+                      bool &hasOtherMemReadingInsts) {
   if (Inst.mayHaveSideEffects()) {
     SideEffectInsts.insert(&Inst);
     sideEffectsInBlock.push_back(&Inst);
+  } else if (Inst.mayReadFromMemory()) {
+    hasOtherMemReadingInsts = true;
   }
 }
 
@@ -885,11 +888,15 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   SmallVector<BeginAccessInst *, 8> BeginAccesses;
   SmallVector<FullApplySite, 8> fullApplies;
 
+  // True if the loop has instructions which (may) read from memory, which are not
+  // in `Loads` and not in `sideEffects`.
+  bool hasOtherMemReadingInsts = false;
+
   for (auto *BB : Loop->getBlocks()) {
     SmallVector<SILInstruction *, 8> sideEffectsInBlock;
     for (auto &Inst : *BB) {
       if (hasOwnershipOperandsOrResults(&Inst)) {
-        checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        checkSideEffects(Inst, sideEffects, sideEffectsInBlock, hasOtherMemReadingInsts);
         // Collect fullApplies to be checked in analyzeBeginAccess
         if (auto fullApply = FullApplySite::isa(&Inst)) {
           fullApplies.push_back(fullApply);
@@ -921,12 +928,12 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         }
         Stores.push_back(store);
         LoadsAndStores.push_back(&Inst);
-        checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        checkSideEffects(Inst, sideEffects, sideEffectsInBlock, hasOtherMemReadingInsts);
         break;
       }
       case SILInstructionKind::BeginAccessInst:
         BeginAccesses.push_back(cast<BeginAccessInst>(&Inst));
-        checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        checkSideEffects(Inst, sideEffects, sideEffectsInBlock, hasOtherMemReadingInsts);
         break;
       case SILInstructionKind::RefElementAddrInst:
         SpecialHoist.push_back(cast<RefElementAddrInst>(&Inst));
@@ -937,7 +944,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         // cond_fail that would have protected (executed before) a memory access
         // must - after hoisting - also be executed before said access.
         HoistUp.insert(&Inst);
-        checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        checkSideEffects(Inst, sideEffects, sideEffectsInBlock, hasOtherMemReadingInsts);
         break;
       case SILInstructionKind::ApplyInst: {
         auto *AI = cast<ApplyInst>(&Inst);
@@ -971,7 +978,7 @@ void LoopTreeOptimization::analyzeCurrentLoop(
           }
         }
 
-        checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        checkSideEffects(Inst, sideEffects, sideEffectsInBlock, hasOtherMemReadingInsts);
         if (canHoistUpDefault(&Inst, Loop, DomTree, RunsOnHighLevelSIL)) {
           HoistUp.insert(&Inst);
         }
@@ -1013,23 +1020,25 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     }
   }
 
-  // Collect memory locations for which we can move all loads and stores out
-  // of the loop.
-  //
-  // Note: The Loads set and LoadsAndStores set may mutate during this loop.
-  for (StoreInst *SI : Stores) {
-    // Use AccessPathWithBase to recover a base address that can be used for
-    // newly inserted memory operations. If we instead teach hoistLoadsAndStores
-    // how to rematerialize global_addr, then we don't need this base.
-    auto access = AccessPathWithBase::compute(SI->getDest());
-    auto accessPath = access.accessPath;
-    if (accessPath.isValid() &&
-        (access.base && isLoopInvariant(access.base, Loop))) {
-      if (isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, SI->getDest(),
-                                accessPath)) {
-        if (!LoadAndStoreAddrs.count(accessPath)) {
-          if (splitLoads(Loads, accessPath, SI->getDest())) {
-            LoadAndStoreAddrs.insert(accessPath);
+  if (!hasOtherMemReadingInsts) {
+    // Collect memory locations for which we can move all loads and stores out
+    // of the loop.
+    //
+    // Note: The Loads set and LoadsAndStores set may mutate during this loop.
+    for (StoreInst *SI : Stores) {
+      // Use AccessPathWithBase to recover a base address that can be used for
+      // newly inserted memory operations. If we instead teach hoistLoadsAndStores
+      // how to rematerialize global_addr, then we don't need this base.
+      auto access = AccessPathWithBase::compute(SI->getDest());
+      auto accessPath = access.accessPath;
+      if (accessPath.isValid() &&
+          (access.base && isLoopInvariant(access.base, Loop))) {
+        if (isOnlyLoadedAndStored(AA, sideEffects, Loads, Stores, SI->getDest(),
+                                  accessPath)) {
+          if (!LoadAndStoreAddrs.count(accessPath)) {
+            if (splitLoads(Loads, accessPath, SI->getDest())) {
+              LoadAndStoreAddrs.insert(accessPath);
+            }
           }
         }
       }
@@ -1139,7 +1148,7 @@ SingleValueInstruction *LoopTreeOptimization::splitLoad(
       }
       elements.push_back(elementVal);
     }
-    return builder.createTuple(loc, elements);
+    return builder.createTuple(loc, loadTy.getObjectType(), elements);
   }
   auto structTy = loadTy.getStructOrBoundGenericStruct();
   assert(structTy && "tuple and struct elements are checked earlier");

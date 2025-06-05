@@ -113,6 +113,7 @@ let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
 func r23670252(_ dictionary: [String : AnyObject], someObject: AnyObject) {
   let color : String?
   color = dictionary["color"]  // expected-error {{cannot assign value of type 'AnyObject?' to type 'String?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('AnyObject' and 'String') are expected to be equal}}
   _ = color
 }
 

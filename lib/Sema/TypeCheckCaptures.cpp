@@ -364,9 +364,8 @@ public:
         // }
         if (!isa<FuncDecl>(D)) {
           if (DC->isLocalContext()) {
-            Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
-                                   NTD->getDescriptiveKind(),
-                                   D->getBaseIdentifier());
+            Context.Diags.diagnose(DRE->getLoc(),
+                                   diag::capture_across_type_decl, NTD, D);
 
             NTD->diagnose(diag::kind_declared_here,
                           DescriptiveDeclKind::Type);
@@ -396,13 +395,11 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
-      if (var->getAccessStrategy(DRE->getAccessSemantics(),
-                                 var->supportsMutation() ? AccessKind::ReadWrite
-                                                         : AccessKind::Read,
-                                 CurDC->getParentModule(),
-                                 CurDC->getResilienceExpansion(),
-                                 /*useOldABI=*/false)
-              .getKind() == AccessStrategy::Storage)
+      if (var->isAccessedViaPhysicalStorage(
+              DRE->getAccessSemantics(),
+              var->supportsMutation() ? AccessKind::ReadWrite
+                                      : AccessKind::Read,
+              CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
     }
 
@@ -790,8 +787,9 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
         std::optional<ForeignAsyncConvention> asyncConvention;
         std::optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
-            isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
-                                  asyncConvention, errorConvention)) {
+            isRepresentableInLanguage(AFD,
+                                      ObjCReason::MemberOfObjCMembersClass,
+                                      asyncConvention, errorConvention)) {
           AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
@@ -857,43 +855,30 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   return finder.getCaptureInfo();
 }
 
-static bool isLazy(PatternBindingDecl *PBD) {
-  if (auto var = PBD->getSingleVar())
-    return var->getAttrs().hasAttribute<LazyAttr>();
-  return false;
-}
+CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
+                                                       PatternBindingDecl *PBD,
+                                                       unsigned int idx) const {
+  auto *init = PBD->getExecutableInit(idx);
+  if (!init)
+    return CaptureInfo::empty();
 
-void TypeChecker::checkPatternBindingCaptures(IterableDeclContext *DC) {
-  for (auto member : DC->getMembers()) {
-    // Ignore everything other than PBDs.
-    auto *PBD = dyn_cast<PatternBindingDecl>(member);
-    if (!PBD) continue;
-    // Walk the initializers for all properties declared in the type with
-    // an initializer.
-    for (unsigned i : range(PBD->getNumPatternEntries())) {
-      if (PBD->isInitializerSubsumed(i))
-        continue;
+  // Only have captures when we have a PatternBindingInitializer context, i.e
+  // local variables don't have captures.
+  auto *DC = PBD->getInitContext(idx);
+  if (!DC)
+    return CaptureInfo::empty();
 
-      auto *init = PBD->getInit(i);
-      if (init == nullptr)
-        continue;
+  FindCapturedVars finder(init->getLoc(), DC,
+                          /*NoEscape=*/false,
+                          /*ObjC=*/false,
+                          /*IsGenericFunction*/ false);
+  init->walk(finder);
 
-      auto *DC = PBD->getInitContext(i);
-      FindCapturedVars finder(init->getLoc(),
-                              DC,
-                              /*NoEscape=*/false,
-                              /*ObjC=*/false,
-                              /*IsGenericFunction*/false);
-      init->walk(finder);
-
-      auto &ctx = DC->getASTContext();
-      if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
-        ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
-                           diag::dynamic_self_stored_property_init);
-      }
-
-      auto captures = finder.getCaptureInfo();
-      PBD->setCaptureInfo(i, captures);
-    }
+  auto &ctx = DC->getASTContext();
+  if (finder.getDynamicSelfCaptureLoc().isValid()) {
+    ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                       diag::dynamic_self_stored_property_init);
   }
+
+  return finder.getCaptureInfo();
 }

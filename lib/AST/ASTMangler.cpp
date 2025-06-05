@@ -299,7 +299,7 @@ std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(C)) {
     appendProtocolConformance(sc);
     appendOperator("WP");
-  } else if (isa<NormalProtocolConformance>(C)) {
+  } else if (isa<NormalProtocolConformance>(C) || isa<InheritedProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
   } else if (isa<SelfProtocolConformance>(C)) {
@@ -395,7 +395,7 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
-          return GenericTypeParamType::getType(0, 0, ctx);
+          return ctx.TheSelfType;
         }
         return std::nullopt;
       });
@@ -431,7 +431,7 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
-          return GenericTypeParamType::getType(0, 0, ctx);
+          return ctx.TheSelfType;
         }
         return std::nullopt;
       });
@@ -1199,7 +1199,8 @@ getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
   return std::nullopt;
 }
 
-void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
+void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name,
+                                bool skipLocalDiscriminator) {
   ASSERT(!getABIDecl(decl) && "caller should make sure we get ABI decls");
   if (name.empty())
     name = decl->getBaseName();
@@ -1240,6 +1241,11 @@ void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
+    // If we don't need a local discriminator (attached macros receive a
+    // separate discriminator), we're done.
+    if (skipLocalDiscriminator)
+      return;
+
     if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
       if (!decl->hasName()) {
         // Mangle unnamed params with their ordering.
@@ -1440,8 +1446,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
     case TypeKind::BuiltinUnboundGeneric:
-      llvm::errs() << "Don't know how to mangle a BuiltinUnboundGenericType\n";
-      abort();
+      ABORT("Don't know how to mangle a BuiltinUnboundGenericType");
     case TypeKind::Locatable: {
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
@@ -1607,7 +1612,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // ExtendedExistentialTypeShapes consider existential metatypes to
       // be part of the existential, so if we're symbolically referencing
       // shapes, we need to handle that at this level.
-      if (EMT->hasParameterizedExistential()) {
+      if (EMT->getExistentialLayout().needsExtendedShape(AllowInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(EMT);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
@@ -1616,7 +1621,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       }
 
       if (EMT->getInstanceType()->isExistentialType() &&
-          EMT->hasParameterizedExistential())
+          EMT->getExistentialLayout().needsExtendedShape(AllowInverses))
         appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
       else
         appendType(EMT->getInstanceType(), sig, forDecl);
@@ -1672,8 +1677,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return appendType(strippedTy, sig, forDecl);
       }
 
-      if (PCT->hasParameterizedExistential()
-          || (PCT->hasInverse() && AllowInverses))
+      if (PCT->getExistentialLayout().needsExtendedShape(AllowInverses))
         return appendConstrainedExistential(PCT, sig, forDecl);
 
       // We mangle ProtocolType and ProtocolCompositionType using the
@@ -1687,7 +1691,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
-      if (ET->hasParameterizedExistential()) {
+
+      if (ET->getExistentialLayout().needsExtendedShape(AllowInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(ET);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, ET, sig, forDecl);
@@ -1697,6 +1702,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         return appendConstrainedExistential(ET->getConstraintType(), sig,
                                             forDecl);
       }
+
       return appendType(ET->getConstraintType(), sig, forDecl);
     }
 
@@ -1749,9 +1755,10 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype:
     case TypeKind::ExistentialArchetype:
-      llvm::errs() << "Cannot mangle free-standing archetype: ";
-      tybase->dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot mangle free-standing archetype: ";
+        tybase->dump(out);
+      });
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
@@ -4461,8 +4468,7 @@ static unsigned conformanceRequirementIndex(
     ++result;
   }
 
-  llvm::errs() <<"Conformance access path step is missing from requirements";
-  abort();
+  ABORT("Conformance access path step is missing from requirements");
 }
 
 void ASTMangler::appendDependentProtocolConformance(
@@ -4566,9 +4572,10 @@ void ASTMangler::appendAnyProtocolConformance(
   } else if (conformance.isPack()) {
     appendPackProtocolConformance(conformance.getPack(), genericSig);
   } else {
-    llvm::errs() << "Bad conformance in mangler: ";
-    conformance.dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Bad conformance in mangler: ";
+      conformance.dump(out);
+    });
   }
 }
 
@@ -5158,13 +5165,15 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
     // If we needed a local discriminator, stuff that into the name itself.
     // This is hack, but these names aren't stable anyway.
+    bool skipLocalDiscriminator = false;
     if (auto discriminator = precheckedMangleContext.second) {
+      skipLocalDiscriminator = true;
       name = encodeLocalPrecheckedDiscriminator(
           decl->getASTContext(), name, *discriminator);
     }
 
     if (auto valueDecl = dyn_cast<ValueDecl>(decl))
-      appendDeclName(valueDecl, name);
+      appendDeclName(valueDecl, name, skipLocalDiscriminator);
     else if (!name.empty())
       appendIdentifier(name.str());
     else
@@ -5266,15 +5275,11 @@ static void extractExistentialInverseRequirements(
 
   auto &ctx = PCT->getASTContext();
 
-  // Form a parameter referring to the existential's Self.
-  auto existentialSelf =
-      GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
-
   for (auto ip : PCT->getInverses()) {
     auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
     assert(proto);
     ASSERT(!getABIDecl(proto) && "can't use @abi on inverse protocols");
-    inverses.push_back({existentialSelf, proto, SourceLoc()});
+    inverses.push_back({ctx.TheSelfType, proto, SourceLoc()});
   }
 }
 
@@ -5421,6 +5426,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       break;
     };
   }

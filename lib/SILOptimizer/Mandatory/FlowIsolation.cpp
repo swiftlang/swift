@@ -484,9 +484,9 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     VarDecl *var = cast<RefElementAddrInst>(use)->getField();
 
     diag.diagnose(illegalLoc.getSourceLoc(), diag::isolated_after_nonisolated,
-                  forDeinit, var->getDescriptiveKind(), var->getName())
-      .highlight(illegalLoc.getSourceRange())
-      .warnUntilSwiftVersion(6);
+                  forDeinit, var)
+        .highlight(illegalLoc.getSourceRange())
+        .warnUntilSwiftVersion(6);
 
     // after <verb><adjective> <subject>, ... can't use self anymore, etc ...
     //   example:

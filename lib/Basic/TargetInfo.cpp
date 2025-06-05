@@ -65,6 +65,14 @@ void printTargetInfo(const CompilerInvocation &invocation,
   writeEscaped(version::getSwiftFullVersion(version::Version::getCurrentLanguageVersion()), out);
   out << "\",\n";
 
+  // Distribution tag, if any.
+  StringRef tag = version::getCurrentCompilerTag();
+  if (!tag.empty()) {
+    out << "  \"swiftCompilerTag\": \"";
+    writeEscaped(tag, out);
+    out << "\",\n";
+  }
+
   // Target triple and target variant triple.
   auto runtimeVersion =
     invocation.getIRGenOptions().AutolinkRuntimeCompatibilityLibraryVersion;
@@ -169,6 +177,16 @@ void printTripleInfo(const CompilerInvocation &invocation,
     out << " ],\n";
   } else {
     out << "    \"compatibilityLibraries\": [ ],\n";
+  }
+
+  if (tripleBTCFIByDefaultInOpenBSD(triple)) {
+#if SWIFT_OPENBSD_BTCFI
+     out << "    \"openbsdBTCFIEnabled\": true,\n";
+#else
+     out << "    \"openbsdBTCFIEnabled\": false,\n";
+#endif
+  } else {
+     out << "    \"openbsdBTCFIEnabled\": false,\n";
   }
 
   out << "    \"librariesRequireRPath\": "

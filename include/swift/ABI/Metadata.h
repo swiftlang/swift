@@ -2352,12 +2352,7 @@ public:
   }
   
   bool isCopyable() const {
-    if (!hasGeneralizationSignature()) {
-      return true;
-    }
-    auto *reqts = getGenSigRequirements();
-    for (unsigned i = 0, e = getNumGenSigRequirements(); i < e; ++i) {
-      auto &reqt = reqts[i];
+    for (auto &reqt : getRequirementSignature().getRequirements()) {
       if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
         continue;
       }
@@ -2792,11 +2787,22 @@ using ResilientWitnessesHeader = TargetResilientWitnessesHeader<InProcess>;
 /// global actor protocol.
 template<typename Runtime>
 struct TargetGlobalActorReference {
+private:
+  using SignedDescriptorPointer =
+      const TargetProtocolConformanceDescriptor<Runtime>
+          *__ptrauth_swift_protocol_conformance_descriptor;
+
+public:
   /// The type of the global actor.
   RelativeDirectPointer<const char, /*nullable*/ false> type;
 
   /// The conformance of the global actor to the GlobalActor protocol.
-  TargetRelativeProtocolConformanceDescriptorPointer<Runtime> conformance;
+  RelativeIndirectablePointer<
+      const TargetProtocolConformanceDescriptor<Runtime>,
+      /*nullable*/ false,
+      /*offset*/ int32_t,
+      /*indirect type*/ SignedDescriptorPointer>
+      conformance;
 };
 
 /// Describes the context of a protocol conformance that is relevant when
@@ -2982,14 +2988,6 @@ public:
       return llvm::StringRef();
 
     return Demangle::makeSymbolicMangledNameStringRef(this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->type);
-  }
-
-  /// True if this is a conformance to 'SerialExecutor' which has a non-default
-  /// (i.e. not the stdlib's default implementation) witness. This means that
-  /// the developer has implemented this method explicitly and we should prefer
-  /// calling it.
-  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
-    return Flags.hasNonDefaultSerialExecutorIsIsolatingCurrentContext();
   }
 
   /// Retrieve the protocol conformance of the global actor type to the

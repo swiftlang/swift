@@ -57,7 +57,7 @@ public:
   annotatedAvailableRange(const Decl *D);
 
   static AvailabilityRange
-  annotatedAvailableRangeForAttr(const Decl *D, const SpecializeAttr *attr,
+  annotatedAvailableRangeForAttr(const Decl *D, const AbstractSpecializeAttr *attr,
                                  ASTContext &ctx);
 
   /// For the attribute's introduction version, update the platform and version
@@ -80,11 +80,6 @@ public:
   static bool updateObsoletedAvailabilityDomainForFallback(
       const SemanticAvailableAttr &attr, const ASTContext &ctx,
       AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
-
-  static void
-  updateAvailabilityDomainForFallback(const SemanticAvailableAttr &attr,
-                                      const ASTContext &ctx,
-                                      AvailabilityDomain &domain);
 
   /// For the attribute's before version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.

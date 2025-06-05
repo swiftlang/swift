@@ -320,6 +320,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
                            !protoDecl->isMarkerProtocol());
   representsAnyObject = false;
 
+  inverses = InvertibleProtocolSet();
+
   protocols.push_back(protoDecl);
   expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
@@ -353,7 +355,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  auto inverses = type->getInverses();
+  inverses = type->getInverses();
   expandDefaults(protocols, inverses, type->getASTContext());
 
   representsAnyObject = [&]() {
@@ -431,6 +433,16 @@ Type ExistentialLayout::getSuperclass() const {
   }
 
   return Type();
+}
+
+bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+  if (!getParameterizedProtocols().empty())
+    return true;
+
+  if (allowInverses && hasInverses())
+    return true;
+
+  return false;
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -829,15 +841,28 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
   return type->wrapInOptionalType()->getCanonicalType();
 }
 
-Type TypeBase::isArrayType() {
-  if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (isArray())
-      return boundStruct->getGenericArgs()[0];
+Type TypeBase::getArrayElementType() {
+  if (!isArray())
+    return Type();
 
-    if (isInlineArray())
-      return boundStruct->getGenericArgs()[1];
-  }
-  return Type();
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // Array<T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[0];
+}
+
+Type TypeBase::getInlineArrayElementType() {
+  if (!isInlineArray())
+    return Type();
+
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // InlineArray<n, T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[1];
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
@@ -1186,6 +1211,15 @@ bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
   return false;
 }
 
+bool ExistentialLayout::containsNonMarkerProtocols() const {
+  for (auto proto : getProtocols()) {
+    if (!proto->isMarkerProtocol())
+      return true;
+  }
+
+  return false;
+}
+
 LayoutConstraint ExistentialLayout::getLayoutConstraint() const {
   if (hasExplicitAnyObject) {
     return LayoutConstraint::getLayoutConstraint(
@@ -1344,6 +1378,7 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
+  alwaysInheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
 
@@ -1400,8 +1435,13 @@ ParameterListInfo::ParameterListInfo(
       implicitSelfCapture.set(i);
     }
 
-    if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
-      inheritActorContext.set(i);
+    if (auto *attr =
+            param->getAttrs().getAttribute<InheritActorContextAttr>()) {
+      if (attr->isAlways()) {
+        alwaysInheritActorContext.set(i);
+      } else {
+        inheritActorContext.set(i);
+      }
     }
 
     if (param->getInterfaceType()->is<PackExpansionType>()) {
@@ -1435,10 +1475,18 @@ bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
       : false;
 }
 
-bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
-  return paramIdx < inheritActorContext.size()
-      ? inheritActorContext[paramIdx]
-      : false;
+std::pair<bool, InheritActorContextModifier>
+ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
+  if (paramIdx >= inheritActorContext.size())
+    return std::make_pair(false, InheritActorContextModifier::None);
+
+  if (inheritActorContext[paramIdx])
+    return std::make_pair(true, InheritActorContextModifier::None);
+
+  if (alwaysInheritActorContext[paramIdx])
+    return std::make_pair(true, InheritActorContextModifier::Always);
+
+  return std::make_pair(false, InheritActorContextModifier::None);
 }
 
 bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
@@ -1727,7 +1775,8 @@ CanType TypeBase::computeCanonicalType() {
     auto &C = gpDecl->getASTContext();
     Result =
         GenericTypeParamType::get(gp->getParamKind(), gp->getDepth(),
-                                  gp->getIndex(), gp->getValueType(),
+                                  gp->getIndex(), gp->getWeight(),
+                                  gp->getValueType(),
                                   C);
     break;
   }
@@ -1876,6 +1925,18 @@ CanType TypeBase::computeCanonicalType() {
     }
     ASTContext &ctx = newTerms[0]->getASTContext();
     Result = ErrorUnionType::get(ctx, newTerms).getPointer();
+    break;
+  }
+  case TypeKind::Integer: {
+    auto intTy = cast<IntegerType>(this);
+    APInt value = intTy->getValue();
+    if (intTy->isNegative()) {
+      value = -value;
+    }
+    SmallString<20> canonicalText;
+    value.toStringUnsigned(canonicalText);
+    Result = IntegerType::get(canonicalText, intTy->isNegative(),
+                              intTy->getASTContext());
     break;
   }
   }
@@ -2060,8 +2121,9 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
   : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
     Decl(param) {
   ASSERT(param->getDepth() != GenericTypeParamDecl::InvalidDepth);
-  Depth = param->getDepth();
   IsDecl = true;
+  Depth = param->getDepth();
+  Weight = 0;
   Index = param->getIndex();
   ParamKind = param->getParamKind();
   ValueType = param->getValueType();
@@ -2074,8 +2136,9 @@ GenericTypeParamType::GenericTypeParamType(Identifier name,
                         canType->getRecursiveProperties()),
       Decl(nullptr) {
   Name = name;
-  Depth = canType->getDepth();
   IsDecl = false;
+  Depth = canType->getDepth();
+  Weight = canType->getWeight();
   Index = canType->getIndex();
   ParamKind = canType->getParamKind();
   ValueType = canType->getValueType();
@@ -2085,13 +2148,14 @@ GenericTypeParamType::GenericTypeParamType(Identifier name,
 
 GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
                                            unsigned depth, unsigned index,
-                                           Type valueType,
+                                           unsigned weight, Type valueType,
                                            RecursiveTypeProperties props,
                                            const ASTContext &ctx)
     : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
       Decl(nullptr) {
-  Depth = depth;
   IsDecl = false;
+  Depth = depth;
+  Weight = weight;
   Index = index;
   ParamKind = paramKind;
   ValueType = valueType;
@@ -2112,8 +2176,10 @@ Identifier GenericTypeParamType::getName() const {
   if (!isCanonical())
     return Name;
 
-  // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
+  return getCanonicalName();
+}
 
+Identifier GenericTypeParamType::getCanonicalName() const {
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
@@ -2140,6 +2206,15 @@ Type GenericTypeParamType::getValueType() const {
     return getDecl()->getValueType();
 
   return ValueType;
+}
+
+GenericTypeParamType *GenericTypeParamType::withDepth(unsigned depth) const {
+  return GenericTypeParamType::get(getParamKind(),
+                                   depth,
+                                   getIndex(),
+                                   getWeight(),
+                                   getValueType(),
+                                   getASTContext());
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
@@ -4569,7 +4644,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   // Try to get the `TangentVector` associated type of `base`.
   // Return the associated type if it is valid.
   auto conformance = swift::lookupConformance(this, differentiableProtocol);
-  auto assocTy = conformance.getTypeWitness(this, assocDecl);
+  auto assocTy = conformance.getTypeWitness(assocDecl);
   if (!assocTy->hasError())
     return cache(TangentSpace::getTangentVector(assocTy));
 
@@ -4994,11 +5069,15 @@ StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
   llvm_unreachable("bad ParamSpecifier");
 }
 
-std::optional<DiagnosticBehavior>
-TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
-  auto *self = const_cast<TypeBase *>(this);
+static std::optional<DiagnosticBehavior>
+getConcurrencyDiagnosticBehaviorLimitRec(
+    Type type, DeclContext *declCtx,
+    llvm::SmallPtrSetImpl<NominalTypeDecl *> &visited) {
+  if (auto *nomDecl = type->getNominalOrBoundGenericNominal()) {
+    // If we have already seen this type, treat it as having no limit.
+    if (!visited.insert(nomDecl).second)
+      return std::nullopt;
 
-  if (auto *nomDecl = self->getNominalOrBoundGenericNominal()) {
     // First try to just grab the exact concurrency diagnostic behavior.
     if (auto result =
             swift::getConcurrencyDiagnosticBehaviorLimit(nomDecl, declCtx)) {
@@ -5009,11 +5088,12 @@ TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
     // merging our fields if we have a struct.
     if (auto *structDecl = dyn_cast<StructDecl>(nomDecl)) {
       std::optional<DiagnosticBehavior> diagnosticBehavior;
-      auto substMap = self->getContextSubstitutionMap();
+      auto substMap = type->getContextSubstitutionMap();
       for (auto storedProperty : structDecl->getStoredProperties()) {
         auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
         auto astType = storedProperty->getInterfaceType().subst(substMap);
-        auto rhs = astType->getConcurrencyDiagnosticBehaviorLimit(declCtx);
+        auto rhs = getConcurrencyDiagnosticBehaviorLimitRec(astType, declCtx,
+                                                            visited);
         auto result = lhs.merge(rhs.value_or(DiagnosticBehavior::Unspecified));
         if (result != DiagnosticBehavior::Unspecified)
           diagnosticBehavior = result;
@@ -5024,13 +5104,14 @@ TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
 
   // When attempting to determine the diagnostic behavior limit of a tuple, just
   // merge for each of the elements.
-  if (auto *tupleType = self->getAs<TupleType>()) {
+  if (auto *tupleType = type->getAs<TupleType>()) {
     std::optional<DiagnosticBehavior> diagnosticBehavior;
     for (auto tupleType : tupleType->getElements()) {
       auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
 
       auto type = tupleType.getType()->getCanonicalType();
-      auto rhs = type->getConcurrencyDiagnosticBehaviorLimit(declCtx);
+      auto rhs = getConcurrencyDiagnosticBehaviorLimitRec(type, declCtx,
+                                                          visited);
       auto result = lhs.merge(rhs.value_or(DiagnosticBehavior::Unspecified));
       if (result != DiagnosticBehavior::Unspecified)
         diagnosticBehavior = result;
@@ -5038,7 +5119,21 @@ TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
     return diagnosticBehavior;
   }
 
-  return {};
+  // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
+  // them to warnings prior to Swift 7.
+  if (type->is<AnyMetatypeType>()) {
+    if (!type->getASTContext().LangOpts.isSwiftVersionAtLeast(7))
+      return DiagnosticBehavior::Warning;
+  }
+
+  return std::nullopt;
+}
+
+std::optional<DiagnosticBehavior>
+TypeBase::getConcurrencyDiagnosticBehaviorLimit(DeclContext *declCtx) const {
+  auto *self = const_cast<TypeBase *>(this);
+  llvm::SmallPtrSet<NominalTypeDecl *, 16> visited;
+  return getConcurrencyDiagnosticBehaviorLimitRec(Type(self), declCtx, visited);
 }
 
 GenericTypeParamKind

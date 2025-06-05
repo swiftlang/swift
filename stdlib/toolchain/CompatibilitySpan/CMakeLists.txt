@@ -4,6 +4,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
 
   add_swift_target_library("${library_name}" ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     FakeStdlib.swift
+    ../../public/core/Span/MutableRawSpan.swift
+    ../../public/core/Span/MutableSpan.swift
     ../../public/core/Span/RawSpan.swift
     ../../public/core/Span/Span.swift
 
@@ -16,6 +18,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
       -parse-stdlib
       -module-abi-name Swift
       -DSPAN_COMPATIBILITY_STUB
+
+    NO_SWIFTMODULE
 
     DEPLOYMENT_VERSION_OSX ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX}
     DEPLOYMENT_VERSION_IOS ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS}

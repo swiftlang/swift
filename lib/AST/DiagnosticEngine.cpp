@@ -166,6 +166,16 @@ DiagnosticState::DiagnosticState() {
 Diagnostic::Diagnostic(DiagID ID)
     : Diagnostic(ID, storedDiagnosticInfos[(unsigned)ID].groupID) {}
 
+std::optional<const DiagnosticInfo *> Diagnostic::getWrappedDiagnostic() const {
+  for (const auto &arg : getArgs()) {
+    if (arg.getKind() == DiagnosticArgumentKind::Diagnostic) {
+      return arg.getAsDiagnostic();
+    }
+  }
+
+  return std::nullopt;
+}
+
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
   return CharSourceRange(SM, SR.Start, Lexer::getLocForEndOfToken(SM, SR.End));
 }
@@ -303,18 +313,12 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
   return *this;
 }
 
-SourceLoc
-DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
-                                           SourceFile *sourceFile) const {
+SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
   auto &SM = SourceMgr;
 
   SourceLoc bestLoc;
-
-  auto SF =
-      sourceFile ? sourceFile : Member->getDeclContext()->getParentSourceFile();
-  if (!SF) {
+  if (!SF)
     return bestLoc;
-  }
 
   for (auto item : SF->getTopLevelItems()) {
     // If we found an import declaration, we want to insert after it.
@@ -346,30 +350,21 @@ DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
 
 InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  auto Member = Engine->ActiveDiagnostic->getDecl();
-  SourceLoc bestLoc = Engine->getBestAddImportFixItLoc(Member);
+  auto decl = Engine->ActiveDiagnostic->getDecl();
+  if (!decl)
+    return *this;
 
-  if (bestLoc.isValid()) {
-    llvm::SmallString<64> importText;
+  auto bestLoc = Engine->getBestAddImportFixItLoc(
+      decl->getDeclContext()->getOutermostParentSourceFile());
+  if (!bestLoc.isValid())
+    return *this;
 
-    // @_spi imports.
-    if (Member->isSPI()) {
-      auto spiGroups = Member->getSPIGroups();
-      if (!spiGroups.empty()) {
-        importText += "@_spi(";
-        importText += spiGroups[0].str();
-        importText += ") ";
-      }
-    }
+  llvm::SmallString<64> importText;
+  importText += "import ";
+  importText += ModuleName;
+  importText += "\n";
 
-    importText += "import ";
-    importText += ModuleName;
-    importText += "\n";
-
-    return fixItInsert(bestLoc, importText);
-  }
-
-  return *this;
+  return fixItInsert(bestLoc, importText);
 }
 
 InFlightDiagnostic &
@@ -383,15 +378,17 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
                                       const ClosureExpr *E) {
   ASSERT(!E->isImplicit());
 
-  SourceLoc insertionLoc;
+  SourceLoc insertionLoc = E->getBracketRange().Start;
 
-  if (auto *paramList = E->getParameters()) {
-    // HACK: Don't set insertion loc to param list start loc if it's equal to
-    // closure start loc (meaning it's implicit).
-    // FIXME: Don't set the start loc of an implicit param list, or put an
-    // isImplicit bit on ParameterList.
-    if (paramList->getStartLoc() != E->getStartLoc()) {
-      insertionLoc = paramList->getStartLoc();
+  if (insertionLoc.isInvalid()) {
+    if (auto *paramList = E->getParameters()) {
+      // HACK: Don't set insertion loc to param list start loc if it's equal to
+      // closure start loc (meaning it's implicit).
+      // FIXME: Don't set the start loc of an implicit param list, or put an
+      // isImplicit bit on ParameterList.
+      if (paramList->getStartLoc() != E->getStartLoc()) {
+        insertionLoc = paramList->getStartLoc();
+      }
     }
   }
 
@@ -402,9 +399,20 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
   if (insertionLoc.isValid()) {
     return fixItInsert(insertionLoc, "%0 ", {Attr});
   } else {
-    insertionLoc = E->getBody()->getLBraceLoc();
+    auto *body = E->getBody();
+
+    insertionLoc = body->getLBraceLoc();
     ASSERT(insertionLoc.isValid());
-    return fixItInsertAfter(insertionLoc, " %0 in ", {Attr});
+
+    StringRef fixIt = " %0 in";
+    // If the first token in the body literally begins with the next char after
+    // '{', play it safe with a trailing space.
+    if (body->getContentStartLoc() ==
+        insertionLoc.getAdvancedLoc(/*ByteOffset=*/1)) {
+      fixIt = " %0 in ";
+    }
+
+    return fixItInsertAfter(insertionLoc, fixIt, {Attr});
   }
 }
 
@@ -442,7 +450,7 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     // version. We do this before limiting the behavior, because
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
-      if (majorVersion > 6) {
+      if (majorVersion >= version::Version::getFutureMajorLanguageVersion()) {
         wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
         wrapIn(diag::error_in_swift_lang_mode, majorVersion);
@@ -460,6 +468,11 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
   }
 
   return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftVersion() {
+  using namespace version;
+  return warnUntilSwiftVersion(Version::getFutureMajorLanguageVersion());
 }
 
 InFlightDiagnostic &
@@ -498,13 +511,14 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   Engine->WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
   wrapped.FormatArgs = Engine->WrappedDiagnosticArgs.back();
 
-  // Overwrite the ID and argument with those from the wrapper.
+  // Overwrite the ID and arguments with those from the wrapper.
   Engine->getActiveDiagnostic().ID = wrapper.ID;
   Engine->getActiveDiagnostic().Args = wrapper.Args;
   // Intentionally keeping the original GroupID here
 
   // Set the argument to the diagnostic being wrapped.
-  assert(wrapper.getArgs().front().getKind() == DiagnosticArgumentKind::Diagnostic);
+  ASSERT(wrapper.getArgs().front().getKind() ==
+         DiagnosticArgumentKind::Diagnostic);
   Engine->getActiveDiagnostic().Args.front() = &wrapped;
 
   return *this;
@@ -863,18 +877,22 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
     }
 
-    // If it's an accessor, describe that and then switch to discussing its
-    // storage.
-    if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-      Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " for ";
-      D = accessor->getStorage();
-    }
-
-    // If it's an extension, describe that and then switch to discussing its
-    // nominal type.
-    if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-      Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " of ";
-      D = ext->getSelfNominalTypeDecl();
+    if (includeName) {
+      if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+        // If it's an accessor, describe that and then switch to discussing its
+        // storage declaration.
+        Out << Decl::getDescriptiveKindName(D->getDescriptiveKind()) << " for ";
+        D = accessor->getStorage();
+      } else if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+        // If it's an extension with a valid bound type declaration, describe
+        // the extension itself then switch to discussing the bound
+        // declaration.
+        if (auto *nominal = ext->getSelfNominalTypeDecl()) {
+          Out << Decl::getDescriptiveKindName(D->getDescriptiveKind())
+              << " of ";
+          D = nominal;
+        }
+      }
     }
 
     // Figure out the name we want to print.
@@ -1077,6 +1095,26 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << '@';
       printAttrName();
     }
+    break;
+  }
+  case DiagnosticArgumentKind::TypeAttribute: {
+    bool useAtStyle = true;
+    if (Modifier == "kind") {
+      useAtStyle = false;
+    } else {
+      ASSERT(Modifier.empty() &&
+             "Improper modifier for TypeAttribute argument");
+    }
+
+    if (!useAtStyle) {
+      Out << "attribute ";
+    }
+    Out << FormatOpts.OpeningQuotationMark;
+    if (useAtStyle) {
+      Out << '@';
+    }
+    Out << Arg.getAsTypeAttribute()->getAttrName();
+    Out << FormatOpts.ClosingQuotationMark;
     break;
   }
   case DiagnosticArgumentKind::AvailabilityDomain:
@@ -1377,7 +1415,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
 
   auto groupID = diagnostic.getGroupID();
   StringRef Category;
-  if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
+  if (auto wrapped = diagnostic.getWrappedDiagnostic())
+    Category = wrapped.value()->Category;
+  else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     Category = "no-usage";
@@ -1621,16 +1661,15 @@ DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
   case PrintDiagnosticNamesMode::Group:
     break;
   case PrintDiagnosticNamesMode::Identifier: {
-    // If this diagnostic is a wrapper for another diagnostic, use the ID of
-    // the wrapped diagnostic.
-    for (const auto &arg : diagnostic.getArgs()) {
-      if (arg.getKind() == DiagnosticArgumentKind::Diagnostic) {
-        diagID = arg.getAsDiagnostic()->ID;
-        break;
-      }
+    auto userFacingID = diagID;
+    // If this diagnostic wraps another one, use the ID of the wrapped
+    // diagnostic.
+    if (auto wrapped = diagnostic.getWrappedDiagnostic()) {
+      userFacingID = wrapped.value()->ID;
     }
 
-    message = formatMessageWithName(message, diagnosticIDStringFor(diagID));
+    message =
+        formatMessageWithName(message, diagnosticIDStringFor(userFacingID));
     break;
   }
   }

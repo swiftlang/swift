@@ -253,8 +253,17 @@ struct AliasAnalysis {
     case let storeBorrow as StoreBorrowInst:
       return memLoc.mayAlias(with: storeBorrow.destination, self) ? .init(write: true) : .noEffects
 
-    case let mdi as MarkDependenceInstruction:
+    case let mdi as MarkDependenceInst:
       if mdi.base.type.isAddress && memLoc.mayAlias(with: mdi.base, self) {
+        return .init(read: true)
+      }
+      return .noEffects
+
+    case let mdai as MarkDependenceAddrInst:
+      if memLoc.mayAlias(with: mdai.address, self) {
+        return .init(read: true, write: true)
+      }
+      if mdai.base.type.isAddress && memLoc.mayAlias(with: mdai.base, self) {
         return .init(read: true)
       }
       return .noEffects
@@ -262,8 +271,8 @@ struct AliasAnalysis {
     case let copy as SourceDestAddrInstruction:
       let mayRead = memLoc.mayAlias(with: copy.source, self)
       let mayWrite = memLoc.mayAlias(with: copy.destination, self)
-      var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSrc))
-      if !copy.isInitializationOfDest {
+      var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSource))
+      if !copy.isInitializationOfDestination {
         effects.merge(with: defaultEffects(of: copy, on: memLoc))
       }
       return effects
@@ -358,7 +367,7 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
       // Check if the memLoc is "derived" from the begin_borrow, i.e. is an interior pointer.
-      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BorrowIntroducingInstruction)
+      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
   }
@@ -613,6 +622,14 @@ private enum ImmutableScope {
       if beginAccess.isUnsafe {
         return nil
       }
+
+      // This is a workaround for a bug in the move-only checker: rdar://151841926.
+      // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
+      // TODO: remove this once the bug is fixed.
+      if beginAccess.isStatic {
+        return nil
+      }
+
       switch beginAccess.accessKind {
       case .read:
         self = .readAccess(beginAccess)
@@ -704,7 +721,7 @@ private enum ImmutableScope {
 }
 
 private struct FindBeginBorrowWalker : ValueUseDefWalker {
-  let beginBorrow: BorrowIntroducingInstruction
+  let beginBorrow: BeginBorrowInstruction
   var walkUpCache = WalkerCache<Path>()
 
   mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {

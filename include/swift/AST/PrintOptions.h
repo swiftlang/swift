@@ -143,6 +143,9 @@ struct PrintOptions {
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
+  /// Use \c let for a read-only computed property.
+  bool InferPropertyIntroducerFromAccessors = false;
+
   /// Whether to print *any* accessors on subscript.
   bool PrintSubscriptAccessors = true;
 
@@ -171,6 +174,10 @@ struct PrintOptions {
 
   /// Whether to print the bodies of accessors in protocol context.
   bool PrintAccessorBodiesInProtocols = false;
+
+  /// Whether to print the parameter list of accessors like \c set . (Even when
+  /// \c true , parameters marked implicit still won't be printed.)
+  bool PrintExplicitAccessorParameters = true;
 
   /// Whether to print type definitions.
   bool TypeDefinitions = false;
@@ -233,6 +240,12 @@ struct PrintOptions {
   ///
   /// \see FileUnit::getExportedModuleName
   bool UseExportedModuleNames = false;
+
+  /// If true, printed module names will use the "public" (for documentation)
+  /// name, which may be different from the regular name.
+  ///
+  /// \see FileUnit::getPublicModuleName
+  bool UsePublicModuleNames = false;
 
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
@@ -396,9 +409,6 @@ struct PrintOptions {
 
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
-
-  /// Suppress the @execution attribute
-  bool SuppressExecutionAttribute = false;
 
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
@@ -591,7 +601,7 @@ struct PrintOptions {
   bool AlwaysDesugarArraySliceTypes = false;
 
   /// Whether to always desugar inline array types from
-  /// `[<count> x <element>]` to `InlineArray<count, element>`
+  /// `[<count> of <element>]` to `InlineArray<count, element>`
   bool AlwaysDesugarInlineArrayTypes = false;
 
   /// Whether to always desugar dictionary types
@@ -707,6 +717,7 @@ struct PrintOptions {
     result.MapCrossImportOverlaysToDeclaringModule = true;
     result.PrintCurrentMembersOnly = false;
     result.SuppressExpandedMacros = true;
+    result.UsePublicModuleNames = true;
     return result;
   }
 

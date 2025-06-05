@@ -567,7 +567,7 @@ final internal class __VaListBuilder {
   @inlinable // c-abi
   internal func va_list() -> CVaListPointer {
     #if arch(x86_64) || arch(s390x)
-      header.reg_save_area = storage._baseAddress
+      unsafe header.reg_save_area = storage._baseAddress
       unsafe header.overflow_arg_area
         = storage._baseAddress + _registerSaveWords
       return unsafe CVaListPointer(

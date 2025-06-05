@@ -75,7 +75,7 @@ class GenericParamList;
 class TrailingWhereClause;
 class ParameterList;
 class PatternBindingEntry;
-class SpecializeAttr;
+class AbstractSpecializeAttr;
 class GenericContext;
 class DeclName;
 class StmtConditionElement;
@@ -1241,10 +1241,10 @@ public:
 /// The \c _@specialize attribute.
 class SpecializeAttributeScope final : public ASTScopeImpl {
 public:
-  SpecializeAttr *const specializeAttr;
+  AbstractSpecializeAttr *const specializeAttr;
   AbstractFunctionDecl *const whatWasSpecialized;
 
-  SpecializeAttributeScope(SpecializeAttr *specializeAttr,
+  SpecializeAttributeScope(AbstractSpecializeAttr *specializeAttr,
                            AbstractFunctionDecl *whatWasSpecialized)
       : ASTScopeImpl(ScopeKind::SpecializeAttribute),
         specializeAttr(specializeAttr), whatWasSpecialized(whatWasSpecialized) {
@@ -1871,15 +1871,20 @@ public:
 class TryScope final : public ASTScopeImpl {
 public:
   AnyTryExpr *const expr;
-  TryScope(AnyTryExpr *e)
-      : ASTScopeImpl(ScopeKind::Try), expr(e) {}
+
+  /// The end location of the scope. This may be past the TryExpr for
+  /// cases where the `try` is at the top-level of an unfolded SequenceExpr. In
+  /// such cases, the `try` covers all elements to the right.
+  SourceLoc endLoc;
+
+  TryScope(AnyTryExpr *e, SourceLoc endLoc)
+      : ASTScopeImpl(ScopeKind::Try), expr(e), endLoc(endLoc) {
+    ASSERT(endLoc.isValid());
+  }
   virtual ~TryScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
-
-private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange

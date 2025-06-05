@@ -32,6 +32,7 @@
 namespace swift {
 class ASTContext;
 class CustomAvailabilityDomain;
+class Decl;
 class DeclContext;
 class ModuleDecl;
 
@@ -148,6 +149,11 @@ public:
     return AvailabilityDomain(Kind::Embedded);
   }
 
+  /// If `decl` represents an availability domain, returns the corresponding
+  /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
+  static std::optional<AvailabilityDomain> forCustom(Decl *decl,
+                                                     const ASTContext &ctx);
+
   static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
   }
@@ -236,6 +242,10 @@ public:
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
 
+  /// Returns the decl that represents the domain, or `nullptr` if the domain
+  /// does not have a decl.
+  Decl *getDecl() const;
+
   /// Returns the module that the domain belongs to, if it is a custom domain.
   ModuleDecl *getModule() const;
 
@@ -252,6 +262,20 @@ public:
   /// `isRoot()`). For example, macCatalyst and visionOS are both ultimately
   /// descendants of the iOS domain.
   AvailabilityDomain getRootDomain() const;
+
+  /// Returns the canonical domain that versions in this domain must be remapped
+  /// to before making availability comparisons in the current compilation
+  /// context. Sets \p didRemap to `true` if a remap was required.
+  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx,
+                                             bool &didRemap) const;
+
+  /// Returns the canonical domain that versions in this domain must be remapped
+  /// to before making availability comparisons in the current compilation
+  /// context.
+  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx) const {
+    bool unused;
+    return getRemappedDomain(ctx, unused);
+  }
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
@@ -307,24 +331,26 @@ private:
   Identifier name;
   Kind kind;
   ModuleDecl *mod;
+  Decl *decl;
 
-  CustomAvailabilityDomain(Identifier name, ModuleDecl *mod, Kind kind);
+  CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
+                           Decl *decl);
 
 public:
-  static const CustomAvailabilityDomain *get(StringRef name, ModuleDecl *mod,
-                                             Kind kind, const ASTContext &ctx);
+  static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
+                                             ModuleDecl *mod, Decl *decl,
+                                             const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
+  Decl *getDecl() const { return decl; }
 
   /// Uniquing for `ASTContext`.
   static void Profile(llvm::FoldingSetNodeID &ID, Identifier name,
-                      ModuleDecl *mod, Kind kind);
+                      ModuleDecl *mod);
 
-  void Profile(llvm::FoldingSetNodeID &ID) const {
-    Profile(ID, name, mod, kind);
-  }
+  void Profile(llvm::FoldingSetNodeID &ID) const { Profile(ID, name, mod); }
 };
 
 /// Represents either a resolved availability domain or an identifier written
@@ -406,6 +432,20 @@ public:
   void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
   void print(llvm::raw_ostream &os) const;
+};
+
+/// Represents an `AvailabilityRange` paired with the `AvailabilityDomain` that
+/// the range applies to.
+class AvailabilityDomainAndRange {
+  AvailabilityDomain domain;
+  AvailabilityRange range;
+
+public:
+  AvailabilityDomainAndRange(AvailabilityDomain domain, AvailabilityRange range)
+      : domain(domain), range(range) {};
+
+  AvailabilityDomain getDomain() const { return domain; }
+  AvailabilityRange getRange() const { return range; }
 };
 
 } // end namespace swift

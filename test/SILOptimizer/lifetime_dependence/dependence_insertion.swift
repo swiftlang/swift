@@ -17,19 +17,6 @@
 
 import Builtin
 
-@unsafe
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(borrow source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, borrowing source: borrowing U
-) -> T {
-  dependent
-}
-
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
@@ -92,6 +79,39 @@ func bv_borrow_var(p: UnsafeRawPointer, i: Int) {
 @lifetime(borrow p)
 func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
   BV(p, 0)
+}
+
+// =============================================================================
+// Builtin.addressOfBorrow
+// =============================================================================
+
+// swift-frontend -emit-sil -enable-builtin-module -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableParameters -Xllvm -sil-print-function=test ./dependsOnAddress.swift
+
+import Builtin
+
+struct IntHolder {
+  var field: Int
+}
+
+struct NERawPointer: ~Escapable {
+  var p: Builtin.RawPointer
+}
+
+@lifetime(borrow x)
+func pointerDepends(on x: Builtin.RawPointer) -> NERawPointer {
+  NERawPointer(p: x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A22BuiltinAddressOfBorrow6holderAA12NERawPointerVAA9IntHolderVz_tF : $@convention(thin) (@inout IntHolder) -> @lifetime(borrow 0) @owned NERawPointer {
+// CHECK: bb0(%0 : $*IntHolder):
+// CHECK: [[ACCESS:%[0-9]+]] = begin_access [read] [static] %0
+// CHECK: [[PTR:%[0-9]+]] = address_to_pointer [stack_protection] %2 to $Builtin.RawPointer
+// CHECK: [[NE:%[0-9]+]] = apply %{{.*}}([[PTR]]) : $@convention(thin) (Builtin.RawPointer) -> @lifetime(borrow 0) @owned NERawPointer
+// CHECK: mark_dependence [unresolved] [[NE]] on %0
+// CHECK-LABEL: } // end sil function '$s4test0A22BuiltinAddressOfBorrow6holderAA12NERawPointerVAA9IntHolderVz_tF'
+@lifetime(borrow holder)
+func testBuiltinAddressOfBorrow(holder: inout IntHolder) -> NERawPointer {
+  pointerDepends(on: Builtin.addressOfBorrow(holder))
 }
 
 // =============================================================================

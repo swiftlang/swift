@@ -217,6 +217,10 @@ enum class ImportTypeAttr : uint8_t {
   ///
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter = 1 << 5,
+
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((swift_attr("sending"))) .
+  Sending = 1 << 6,
 };
 
 /// Find and iterate over swift attributes embedded in the type
@@ -474,8 +478,6 @@ public:
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
-  const bool UseClangIncludeTree;
-  bool importSymbolicCXXDecls;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -690,6 +692,9 @@ private:
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
 
+  // Store all methods that result from cloning a base member
+  llvm::DenseSet<ValueDecl *> clonedMembers;
+
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
@@ -697,6 +702,8 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
+
+  bool isClonedMemberDecl(ValueDecl *decl);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -1685,7 +1692,7 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
-  ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                     uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
@@ -1722,8 +1729,15 @@ public:
 
     if constexpr (std::is_base_of_v<NominalTypeDecl, DeclTy>) {
       // Estimate brace locations.
-      auto begin = ClangN.getAsDecl()->getBeginLoc();
-      auto end = ClangN.getAsDecl()->getEndLoc();
+      clang::SourceLocation begin;
+      clang::SourceLocation end;
+      if (auto *td = dyn_cast_or_null<clang::TagDecl>(ClangN.getAsDecl())) {
+        begin = td->getBraceRange().getBegin();
+        end = td->getBraceRange().getEnd();
+      } else {
+        begin = ClangN.getAsDecl()->getBeginLoc();
+        end = ClangN.getAsDecl()->getEndLoc();
+      }
       SourceRange range;
       if (begin.isValid() && end.isValid() && D->getNameLoc().isValid())
         range = SourceRange(importSourceLoc(begin), importSourceLoc(end));
@@ -1732,6 +1746,11 @@ public:
       }
       assert(range.isValid() == D->getNameLoc().isValid());
       D->setBraces(range);
+#ifndef NDEBUG
+      auto declRange = D->getSourceRange();
+      CharSourceRange checkValidRange(SwiftContext.SourceMgr, declRange.Start,
+                                      declRange.End);
+#endif
     }
 
     // SwiftAttrs on ParamDecls are interpreted by applyParamAttributes().
@@ -1742,7 +1761,7 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
-  void swiftify(FuncDecl *MappedDecl);
+  void swiftify(AbstractFunctionDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -2047,14 +2066,19 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   return std::nullopt;
 }
 
-inline std::string getPrivateOperatorName(const std::string &OperatorToken) {
-#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
-  if (OperatorToken == Spelling) {                                             \
-    return "__operator" #Name;                                                 \
-  };
-#include "clang/Basic/OperatorKinds.def"
-  return "None";
-}
+/// Construct the imported Swift name for an imported Clang operator kind,
+/// e.g., \c "__operatorPlus" for Clang::OO_Plus.
+///
+/// Returns an empty identifier (internally, a nullptr) when \a op does not
+/// represent an actual operator, i.e., OO_None or NUM_OVERLOADED_OPERATORS.
+Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
+
+/// Construct the imported Swift name corresponding to an operator identifier,
+/// e.g., \c "__operatorPlus" for \c "+".
+///
+/// Returns an empty identifier (internally, a nullptr) when \a op does not
+/// correspond to an overloaded C++ operator.
+Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
@@ -2066,6 +2090,27 @@ bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
+inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
+    return elaborated->desugar().getTypePtr();
+  return type;
+}
+
+inline clang::QualType desugarIfElaborated(clang::QualType type) {
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
+    return elaborated->desugar();
+  return type;
+}
+
+/// Option set enums are sometimes imported as typedefs which assign a name to
+/// the type, but are unavailable in Swift.
+///
+/// If given such a typedef, this helper function retrieves and imports the
+/// underlying enum type. Returns an empty ImportedType otherwise.
+///
+/// If \a type is an elaborated type, it should be desugared first.
+ImportedType findOptionSetEnum(clang::QualType type,
+                               ClangImporter::Implementation &Impl);
 } // end namespace importer
 } // end namespace swift
 

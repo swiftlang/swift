@@ -118,9 +118,11 @@ def setup_mock_remote(base_dir, base_config):
         call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
                      cwd=remote_repo_path)
         call_quietly(['git', 'clone', '-l', remote_repo_path, local_repo_path])
-        call_quietly(['git', 'config', 'user.name', 'swift_test'],
+        call_quietly(['git', 'config', '--local', 'user.name', 'swift_test'],
                      cwd=local_repo_path)
-        call_quietly(['git', 'config', 'user.email', 'no-reply@swift.org'],
+        call_quietly(['git', 'config', '--local', 'user.email', 'no-reply@swift.org'],
+                     cwd=local_repo_path)
+        call_quietly(['git', 'config', '--local', 'commit.gpgsign', 'false'],
                      cwd=local_repo_path)
         call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
                      cwd=local_repo_path)

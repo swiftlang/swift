@@ -259,9 +259,10 @@ void MemoryLifetimeVerifier::reportError(const Twine &complaint,
   if (DontAbortOnMemoryLifetimeErrors)
     return;
 
-  llvm::errs() << "in function:\n";
-  function->print(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "in function:\n";
+    function->print(out);
+  });
 }
 
 void MemoryLifetimeVerifier::require(const Bits &wrongBits,

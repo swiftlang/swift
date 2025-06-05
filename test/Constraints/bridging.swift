@@ -283,24 +283,29 @@ func rdar19831698() {
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
 func rdar19836341(_ ns: NSString?, vns: NSString?) {
   var vns = vns
-  let _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{22-22= as String?}}
-  var _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{22-22= as String?}}
+  let _: String? = ns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{22-22= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
+  var _: String? = ns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{22-22= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
 
   // Important part about below diagnostic is that from-type is described as
   // 'NSString?' and not '@lvalue NSString?':
-  let _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{23-23= as String?}}
-  var _: String? = vns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}{{23-23= as String?}}
+  let _: String? = vns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{23-23= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
+  var _: String? = vns // expected-error{{cannot assign value of type 'NSString?' to type 'String?'}}{{23-23= as String?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('NSString' and 'String') are expected to be equal}}
 
   vns = ns
 }
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(_ ns: NSString?) {
-  var s: String = ns ?? "str" as String as String // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{19-19=(}} {{50-50=) as String}}
-  // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'NSString'}} {{50-50= as NSString}}
-  var s2 = ns ?? "str" as String as String // expected-error {{cannot convert value of type 'String' to expected argument type 'NSString'}}{{43-43= as NSString}}
+  var s: String = ns ?? "str" as String as String
+  // expected-error@-1 {{cannot convert value of type 'NSString?' to expected argument type 'String?'}} {{21-21= as String?}}
+  var s2 = ns ?? "str" as String as String // expected-error {{binary operator '??' cannot be applied to operands of type 'NSString?' and 'String'}}
 
-  let s3: NSString? = "str" as String? // expected-error {{cannot convert value of type 'String?' to specified type 'NSString?'}}{{39-39= as NSString?}}
+  let s3: NSString? = "str" as String? // expected-error {{cannot assign value of type 'String?' to type 'NSString?'}}{{39-39= as NSString?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('String' and 'NSString') are expected to be equal}}
 
   var s4: String = ns ?? "str" // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{20-20=(}} {{31-31=) as String}}
   var s5: String = (ns ?? "str") as String // fixed version
@@ -308,7 +313,8 @@ func rdar20029786(_ ns: NSString?) {
 
 // Make sure more complicated cast has correct parenthesization
 func castMoreComplicated(anInt: Int?) {
-  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot convert value of type 'Int?' to specified type '(any NSObject & NSCopying)?'}}{{41-41= as (any NSObject & NSCopying)?}}
+  let _: (NSObject & NSCopying)? = anInt // expected-error{{cannot assign value of type 'Int?' to type '(any NSObject & NSCopying)?'}}{{41-41= as (any NSObject & NSCopying)?}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int' and 'any NSObject & NSCopying') are expected to be equal}}
 }
 
 
@@ -365,6 +371,28 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
   z = h // expected-error{{value of type 'String' expected to be an instance of a class or class-constrained type in assignment}}
 
   _ = z
+}
+
+do {
+  func f(an : Any, oan: Any?) -> AnyObject? {
+    let a1 : AnyObject
+    a1 = an
+    // expected-error@-1:8 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{none}}
+    // expected-note@-2:8 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{12-12= as AnyObject}}
+    let a2 : AnyObject?
+    a2 = an
+    // expected-error@-1:10 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{12-12= as AnyObject}}
+    let a3 : AnyObject!
+    a3 = an
+    // expected-error@-1:10 {{value of type 'Any' expected to be an instance of a class or class-constrained type in assignment}}{{12-12= as AnyObject}}
+
+    let obj: AnyObject = an
+    // expected-error@-1:26 {{value of type 'Any' expected to be instance of class or class-constrained type}}{{none}}
+    // expected-note@-2:26 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{28-28= as AnyObject}}
+
+    return oan
+    // expected-error@-1:12 {{return expression of type 'Any' expected to be an instance of a class or class-constrained type}}{{15-15= as AnyObject}}
+  }
 }
 
 func bridgeAnyContainerToAnyObject(x: [Any], y: [NSObject: Any]) {

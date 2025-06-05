@@ -18,6 +18,15 @@ struct NonCopyable : ~Copyable {
   var x: Int
 }
 
+struct S {
+  var i: Int
+  var s: String
+}
+
+struct Pair  {
+  var t: (a: Int, b: Int)
+}
+
 // globalArray
 sil_global @globalArray : $Storage
 
@@ -1666,4 +1675,63 @@ bb3:
   %r = tuple()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @store_and_load_borrow :
+// CHECK:       bb1({{.*}}):
+// CHECK:         store %1 to [trivial]
+// CHECK:         load_borrow
+// CHECK:       bb2:
+// CHECK-LABEL: } // end sil function 'store_and_load_borrow'
+sil [ossa] @store_and_load_borrow : $@convention(thin) (@inout S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  %2 = load_borrow %0
+  %3 = struct_element_addr %0, #S.i
+  br bb1(%2)
+
+bb1(%4 : @reborrow $S):
+  %5 = borrowed %4 from ()
+  end_borrow %5
+  store %1 to [trivial] %3
+  %10 = load_borrow %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%10)
+
+bb3:
+  br bb4(%10)
+
+bb4(%14 : @reborrow $S):
+  %15 = borrowed %14 from ()
+  end_borrow %15
+  %r = tuple()
+  return %r
+}
+
+// Just check that LICM doesn't produce invalid SIL because of a tuple type mismatch.
+// CHECK-LABEL: sil [ossa] @split_load_of_labeld_tuples :
+// CHECK-LABEL: } // end sil function 'split_load_of_labeld_tuples'
+sil [ossa] @split_load_of_labeld_tuples : $@convention(thin) (@inout Pair, Int) -> () {
+bb0(%0 : $*Pair, %1 : $Int):
+  br bb1
+
+bb1:
+  cond_br undef, bb3, bb2
+
+bb2:
+  %4 = load [trivial] %0
+  %5 = struct_element_addr %0, #Pair.t
+  %6 = tuple_element_addr %5, 0
+  %7 = alloc_stack $Int
+  store %1 to [trivial] %7
+  %9 = load [trivial] %7
+  store %9 to [trivial] %6
+  dealloc_stack %7
+  br bb1
+
+bb3:
+  %13 = tuple ()
+  return %13
+}
+
 

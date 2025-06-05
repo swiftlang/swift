@@ -57,7 +57,6 @@ split_embedded_sources(
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
-  EMBEDDED SwiftSettings.swift
   EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguouslyStored.swift
@@ -214,6 +213,13 @@ split_embedded_sources(
   EMBEDDED UnsafeRawPointer.swift
   EMBEDDED UTFEncoding.swift
   EMBEDDED UTF8.swift
+  EMBEDDED UTF8EncodingError.swift
+  EMBEDDED UTF8Span.swift
+  EMBEDDED UTF8SpanBits.swift
+  EMBEDDED UTF8SpanComparisons.swift
+  EMBEDDED UTF8SpanFundamentals.swift
+  EMBEDDED UTF8SpanInternalHelpers.swift
+  EMBEDDED UTF8SpanIterators.swift
   EMBEDDED UTF16.swift
   EMBEDDED UTF32.swift
   EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
@@ -252,7 +258,7 @@ split_embedded_sources(
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
 
     NORMAL AtomicInt.swift.gyb
-    NORMAL FloatingPointParsing.swift.gyb
+  EMBEDDED FloatingPointParsing.swift.gyb
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED LegacyInt128.swift.gyb
@@ -262,11 +268,21 @@ split_embedded_sources(
   )
 
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+  split_embedded_sources(
+    OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_VECTOR_GYB_SOURCES
+    OUT_LIST_NORMAL SWIFTLIB_VECTOR_GYB_SOURCES
+    
+    EMBEDDED SIMDIntegerConcreteOperations.swift.gyb
+    EMBEDDED SIMDFloatConcreteOperations.swift.gyb
+    EMBEDDED SIMDMaskConcreteOperations.swift.gyb
+    EMBEDDED SIMDVectorTypes.swift.gyb
+  )
+
   list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
-  list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+  list(APPEND SWIFTLIB_GYB_SOURCES ${SWIFTLIB_VECTOR_GYB_SOURCES})
 
   list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
-  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES ${SWIFTLIB_EMBEDDED_VECTOR_GYB_SOURCES})
 endif()
 
 # Freestanding and Linux/Android builds both have failures to resolve.
@@ -326,6 +342,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCo
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")

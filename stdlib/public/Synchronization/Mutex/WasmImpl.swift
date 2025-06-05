@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Note: All atomic accesses on WASM are sequentially consistent regardless of
+// Note: All atomic accesses on Wasm are sequentially consistent regardless of
 // what ordering we tell LLVM to use.
 
 @_extern(c, "llvm.wasm.memory.atomic.wait32")

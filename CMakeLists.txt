@@ -336,6 +336,8 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
+set(SWIFT_TOOLCHAIN_VERSION "" CACHE STRING
+    "The Swift compiler tag")
 
 option(SWIFT_DISABLE_DEAD_STRIPPING
       "Turn off Darwin-specific dead stripping for Swift host tools." FALSE)
@@ -462,6 +464,10 @@ option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
 
+option(SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY
+       "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code"
+       FALSE)
+
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
        FALSE)
@@ -574,6 +580,17 @@ set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
 
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "/usr/lib/swift" CACHE STRING
     "The directory of the install_name for standard library dylibs")
+
+#
+# User-configurable OpenBSD-specific options.
+#
+
+option(SWIFT_OPENBSD_BTCFI
+  "Emit branch target identification instructions and sign return addresses when available"
+  FALSE)
+if(SWIFT_OPENBSD_BTCFI)
+  add_definitions("-DSWIFT_OPENBSD_BTCFI")
+endif()
 
 # We don't want to use the same install_name_dir as the standard library which
 # will be installed in /usr/lib/swift. These private libraries should continue
@@ -1393,8 +1410,9 @@ endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Build type:               ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:               ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Strict availability:      ${SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
@@ -1622,6 +1640,12 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
+      if(sdk STREQUAL "OSX" AND SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION VERSION_LESS "10.15")
+        set(build_concurrency NO)
+      else()
+        set(build_concurrency YES)
+      endif()
+
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
@@ -1647,20 +1671,21 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
-          -DSwiftCore_ENABLE_CONCURRENCY=YES)
+          -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
 
       ExternalProject_Get_Property("${stdlib_target}-core" INSTALL_DIR)
 
-      ExternalProject_Add("${stdlib_target}-StringProcessing"
-        SOURCE_DIR
-          "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental/StringProcessing"
+      ExternalProject_Add("${stdlib_target}-Supplemental"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
         DEPENDS "${stdlib_target}-core"
         INSTALL_DIR "${INSTALL_DIR}"
-        INSTALL_COMMAND "" # No install story set up yet
+        INSTALL_COMMAND ""
+        LIST_SEPARATOR "|"
         CMAKE_ARGS
+          -DSwift_ENABLE_RUNTIMES=StringProcessing
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
@@ -1672,7 +1697,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
-          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM})
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+          -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE)
     endforeach()
   endforeach()
 endif()

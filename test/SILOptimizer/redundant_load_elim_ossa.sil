@@ -137,6 +137,11 @@ struct ExistentialIntPair {
   var x: Int
 }
 
+public struct S {
+  var e: Optional<String>
+}
+
+
 sil_global @total : $Int32
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
@@ -1701,5 +1706,73 @@ bb0(%0 : $*ExistentialIntPair, %1 : $*ExistentialIntPair):
   %3 = struct_element_addr %1, #ExistentialIntPair.x
   %4 = load [trivial] %3
   return %4
+}
+
+sil @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+
+// CHECK-LABEL: sil [ossa] @aliasing_apply_with_direct_and_indirect_result :
+// CHECK:         apply
+// CHECK:         [[L:%.*]] = load
+// CHECK:         return [[L]]
+// CHECK-LABEL: } // end sil function 'aliasing_apply_with_direct_and_indirect_result'
+sil [ossa] @aliasing_apply_with_direct_and_indirect_result : $@convention(thin) (UInt64) -> UInt64 {
+bb0(%0 : $UInt64):
+  %4 = alloc_stack $UInt64
+  store %0 to [trivial] %4
+  %11 = function_ref @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+  %12 = apply %11(%4) : $@convention(thin) () -> (Int64, @out UInt64)
+  %13 = load [trivial] %4
+  dealloc_stack %4
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @struct_of_optional_none :
+// CHECK:         [[E:%.*]] = enum
+// CHECK:         [[S:%.*]] = struct $S ([[E]] : $Optional<String>)
+// CHECK:         [[F:%.*]] = struct_extract [[S]] : $S, #S.e
+// CHECK:         return [[F]]
+// CHECK-LABEL: } // end sil function 'struct_of_optional_none'
+sil [ossa] @struct_of_optional_none : $@convention(thin) () -> @owned Optional<String> {
+bb0:
+  %0 = enum $Optional<String>, #Optional.none!enumelt
+  %1 = struct $S (%0)
+  %2 = alloc_stack $S
+  store %1 to [init] %2
+  %4 = struct_element_addr %2, #S.e
+  %5 = load [take] %4
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_of_optional_none :
+// CHECK:         [[E:%.*]] = enum
+// CHECK:         [[T:%.*]] = tuple ([[E]] : $Optional<String>, %0 : $Int)
+// CHECK:         [[F:%.*]] = tuple_extract [[T]] : $(Optional<String>, Int), 0
+// CHECK:         return [[F]]
+// CHECK-LABEL: } // end sil function 'tuple_of_optional_none'
+sil [ossa] @tuple_of_optional_none : $@convention(thin) (Int) -> @owned Optional<String> {
+bb0(%0 : $Int):
+  %1 = enum $Optional<String>, #Optional.none!enumelt
+  %2 = tuple (%1, %0)
+  %3 = alloc_stack $(Optional<String>, Int)
+  store %2 to [init] %3
+  %5 = tuple_element_addr %3, 0
+  %6 = load [take] %5
+  dealloc_stack %3
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @vector :
+// CHECK:         return %1
+// CHECK-LABEL: } // end sil function 'vector'
+sil [ossa] @vector : $@convention(thin) (@inout Builtin.FixedArray<10, Int>, Int, Int) -> Int {
+bb0(%0 : $*Builtin.FixedArray<10, Int>, %1 : $Int, %2 : $Int):
+  %3 = vector_base_addr %0
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr %3, %4
+  store %1 to [trivial] %5
+  store %2 to [trivial] %3
+  %6 = load [trivial] %5
+  return %6
 }
 

@@ -18,16 +18,20 @@
 
 using namespace swift;
 
-std::optional<AvailabilityRange>
-AvailabilityConstraint::getPotentiallyUnavailableRange(
-    const ASTContext &ctx) const {
+AvailabilityDomainAndRange
+AvailabilityConstraint::getDomainAndRange(const ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::UnconditionallyUnavailable:
+    // Technically, unconditional unavailability doesn't have an associated
+    // range. However, if you view it as a special case of obsoletion, then an
+    // unconditionally unavailable declaration is "always obsoleted."
+    return AvailabilityDomainAndRange(getDomain().getRemappedDomain(ctx),
+                                      AvailabilityRange::alwaysAvailable());
   case Reason::Obsoleted:
+    return getAttr().getObsoletedDomainAndRange(ctx).value();
   case Reason::UnavailableForDeployment:
-    return std::nullopt;
   case Reason::PotentiallyUnavailable:
-    return getAttr().getIntroducedRange(ctx);
+    return getAttr().getIntroducedDomainAndRange(ctx).value();
   }
 }
 
@@ -113,25 +117,59 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
   return result;
 }
 
+static bool canIgnoreConstraintInUnavailableContexts(
+    const Decl *decl, const AvailabilityConstraint &constraint) {
+  auto domain = constraint.getDomain();
+
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    // Always reject uses of universally unavailable declarations, regardless
+    // of context, since there are no possible compilation configurations in
+    // which they are available. However, make an exception for types and
+    // conformances, which can sometimes be awkward to avoid references to.
+    if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
+      if (domain.isUniversal() || domain.isSwiftLanguage())
+        return false;
+    }
+    return true;
+
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    switch (domain.getKind()) {
+    case AvailabilityDomain::Kind::Universal:
+    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::PackageDescription:
+    case AvailabilityDomain::Kind::Embedded:
+    case AvailabilityDomain::Kind::Custom:
+      return false;
+    case AvailabilityDomain::Kind::Platform:
+      // Platform availability only applies to the target triple that the
+      // binary is being compiled for. Since the same declaration can be
+      // potentially unavailable from a given context when compiling for one
+      // platform, but available from that context when compiling for a
+      // different platform, it is overly strict to enforce potential platform
+      // unavailability constraints in contexts that are unavailable to that
+      // platform.
+      return true;
+    }
+    return constraint.getDomain().isPlatform();
+
+  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    return false;
+  }
+}
+
 static bool
-isInsideCompatibleUnavailableDeclaration(const Decl *decl,
-                                         const SemanticAvailableAttr &attr,
-                                         const AvailabilityContext &context) {
+shouldIgnoreConstraintInContext(const Decl *decl,
+                                const AvailabilityConstraint &constraint,
+                                const AvailabilityContext &context) {
   if (!context.isUnavailable())
     return false;
 
-  if (!attr.isUnconditionallyUnavailable())
+  if (!canIgnoreConstraintInUnavailableContexts(decl, constraint))
     return false;
 
-  // Refuse calling universally unavailable functions from unavailable code,
-  // but allow the use of types.
-  auto domain = attr.getDomain();
-  if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
-    if (domain.isUniversal() || domain.isSwiftLanguage())
-      return false;
-  }
-
-  return context.containsUnavailableDomain(domain);
+  return context.containsUnavailableDomain(constraint.getDomain());
 }
 
 /// Returns the `AvailabilityConstraint` that describes how \p attr restricts
@@ -218,8 +256,7 @@ static void getAvailabilityConstraintsForDecl(
   // declaration is unconditionally unavailable in a domain for which
   // the context is already unavailable.
   llvm::erase_if(constraints, [&](const AvailabilityConstraint &constraint) {
-    return isInsideCompatibleUnavailableDeclaration(decl, constraint.getAttr(),
-                                                    context);
+    return shouldIgnoreConstraintInContext(decl, constraint, context);
   });
 }
 

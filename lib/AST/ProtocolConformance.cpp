@@ -203,6 +203,31 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
+void NormalProtocolConformance::setSourceKindAndImplyingConformance(
+    ConformanceEntryKind sourceKind,
+    NormalProtocolConformance *implyingConformance) {
+  assert(sourceKind != ConformanceEntryKind::Inherited &&
+         "a normal conformance cannot be inherited");
+  assert((sourceKind == ConformanceEntryKind::Implied) ==
+             (bool)implyingConformance &&
+         "an implied conformance needs something that implies it");
+  assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
+         "cannot create conformance pre-macro-expansion");
+  Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
+  if (auto implying = implyingConformance) {
+    ImplyingConformance = implying;
+    PreconcurrencyLoc = implying->getPreconcurrencyLoc();
+    Bits.NormalProtocolConformance.Options =
+        implyingConformance->getOptions().toRaw();
+    if (getProtocol()->isMarkerProtocol()) {
+      setExplicitGlobalActorIsolation(nullptr);
+    } else if (auto globalActorIsolationType =
+                   implyingConformance->getExplicitGlobalActorIsolation()) {
+      setExplicitGlobalActorIsolation(globalActorIsolationType);
+    }
+  }
+}
+
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
@@ -490,14 +515,22 @@ TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
   return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
 }
 
+bool NormalProtocolConformance::hasExplicitGlobalActorIsolation() const {
+  return Bits.NormalProtocolConformance.HasExplicitGlobalActor;
+}
+
 void
 NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
   if (!typeExpr) {
     Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    Bits.NormalProtocolConformance.Options &=
+        ~(unsigned)ProtocolConformanceFlags::GlobalActorIsolated;
     return;
   }
 
   Bits.NormalProtocolConformance.HasExplicitGlobalActor = true;
+  Bits.NormalProtocolConformance.Options |=
+      (unsigned)ProtocolConformanceFlags::GlobalActorIsolated;
   ASTContext &ctx = getDeclContext()->getASTContext();
   ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this] = typeExpr;
 }
@@ -592,14 +625,6 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   assert(!type->hasArchetype() && "type witnesses must be interface types");
   TypeWitnesses[assocType] = {type, typeDecl};
-}
-
-Type ProtocolConformance::getAssociatedType(Type assocType) const {
-  assert(assocType->isTypeParameter() &&
-         "associated type must be a type parameter");
-
-  ProtocolConformanceRef ref(const_cast<ProtocolConformance*>(this));
-  return ref.getAssociatedType(getType(), assocType);
 }
 
 ProtocolConformanceRef
@@ -712,6 +737,13 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
     return Witness();
   }
   return entry->second;
+}
+
+ProtocolConformanceRef
+SelfProtocolConformance::getAssociatedConformance(Type assocType,
+                                                  ProtocolDecl *protocol) const {
+  ASSERT(assocType->isEqual(protocol->getSelfInterfaceType()));
+  return lookupConformance(getType(), protocol);
 }
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
@@ -867,14 +899,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
   ProtocolConformanceRef conformance =
     GenericConformance->getAssociatedConformance(assocType, protocol);
 
-  auto subMap = getSubstitutionMap();
-
-  Type origType =
-    (conformance.isConcrete()
-       ? conformance.getConcrete()->getType()
-       : GenericConformance->getAssociatedType(assocType));
-
-  return conformance.subst(origType, subMap);
+  return conformance.subst(getSubstitutionMap());
 }
 
 ConcreteDeclRef

@@ -196,7 +196,7 @@ typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'i
 
 // rdar://94888357 - failed to produce a diagnostic when type is used incorrectly
 func rdar94888357() {
-  struct S<T> { // expected-note {{generic type 'S' declared here}}
+  struct S<T> { // expected-note {{generic struct 'S' declared here}}
     init(_ str: String) {}
   }
 
@@ -219,3 +219,18 @@ do {
     subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
   }
 }
+
+let tupleTypeWithTrailingComma: (
+  bar: String,
+  quux: String,
+)
+
+let _ = (bar: String, quux: String,).self
+
+let closureTypeWithTrailingCommas: (
+  String,
+  String,
+) -> (
+  bar: String,
+  quux: String,
+)

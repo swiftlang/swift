@@ -169,6 +169,7 @@ enum class DescriptiveDeclKind : uint8_t {
   PostfixOperator,
   PrecedenceGroup,
   TypeAlias,
+  GenericTypeAlias,
   GenericTypeParam,
   AssociatedType,
   Type,
@@ -183,7 +184,6 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericClass,
   GenericActor,
   GenericDistributedActor,
-  GenericType,
   Subscript,
   StaticSubscript,
   ClassSubscript,
@@ -213,7 +213,8 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueResultType,
   OpaqueVarType,
   Macro,
-  MacroExpansion
+  MacroExpansion,
+  Using
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -267,6 +268,16 @@ static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
               "Self Access Kind is too small to fit in SelfAccess kind bits. "
               "Please expand ");
 
+enum class UsingSpecifier : uint8_t {
+  MainActor,
+  Nonisolated,
+  LastSpecifier = Nonisolated,
+};
+enum : unsigned {
+  NumUsingSpecifierBits =
+      countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
+};
+
 /// Diagnostic printing of \c SelfAccessKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 
@@ -310,6 +321,9 @@ struct OverloadSignature {
   /// Whether this is a macro.
   unsigned IsMacro : 1;
 
+  /// Whether this is a generic argument.
+  unsigned IsGenericArg : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
@@ -323,8 +337,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsEnumElement(false), IsNominal(false),
+        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -735,7 +751,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -804,10 +820,7 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1,
-
-    /// Whether this module has enabled `ExtensibleEnums` feature.
-    ExtensibleEnums : 1
+    StrictMemorySafety : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -823,6 +836,10 @@ protected:
 
     /// The number of elements in this path.
     NumPathElements : 8
+  );
+
+  SWIFT_INLINE_BITFIELD(UsingDecl, Decl, NumUsingSpecifierBits,
+    Specifier : NumUsingSpecifierBits
   );
 
   SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
@@ -1148,6 +1165,10 @@ public:
   /// \Note this method returns \c false if this declaration was
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
+
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context, and the macro was attached to a node imported from clang.
+  bool isInMacroExpansionFromClangHeader() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -2287,6 +2308,7 @@ private:
   // Flags::Checked.
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   bool isFullyValidated() const {
     return InitContextAndFlags.getInt().contains(
@@ -2435,8 +2457,20 @@ private:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  CaptureInfo getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  /// Retrieve the computed capture info, or \c nullopt if it hasn't been
+  /// computed yet.
+  std::optional<CaptureInfo> getCachedCaptureInfo() const {
+    if (!Captures.hasBeenComputed())
+      return std::nullopt;
+
+    return Captures;
+  }
+
+  void setCaptureInfo(CaptureInfo captures) {
+    ASSERT(!Captures.hasBeenComputed());
+    ASSERT(captures.hasBeenComputed());
+    Captures = captures;
+  }
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2460,6 +2494,7 @@ class PatternBindingDecl final : public Decl,
   friend class Decl;
   friend class PatternBindingEntryRequest;
   friend class PatternBindingCheckedAndContextualizedInitRequest;
+  friend class PatternBindingCaptureInfoRequest;
 
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
@@ -2503,9 +2538,7 @@ public:
                                                Pattern *Pat, Expr *E,
                                                DeclContext *Parent);
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : VarLoc;
-  }
+  SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
 
   unsigned getNumPatternEntries() const {
@@ -2639,13 +2672,9 @@ public:
     getMutablePatternList()[i].setInitContext(init);
   }
 
-  CaptureInfo getCaptureInfo(unsigned i) const {
-    return getPatternList()[i].getCaptureInfo();
-  }
-
-  void setCaptureInfo(unsigned i, CaptureInfo captures) {
-    getMutablePatternList()[i].setCaptureInfo(captures);
-  }
+  /// Retrieve the capture info for the initializer at the given index,
+  /// computing if needed.
+  CaptureInfo getCaptureInfo(unsigned i) const;
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -6232,10 +6261,16 @@ public:
                               bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
-  AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind, ModuleDecl *module,
-                                   ResilienceExpansion expansion,
-                                   bool useOldABI) const;
+  AccessStrategy getAccessStrategy(
+      AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+      ResilienceExpansion expansion,
+      std::optional<std::pair<SourceRange, const DeclContext *>> location,
+      bool useOldABI) const;
+
+  /// Whether access is via physical storage.
+  bool isAccessedViaPhysicalStorage(AccessSemantics semantics,
+                                    AccessKind accessKind, ModuleDecl *module,
+                                    ResilienceExpansion expansion) const;
 
   /// Do we need to use resilient access patterns outside of this
   /// property's resilience domain?
@@ -6256,9 +6291,12 @@ public:
   /// Otherwise, its override must be referenced.
   bool isValidKeyPathComponent() const;
 
-  /// True if the storage exports a property descriptor for key paths in
-  /// other modules.
-  bool exportsPropertyDescriptor() const;
+  /// If the storage exports a property descriptor for key paths in other
+  /// modules, this returns the generic signature in which its member methods
+  /// are emitted. If the storage does not export a property descriptor,
+  /// returns `std::nullopt`.
+  std::optional<GenericSignature>
+  getPropertyDescriptorGenericSignature() const;
 
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;
@@ -6895,6 +6933,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
+
+    /// Whether or not this parameter is isolated to a caller.
+    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -6971,6 +7012,10 @@ public:
 
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
+
+  static ParamDecl *cloneAccessor(const ASTContext &Ctx,
+                                  ParamDecl const *subscriptParam,
+                                  DeclContext *Parent);
 
   static ParamDecl *
   createImplicit(ASTContext &Context, SourceLoc specifierLoc,
@@ -7181,6 +7226,18 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
+  }
+
+  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
+  bool isCallerIsolated() const {
+    return getOptions().contains(Flag::IsCallerIsolated);
+  }
+
+  void setCallerIsolated(bool value = true) {
+    if (value)
+      addFlag(Flag::IsCallerIsolated);
+    else
+      removeFlag(Flag::IsCallerIsolated);
   }
 
   /// Whether or not this parameter is marked with '@_addressable'.
@@ -8106,6 +8163,11 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
+  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// formalizing the attribute.
+  std::optional<ForeignLanguage> getCDeclKind() const;
+
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
   bool argumentNameIsAPIByDefault() const;
@@ -8138,8 +8200,6 @@ public:
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
-
-  std::optional<ExecutionKind> getExecutionBehavior() const;
 
   /// Whether the declaration is later overridden in the module
   ///
@@ -8373,9 +8433,8 @@ public:
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
-  }
+  SourceLoc getStartLoc() const;
+  SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
@@ -9691,6 +9750,34 @@ public:
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
   }
+};
+
+/// UsingDecl - This represents a single `using` declaration, e.g.:
+///   using @MainActor
+class UsingDecl : public Decl {
+  friend class Decl;
+
+private:
+  SourceLoc UsingLoc, SpecifierLoc;
+
+  UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+            UsingSpecifier specifier, DeclContext *parent);
+
+public:
+  UsingSpecifier getSpecifier() const {
+    return static_cast<UsingSpecifier>(Bits.UsingDecl.Specifier);
+  }
+
+  std::string getSpecifierName() const;
+
+  SourceLoc getLocFromSource() const { return UsingLoc; }
+  SourceRange getSourceRange() const { return {UsingLoc, SpecifierLoc}; }
+
+  static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
+                           SourceLoc specifierLoc, UsingSpecifier specifier,
+                           DeclContext *parent);
+
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
 };
 
 inline void

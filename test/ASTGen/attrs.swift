@@ -1,8 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -13,8 +11,6 @@
 // RUN:   | %sanitize-address > %t/astgen.ast
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -28,8 +24,6 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature ABIAttribute \
-// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -41,8 +35,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_ABIAttribute
-// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_RawLayout
@@ -178,6 +170,9 @@ struct ProjectedValueStruct {
 @_specialize(where X: _TrivialStride(16), Y: _Trivial(32, 4), Z: _Class)
 func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
 
+@specialized(where X == Int, Y == Float, Z == Double)
+func testSpecializePublic<X, Y, Z>(x: X, y: Y, z: Z) {}
+
 @_spi(SPIName) public func spiFn() {}
 
 struct StorageRestrctionTest {
@@ -195,19 +190,19 @@ struct StorageRestrctionTest {
 @_unavailableFromAsync struct UnavailFromAsyncStruct { } // expected-error {{'@_unavailableFromAsync' attribute cannot be applied to this declaration}}
 @_unavailableFromAsync(message: "foo bar") func UnavailFromAsyncFn() {}
 
-@execution(concurrent) func testGlobal() async { // Ok
+@concurrent func testGlobal() async { // Ok
 }
 
 do {
-  @execution(caller) func testLocal() async {} // Ok
+  nonisolated(nonsending) func testLocal() async {} // Ok
 
   struct Test {
-    @execution(concurrent) func testMember() async {} // Ok
+    @concurrent func testMember() async {} // Ok
   }
 }
 
 typealias testConvention = @convention(c) (Int) -> Int
-typealias testExecution = @execution(concurrent) () async -> Void
+typealias testExecution = @concurrent () async -> Void
 typealias testIsolated = @isolated(any) () -> Void
 
 protocol OpProto {}
@@ -264,3 +259,6 @@ struct LayoutOuter {
 struct AnyEraser: EraserProto {
   init<T: EraserProto>(erasing: T) {}
 }
+
+func takeNone(@_inheritActorContext param: @Sendable () async -> ()) { }
+func takeAlways(@_inheritActorContext(always) param: sending @isolated(any) () -> ()) { }

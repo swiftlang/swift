@@ -13,6 +13,8 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsModuleDiffer.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/SourceManager.h"
 #include "gtest/gtest.h"
 
@@ -142,7 +144,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group) {
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-        EXPECT_TRUE(info.Category == "DeprecatedDeclaration");
+        EXPECT_EQ(info.Category, "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
 }
@@ -162,9 +164,64 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group_WrappedDiag) {
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
         EXPECT_FALSE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-        EXPECT_TRUE(info.Category == "DeprecatedDeclaration");
+        EXPECT_EQ(info.Category, "DeprecatedDeclaration");
       },
       /*expectedNumCallbackCalls=*/1);
+}
+
+// Test that the category is appropriately set in these cases, and that the
+// category of a wrapped diagnostic is favored.
+TEST(DiagnosticInfo, CategoryDeprecation) {
+  testCase(
+      [](DiagnosticEngine &diags) {
+        diags.setLanguageVersion(version::Version({5}));
+
+        const auto diag = diag::iuo_deprecated_here;
+        EXPECT_TRUE(diags.isDeprecationDiagnostic(diag.ID));
+
+        diags.diagnose(SourceLoc(), diag);
+        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(6);
+        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(99);
+      },
+      [](DiagnosticEngine &, const DiagnosticInfo &info) {
+        EXPECT_EQ(info.Category, "deprecation");
+      },
+      /*expectedNumCallbackCalls=*/3);
+}
+TEST(DiagnosticInfo, CategoryNoUsage) {
+  testCase(
+      [](DiagnosticEngine &diags) {
+        diags.setLanguageVersion(version::Version({5}));
+
+        const auto diag = diag::expression_unused_function;
+        EXPECT_TRUE(diags.isNoUsageDiagnostic(diag.ID));
+
+        diags.diagnose(SourceLoc(), diag);
+        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(6);
+        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(99);
+      },
+      [](DiagnosticEngine &, const DiagnosticInfo &info) {
+        EXPECT_EQ(info.Category, "no-usage");
+      },
+      /*expectedNumCallbackCalls=*/3);
+}
+TEST(DiagnosticInfo, CategoryAPIDigesterBreakage) {
+  testCase(
+      [](DiagnosticEngine &diags) {
+        diags.setLanguageVersion(version::Version({5}));
+
+        const auto diag = diag::enum_case_added;
+        EXPECT_TRUE(diags.isAPIDigesterBreakageDiagnostic(diag.ID));
+
+        diags.diagnose(SourceLoc(), diag, StringRef());
+        diags.diagnose(SourceLoc(), diag, StringRef()).warnUntilSwiftVersion(6);
+        diags.diagnose(SourceLoc(), diag, StringRef())
+            .warnUntilSwiftVersion(99);
+      },
+      [](DiagnosticEngine &, const DiagnosticInfo &info) {
+        EXPECT_EQ(info.Category, "api-digester-breaking-change");
+      },
+      /*expectedNumCallbackCalls=*/3);
 }
 
 } // end anonymous namespace

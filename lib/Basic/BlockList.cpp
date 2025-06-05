@@ -115,8 +115,10 @@ void swift::BlockListStore::Implementation::addConfigureFilePath(StringRef path)
                       SM.getLLVMSourceMgr());
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
     assert(DI != Stream.end() && "Failed to read a document");
-    yaml::Node *N = DI->getRoot();
-    for (auto &pair: *dyn_cast<yaml::MappingNode>(N)) {
+    auto *MapNode = dyn_cast<yaml::MappingNode>(DI->getRoot());
+    if (!MapNode)
+      continue;
+    for (auto &pair: *MapNode) {
       std::string key = getScalaString(pair.getKey());
       auto action = llvm::StringSwitch<BlockListAction>(key)
 #define BLOCKLIST_ACTION(X) .Case(#X, BlockListAction::X)

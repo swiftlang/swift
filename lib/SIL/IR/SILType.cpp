@@ -706,6 +706,39 @@ bool SILFunctionType::isNoReturnFunction(SILModule &M,
   return false;
 }
 
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
+  return isAddressable(paramIdx, caller->getModule(),
+                       caller->getGenericEnvironment(),
+                       caller->getModule().Types,
+                       caller->getTypeExpansionContext());
+}
+
+// 'genericEnv' may be null.
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
+                                    GenericEnvironment *genericEnv,
+                                    Lowering::TypeConverter &typeConverter,
+                                    TypeExpansionContext expansion) {
+  SILParameterInfo paramInfo = getParameters()[paramIdx];
+  for (auto &depInfo : getLifetimeDependencies()) {
+    auto *addressableIndices = depInfo.getAddressableIndices();
+    if (addressableIndices && addressableIndices->contains(paramIdx)) {
+      return true;
+    }
+    auto *condAddressableIndices = depInfo.getConditionallyAddressableIndices();
+    if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
+      CanType argType = paramInfo.getArgumentType(module, this, expansion);
+      CanType contextType = genericEnv
+        ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
+        : argType;
+      assert(!contextType->hasTypeParameter());
+      auto &tl = typeConverter.getTypeLowering(contextType, expansion);
+      if (tl.getRecursiveProperties().isAddressableForDependencies())
+        return true;
+    }
+  }
+  return false;
+}
+
 #ifndef NDEBUG
 static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   assert(type1->isLegalSILType());

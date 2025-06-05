@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-irgen                                            \
 // RUN:     %s                                                              \
+// RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors                 \
 // RUN: | %IRGenFileCheck %s
 
@@ -97,7 +98,7 @@ public var irm: Int {
 // CHECK-SAME:                   ptr @"$s19coroutine_accessors1SV3irmSivyTwc",
 // CHECK-SAME:                   ptr [[ALLOCATOR]],
 // CHECK-SAME:                   ptr [[FRAME]],
-// CHECK-SAME:                   ptr @"$s19coroutine_accessors1SVSiIetMIgYy_TC",
+// CHECK-SAME:                   $s19coroutine_accessors1SVSiIetMIgYy_TC
 // CHECK-SAME:                   ptr @_swift_coro_alloc,
 // CHECK-SAME:                   ptr @_swift_coro_dealloc
 // CHECK-SAME:               )
@@ -125,7 +126,7 @@ public var irm: Int {
 // CHECK-LABEL:     define{{.*}} { ptr, ptr } @"$s19coroutine_accessors1SV3irmSivx"(
 // CHECK-SAME:          ptr noalias [[FRAME:%[^,]+]],
 // CHECK-SAME:          ptr swiftcoro [[ALLOCATOR:%[^,]+]],
-// CHECK-SAME:          ptr nocapture swiftself dereferenceable({{8|16}}) [[SELF:%[^)]+]]
+// CHECK-SAME:          ptr{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{8|16}}) [[SELF:%[^)]+]]
 // CHECK-SAME:      )
 // CHECK-SAME:      {
 // CHECK:               [[ID:%[^,]+]] = call token @llvm.coro.id.retcon.once.dynamic(
@@ -134,7 +135,7 @@ public var irm: Int {
 // CHECK-SAME:                   ptr @"$s19coroutine_accessors1SV3irmSivxTwc",
 // CHECK-SAME:                   ptr [[ALLOCATOR]],
 // CHECK-SAME:                   ptr [[FRAME]],
-// CHECK-SAME:                   ptr @"$s19coroutine_accessors1SVSiIetMIlYl_TC",
+// CHECK-SAME:                   $s19coroutine_accessors1SVSiIetMIlYl_TC
 // CHECK-SAME:                   ptr @_swift_coro_alloc,
 // CHECK-SAME:                   ptr @_swift_coro_dealloc
 // CHECK-SAME:               )
@@ -142,7 +143,7 @@ public var irm: Int {
 // CHECK-SAME:                   token [[ID]],
 // CHECK-SAME:                   ptr null
 // CHECK-SAME:               )
-// CHECK:               [[S_FIELD__I:%[^,]+]] = getelementptr inbounds %T19coroutine_accessors1SV,
+// CHECK:               [[S_FIELD__I:%[^,]+]] = getelementptr inbounds{{.*}} %T19coroutine_accessors1SV,
 // CHECK-SAME:                     ptr [[SELF]],
 // CHECK-SAME:                     i32 0,
 // CHECK-SAME:                     i32 1
@@ -230,7 +231,7 @@ public mutating func increment_irm() {
 // CHECK-SAME:        _swift_coro_async_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call swiftcc void @swift_task_dealloc_through(ptr [[FRAME]])
+// CHECK:         call swiftcc void @{{(_)?}}swift_task_dealloc_through(ptr [[FRAME]])
 // CHECK:       }
 @_silgen_name("increment_irm_async")
 public mutating func increment_irm_async() async {
@@ -292,7 +293,7 @@ public var force_yield_once_2_convention : () {
 // CHECK-LABEL: define{{.*}} { ptr, ptr } @increment_irm_yield_once_2(
 //                  ptr noalias %0
 // CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
-//                  ptr nocapture swiftself dereferenceable(16) %2
+//                  ptr{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable(16) %2
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 //      :         [[SIZE_32:%[^,]+]] = load i32

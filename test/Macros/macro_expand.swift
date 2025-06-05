@@ -63,6 +63,9 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 
 #endif
 
+@freestanding(declaration, names: named(storedProperty))
+public macro AddStoredProperty<T>(_ x: T) = #externalMacro(module: "MacroDefinition", type: "StoredPropertyMacro")
+
 #if TEST_DIAGNOSTICS
 @freestanding(declaration)
 macro NotCovered() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
@@ -72,7 +75,7 @@ struct MemberNotCovered {
   // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
 
   // CHECK-DIAGS: error: declaration name 'value' is not covered by macro 'NotCovered'
-  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX70_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
+  // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-5]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll10NotCoveredfMf_.swift
   // CHECK-DIAGS: var value: Int
   // CHECK-DIAGS: END CONTENTS OF FILE
 }
@@ -126,6 +129,41 @@ struct Bad {}
 // CHECK-DIAGS: typealias _ImageLiteralType = Void
 // CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
 // CHECK-DIAGS: END CONTENTS OF FILE
+
+class HasStoredPropertyClassInvalid {
+  #AddStoredProperty((Self.self, 0).1) // expected-note {{in expansion of macro 'AddStoredProperty' here}}
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-2]]_2_33_{{.*}}AddStoredPropertyfMf_.swift:1:22: error: covariant 'Self' type cannot be referenced from a stored property initializer
+}
+
+// Redeclaration checking should behave as though expansions are part of the
+// source file.
+struct RedeclChecking {
+  #varValue
+
+  // expected-error@+1 {{invalid redeclaration of 'value'}}
+  var value: Int { 0 }
+}
+
+// CHECK-DIAGS: macro_expand.swift:[[@LINE-3]]:7: error: invalid redeclaration of 'value'
+// CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-8]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:1:5: note: 'value' previously declared here
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-9]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:
+// CHECK-DIAGS: var value: Int {
+// CHECK-DIAGS:     1
+// CHECK-DIAGS: }
+// CHECK-DIAGS: END CONTENTS OF FILE
+
+@attached(body)
+public macro ThrowCancellation() = #externalMacro(module: "MacroDefinition", type: "ThrowCancellationMacro")
+
+// https://github.com/swiftlang/swift/issues/79039 - Make sure we diagnose the
+// error mismatch.
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039()' here}}
+func issue79039() throws(DecodingError)
+// CHECK-DIAGS: @__swiftmacro_9MacroUser10issue7903917ThrowCancellationfMb_.swift:2:11: error: thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'
+
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039_2()' here}}
+func issue79039_2() throws(DecodingError) {}
+// CHECK-DIAGS: @__swiftmacro_9MacroUser12issue79039_217ThrowCancellationfMb_.swift:2:11: error: thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'
 #endif
 
 @freestanding(declaration)
@@ -138,18 +176,16 @@ macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "Fa
 func invalidDeclarationMacro() {
   #accidentalCodeItem
   // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX138_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-3]]_2_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
 
   @AccidentalCodeItem struct S {}
   // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
-  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l0L_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l018AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
 
-  struct LocalThing1 {
-    func f() {
-      #accidentalCodeItem
-      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
-      // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l0L_18AccidentalCodeItemfMp_.swift
-    }
+  do {
+    @AccidentalCodeItem struct S {}
+    // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+    // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF5S_$l118AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
   }
 }
 #endif
@@ -648,6 +684,64 @@ struct HasNestedType {
   #DefineComparableType
 }
 
+@attached(accessor)
+macro AddGetter() = #externalMacro(module: "MacroDefinition", type: "AddGetterMacro")
+
+// Make sure the mangling for the accessor macro doesn't kick local
+// discriminator assignment, which would miss the autoclosure.
+func testLocalAccessorMacroWithAutoclosure() {
+  @AddGetter
+  var x: Int = 2
+
+  func takesAutoclosure(_ x: @autoclosure () -> Int) {}
+  takesAutoclosure(1)
+}
+
+@propertyWrapper
+struct SomePropertyWrapper<T> {
+  var wrappedValue: T
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+  init(projectedValue: Self) {
+    self = projectedValue
+  }
+  var projectedValue: Self { self }
+}
+
+// Property wrappers on macros probably aren't all that useful, but make sure
+// we don't crash.
+@freestanding(expression)
+macro hasPropertyWrapperParam(@SomePropertyWrapper x: Int) = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+
+func testPropertyWrapperMacro() {
+  #hasPropertyWrapperParam(x: 0)
+  #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
+}
+
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
+
 #if TEST_DIAGNOSTICS
 @freestanding(expression)
 macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
@@ -655,4 +749,26 @@ macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah
 @freestanding(expression)
 macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
 // FIXME: xpected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+
+// Because this is a method in a local decl, it ends up getting delayed, so
+// we need to check it at the end of the file.
+// FIXME: We either need to switch to using CHECK-DAG, or ideally teach
+// the diagnostic verifier about macro expansion buffers.
+func invalidDeclarationMacro2() {
+  struct LocalThing1 {
+    func f() {
+      #accidentalCodeItem
+      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+      // CHECK-DIAGS: @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-3]]_6_18accidentalCodeItemfMf_.swift:1:1: error: expected macro expansion to produce a declaration
+    }
+  }
+}
 #endif
+
+// Make sure we compute captures for the introduced stored property here.
+struct HasStoredProperty {
+  #AddStoredProperty(0)
+}
+class HasStoredPropertyClass {
+  #AddStoredProperty(0)
+}

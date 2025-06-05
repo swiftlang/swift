@@ -317,9 +317,13 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   case Kind::OpenedExistential:
   case Kind::OpenedElement:
   case Kind::Opaque: {
-    OuterSubstitutions replacer{
-        getOuterSubstitutions(), getGenericSignature()->getMaxDepth()};
-    return type.subst(replacer, replacer);
+    if (auto subs = getOuterSubstitutions()) {
+      OuterSubstitutions replacer{subs,
+                                  getGenericSignature()->getMaxDepth()};
+      return type.subst(replacer, replacer);
+    }
+
+    return type;
   }
   }
 }
@@ -745,33 +749,12 @@ Type BuildForwardingSubstitutions::operator()(SubstitutableType *type) const {
   return Type();
 }
 
-SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
+SubstitutionMap
+GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
                               BuildForwardingSubstitutions(this),
                               MakeAbstractConformanceForGenericType());
-}
-
-std::pair<Type, ProtocolConformanceRef>
-GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
-                                           Type conformingType,
-                                           ProtocolConformanceRef conformance) {
-  if (!genericEnv)
-    return {conformingType, conformance};
-  
-  return genericEnv->mapConformanceRefIntoContext(conformingType, conformance);
-}
-
-std::pair<Type, ProtocolConformanceRef>
-GenericEnvironment::mapConformanceRefIntoContext(
-                                     Type conformingInterfaceType,
-                                     ProtocolConformanceRef conformance) const {
-  auto contextConformance = conformance.subst(conformingInterfaceType,
-    QueryInterfaceTypeSubstitutions(this),
-    LookUpConformanceInModule());
-  
-  auto contextType = mapTypeIntoContext(conformingInterfaceType);
-  return {contextType, contextConformance};
 }
 
 OpenedElementContext

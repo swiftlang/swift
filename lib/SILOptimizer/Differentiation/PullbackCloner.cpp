@@ -1780,8 +1780,12 @@ public:
   void visitMoveValueInst(MoveValueInst *mvi) {
     switch (getTangentValueCategory(mvi)) {
     case SILValueCategory::Address:
-      llvm::report_fatal_error("AutoDiff does not support move_value with "
-                               "SILValueCategory::Address");
+      LLVM_DEBUG(getADDebugStream() << "AutoDiff does not support move_value with "
+                 "SILValueCategory::Address");
+      getContext().emitNondifferentiabilityError(
+        mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
     case SILValueCategory::Object:
       visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
     }
@@ -2094,6 +2098,23 @@ PullbackCloner::PullbackCloner(VJPCloner &vjpCloner)
     : impl(*new Implementation(vjpCloner)) {}
 
 PullbackCloner::~PullbackCloner() { delete &impl; }
+
+static SILValue getArrayValue(ApplyInst *ai) {
+  SILValue arrayValue;
+  for (auto use : ai->getUses()) {
+    auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
+    if (!dti)
+      continue;
+    DEBUG_ASSERT(!arrayValue && "Array value already found");
+    // The first `destructure_tuple` result is the `Array` value.
+    arrayValue = dti->getResult(0);
+#ifndef DEBUG_ASSERT_enabled
+    break;
+#endif
+  }
+  ASSERT(arrayValue);
+  return arrayValue;
+}
 
 //--------------------------------------------------------------------------//
 // Entry point
@@ -2439,6 +2460,134 @@ bool PullbackCloner::Implementation::run() {
   // Visit original blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
+    LLVM_DEBUG(getADDebugStream()
+               << "Begin search for adjoints of loop-local active values\n");
+    llvm::DenseMap<const SILLoop *, llvm::DenseSet<SILValue>>
+        loopLocalActiveValues;
+    for (auto *bb : originalBlocks) {
+      const SILLoop *loop = vjpCloner.getLoopInfo()->getLoopFor(bb);
+      if (loop == nullptr)
+        continue;
+      SILBasicBlock *loopHeader = loop->getHeader();
+      SILBasicBlock *pbLoopHeader = getPullbackBlock(loopHeader);
+      LLVM_DEBUG(getADDebugStream()
+                 << "Original bb" << bb->getDebugID()
+                 << " belongs to a loop, original header bb"
+                 << loopHeader->getDebugID() << ", pullback header bb"
+                 << pbLoopHeader->getDebugID() << '\n');
+      builder.setInsertionPoint(pbLoopHeader);
+      auto bbActiveValuesIt = activeValues.find(bb);
+      if (bbActiveValuesIt == activeValues.end())
+        continue;
+      const auto &bbActiveValues = bbActiveValuesIt->second;
+      for (SILValue bbActiveValue : bbActiveValues) {
+        if (vjpCloner.getLoopInfo()->getLoopFor(
+                bbActiveValue->getParentBlock()) != loop) {
+          LLVM_DEBUG(
+              getADDebugStream()
+              << "The following active value is NOT loop-local, skipping: "
+              << bbActiveValue);
+          continue;
+        }
+
+        auto [_, wasInserted] =
+            loopLocalActiveValues[loop].insert(bbActiveValue);
+        LLVM_DEBUG(getADDebugStream()
+                   << "The following active value is loop-local, ");
+        if (!wasInserted) {
+          LLVM_DEBUG(llvm::dbgs() << "but it was already processed, skipping: "
+                                  << bbActiveValue);
+          continue;
+        }
+
+        if (getTangentValueCategory(bbActiveValue) ==
+            SILValueCategory::Object) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "zeroing its adjoint value in loop header: "
+                     << bbActiveValue);
+          setAdjointValue(bb, bbActiveValue,
+                          makeZeroAdjointValue(getRemappedTangentType(
+                              bbActiveValue->getType())));
+          continue;
+        }
+
+        ASSERT(getTangentValueCategory(bbActiveValue) ==
+               SILValueCategory::Address);
+
+        // getAdjointProjection might call materializeAdjointDirect which
+        // writes to debug output, emit \n.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "checking if it's adjoint is a projection\n");
+
+        if (!getAdjointProjection(bb, bbActiveValue)) {
+          LLVM_DEBUG(getADDebugStream()
+                     << "Adjoint for the following value is NOT a projection, "
+                        "zeroing its adjoint buffer in loop header: "
+                     << bbActiveValue);
+
+          // All adjoint buffers are allocated in the pullback entry and
+          // deallocated in the pullback exit. So, use IsNotInitialization to
+          // emit destroy_addr before zeroing the buffer.
+          ASSERT(bufferMap.contains({bb, bbActiveValue}));
+          builder.emitZeroIntoBuffer(pbLoc, getAdjointBuffer(bb, bbActiveValue),
+                                     IsNotInitialization);
+
+          continue;
+        }
+
+        LLVM_DEBUG(getADDebugStream()
+                   << "Adjoint for the following value is a projection, ");
+
+        // If Projection::isAddressProjection(v) is true for a value v, it
+        // is not added to active values list (see recordValueIfActive).
+        //
+        // Ensure that only the following value types conforming to
+        // getAdjointProjection but not conforming to
+        // Projection::isAddressProjection can go here.
+        //
+        // Instructions conforming to Projection::isAddressProjection and
+        // thus never corresponding to an active value do not need any
+        // handling, because only active values can have adjoints from
+        // previous iterations propagated via BB arguments.
+        do {
+          // Consider '%X = begin_access [modify] [static] %Y'.
+          // 1. If %Y is loop-local, it's adjoint buffer will
+          //    be zeroed, and we'll have zero adjoint projection to it.
+          // 2. Otherwise, we do not need to zero the projection buffer.
+          // Thus, we can just skip.
+          if (dyn_cast<BeginAccessInst>(bbActiveValue)) {
+            LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
+            break;
+          }
+
+          // Consider the following sequence:
+          //   %1 = function_ref @allocUninitArray
+          //   %2 = apply %1<Float>(%0)
+          //   (%3, %4) = destructure_tuple %2
+          //   %5 = mark_dependence %4 on %3
+          //   %6 = pointer_to_address %6 to [strict] $*Float
+          // Since %6 is active, %3 (which is an array) must also be active.
+          // Thus, adjoint for %3 will be zeroed if needed. Ensure that expected
+          // invariants hold and then skip.
+          if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
+                  bbActiveValue)) {
+            ASSERT(isa<PointerToAddressInst>(bbActiveValue));
+            SILValue arrayValue = getArrayValue(ai);
+            ASSERT(llvm::find(bbActiveValues, arrayValue) !=
+                   bbActiveValues.end());
+            ASSERT(vjpCloner.getLoopInfo()->getLoopFor(
+                       arrayValue->getParentBlock()) == loop);
+            LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
+            break;
+          }
+
+          ASSERT(false);
+        } while (false);
+      }
+    }
+    LLVM_DEBUG(getADDebugStream()
+               << "End search for adjoints of loop-local active values\n");
+
     for (auto *bb : originalBlocks) {
       visitSILBasicBlock(bb);
       if (errorOccurred)
@@ -2976,8 +3125,21 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         break;
       }
       }
-    } else
-      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
+    } else {
+      LLVM_DEBUG(getADDebugStream() <<
+                 "do not know how to handle this incoming bb argument");
+      if (auto term = bbArg->getSingleTerminator()) {
+        getContext().emitNondifferentiabilityError(term, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      } else {
+        // This will be a bit confusing, but still better than nothing.
+        getContext().emitNondifferentiabilityError(bbArg, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      }
+
+      errorOccurred = true;
+      return;
+    }
   }
 
   // 3. Build the pullback successor cases for the `switch_enum`
@@ -3339,19 +3501,9 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
       eltIndex = ili->getValue().getLimitedValue();
     }
     // Get the array adjoint value.
-    SILValue arrayAdjoint;
-    assert(ai && "Expected `array.uninitialized_intrinsic` application");
-    for (auto use : ai->getUses()) {
-      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-      if (!dti)
-        continue;
-      assert(!arrayAdjoint && "Array adjoint already found");
-      // The first `destructure_tuple` result is the `Array` value.
-      auto arrayValue = dti->getResult(0);
-      arrayAdjoint = materializeAdjointDirect(
-          getAdjointValue(origBB, arrayValue), definingInst->getLoc());
-    }
-    assert(arrayAdjoint && "Array does not have adjoint value");
+    SILValue arrayValue = getArrayValue(ai);
+    SILValue arrayAdjoint = materializeAdjointDirect(
+        getAdjointValue(origBB, arrayValue), definingInst->getLoc());
     // Apply `Array.TangentVector.subscript` to get array element adjoint value.
     auto *eltAdjBuffer =
         getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, ai->getLoc());
@@ -3514,14 +3666,31 @@ void PullbackCloner::Implementation::
   if (originalValue != dti->getResult(0))
     return;
   // Accumulate the array's adjoint value into the adjoint buffers of its
-  // element addresses: `pointer_to_address` and `index_addr` instructions.
+  // element addresses: `pointer_to_address` and (optionally) `index_addr`
+  // instructions.
+  // The input code looks like as follows:
+  //  %17 = integer_literal $Builtin.Word, 1
+  //  function_ref _allocateUninitializedArray<A>(_:)
+  //  %18 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  //  %19 = apply %18<Float>(%17) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  //  (%20, %21) = destructure_tuple %19
+  //  %22 = mark_dependence %21 on %20
+  //  %23 = pointer_to_address %22 to [strict] $*Float
+  //  store %0 to [trivial] %23
+  //  function_ref _finalizeUninitializedArray<A>(_:)
+  //  %25 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  //  %26 = apply %25<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %27
+  // Note that %20 and %21 are in some sense "aliases" for each other. Here our `originalValue` is %20 in the code above.
+  // We need to trace from %21 down to %23 and propagate (decomposed) adjoint of originalValue to adjoint of %23.
+  // Then the generic adjoint propagation code would do its job to propagate %23' to %0'.
+  // If we're initializing multiple values we're having additional `index_addr` instructions, but
+  // the handling is similar.
   LLVM_DEBUG(getADDebugStream()
              << "Accumulating adjoint value for array literal into element "
                 "address adjoint buffers"
              << originalValue);
   auto arrayAdjoint = materializeAdjointDirect(arrayAdjointValue, loc);
   builder.setCurrentDebugScope(remapScope(dti->getDebugScope()));
-  builder.setInsertionPoint(arrayAdjoint->getParentBlock());
   for (auto use : dti->getResult(1)->getUses()) {
     auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
     assert(mdi && "Expected mark_dependence user");

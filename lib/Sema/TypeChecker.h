@@ -496,6 +496,8 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
+void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
+
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
                                Type paramType, bool isAutoClosure,
                                bool atCallerSide);
@@ -797,9 +799,6 @@ bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
-
-/// Check for invalid captures from stored property initializers.
-void checkPatternBindingCaptures(IterableDeclContext *DC);
 
 /// Update the DeclContexts for AST nodes in a given DeclContext. This is
 /// necessary after type-checking since autoclosures may have been introduced.
@@ -1537,14 +1536,6 @@ bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
-
-/// Determine whether the type parameter has requirements that would prohibit
-/// it from using any isolated conformances.
-///
-/// Returns the protocol to which the type conforms that causes the conflict,
-/// which can be either Sendable or SendableMetatype.
-std::optional<ProtocolDecl *> typeParameterProhibitsIsolatedConformance(
-    Type type, GenericSignature signature);
 
 } // end namespace swift
 

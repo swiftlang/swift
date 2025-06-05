@@ -370,23 +370,6 @@ done:
   if (SequencedExprs.size() == 1)
     return makeParserResult(SequenceStatus, SequencedExprs[0]);
 
-  // If the left-most sequence expr is a 'try', hoist it up to turn
-  // '(try x) + y' into 'try (x + y)'. This is necessary to do in the
-  // parser because 'try' nodes are represented in the ASTScope tree
-  // to look up catch nodes. The scope tree must be syntactic because
-  // it's constructed before sequence folding happens during preCheckExpr.
-  // Otherwise, catch node lookup would find the incorrect catch node for
-  // 'try x + y' at the source location for 'y'.
-  //
-  // 'try' has restrictions for where it can appear within a sequence
-  // expr. This is still diagnosed in TypeChecker::foldSequence.
-  if (auto *tryEval = dyn_cast<AnyTryExpr>(SequencedExprs[0])) {
-    SequencedExprs[0] = tryEval->getSubExpr();
-    auto *sequence = SequenceExpr::create(Context, SequencedExprs);
-    tryEval->setSubExpr(sequence);
-    return makeParserResult(SequenceStatus, tryEval);
-  }
-
   return makeParserResult(SequenceStatus,
                           SequenceExpr::create(Context, SequencedExprs));
 }
@@ -438,12 +421,14 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 
   if (Tok.isContextualKeyword("unsafe") &&
       !(peekToken().isAtStartOfLine() ||
-        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
-                          tok::equal, tok::colon, tok::comma, tok::eof) ||
+        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::equal,
+                          tok::colon, tok::comma, tok::eof) ||
         (isExprBasic && peekToken().is(tok::l_brace)) ||
         peekToken().is(tok::period) ||
         (peekToken().isAny(tok::l_paren, tok::l_square) &&
-         peekToken().getRange().getStart() == Tok.getRange().getEnd()))) {
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()) ||
+        peekToken().isBinaryOperatorLike() ||
+        peekToken().isPostfixOperatorLike())) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -518,6 +503,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
        peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {
     ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
     auto *typeExpr = new (Context) TypeExpr(ty.get());
     return makeParserResult(typeExpr);
   }
@@ -559,8 +547,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse '@' sign, 'inout' or 'nonisolated' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      Tok.isContextualKeyword("nonisolated")) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);
@@ -1924,11 +1913,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   default:
   UnknownCharacter:
     checkForInputIncomplete();
-    // Enable trailing comma in string literal interpolation
-    // Note that 'Tok.is(tok::r_paren)' is not used because the text is ")\"\n" but the kind is actualy 'eof'
-    if (Tok.is(tok::eof) && Tok.getText() == ")") {
-      return nullptr;
-    }
     // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);
     return nullptr;
@@ -1989,7 +1973,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(TokenLoc),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =
@@ -3658,7 +3642,7 @@ Parser::parseExprCollectionElement(std::optional<bool> &isDictionary) {
   } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     Value = makeParserResult(makeParserError(),
-                             new (Context) ErrorExpr(SourceRange()));
+                             new (Context) ErrorExpr(PreviousLoc));
   }
 
   // Make a tuple of Key Value pair.

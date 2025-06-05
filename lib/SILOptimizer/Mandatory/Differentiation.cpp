@@ -999,10 +999,14 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
 
   // We can generate empty JVP / VJP for functions available externally. These
   // functions have the same linkage as the original ones sans `external`
-  // flag. Important exception here hidden_external functions as they are
-  // serializable but corresponding hidden ones would be not and the SIL
-  // verifier will fail. Patch `serializeFunctions` for this case.
-  if (orig->getLinkage() == SILLinkage::HiddenExternal)
+  // flag. Important exception here hidden_external non-@_alwaysEmitIntoClient
+  // functions as they are serializable but corresponding hidden ones would be
+  // not and the SIL verifier will fail. Patch `serializeFunctions` for this
+  // case. For @_alwaysEmitIntoClient original functions (which might be
+  // HiddenExternal if we only have declaration without definition), we want
+  // derivatives to be serialized and do not patch `serializeFunctions`.
+  if (orig->getLinkage() == SILLinkage::HiddenExternal &&
+      !orig->markedAsAlwaysEmitIntoClient())
     serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.

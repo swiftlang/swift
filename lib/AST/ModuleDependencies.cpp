@@ -25,7 +25,6 @@
 #include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -500,6 +499,18 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
   SharedFilesystemCache.emplace();
 }
 
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftDependencyScanningService::getClangScanningFS(ASTContext &ctx) const {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
+      llvm::vfs::createPhysicalFileSystem();
+  ClangInvocationFileMapping fileMapping =
+    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
+
+  if (CAS)
+    return llvm::cas::createCASProvidingFileSystem(CAS, baseFileSystem);
+  return baseFileSystem;
+}
+
 bool
 swift::dependencies::checkImportNotTautological(const ImportPath::Module modulePath,
                                                 const SourceLoc importLoc,
@@ -602,13 +613,16 @@ swift::dependencies::registerBackDeployLibraries(
 }
 
 SwiftDependencyTracker::SwiftDependencyTracker(
-    llvm::cas::CachingOnDiskFileSystem &FS, llvm::PrefixMapper *Mapper,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
     const CompilerInvocation &CI)
-    : FS(FS.createProxyFS()), Mapper(Mapper) {
+    : CAS(CAS), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
 
+  FS = llvm::cas::createCASProvidingFileSystem(
+      CAS, llvm::vfs::createPhysicalFileSystem());
+
   auto addCommonFile = [&](StringRef path) {
-    auto file = FS.openFileForRead(path);
+    auto file = FS->openFileForRead(path);
     if (!file)
       return;
     auto status = (*file)->status();
@@ -679,18 +693,22 @@ SwiftDependencyTracker::createTreeFromDependencies() {
   llvm::SmallVector<clang::cas::IncludeTree::FileList::FileEntry> Files;
   for (auto &file : TrackedFiles) {
     auto includeTreeFile = clang::cas::IncludeTree::File::create(
-        FS->getCAS(), file.first, file.second.FileRef);
-    if (!includeTreeFile)
-      return includeTreeFile.takeError();
+        *CAS, file.first, file.second.FileRef);
+    if (!includeTreeFile) {
+      return llvm::createStringError("CASFS createTree failed for " +
+                                     file.first + ": " +
+                                     toString(includeTreeFile.takeError()));
+    }
     Files.push_back(
         {includeTreeFile->getRef(),
          (clang::cas::IncludeTree::FileList::FileSizeTy)file.second.Size});
   }
 
   auto includeTreeList =
-      clang::cas::IncludeTree::FileList::create(FS->getCAS(), Files, {});
+      clang::cas::IncludeTree::FileList::create(*CAS, Files, {});
   if (!includeTreeList)
-    return includeTreeList.takeError();
+    return llvm::createStringError("casfs include-tree filelist error: " +
+                                   toString(includeTreeList.takeError()));
 
   return *includeTreeList;
 }
@@ -706,9 +724,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       return false;
 
     // CASOption mismatch, return error.
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::error_cas,
-        "conflicting CAS options used in scanning service");
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_conflict_options);
     return true;
   }
 
@@ -717,14 +733,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CAS = Instance.getSharedCASInstance();
   ActionCache = Instance.getSharedCacheInstance();
 
-  auto CachingFS =
-      llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
-  if (!CachingFS) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                 toString(CachingFS.takeError()));
-    return true;
-  }
-  CacheFS = std::move(*CachingFS);
+  CacheFS = llvm::cas::createCASProvidingFileSystem(
+      CAS, llvm::vfs::createPhysicalFileSystem());
 
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
@@ -742,19 +752,14 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     Mapper->sort();
   }
 
-  UseClangIncludeTree =
-      Instance.getInvocation().getClangImporterOptions().UseClangIncludeTree;
   const clang::tooling::dependencies::ScanningOutputFormat ClangScanningFormat =
-      UseClangIncludeTree
-          ? clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree
-          : clang::tooling::dependencies::ScanningOutputFormat::FullTree;
+      clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree;
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      ClangScanningFormat,
-      Instance.getInvocation().getCASOptions().CASOpts,
+      ClangScanningFormat, Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS,
+      /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
       // consistent with the non-CAS case.
@@ -886,11 +891,61 @@ void ModuleDependenciesCache::recordDependency(
 }
 
 void ModuleDependenciesCache::recordDependencies(
-    ModuleDependencyVector dependencies) {
+    ModuleDependencyVector dependencies, DiagnosticEngine &diags) {
   for (const auto &dep : dependencies) {
-    if (!hasDependency(dep.first))
+    if (hasDependency(dep.first)) {
+      if (dep.first.Kind == ModuleDependencyKind::Clang) {
+        auto priorClangModuleDetails =
+            findKnownDependency(dep.first).getAsClangModule();
+        auto newClangModuleDetails = dep.second.getAsClangModule();
+        auto priorContextHash = priorClangModuleDetails->contextHash;
+        auto newContextHash = newClangModuleDetails->contextHash;
+        if (priorContextHash != newContextHash) {
+          // This situation means that within the same scanning action, Clang
+          // Dependency Scanner has produced two different variants of the same
+          // module. This is not supposed to happen, but we are currently
+          // hunting down the rare cases where it does, seemingly due to
+          // differences in Clang Scanner direct by-name queries and transitive
+          // header lookup queries.
+          //
+          // Emit a failure diagnostic here that is hopefully more actionable
+          // for the time being.
+          diags.diagnose(SourceLoc(), diag::dependency_scan_unexpected_variant,
+                         dep.first.ModuleName);
+          diags.diagnose(
+              SourceLoc(),
+              diag::dependency_scan_unexpected_variant_context_hash_note,
+              priorContextHash, newContextHash);
+          diags.diagnose(
+              SourceLoc(),
+              diag::dependency_scan_unexpected_variant_module_map_note,
+              priorClangModuleDetails->moduleMapFile,
+              newClangModuleDetails->moduleMapFile);
+
+          auto diagnoseExtraCommandLineFlags =
+              [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
+                       const ClangModuleDependencyStorage *baseModuleDetails,
+                       bool isNewlyDiscovered) -> void {
+            std::unordered_set<std::string> baseCommandLineSet(
+                baseModuleDetails->buildCommandLine.begin(),
+                baseModuleDetails->buildCommandLine.end());
+            for (const auto &checkArg : checkModuleDetails->buildCommandLine)
+              if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
+                diags.diagnose(
+                    SourceLoc(),
+                    diag::dependency_scan_unexpected_variant_extra_arg_note,
+                    isNewlyDiscovered, checkArg);
+          };
+          diagnoseExtraCommandLineFlags(priorClangModuleDetails,
+                                        newClangModuleDetails, true);
+          diagnoseExtraCommandLineFlags(newClangModuleDetails,
+                                        priorClangModuleDetails, false);
+        }
+      }
+    } else
       recordDependency(dep.first.ModuleName, dep.second);
-    if (dep.second.getKind() == ModuleDependencyKind::Clang) {
+
+    if (dep.first.Kind == ModuleDependencyKind::Clang) {
       auto clangModuleDetails = dep.second.getAsClangModule();
       addSeenClangModule(clang::tooling::dependencies::ModuleID{
           dep.first.ModuleName, clangModuleDetails->contextHash});

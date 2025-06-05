@@ -123,6 +123,16 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
     __attribute__((swift_async_error(zero_argument, 3)));
 - (void)getIceCreamFlavorWithCompletionHandler:
     (void (^)(Flavor flavor, NSError *__nullable error))completionHandler;
+
+@property(class, strong, readonly) SlowServer *standardServer;
+- (void)getValueWithKey:(NSString *)valueIdentifier
+             completion:(void (^)(NSString *__nullable value,
+                                  NSError *__nullable error))completionHandler;
+- (void)getMainActorValueWithKey:(NSString *)valueIdentifier
+                      completion:
+                          (void (^)(NSString *__nullable value,
+                                    NSError *__nullable error))completionHandler
+    MAIN_ACTOR;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -250,7 +260,7 @@ typedef NS_ERROR_ENUM(unsigned, SendableErrorCode, SendableErrorDomain) {
 typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
   NonSendableErrorCodeFoo, NonSendableErrorCodeBar
 } NONSENDABLE;
-// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
+// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-Sendable because Swift errors are always sendable}}
 
 UI_ACTOR
 @interface PictureFrame : NSObject

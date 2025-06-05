@@ -58,13 +58,13 @@ template <typename Runtime> struct ConcurrentHashMap {
 
 template <typename Runtime> struct ConformanceCacheEntry {
   typename Runtime::StoredPointer Type;
-  typename Runtime::StoredPointer Proto;
+  typename Runtime::StoredSignedPointer Proto;
   typename Runtime::StoredPointer Witness;
 };
 
 template <typename Runtime>
 struct HeapObject {
-  typename Runtime::StoredPointer Metadata;
+  typename Runtime::StoredSignedPointer Metadata;
   typename Runtime::StoredSize RefCounts;
 };
 
@@ -82,8 +82,7 @@ template <typename Runtime>
 struct StackAllocator {
   typename Runtime::StoredPointer LastAllocation;
   typename Runtime::StoredPointer FirstSlab;
-  int32_t NumAllocatedSlabs;
-  bool FirstSlabIsPreallocated;
+  int32_t NumAllocatedSlabsAndFirstSlabIsPreallocated;
 
   struct Slab {
     typename Runtime::StoredPointer Metadata;
@@ -123,7 +122,8 @@ struct AsyncTaskPrivateStorage {
   StackAllocator<Runtime> Allocator;
   typename Runtime::StoredPointer Local;
   uint32_t Id;
-  uint32_t BasePriority;
+  typename Runtime::StoredSize BasePriority;
+  typename Runtime::StoredPointer DependencyRecord;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>
@@ -131,10 +131,7 @@ struct AsyncTask: Job<Runtime> {
   // On 64-bit, there's a Reserved64 after ResumeContext.
   typename Runtime::StoredPointer ResumeContextAndReserved[
     sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
-  union {
-    AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
-    typename Runtime::StoredPointer PrivateStorageRaw[14];
-  };
+  AsyncTaskPrivateStorage<Runtime, ActiveTaskStatus> PrivateStorage;
 };
 
 template <typename Runtime>

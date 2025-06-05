@@ -251,7 +251,8 @@ private:
     auto BaseKey = Instance.getCompilerBaseKey();
     if (!BaseKey) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                   "Base Key doesn't exist");
+                                   "query base cache key",
+                                   "base cache key doesn't exist");
       return std::nullopt;
     }
 

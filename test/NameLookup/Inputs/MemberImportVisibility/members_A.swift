@@ -17,6 +17,9 @@ infix operator <>
 extension X {
   public func XinA() { }
 
+  @_spi(A)
+  public func XinA_spi() { }
+
   public var propXinA: Bool { return true }
 
   public static func <<<(a: Self, b: Self) -> Self { a }
@@ -35,8 +38,8 @@ public enum EnumInA {
 }
 
 open class BaseClassInA {
-  public init() {}
   open func methodInA() {}
+  open func overriddenMethod() {}
 }
 
 public protocol ProtocolInA {

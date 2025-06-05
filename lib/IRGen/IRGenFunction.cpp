@@ -63,6 +63,11 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
 }
 
 IRGenFunction::~IRGenFunction() {
+  // Move the trap basic blocks to the end of the function.
+  for (auto *FailBB : FailBBs) {
+    CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
+  }
+
   emitEpilogue();
 
   // Restore the debug location.
@@ -543,6 +548,39 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
     Builder.CreateUnreachable();
 }
 
+void IRGenFunction::emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                                        const SILDebugScope *debugScope) {
+  // The condition should be false, or we die.
+  auto expectedCond = Builder.CreateExpect(condition,
+                                           llvm::ConstantInt::get(IGM.Int1Ty, 0));
+
+  // Emit individual fail blocks so that we can map the failure back to a source
+  // line.
+  auto origInsertionPoint = Builder.GetInsertBlock();
+
+  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
+
+  if (IGM.getOptions().AnnotateCondFailMessage && !failureMessage.empty())
+    br->addAnnotationMetadata(failureMessage);
+
+  Builder.SetInsertPoint(&CurFn->back());
+  Builder.emitBlock(failBB);
+  if (IGM.DebugInfo && debugScope) {
+    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
+    // instruction emitted from ``Builtin.condfail`` should have an inlined
+    // debug location. This is because zero is not an artificial line location
+    // in CodeView.
+    IGM.DebugInfo->setInlinedTrapLocation(Builder, debugScope);
+  }
+  emitTrap(failureMessage, /*EmitUnreachable=*/true);
+
+  Builder.SetInsertPoint(origInsertionPoint);
+  Builder.emitBlock(contBB);
+  FailBBs.push_back(failBB);
+}
+
 Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
   auto *call = Builder.CreateCall(IGM.getTaskAllocFunctionPointer(), {size});
   call->setDoesNotThrow();
@@ -553,13 +591,6 @@ Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
 
 void IRGenFunction::emitTaskDealloc(Address address) {
   auto *call = Builder.CreateCall(IGM.getTaskDeallocFunctionPointer(),
-                                  {address.getAddress()});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGM.SwiftCC);
-}
-
-void IRGenFunction::emitTaskDeallocThrough(Address address) {
-  auto *call = Builder.CreateCall(IGM.getTaskDeallocThroughFunctionPointer(),
                                   {address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
@@ -907,4 +938,3 @@ void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   Builder.CreateCall(IGM.getClearSensitiveFunctionPointer(),
                          {address.getAddress(), size});
 }
-

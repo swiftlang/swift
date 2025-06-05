@@ -86,6 +86,10 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void) testWithCompletion: (void (^)(void)) completion;
 @end
 
+@interface TestSelfCapture : NSObject
++ (void)doWithCompletion:(void(^)(void)) completion;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
@@ -218,4 +222,26 @@ extension DataHandler : CompletionWithoutSendable {
 extension TestDR {
   @_dynamicReplacement(for: test(completion:))
   func __replaceObjCFunc(_: @escaping () -> Void) {} // Ok
+}
+
+class SelfCapture { // expected-note 5 {{class 'SelfCapture' does not conform to the 'Sendable' protocol}}
+  static func use(_ closure: @autoclosure () -> Any) {
+  }
+  
+  func testDirect() {
+    TestSelfCapture.do {
+      Self.use(self)
+      // expected-warning@-1 {{capture of 'self' with non-Sendable type 'SelfCapture' in a '@Sendable' closure}}
+      // expected-warning@-2 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
+    }
+  }
+
+  func testThroughClosure() {
+    TestSelfCapture.do {
+      let _ = { Self.use(self) }()
+      // expected-warning@-1 {{capture of 'self' with non-Sendable type 'SelfCapture' in a '@Sendable' closure}}
+      // expected-warning@-2 {{capture of 'self' with non-Sendable type 'SelfCapture' in an isolated closure}}
+      // expected-warning@-3 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
+    }
+  }
 }
