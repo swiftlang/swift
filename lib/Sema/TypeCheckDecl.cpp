@@ -3034,19 +3034,16 @@ static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
   }
 
   auto nominalGenericArguments = nominal->getDeclaredInterfaceType()
-                                     .getPointer()
                                      ->getAs<BoundGenericType>()
                                      ->getGenericArgs();
   auto typealiasGenericArguments = typealias->getUnderlyingType()
-                                       .getPointer()
                                        ->getAs<BoundGenericType>()
                                        ->getGenericArgs();
 
   for (size_t i = 0; i < nominalGenericArguments.size(); i++) {
     auto nominalBoundGenericType = nominalGenericArguments[i];
     auto typealiasBoundGenericType = typealiasGenericArguments[i];
-    if (nominalBoundGenericType.getPointer()->isEqual(
-            typealiasBoundGenericType.getPointer())) {
+    if (nominalBoundGenericType->isEqual(typealiasBoundGenericType)) {
       continue;
     }
 
