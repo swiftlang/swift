@@ -163,7 +163,7 @@ static FullApplySite speculateMonomorphicTarget(SILPassManager *pm, FullApplySit
   // class instance is identical to the SILType.
 
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
-                                      CastingIsolatedConformances::Allow,
+                                      CheckedCastInstOptions(),
                                       CMI->getOperand(),
                                       CMI->getOperand()->getType().getASTType(),
                                       SILType::getPrimitiveObjectType(SubType),

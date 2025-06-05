@@ -1040,8 +1040,8 @@ public:
 
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
-  void printCastingIsolatedConformancesIfNeeded(CastingIsolatedConformances flag) {
-    switch (flag) {
+  void printCheckedCastInstOptions(CheckedCastInstOptions options) {
+    switch (options.isolatedConformances()) {
     case CastingIsolatedConformances::Allow:
       break;
 
@@ -2107,13 +2107,13 @@ public:
   }
 
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     if (CI->isExact())
       *this << "[exact] ";
     *this << CI->getSourceFormalType() << " in ";
@@ -2128,14 +2128,14 @@ public:
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
