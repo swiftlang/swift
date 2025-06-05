@@ -6812,7 +6812,7 @@ static bool checkSendableInstanceStorage(
             member
                 ->diagnose(diag::non_concurrent_type_member, type,
                            isa<EnumElementDecl>(member), member->getName(),
-                           nominal)
+                           nominal, type->isEqual(memberType))
                 .limitBehaviorWithPreconcurrency(
                     behavior, fromPreconcurrencyConformance ||
                                   preconcurrencyBehavior.has_value());
