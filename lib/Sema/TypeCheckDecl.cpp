@@ -3069,7 +3069,6 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // Check that the nominal type and the typealias are either both generic
   // at this level or neither are.
-  ASSERT(nominal->isGeneric() == typealias->isGeneric());
   if (nominal->isGeneric() != typealias->isGeneric())
     return false;
 
