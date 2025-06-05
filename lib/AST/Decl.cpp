@@ -190,6 +190,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
+  TRIVIAL_KIND(Using);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -396,6 +397,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(OpaqueVarType, "type");
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
+  ENTRY(Using, "using");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -1707,6 +1709,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -1832,6 +1835,30 @@ bool ImportDecl::isAccessLevelImplicit() const {
     return false;
   }
   return true;
+}
+
+UsingDecl::UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+                     UsingSpecifier specifier, DeclContext *parent)
+    : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
+      SpecifierLoc(specifierLoc) {
+  Bits.UsingDecl.Specifier = static_cast<unsigned>(specifier);
+  assert(getSpecifier() == specifier &&
+         "not enough bits in UsingDecl flags for specifier");
+}
+
+std::string UsingDecl::getSpecifierName() const {
+  switch (getSpecifier()) {
+  case UsingSpecifier::MainActor:
+    return "@MainActor";
+  case UsingSpecifier::Nonisolated:
+    return "nonisolated";
+  }
+}
+
+UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
+                             SourceLoc specifierLoc, UsingSpecifier specifier,
+                             DeclContext *parent) {
+  return new (ctx) UsingDecl(usingLoc, specifierLoc, specifier, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -3635,6 +3662,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -4748,6 +4776,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
+  case DeclKind::Using:
     // These don't take attributes.
     return SourceLoc();
 

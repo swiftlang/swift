@@ -632,6 +632,10 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
+  return isa<UsingDecl>(D);
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

@@ -383,6 +383,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      // The `using` declarations are private to the file at the moment
+      // and shouldn't appear in swift interfaces.
+      if (isa<UsingDecl>(D))
+        return false;
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
@@ -3056,6 +3061,11 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                      }
                    },
                    [&] { Printer << "."; });
+}
+
+void PrintAST::visitUsingDecl(UsingDecl *decl) {
+  Printer.printIntroducerKeyword("using", Options, " ");
+  Printer << decl->getSpecifierName();
 }
 
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {

@@ -603,9 +603,9 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<OperatorDecl>(decl) ||
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
-      isa<ExtensionDecl>(decl)) {
-    decl->diagnose(diag::invalid_decl_in_macro_expansion,
-                   decl->getDescriptiveKind());
+      isa<ExtensionDecl>(decl) ||
+      isa<UsingDecl>(decl)) {
+    decl->diagnose(diag::invalid_decl_in_macro_expansion, decl->getDescriptiveKind());
     decl->setInvalid();
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
