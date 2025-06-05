@@ -17,3 +17,13 @@ module TopLevelModule {
   }
   export *
 }
+
+module AmbiguousA {
+  header "ambiguous_a.h"
+  requires cplusplus
+}
+
+module AmbiguousB {
+  header "ambiguous_a.h"
+  requires cplusplus
+}
