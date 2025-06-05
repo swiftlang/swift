@@ -639,5 +639,8 @@ NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
      "%select{first|second}0 module command-line has extra argument: '%1'", (bool, StringRef))
 
 
+ERROR(swift_lang_must_be_five,none,
+      "Swift language mode must be set to '5' to be able to use C++ interoperability.", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
