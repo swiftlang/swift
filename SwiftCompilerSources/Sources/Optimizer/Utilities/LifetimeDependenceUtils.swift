@@ -165,16 +165,12 @@ extension LifetimeDependence {
   //
   // This is necessary because inserting a mark_dependence placeholder for such an unsafe dependence would illegally
   // have the same base and value operand.
-  //
-  // TODO: handle indirect results
-  init?(unsafeApplyResult value: Value, _ context: some Context) {
+  init?(unsafeApplyResult value: Value, apply: FullApplySite, _ context: some Context) {
     if value.isEscapable {
       return nil
     }
-    if (value.definingInstructionOrTerminator as! FullApplySite).hasResultDependence {
-      return nil
-    }
-    assert(value.ownership == .owned, "unsafe apply result must be owned")
+    assert(!apply.hasResultDependence, "mark_dependence should be used instead")
+    assert(value.ownership == .owned || value.type.isAddress, "unsafe apply result must be owned")
     self.scope = Scope(base: value, context)
     self.dependentValue = value
     self.markDepInst = nil
@@ -578,8 +574,8 @@ extension LifetimeDependenceDefUseWalker {
     }
     let root = dependence.dependentValue
     if root.type.isAddress { 
-      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), or an
-      // allocation or incoming argument. In all these cases, it is sufficient to walk down the address uses.
+      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), an
+      // allocation, an incoming argument, or an outgoing argument. In all these cases, walk down the address uses.
       return walkDownAddressUses(of: root)
     }
     return walkDownUses(of: root, using: nil)
@@ -974,7 +970,8 @@ extension LifetimeDependenceDefUseWalker {
 
   private mutating func visitAppliedUse(of operand: Operand, by apply: FullApplySite) -> WalkResult {
     if let conv = apply.convention(of: operand), conv.isIndirectOut {
-      return leafUse(of: operand)
+      // This apply initializes an allocation.
+      return dependentUse(of: operand, dependentAddress: operand.value)
     }
     if apply.isCallee(operand: operand) {
       return leafUse(of: operand)
