@@ -147,7 +147,7 @@ public enum _DebuggerSupport {
       return value.map(String.init(reflecting:))
     case .collection?, .dictionary?, .set?, .tuple?:
       return count == 1 ? "1 element" : "\(count) elements"
-    case .`struct`?, .`enum`?, nil:
+    case .`struct`?, .`enum`?, .foreign?, nil:
       switch value {
       case let x as CustomDebugStringConvertible:
         return x.debugDescription
