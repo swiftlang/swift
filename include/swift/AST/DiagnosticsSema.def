@@ -5869,8 +5869,8 @@ ERROR(non_sendable_keypath_capture,none,
       (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'Sendable'-conforming %kind3 has non-Sendable type %0",
-      (Type, bool, DeclName, const ValueDecl *))
+      "'Sendable'-conforming %kind3 %select{contains|has}4 non-Sendable type %0",
+      (Type, bool, DeclName, const ValueDecl *, bool))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %kind1 is mutable",
       (DeclName, const ValueDecl *))
