@@ -477,7 +477,7 @@ public:
 
 class RawConformanceIsolationRequest :
     public SimpleRequest<RawConformanceIsolationRequest,
-                         std::optional<ActorIsolation>(ProtocolConformance *),
+                         std::optional<ActorIsolation>(NormalProtocolConformance *),
                          RequestFlags::SeparatelyCached |
                          RequestFlags::SplitCached> {
 public:
@@ -488,7 +488,7 @@ private:
 
   // Evaluation.
   std::optional<ActorIsolation>
-  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
 
 public:
   // Separate caching.
@@ -499,7 +499,7 @@ public:
 
 class ConformanceIsolationRequest :
     public SimpleRequest<ConformanceIsolationRequest,
-                         ActorIsolation(ProtocolConformance *),
+                         ActorIsolation(NormalProtocolConformance *),
                          RequestFlags::SeparatelyCached |
                          RequestFlags::SplitCached> {
 public:
@@ -510,7 +510,7 @@ private:
 
   // Evaluation.
   ActorIsolation
-  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
 
 public:
   // Separate caching.

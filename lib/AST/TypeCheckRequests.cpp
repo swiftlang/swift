@@ -1378,7 +1378,7 @@ RawConformanceIsolationRequest::getCachedResult() const {
   auto conformance = std::get<0>(getStorage());
 
   // Was actor isolation non-isolated?
-  if (conformance->isRawConformanceInferred())
+  if (conformance->isRawIsolationInferred())
     return std::optional<ActorIsolation>();
 
   ASTContext &ctx = conformance->getDeclContext()->getASTContext();
