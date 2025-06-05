@@ -329,10 +329,7 @@ func transformType(
   let text = name.text
   let isRaw = isRawPointerType(text: text)
   if isRaw && !isSizedBy {
-    throw DiagnosticError("raw pointers only supported for SizedBy", node: name)
-  }
-  if !isRaw && isSizedBy {
-    throw DiagnosticError("SizedBy only supported for raw pointers", node: name)
+    throw DiagnosticError("void pointers not supported for countedBy", node: name)
   }
 
   guard let kind: Mutability = getPointerMutability(text: text) else {
@@ -373,6 +370,33 @@ func isMutablePointerType(_ type: TypeSyntax) -> Bool {
   } catch _ {
     return false
   }
+}
+
+func getPointeeType(_ type: TypeSyntax) -> TypeSyntax? {
+  if let optType = type.as(OptionalTypeSyntax.self) {
+    return getPointeeType(optType.wrappedType)
+  }
+  if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+    return getPointeeType(impOptType.wrappedType)
+  }
+  if let attrType = type.as(AttributedTypeSyntax.self) {
+    return getPointeeType(attrType.baseType)
+  }
+
+  guard let idType = type.as(IdentifierTypeSyntax.self) else {
+    return nil
+  }
+  let text = idType.name.text
+  if text != "UnsafePointer" && text != "UnsafeMutablePointer" {
+    return nil
+  }
+  guard let x = idType.genericArgumentClause else {
+    return nil
+  }
+  guard let y = x.arguments.first else {
+    return nil
+  }
+  return y.argument.as(TypeSyntax.self)
 }
 
 protocol BoundsCheckedThunkBuilder {
@@ -648,6 +672,7 @@ extension PointerBoundsThunkBuilder {
       return try transformType(oldType, generateSpan, isSizedBy, isParameter)
     }
   }
+
   var countLabel: String {
     return isSizedBy && generateSpan ? "byteCount" : "count"
   }
@@ -826,7 +851,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     var args = argOverrides
     let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
     assert(args[index] == nil)
-    args[index] = try castPointerToOpaquePointer(unwrapIfNonnullable(argExpr))
+    args[index] = try castPointerToTargetType(unwrapIfNonnullable(argExpr))
     let call = try base.buildFunctionCall(args)
     let ptrRef = unwrapIfNullable("\(name)")
 
@@ -871,10 +896,15 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     return type
   }
 
-  func castPointerToOpaquePointer(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
+  func castPointerToTargetType(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
     let type = peelOptionalType(getParam(signature, index).type)
     if type.canRepresentBasicType(type: OpaquePointer.self) {
       return ExprSyntax("OpaquePointer(\(baseAddress))")
+    }
+    if isSizedBy {
+      if let pointeeType = getPointeeType(type) {
+        return "\(baseAddress).assumingMemoryBound(to: \(pointeeType).self)"
+      }
     }
     return baseAddress
   }
@@ -907,7 +937,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
       return unwrappedCall
     }
 
-    args[index] = try castPointerToOpaquePointer(getPointerArg())
+    args[index] = try castPointerToTargetType(getPointerArg())
     return try base.buildFunctionCall(args)
   }
 }
