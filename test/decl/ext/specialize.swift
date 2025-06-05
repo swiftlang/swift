@@ -82,15 +82,16 @@ struct S4<A, B> {
 struct S5<A> {
   // Generic parameters: <A, B, C>
   // Depth:               0  1  1
-  typealias Alias<B, C> = S4<A, B>.Nested<C>
-
+  typealias Alias<B, C> = S4<A, B>.Nested<C> where A == Int
 }
 
 extension S5.Alias{
-  func adding(_ c: Int) -> Self {
-        S4.Nested(c: self.c + c) //expected-error {{binary operator '+' cannot be applied to operands of type 'C' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int)}}
-    }
+  func test() {
+    let int: Int
+    let _: A = int // expected-error {{cannot convert value of type 'Int' to specified type 'A'}}
+  }
 }
+
 
 struct S11<T> {
   struct Inner<U> {}
