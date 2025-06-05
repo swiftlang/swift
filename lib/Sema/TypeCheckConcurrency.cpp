@@ -3052,7 +3052,8 @@ namespace {
         }
       }
 
-      if (mayExecuteConcurrentlyWith(
+      if (ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation) &&
+          mayExecuteConcurrentlyWith(
               localFunc.getAsDeclContext(), getDeclContext(),
               /*includeSending*/true)) {
         auto innermostGenericDC = localFunc.getAsDeclContext();
