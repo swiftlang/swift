@@ -546,12 +546,8 @@ final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAdd
   public var isInitializationOfDestination: Bool { true }
   public override var mayTrap: Bool { true }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.UnconditionalCheckedCastAddr_getIsolatedConformances() {
-    case .Allow: .allow
-    case .Prohibit: .prohibit
-    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.UnconditionalCheckedCastAddr_getCheckedCastOptions().storage)
   }
 }
 
@@ -1060,12 +1056,8 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
     CanonicalType(bridged: bridged.UnconditionalCheckedCast_getTargetFormalType())
   }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.UnconditionalCheckedCast_getIsolatedConformances() {
-    case .Allow: .allow
-    case .Prohibit: .prohibit
-    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.UnconditionalCheckedCast_getCheckedCastOptions().storage)
   }
 }
 
@@ -1793,16 +1785,21 @@ final public class DynamicMethodBranchInst : TermInst {
 final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
+public struct CheckedCastInstOptions {
+  var storage: UInt8 = 0
+  
+  var bridged: BridgedInstruction.CheckedCastInstOptions {
+    .init(storage: storage)
+  }
+  
+  var isolatedConformances: CastingIsolatedConformances {
+    return (storage & 0x01) != 0 ? .prohibit : .allow
+  }
+}
+
 public enum CastingIsolatedConformances {
   case allow
   case prohibit
-
-  var bridged: BridgedInstruction.CastingIsolatedConformances {
-    switch self {
-    case .allow: return .Allow
-    case .prohibit: return .Prohibit
-    }
-  }
 }
 
 final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
@@ -1814,12 +1811,8 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()
   }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.CheckedCastBranch_getIsolatedConformances() {
-    case .Allow: return .allow
-    case .Prohibit: return .prohibit
-    default: fatalError("Bad CastingIsolatedConformances value")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.CheckedCastBranch_getCheckedCastOptions().storage)
   }
 }
 
@@ -1862,12 +1855,8 @@ final public class CheckedCastAddrBranchInst : TermInst {
     }
   }
 
-  public var isolatedConformances: CastingIsolatedConformances {
-    switch bridged.CheckedCastAddrBranch_getIsolatedConformances() {
-    case .Allow: .allow
-    case .Prohibit: .prohibit
-    @unknown default: fatalError("Unhandled CastingIsolatedConformances")
-    }
+  public var checkedCastOptions: CheckedCastInstOptions {
+     .init(storage: bridged.CheckedCastAddrBranch_getCheckedCastOptions().storage)
   }
 }
 

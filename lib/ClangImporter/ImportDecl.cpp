@@ -9145,16 +9145,39 @@ struct CountedByExpressionValidator
 };
 } // namespace
 
-static bool SwiftifiableCAT(const clang::CountAttributedType *CAT) {
-  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr());
-}
-
-static bool SwiftifiablePointerType(Type swiftType) {
-  // don't try to transform any Swift types that _SwiftifyImport doesn't know how to handle
+// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
+// to handle.
+static bool SwiftifiableCountedByPointerType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
-  return nonnullType->isOpaquePointer() ||
-    (nonnullType->getAnyPointerElementType(PTK) && PTK != PTK_AutoreleasingUnsafeMutablePointer);
+  return nonnullType->getAnyPointerElementType(PTK) &&
+    (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer);
+}
+static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
+                                           Type swiftType,
+                                           const clang::CountAttributedType *CAT) {
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  if (nonnullType->isOpaquePointer())
+    return true;
+  PointerTypeKind PTK;
+  if (!nonnullType->getAnyPointerElementType(PTK))
+    return false;
+  if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
+    return true;
+  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer)
+    return false;
+  // We have a pointer to a type with a size. Verify that it is char-sized.
+  auto PtrT = CAT->getAs<clang::PointerType>();
+  auto PointeeT = PtrT->getPointeeType();
+  return ctx.getTypeSizeInChars(PointeeT).isOne();
+}
+static bool SwiftifiableCAT(const clang::ASTContext &ctx,
+                            const clang::CountAttributedType *CAT,
+                            Type swiftType) {
+  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr()) &&
+    (CAT->isCountInBytes() ?
+       SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+     : SwiftifiableCountedByPointerType(swiftType));
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
@@ -9200,7 +9223,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     bool returnIsStdSpan = registerStdSpanTypeMapping(
         swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftReturnTy)) {
+    if (SwiftifiableCAT(getClangASTContext(), CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       attachMacro = true;
     }
@@ -9217,7 +9240,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       Type swiftParamTy = swiftParam->getInterfaceType();
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
-      if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftParamTy)) {
+      if (SwiftifiableCAT(getClangASTContext(), CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, index);
         attachMacro = paramHasBoundsInfo = true;
       }

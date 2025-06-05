@@ -107,7 +107,7 @@ bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
-    CastingIsolatedConformances isolatedConformances,
+    CheckedCastInstOptions options,
     CastConsumptionKind consumption, SILValue src, CanType sourceType,
     SILValue dest, CanType targetType, SILBasicBlock *trueBB,
     SILBasicBlock *falseBB, ProfileCounter TrueCount = ProfileCounter(),
@@ -458,18 +458,18 @@ public:
         getModule(), getSourceFormalType(), getTargetFormalType());
   }
 
-  CastingIsolatedConformances getIsolatedConformances() const {
+  CheckedCastInstOptions getCheckedCastOptions() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      return cast<CheckedCastAddrBranchInst>(inst)->getIsolatedConformances();
+      return cast<CheckedCastAddrBranchInst>(inst)->getCheckedCastOptions();
     case SILDynamicCastKind::CheckedCastBranchInst:
-      return cast<CheckedCastBranchInst>(inst)->getIsolatedConformances();
+      return cast<CheckedCastBranchInst>(inst)->getCheckedCastOptions();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)
-          ->getIsolatedConformances();
+          ->getCheckedCastOptions();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return cast<UnconditionalCheckedCastInst>(inst)
-          ->getIsolatedConformances();
+          ->getCheckedCastOptions();
     }
   }
 };
