@@ -1080,7 +1080,7 @@ extension Range {
     other.isEmpty ||
       (lowerBound <= other.lowerBound && upperBound >= other.upperBound)
   }
-  
+
   /// Returns a Boolean value indicating whether the given closed range is
   /// contained within this range.
   ///

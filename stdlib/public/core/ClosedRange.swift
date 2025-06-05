@@ -128,7 +128,8 @@ extension ClosedRange: RangeExpression {
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
-  @_transparent
+  @inlinable
+  @inline(__always)
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
