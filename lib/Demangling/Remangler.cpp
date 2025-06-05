@@ -3576,6 +3576,14 @@ ManglingError Remangler::mangleOutlinedInitializeWithTake(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleOutlinedInitializeWithTakeNoValueWitness(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOB";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleOutlinedInitializeWithCopy(Node *node,
                                                           unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
