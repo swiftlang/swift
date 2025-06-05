@@ -2838,7 +2838,9 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     // Make sure that synthesized Swift code in the clang module wrapper
     // (e.g. _SwiftifyImport macro expansions) can access the same symbols as
     // if it were actually in the clang module
-    ImportPath::Builder importPath(SwiftContext, I->getFullModuleName(), '.');
+    StringRef moduleName = isCxxStdModule(I) ? SwiftContext.Id_CxxStdlib.str() :
+      I->getFullModuleName();
+    ImportPath::Builder importPath(SwiftContext, moduleName, '.');
     UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext), ImportKind::Module);
     implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
   }
