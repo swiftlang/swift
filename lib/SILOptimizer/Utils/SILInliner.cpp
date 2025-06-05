@@ -128,6 +128,31 @@ public:
       collectAbortApply(abortApply);
       endBorrowInsertPts.push_back(&*std::next(abortApply->getIterator()));
     }
+
+    // mark_dependence/mark_dependence_addr may have begin_apply's token result
+    // as their operand. This is needed for diagnosing lifetime dependencies for
+    // ~Escapable yields. Delete them while inlining the begin_apply since the
+    // dependence is also represented by lifetime dependence sources.
+    if (BeginApply->getCalleeFunction()
+            ->getLoweredFunctionType()
+            ->hasLifetimeDependencies()) {
+      SmallVector<SILInstruction *> toDelete;
+      for (auto *tokenUser : BeginApply->getTokenResult()->getUsers()) {
+        auto mdi = MarkDependenceInstruction(tokenUser);
+        if (!mdi) {
+          continue;
+        }
+        assert(mdi.isNonEscaping());
+        if (auto *valueMDI = dyn_cast<MarkDependenceInst>(*mdi)) {
+          valueMDI->replaceAllUsesWith(valueMDI->getValue());
+        }
+        toDelete.push_back(*mdi);
+      }
+
+      for (auto *inst : toDelete) {
+        inst->eraseFromParent();
+      }
+    }
   }
 
   // Split the basic block before the end/abort_apply. We will insert code
