@@ -133,6 +133,9 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
                           (void (^)(NSString *__nullable value,
                                     NSError *__nullable error))completionHandler
     MAIN_ACTOR;
+
+- (void)startAt:(__nullable NSDate *)value
+     completion:(void (^_Nonnull)(void))completion;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
