@@ -28,7 +28,7 @@
 // CHECK-NEXT: func r(_ p: UnsafeMutablePointer<UnsafeMutablePointer<Int{{[0-9]+}}>?>!, _ len: UnsafeMutablePointer<Int{{[0-9]+}}>!)
 // CHECK-NEXT: func s(_ p: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!
 // CHECK-NEXT: func t(_ p: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!) -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!
-// CHECK-NEXT: var len1: Int{{[0-9]+}} { get }
+// CHECK-NEXT: let len1: Int{{[0-9]+}}
 // CHECK-NEXT: func u(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
 // CHECK-NEXT: var len2: Int{{[0-9]+}}
 // CHECK-NEXT: func v(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
