@@ -514,14 +514,10 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
-///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-///    the self condition is a `LoadExpr`.
 bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
-                                         bool requiresCaptureListRef,
-                                         bool requireLoadExpr) const {
-  return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef,
-                                  requireLoadExpr](const auto &cond) {
-    return cond.rebindsSelf(Ctx, requiresCaptureListRef, requireLoadExpr);
+                                         bool requiresCaptureListRef) const {
+  return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef](const auto &cond) {
+    return cond.rebindsSelf(Ctx, requiresCaptureListRef);
   });
 }
 
@@ -529,11 +525,8 @@ bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
-///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-///    the self condition is a `LoadExpr`.
 bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
-                                       bool requiresCaptureListRef,
-                                       bool requireLoadExpr) const {
+                                       bool requiresCaptureListRef) const {
   auto pattern = getPatternOrNull();
   if (!pattern) {
     return false;
@@ -558,10 +551,6 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   // Check that the RHS expr is exactly `self` and not something else
   Expr *exprToCheckForDRE = getInitializerOrNull();
   if (!exprToCheckForDRE) {
-    return false;
-  }
-
-  if (requireLoadExpr && !isa<LoadExpr>(exprToCheckForDRE)) {
     return false;
   }
 

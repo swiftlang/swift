@@ -103,6 +103,7 @@ func test2() {
   
   
   // Weak
+  // expected-warning @+1 {{variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
@@ -110,7 +111,7 @@ func test2() {
   // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'w2' declared here}}
-  weak var w2 = SomeClass()
+  weak let w2 = SomeClass()
   _ = w2                // ok
   
   
