@@ -4636,41 +4636,43 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  PrintOptions PrintOpts;
-  if (options::PrintInterface) {
-    PrintOpts = PrintOptions::printModuleInterface(
+  PrintOptions PrintOpts = [&] {
+    if (options::PrintInterface) {
+      return PrintOptions::printModuleInterface(
         InitInvok.getFrontendOptions().PrintFullConvention);
-  } else if (options::PrintInterfaceForDoc) {
-    PrintOpts = PrintOptions::printDocInterface();
-  } else {
-    PrintOpts = PrintOptions::printEverything();
-    PrintOpts.FullyQualifiedTypes = options::FullyQualifiedTypes;
-    PrintOpts.FullyQualifiedTypesIfAmbiguous =
-      options::FullyQualifiedTypesIfAmbiguous;
-    PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
-    PrintOpts.AbstractAccessors = options::AbstractAccessors;
-    PrintOpts.FunctionDefinitions = options::FunctionDefinitions;
-    PrintOpts.PrintExprs = options::Expressions;
-    PrintOpts.PreferTypeRepr = options::PreferTypeRepr;
-    PrintOpts.ExplodePatternBindingDecls = options::ExplodePatternBindingDecls;
-    PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
-    PrintOpts.PrintAccess = options::PrintAccess;
-    PrintOpts.AccessFilter = options::AccessFilter;
-    PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
-    PrintOpts.SkipPrivateSystemDecls = options::SkipPrivateSystemDecls;
-    PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
-    PrintOpts.SkipUnavailable = options::SkipUnavailable;
-    PrintOpts.SkipDeinit = options::SkipDeinit;
-    PrintOpts.SkipImports = options::SkipImports;
-    PrintOpts.SkipOverrides = options::SkipOverrides;
-    if (options::SkipParameterNames) {
-      PrintOpts.ArgAndParamPrinting
-        = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-    } else if (options::AlwaysArgumentLabels) {
-      PrintOpts.ArgAndParamPrinting
-        = PrintOptions::ArgAndParamPrintingMode::BothAlways;
+    } else if (options::PrintInterfaceForDoc) {
+      return PrintOptions::printDocInterface();
+    } else {
+      auto PrintOpts = PrintOptions::printEverything();
+      PrintOpts.FullyQualifiedTypes = options::FullyQualifiedTypes;
+      PrintOpts.FullyQualifiedTypesIfAmbiguous =
+        options::FullyQualifiedTypesIfAmbiguous;
+      PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
+      PrintOpts.AbstractAccessors = options::AbstractAccessors;
+      PrintOpts.FunctionDefinitions = options::FunctionDefinitions;
+      PrintOpts.PrintExprs = options::Expressions;
+      PrintOpts.PreferTypeRepr = options::PreferTypeRepr;
+      PrintOpts.ExplodePatternBindingDecls = options::ExplodePatternBindingDecls;
+      PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
+      PrintOpts.PrintAccess = options::PrintAccess;
+      PrintOpts.AccessFilter = options::AccessFilter;
+      PrintOpts.PrintDocumentationComments = !options::SkipDocumentationComments;
+      PrintOpts.SkipPrivateSystemDecls = options::SkipPrivateSystemDecls;
+      PrintOpts.SkipUnsafeCXXMethods = options::SkipUnsafeCXXMethods;
+      PrintOpts.SkipUnavailable = options::SkipUnavailable;
+      PrintOpts.SkipDeinit = options::SkipDeinit;
+      PrintOpts.SkipImports = options::SkipImports;
+      PrintOpts.SkipOverrides = options::SkipOverrides;
+      if (options::SkipParameterNames) {
+        PrintOpts.ArgAndParamPrinting
+          = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+      } else if (options::AlwaysArgumentLabels) {
+        PrintOpts.ArgAndParamPrinting
+          = PrintOptions::ArgAndParamPrintingMode::BothAlways;
+      }
+      return PrintOpts;
     }
-  }
+  }();
   if (options::SkipUnderscoredSystemProtocols)
     PrintOpts.SkipUnderscoredSystemProtocols = true;
   if (options::PrintOriginalSourceText)

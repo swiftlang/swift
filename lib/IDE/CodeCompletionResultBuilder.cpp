@@ -408,7 +408,8 @@ void CodeCompletionResultBuilder::withNestedGroup(
   --CurrentNestingLevel;
 }
 
-void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
+void CodeCompletionResultBuilder::addTypeAnnotation(Type T,
+                                                    const PrintOptions &PO,
                                                     StringRef suffix) {
   T = T->getReferenceStorageReferent();
 

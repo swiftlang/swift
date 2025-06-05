@@ -286,12 +286,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   Implementation(NominalTypeDecl *Target,
                  bool IncludeUnconditional,
-                 PrintOptions Options):
+                 PrintOptions &&Options):
   Target(Target),
   BaseType(Target->getDeclaredInterfaceType()),
   DC(Target),
   IncludeUnconditional(IncludeUnconditional),
-  Options(Options), AllGroups(MergeGroupVector()),
+  Options(std::move(Options)), AllGroups(MergeGroupVector()),
   InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
@@ -484,14 +484,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     auto handleExtension = [&](ExtensionDecl *E, bool Synthesized,
                                ExtensionDecl *EnablingE,
                                NormalProtocolConformance *Conf) {
-      PrintOptions AdjustedOpts = Options;
+      PrintOptions::OverrideScope AdjustedOpts(Options);
       if (Synthesized) {
         // Members from underscored system protocols should still appear as
         // members of the target type, even if the protocols themselves are not
         // printed.
-        AdjustedOpts.SkipUnderscoredSystemProtocols = false;
+        OVERRIDE_PRINT_OPTION(AdjustedOpts, SkipUnderscoredSystemProtocols, false);
       }
-      if (AdjustedOpts.shouldPrint(E)) {
+      if (Options.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);
         if (Pair.first) {
           InfoMap.insert({E, Pair.first});
@@ -556,8 +556,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 };
 
 SynthesizedExtensionAnalyzer::SynthesizedExtensionAnalyzer(
-    NominalTypeDecl *Target, PrintOptions Options, bool IncludeUnconditional)
-    : Impl(*(new Implementation(Target, IncludeUnconditional, Options))) {}
+    NominalTypeDecl *Target, PrintOptions &&Options, bool IncludeUnconditional)
+    : Impl(*(new Implementation(Target, IncludeUnconditional, std::move(Options)))) {}
 
 SynthesizedExtensionAnalyzer::~SynthesizedExtensionAnalyzer() {delete &Impl;}
 

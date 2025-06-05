@@ -4665,7 +4665,7 @@ void SILDebugScope::print(SILModule &Mod) const {
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   // Print other types as their Swift representation.
-  PrintOptions SubPrinter = PrintOptions::printSIL();
+  PrintOptions options = PrintOptions::printSIL();
   auto exported = isExported() ? "true" : "false";
   auto kind = isPartialSpecialization() ? "partial" : "full";
 
@@ -4699,7 +4699,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
         requirements,
         [&](Requirement req) {
           if (!genericSig) {
-            req.print(OS, SubPrinter);
+            req.print(OS, options);
             return;
           }
 
@@ -4717,13 +4717,15 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
           if (req.getKind() != RequirementKind::Layout) {
             auto SecondTy = genericSig->getSugaredType(req.getSecondType());
             Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-            ReqWithDecls.print(OS, SubPrinter);
+            ReqWithDecls.print(OS, options);
           } else {
             Requirement ReqWithDecls(req.getKind(), FirstTy,
                                      req.getLayoutConstraint());
-            auto SubPrinterCopy = SubPrinter;
-            SubPrinterCopy.PrintInternalLayoutName = erased;
-            ReqWithDecls.print(OS, SubPrinterCopy);
+
+            PrintOptions::OverrideScope scope(options);
+            OVERRIDE_PRINT_OPTION(scope, PrintInternalLayoutName, erased);
+
+            ReqWithDecls.print(OS, options);
           }
         },
         [&] { OS << ", "; });

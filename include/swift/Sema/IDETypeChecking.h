@@ -197,7 +197,7 @@ namespace swift {
     Implementation &Impl;
   public:
     SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
-                                 PrintOptions Options,
+                                 PrintOptions &&Options,
                                  bool IncludeUnconditional = true);
     ~SynthesizedExtensionAnalyzer();
 

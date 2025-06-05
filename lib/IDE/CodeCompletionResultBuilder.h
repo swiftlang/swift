@@ -468,7 +468,7 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
-  void addTypeAnnotation(Type T, PrintOptions PO, StringRef suffix = "");
+  void addTypeAnnotation(Type T, const PrintOptions &PO, StringRef suffix = "");
 
   void addBraceStmtWithCursor(StringRef Description = "") {
     addChunkWithText(
