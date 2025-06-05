@@ -91,6 +91,29 @@ extension S5.Alias{
     }
 }
 
+struct S11<T> {
+  struct Inner<U> {}
+}
+
+struct S12<T> {
+  struct Inner<U> {}
+  typealias A1<U> = S11<T>.Inner<U>
+  typealias A2<U> = S12<T>.Inner<U> where T == Int
+}
+
+extension S12<Int>.A1 {
+  func foo1() {
+    let int: Int
+    let _: T = int // OK
+  }
+}
+
+extension S12.A2 {
+  func foo2() {
+    let int: Int
+    let _: T = int // OK
+  }
+}
 
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
