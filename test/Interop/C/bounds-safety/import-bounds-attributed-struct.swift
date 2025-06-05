@@ -68,7 +68,7 @@
 // CHECK-NEXT:   var len: Int{{[0-9]+}}
 // CHECK-NEXT: }
 // CHECK-NEXT: func i(_: UnsafeMutablePointer<i>!) -> UnsafeMutablePointer<i>!
-// CHECK-NEXT: var len1: Int{{[0-9]+}} { get }
+// CHECK-NEXT: let len1: Int{{[0-9]+}}
 // CHECK-NEXT: struct j {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(a: UnsafeMutablePointer<Int{{[0-9]+}}>!, b: UnsafeMutableRawPointer!)
