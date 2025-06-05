@@ -160,7 +160,10 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
     asAvailableAs.push_back(enclosingDecl);
 
-  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
+  // Don't copy SwiftToolchain availability since the derived conformances can end up in module
+  // interfaces.
+  AvailabilityInference::applyInferredAvailableAttrs(
+      property, asAvailableAs, /*includeSwiftToolchain*/false);
 
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyActor_unownedExecutor);

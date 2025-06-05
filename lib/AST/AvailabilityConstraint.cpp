@@ -137,6 +137,7 @@ static bool canIgnoreConstraintInUnavailableContexts(
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Universal:
     case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftToolchain:
     case AvailabilityDomain::Kind::PackageDescription:
     case AvailabilityDomain::Kind::Embedded:
     case AvailabilityDomain::Kind::Custom:

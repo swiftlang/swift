@@ -48,6 +48,9 @@ public:
     /// Represents availability with respect to Swift language mode.
     SwiftLanguage,
 
+    /// Represents availability with respect to the Swift toolchain.
+    SwiftToolchain,
+
     /// Represents PackageDescription availability.
     PackageDescription,
 
@@ -141,6 +144,10 @@ public:
     return AvailabilityDomain(Kind::SwiftLanguage);
   }
 
+  static AvailabilityDomain forSwiftToolchain() {
+    return AvailabilityDomain(Kind::SwiftToolchain);
+  }
+
   static AvailabilityDomain forPackageDescription() {
     return AvailabilityDomain(Kind::PackageDescription);
   }
@@ -180,6 +187,8 @@ public:
   bool isPlatform() const { return getKind() == Kind::Platform; }
 
   bool isSwiftLanguage() const { return getKind() == Kind::SwiftLanguage; }
+
+  bool isSwiftToolchain() const { return getKind() == Kind::SwiftToolchain; }
 
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;
