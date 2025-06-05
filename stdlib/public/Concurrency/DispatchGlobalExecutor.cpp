@@ -55,6 +55,10 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC 1000000000ull
+#endif
+
 using namespace swift;
 
 /// The function passed to dispatch_async_f to execute a job.
@@ -310,10 +314,17 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
   case swift_clock_id_continuous:
     return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
   case swift_clock_id_wall: {
+#if defined(_WIN32)
+    struct timespec ts = { 
+      .tv_sec = sec,
+      .tv_nsec = static_cast<long>(nsec)
+    };
+#else
     struct timespec ts = { 
       .tv_sec = sec,
       .tv_nsec = nsec
     };
+#endif
     return dispatch_walltime(&ts, 0);
   }
   }
