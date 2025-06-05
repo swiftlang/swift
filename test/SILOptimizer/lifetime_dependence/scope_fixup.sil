@@ -404,15 +404,14 @@ bb0:
 // Test that initializing LifetimeDependence.Scope from an unidentified enclosing access scope does not
 // unwrap nil.
 //
-// TODO: the mark_dependence should redirect to the drop_deinit, not the struct_element_addr, but AccessBase does not
-// currently preserve the address of an unidentified base.
-//
 // CHECK-LABEL: sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
-// CHECK: [[DD:%.*]] = drop_deinit
+// CHECK: [[AS:%.*]] = alloc_stack $B
+// CHECK: [[MU:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[AS]]
+// CHECK: [[DD:%.*]] = drop_deinit [[MU]]
 // CHECK: [[SE:%.*]] = struct_element_addr [[DD]], #B.ne
 // CHECK: [[LB:%.*]] = load_borrow
 // CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
-// CHECK: mark_dependence [unresolved] %{{.*}} on [[SE]]
+// CHECK: mark_dependence [unresolved] %{{.*}} on [[AS]]
 // CHECK-LABEL: } // end sil function 'testUnidentified'
 sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
 bb0(%0 : @owned $B):
