@@ -1783,7 +1783,7 @@ function Load-LitTestOverrides($Filename) {
   }
 }
 
-function Get-CompilersDefines([Hashtable] $Platformm, [string] $Variant, [switch] $Test) {
+function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch] $Test) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
   $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
