@@ -116,6 +116,21 @@ extension S12.A2 {
   }
 }
 
+
+struct S13<T> {
+  struct Inner<U> {}
+}
+struct S14 {
+  typealias A<T> = S13<T>.Inner<Int>
+}
+extension S14.A {
+  func test() {
+    let int: Int
+    let _: U = int // error
+  }
+}
+
+
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
