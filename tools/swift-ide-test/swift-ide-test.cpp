@@ -2342,15 +2342,19 @@ private:
     return true;
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
-    if (!Data.isImplicit)
-      annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
+    if (Data.isImplicit) {
+      return true;
+    }
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+    annotateSourceEntity({CharRange, D, CtorTyRef, /*IsRef=*/true});
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
@@ -3909,11 +3913,13 @@ public:
     return true;
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
     if (SeenDecls.insert(D).second)
-      tryDemangleDecl(D, Range, /*isRef=*/true);
+      tryDemangleDecl(D, CharRange, /*isRef=*/true);
 
     if (T) {
       T = T->getRValueType();
@@ -3921,7 +3927,7 @@ public:
                       (NestedDCs.empty()
                        ? D->getDeclContext()
                        : NestedDCs.back()),
-                      Range);
+                      CharRange);
     }
     return true;
   }
