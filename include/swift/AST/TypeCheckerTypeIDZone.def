@@ -407,11 +407,11 @@ SWIFT_REQUEST(TypeChecker, ConformanceHasEffectRequest,
               bool(EffectKind, ProtocolConformanceRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RawConformanceIsolationRequest,
-              std::optional<ActorIsolation>(ProtocolConformance *),
+              std::optional<ActorIsolation>(NormalProtocolConformance *),
               SeparatelyCached | SplitCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceIsolationRequest,
-              ActorIsolation(ProtocolConformance *),
+              ActorIsolation(NormalProtocolConformance *),
               SeparatelyCached | SplitCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
