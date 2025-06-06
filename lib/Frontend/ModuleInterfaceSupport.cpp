@@ -704,8 +704,9 @@ public:
 
     // Preserve the behavior of previous implementations which formatted of
     // empty extensions compactly with '{}' on the same line.
-    PrintOptions extensionPrintOptions = printOptions;
-    extensionPrintOptions.PrintEmptyMembersOnSameLine = true;
+    PrintOptions::OverrideScope extensionPrintingScope(printOptions);
+    OVERRIDE_PRINT_OPTION(extensionPrintingScope,
+                          PrintEmptyMembersOnSameLine, true);
 
     // Then walk the remaining ones, and see what we need to print.
     // FIXME: This will pick the availability attributes from the first sight
@@ -744,7 +745,7 @@ public:
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
           auto protoAndAvailability = ProtocolAndAvailability(
               inherited, availability, isUnchecked, otherAttrs);
-          printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
+          printSynthesizedExtension(out, printOptions, M, nominal,
                                     protoAndAvailability);
           return TypeWalker::Action::SkipNode;
         }
