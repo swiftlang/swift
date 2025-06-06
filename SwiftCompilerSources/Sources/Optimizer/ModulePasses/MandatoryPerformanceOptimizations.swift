@@ -52,10 +52,9 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
                                       _ moduleContext: ModulePassContext) {
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
-      if !context.loadFunction(function: f, loadCalleesRecursively: true) {
-        return
+      if context.loadFunction(function: f, loadCalleesRecursively: true) {
+        optimize(function: f, context, moduleContext, &worklist)
       }
-      optimize(function: f, context, moduleContext, &worklist)
     }
 
     // Generic specialization takes care of removing metatype arguments of generic functions.
@@ -316,8 +315,7 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
 
 private extension FullApplySite {
   func resultIsUsedInGlobalInitialization() -> SmallProjectionPath? {
-    guard parentFunction.isGlobalInitOnceFunction,
-          let global = parentFunction.getInitializedGlobal() else {
+    guard let global = parentFunction.initializedGlobal else {
       return nil
     }
 
@@ -441,25 +439,6 @@ private extension Value {
   }
 }
 
-private extension Function {
-  /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
-  func getInitializedGlobal() -> GlobalVariable? {
-    if !isDefinition {
-      return nil
-    }
-    for inst in self.entryBlock.instructions {
-      switch inst {
-      case let agi as AllocGlobalInst:
-        return agi.global
-      default:
-        break
-      }
-    }
-
-    return nil
-  }
-}
-
 fileprivate struct FunctionWorklist {
   private(set) var functions = Array<Function>()
   private var pushedFunctions = Set<Function>()
@@ -481,20 +460,10 @@ fileprivate struct FunctionWorklist {
         pushIfNotVisited(f)
       }
       
-      // Annotated global init-once functions
-      if f.isGlobalInitOnceFunction {
-        if let global = f.getInitializedGlobal(),
-           global.mustBeInitializedStatically {
-          pushIfNotVisited(f)
-        }
-      }
-      
-      // @const global init-once functions
-      if f.isGlobalInitOnceFunction {
-        if let global = f.getInitializedGlobal(),
-           global.mustBeInitializedStatically {
-          pushIfNotVisited(f)
-        }
+      // Initializers of globals which must be initialized statically.
+      if let global = f.initializedGlobal,
+         global.mustBeInitializedStatically {
+        pushIfNotVisited(f)
       }
     }
   }
