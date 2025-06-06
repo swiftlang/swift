@@ -331,6 +331,7 @@ with a differentiable function used for differentiable programming.
   global ::= generic-signature? type 'WOe' // Outlined consume
   global ::= generic-signature? type 'WOr' // Outlined retain
   global ::= generic-signature? type 'WOs' // Outlined release
+  global ::= generic-signature? type 'WOB' // Outlined initializeWithTake, not using value witness
   global ::= generic-signature? type 'WOb' // Outlined initializeWithTake
   global ::= generic-signature? type 'WOc' // Outlined initializeWithCopy
   global ::= generic-signature? type 'WOC' // Outlined initializeWithCopy, not using value witness

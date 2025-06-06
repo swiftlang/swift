@@ -353,7 +353,7 @@ enum class SendableCheck {
 
   /// Sendable conformance was implied by a protocol that inherits from
   /// Sendable and also predates concurrency.
-  ImpliedByStandardProtocol,
+  ImpliedByPreconcurrencyProtocol,
 
   /// Implicit conformance to Sendable.
   Implicit,
@@ -367,7 +367,7 @@ enum class SendableCheck {
 static inline bool isImplicitSendableCheck(SendableCheck check) {
   switch (check) {
   case SendableCheck::Explicit:
-  case SendableCheck::ImpliedByStandardProtocol:
+  case SendableCheck::ImpliedByPreconcurrencyProtocol:
     return false;
 
   case SendableCheck::Implicit:
