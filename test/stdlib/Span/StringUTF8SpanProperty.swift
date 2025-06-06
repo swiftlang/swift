@@ -86,7 +86,7 @@ suite.test("Span from Large Native String's Substring")
   }
 }
 
-suite.test("Span from UTF8Span")
+suite.test("Span from String.utf8Span")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
@@ -111,4 +111,19 @@ suite.test("UTF8Span from Span")
 
   let span2 = utf8.span
   expectTrue(span1.isIdentical(to: span2))
+}
+
+suite.test("Span from Substring.utf8Span")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = String(22000).dropFirst().dropLast()
+  let utf8span = s.utf8Span
+  let span1 = utf8span.span
+  let utf8view = s.utf8
+  let span2 = utf8view.span
+  expectEqual(span1.count, span2.count)
+  for (i,j) in zip(span1.indices, span2.indices) {
+    expectEqual(span1[i], span2[j])
+  }
 }
