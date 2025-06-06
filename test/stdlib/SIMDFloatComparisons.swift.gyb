@@ -16,33 +16,51 @@
 
 import Swift
 
-%for bits in [32,64]:
-% scalar = {32:'Float',64:'Double'}[bits]
+%for bits in [16,32,64]:
+% scalar = {16:'Float16',32:'Float',64:'Double'}[bits]
 % for totalBits in [64,128]:
 %  n = totalBits // bits
 %  if n != 1:
 %   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
 func compare_eq${n}x${bits}(
   _ a: SIMD${n}<${scalar}>, _ b: SIMD${n}<${scalar}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
   a .== b
 }
+%   if bits == 16:
+#endif
+// CHECK-arm64: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
+%   else:
 // CHECK: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
 // CHECK-x86_64: cmpeqp${'s' if bits == 32 else 'd'}
 // CHECK-x86_64: ret
+%   end
 // CHECKO-arm64-NEXT: fcmeq.${neonSuffix} v0, v0, v1
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmeq.${neonSuffix}
 // CHECKOnone-arm64: ret
 
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
 func compare_ne${n}x${bits}(
   _ a: SIMD${n}<${scalar}>, _ b: SIMD${n}<${scalar}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
   a .!= b
 }
+%   if bits == 16:
+#endif
+// CHECK-arm64: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
+%   else:
 // CHECK: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
 // CHECK-x86_64: cmpneqp${'s' if bits == 32 else 'd'}
 // CHECK-x86_64: ret
+%   end
 // CHECKO-arm64-NEXT: fcmeq.${neonSuffix} [[TMP:v[0-9]+]], v0, v1
 // CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, [[TMP]]
 // CHECKO-arm64-NEXT: ret
@@ -50,53 +68,89 @@ func compare_ne${n}x${bits}(
 // CHECKOnone-arm64: mvn.${totalBits//8}b
 // CHECKOnone-arm64: ret
 
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
 func compare_lt${n}x${bits}(
   _ a: SIMD${n}<${scalar}>, _ b: SIMD${n}<${scalar}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
   a .< b
 }
+%   if bits == 16:
+#endif
+// CHECK-arm64: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
+%   else:
 // CHECK: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
 // CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
 // CHECK-x86_64: ret
+%   end
 // CHECKO-arm64-NEXT: fcmgt.${neonSuffix} v0, v1, v0
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmgt.${neonSuffix}
 // CHECKOnone-arm64: ret
 
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
 func compare_le${n}x${bits}(
   _ a: SIMD${n}<${scalar}>, _ b: SIMD${n}<${scalar}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
   a .<= b
 }
+%   if bits == 16:
+#endif
+// CHECK-arm64: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
+%   else:
 // CHECK: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
 // CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
 // CHECK-x86_64: ret
+%   end
 // CHECKO-arm64-NEXT: fcmge.${neonSuffix} v0, v1, v0
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmge.${neonSuffix}
 // CHECKOnone-arm64: ret
 
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
 func compare_ge${n}x${bits}(
   _ a: SIMD${n}<${scalar}>, _ b: SIMD${n}<${scalar}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
   a .>= b
 }
+%   if bits == 16:
+#endif
+// CHECK-arm64: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
+%   else:
 // CHECK: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
 // CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
 // CHECK-x86_64: ret
+%   end
 // CHECKO-arm64-NEXT: fcmge.${neonSuffix} v0, v0, v1
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmge.${neonSuffix}
 // CHECKOnone-arm64: ret
 
+%   if bits == 16:
+#if arch(arm64)
+@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+%   end
 func compare_gt${n}x${bits}(
   _ a: SIMD${n}<${scalar}>, _ b: SIMD${n}<${scalar}>
 ) -> SIMDMask<SIMD${n}<Int${bits}>> {
   a .> b
 }
+%   if bits == 16:
+#endif
+// CHECK-arm64: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
+%   else:
 // CHECK: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
 // CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
 // CHECK-x86_64: ret
+%   end
 // CHECKO-arm64-NEXT: fcmgt.${neonSuffix} v0, v0, v1
 // CHECKO-arm64-NEXT: ret
 // CHECKOnone-arm64: fcmgt.${neonSuffix}
