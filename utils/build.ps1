@@ -1894,12 +1894,15 @@ function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $Te
       Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
       Copy-Item "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
 
+      $PythonRoot = "$(Get-PythonPath $BuildPlatform)\tools"
+      $env:Path = "$PythonRoot;$env:Path"
+
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";
         # Check for required Python modules in CMake
         LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
-        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
+        LLDB_TEST_USER_ARGS = "--env PYTHONHOME=$PythonRoot --skip-category=watchpoint";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
