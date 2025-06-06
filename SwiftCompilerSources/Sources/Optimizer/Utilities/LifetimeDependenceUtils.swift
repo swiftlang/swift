@@ -834,9 +834,15 @@ extension LifetimeDependenceDefUseWalker {
       return walkDownUses(of: bfi, using: operand)
     case let .storeBorrow(sbi):
       return walkDownAddressUses(of: sbi)
-    case .beginApply:
-      // Skip the borrow scope; the type system enforces non-escapable
-      // arguments.
+    case let .beginApply(bai):
+      // First, visit the uses of any non-Escapable yields. The yielded value may be copied and used outside the
+      // coroutine scope.  Now, visit the uses of the begin_apply token. This adds the coroutine scope itself to the
+      for yield in bai.yieldedValues {
+        if walkDownUses(of: yield, using: operand) == .abortWalk {
+          return .abortWalk
+        }
+      }
+      // lifetime to account for the scope of any arguments.
       return visitInnerBorrowUses(of: borrowInst, operand: operand)
     case .partialApply, .markDependence:
       fatalError("OwnershipUseVisitor should bypass partial_apply [on_stack] "
