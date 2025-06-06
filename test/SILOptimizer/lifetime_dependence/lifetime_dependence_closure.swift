@@ -3,10 +3,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// RUN:   -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 struct NCInt: ~Copyable {
   var value: Int
@@ -17,7 +17,7 @@ struct NCInt: ~Copyable {
 struct NEInt : ~Escapable {
   let value: Int
 
-  @lifetime(borrow borrowed)
+  @_lifetime(borrow borrowed)
   init(borrowed: borrowing NCInt) {
     self.value = borrowed.value
   }

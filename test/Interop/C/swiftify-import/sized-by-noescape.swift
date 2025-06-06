@@ -1,11 +1,11 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature LifetimeDependence -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=SizedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature Lifetimes -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/SizedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature LifetimeDependence -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/SizedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature Lifetimes -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __sized_by __noescape parameters.
 import SizedByNoEscapeClang
@@ -17,7 +17,7 @@ import SizedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @lifetime(_charsized_param0: copy _charsized_param0)
+// CHECK-NEXT: @_lifetime(_charsized_param0: copy _charsized_param0)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_  _charsized_param0: inout MutableRawSpan)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -112,7 +112,7 @@ public func callBytesized(_ p: RawSpan) {
 
 @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
-@lifetime(p: copy p)
+@_lifetime(p: copy p)
 public func callCharsized(_ p: inout MutableRawSpan) {
   charsized(&p)
 }

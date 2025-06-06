@@ -100,7 +100,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func noescape(_ ptr: Span<CInt>) -> UnsafePointer<CInt> {
 // CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
@@ -128,7 +128,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func noescapeOpt(_ ptr: Span<CInt>?) -> UnsafePointer<CInt>? {
 // CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
 // CHECK-NEXT:     if _ptrCount != 37 {
@@ -145,7 +145,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
 // CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
@@ -156,7 +156,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func noescapeMut(_ ptr: inout MutableSpan<CInt>) -> UnsafeMutablePointer<CInt> {
 // CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
@@ -167,7 +167,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
 // CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
 // CHECK-NEXT:     if _ptrCount != 37 {
@@ -184,7 +184,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) -> UnsafeMutablePointer<CInt>? {
 // CHECK-NEXT:     let _ptrCount = ptr?.count ?? 0
 // CHECK-NEXT:     if _ptrCount != 37 {
