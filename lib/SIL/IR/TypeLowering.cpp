@@ -2742,6 +2742,7 @@ namespace {
     template <class LoadableLoweringClass>
     TypeLowering *handleAggregateByProperties(CanType type,
                                               RecursiveProperties props) {
+      props = mergeHasPack(HasPack_t(type->hasAnyPack()), props);
       if (props.isAddressOnly()) {
         return handleAddressOnly(type, props);
       }
