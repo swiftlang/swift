@@ -2894,7 +2894,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       break;
     }
 
-    consumeAttributeLParen();
+    auto LParenLoc = consumeAttributeLParen();
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
@@ -2906,27 +2906,43 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     
     // Parse the subject.
-    if (Tok.isContextualKeyword("set")) {
-      consumeToken();
-    } else {
-      diagnose(Loc, diag::attr_access_expected_set, AttrName);
+    if (!Tok.isContextualKeyword("set")) {
+      auto diag = diagnose(Loc, diag::attr_access_expected_set, AttrName);
+      
+      if (Tok.is(tok::l_paren)) {
+        return makeParserSuccess();
+      }
 
       // Minimal recovery: if there's a single token and then an r_paren,
       // consume them both. If there's just an r_paren, consume that.
-      if (!consumeIf(tok::r_paren)) {
-        if (Tok.isNot(tok::l_paren) && peekToken().is(tok::r_paren)) {
-          consumeToken();
-          consumeToken(tok::r_paren);
-        }
+      if (Tok.is(tok::r_paren)) {
+        auto SetLoc = consumeToken(tok::r_paren);
+        diag.fixItInsert(SetLoc, "set");
+      } else if (peekToken().is(tok::r_paren)) {
+        auto SetLoc = consumeToken();
+        diag.fixItReplace(SetLoc, "set");
+        consumeToken(tok::r_paren);
+      } else if (isStartOfSwiftDecl()) {
+        diag.fixItInsertAfter(LParenLoc, "set)");
+      } else {
+        BacktrackingScope Scope(*this);
+        auto InvalidTokLoc = consumeToken();
+        
+        if (isStartOfSwiftDecl())
+          diag.fixItReplace(InvalidTokLoc, "set)");
       }
+      
       return makeParserSuccess();
     }
+    
+    auto SubjectLoc = consumeToken();
 
     AttrRange = SourceRange(Loc, Tok.getLoc());
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+               DeclAttribute::isDeclModifier(DK))
+        .fixItInsertAfter(SubjectLoc, ")");
       return makeParserSuccess();
     }
 
