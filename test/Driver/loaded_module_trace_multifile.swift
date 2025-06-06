@@ -14,6 +14,9 @@
 // CHECK: "version":2
 // CHECK: "name":"loaded_module_trace_multifile"
 // CHECK: "arch":"{{[^"]*}}"
+// CHECK: "languageMode":"4"
+// CHECK: "enabledLanguageFeatures":[
+// CHECK: ]
 // CHECK: "swiftmodules":[
 // CHECK-DAG: "{{[^"]*\\[/\\]}}Module2.swiftmodule"
 // CHECK-DAG: "{{[^"]*\\[/\\]}}Swift.swiftmodule{{(\\[/\\][^"]+[.]swiftmodule)?}}"
