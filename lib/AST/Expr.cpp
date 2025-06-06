@@ -1089,7 +1089,14 @@ StringRef LiteralExpr::getLiteralKindDescription() const {
   llvm_unreachable("Unhandled literal");
 }
 
-IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc) {
+void BuiltinLiteralExpr::setBuiltinInitializer(
+    ConcreteDeclRef builtinInitializer) {
+  ASSERT(builtinInitializer);
+  BuiltinInitializer = builtinInitializer;
+}
+
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(
+    ASTContext &C, unsigned value, SourceLoc loc) {
   llvm::SmallString<8> Scratch;
   llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
   auto Text = C.AllocateCopy(StringRef(Scratch));
