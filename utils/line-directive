@@ -680,7 +680,7 @@ def run():
         # delegates to the Win32 CreateProcess API. Unix systems handle
         # non-normalized paths, so don't have this problem.
         # Arguments passed to the process are normalized by the process.
-        command_args = expand_response_files(sys.argv[dashes + 1:])
+        command_args = sys.argv[dashes + 1:]
         command_args[0] = os.path.normpath(command_args[0])
 
         try:
