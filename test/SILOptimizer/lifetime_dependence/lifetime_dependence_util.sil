@@ -252,6 +252,7 @@ bb0(%0 : @guaranteed $NE):
 
 // CHECK-LABEL: dependence_coroutine: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NE
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value %{{.*}} : $NE
 // CHECK-NEXT: Leaf use: operand #0 of   %{{.*}} = end_apply %{{.*}} as $()
 // CHECK-NEXT: dependence_coroutine: lifetime_dependence_use with: %0
 sil [ossa] @dependence_coroutine : $@convention(thin) (@guaranteed NE) -> () {
