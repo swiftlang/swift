@@ -3646,6 +3646,15 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'O': {
       switch (nextChar()) {
+      case 'B': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(
+              Node::Kind::OutlinedInitializeWithTakeNoValueWitness,
+              popNode(Node::Kind::Type), sig);
+        return createWithChild(
+            Node::Kind::OutlinedInitializeWithTakeNoValueWitness,
+            popNode(Node::Kind::Type));
+      }
       case 'C': {
         if (auto sig = popNode(Node::Kind::DependentGenericSignature))
           return createWithChildren(Node::Kind::OutlinedInitializeWithCopyNoValueWitness,

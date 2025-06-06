@@ -2661,6 +2661,13 @@ ManglingError Remangler::mangleOutlinedDestroy(Node *node, unsigned depth) {
   Buffer << "Wh";
   return mangleSingleChildNode(node, depth + 1);
 }
+
+ManglingError
+Remangler::mangleOutlinedInitializeWithTakeNoValueWitness(Node *node,
+                                                          unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleOutlinedInitializeWithCopyNoValueWitness(Node *node,
                                                                         unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);

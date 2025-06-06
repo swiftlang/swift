@@ -400,6 +400,7 @@ NODE(AsyncRemoved)
 // Added in Swift 5.TBD
 NODE(ObjectiveCProtocolSymbolicReference)
 
+NODE(OutlinedInitializeWithTakeNoValueWitness)
 NODE(OutlinedInitializeWithCopyNoValueWitness)
 NODE(OutlinedAssignWithTakeNoValueWitness)
 NODE(OutlinedAssignWithCopyNoValueWitness)
