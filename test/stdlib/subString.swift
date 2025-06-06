@@ -31,6 +31,23 @@ func checkHasContiguousStorageSubstring(_ x: Substring.UTF8View) {
   expectTrue(hasStorage)
 }
 
+fileprivate func slices(_ s: String) -> (
+  Substring,
+  Substring,
+  Substring
+) {
+  let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
+    s.index(s.startIndex, offsetBy: 4)]
+  let s2 = s1[s1.startIndex..<s1.endIndex]
+  let s3 = s2[s1.startIndex..<s1.endIndex]
+
+  precondition(s1.isEmpty == false)
+  precondition(s2.isEmpty == false)
+  precondition(s3.isEmpty == false)
+  
+  return (s1, s2, s3)
+}
+
 SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
@@ -282,7 +299,7 @@ SubstringTests.test("Substring.base") {
   }
 }
 
-SubstringTests.test("isIdentical(to:)")
+SubstringTests.test("isIdentical(to:) small ascii")
 .skip(.custom(
   { if #available(SwiftStdlib 6.3, *) { false } else { true } },
   reason: "Requires Swift 6.3's standard library"
@@ -290,35 +307,122 @@ SubstringTests.test("isIdentical(to:)")
 .code {
   guard #available(SwiftStdlib 6.3, *) else { return }
 
-  let s = "abcdefg"
-  let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
-    s.index(s.startIndex, offsetBy: 4)]
-  let s2 = s1[s1.startIndex..<s1.endIndex]
-  let s3 = s2[s1.startIndex..<s1.endIndex]
+  let (a1, a2, a3) = slices("Hello")
+  let (b1, b2, b3) = slices("Hello")
 
-  expectTrue(s1.isIdentical(to: s1))
-  expectTrue(s1.isIdentical(to: s2))
-  expectTrue(s1.isIdentical(to: s3))
+  precondition(a1 == a2)
+  precondition(b1 == b2)
+  precondition(a2 == a3)
+  precondition(b2 == b3)
 
-  expectTrue(s2.isIdentical(to: s1))
-  expectTrue(s2.isIdentical(to: s2))
-  expectTrue(s2.isIdentical(to: s3))
+  expectTrue(a1.isIdentical(to: a1))
+  expectTrue(a1.isIdentical(to: a2))
+  expectTrue(a1.isIdentical(to: a3))
+  expectTrue(a1.isIdentical(to: b1))
+  expectTrue(a1.isIdentical(to: b2))
+  expectTrue(a1.isIdentical(to: b3))
 
-  expectTrue(s3.isIdentical(to: s1))
-  expectTrue(s3.isIdentical(to: s2))
-  expectTrue(s3.isIdentical(to: s3))
+  expectTrue(a2.isIdentical(to: a1))
+  expectTrue(a2.isIdentical(to: a2))
+  expectTrue(a2.isIdentical(to: a3))
+  expectTrue(a2.isIdentical(to: b1))
+  expectTrue(a2.isIdentical(to: b2))
+  expectTrue(a2.isIdentical(to: b3))
 
-  expectFalse(s1.dropFirst().isIdentical(to: s1))
-  expectFalse(s1.dropFirst().isIdentical(to: s2))
-  expectFalse(s1.dropFirst().isIdentical(to: s3))
+  expectTrue(a3.isIdentical(to: a1))
+  expectTrue(a3.isIdentical(to: a2))
+  expectTrue(a3.isIdentical(to: a3))
+  expectTrue(a3.isIdentical(to: b1))
+  expectTrue(a3.isIdentical(to: b2))
+  expectTrue(a3.isIdentical(to: b3))
+}
 
-  expectFalse(s2.dropFirst().isIdentical(to: s1))
-  expectFalse(s2.dropFirst().isIdentical(to: s2))
-  expectFalse(s2.dropFirst().isIdentical(to: s3))
+SubstringTests.test("isIdentical(to:) small unicode")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.3, *) { false } else { true } },
+  reason: "Requires Swift 6.3's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.3, *) else { return }
 
-  expectFalse(s3.dropFirst().isIdentical(to: s1))
-  expectFalse(s3.dropFirst().isIdentical(to: s2))
-  expectFalse(s3.dropFirst().isIdentical(to: s3))
+  let (a1, a2, a3) = slices("Hello Cafe\u{301}")
+  let (b1, b2, b3) = slices("Hello Cafe\u{301}")
+  let (c1, c2, c3) = slices("Hello Café")
+
+  precondition(a1 == a2)
+  precondition(b1 == b2)
+  precondition(c1 == c2)
+  precondition(a2 == a3)
+  precondition(b2 == b3)
+  precondition(c2 == c3)
+
+  expectTrue(a1.isIdentical(to: a1))
+  expectTrue(a1.isIdentical(to: a2))
+  expectTrue(a1.isIdentical(to: a3))
+  expectTrue(a1.isIdentical(to: b1))
+  expectTrue(a1.isIdentical(to: b2))
+  expectTrue(a1.isIdentical(to: b3))
+  expectFalse(a1.isIdentical(to: c1))
+  expectFalse(a1.isIdentical(to: c2))
+  expectFalse(a1.isIdentical(to: c3))
+
+  expectTrue(a2.isIdentical(to: a1))
+  expectTrue(a2.isIdentical(to: a2))
+  expectTrue(a2.isIdentical(to: a3))
+  expectTrue(a2.isIdentical(to: b1))
+  expectTrue(a2.isIdentical(to: b2))
+  expectTrue(a2.isIdentical(to: b3))
+  expectFalse(a2.isIdentical(to: c1))
+  expectFalse(a2.isIdentical(to: c2))
+  expectFalse(a2.isIdentical(to: c3))
+
+  expectTrue(a3.isIdentical(to: a1))
+  expectTrue(a3.isIdentical(to: a2))
+  expectTrue(a3.isIdentical(to: a3))
+  expectTrue(a3.isIdentical(to: b1))
+  expectTrue(a3.isIdentical(to: b2))
+  expectTrue(a3.isIdentical(to: b3))
+  expectFalse(a3.isIdentical(to: c1))
+  expectFalse(a3.isIdentical(to: c2))
+  expectFalse(a3.isIdentical(to: c3))
+}
+
+SubstringTests.test("isIdentical(to:) large ascii")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.3, *) { false } else { true } },
+  reason: "Requires Swift 6.3's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.3, *) else { return }
+
+  let (a1, a2, a3) = slices(String(repeating: "Hello", count: 1000))
+  let (b1, b2, b3) = slices(String(repeating: "Hello", count: 1000))
+
+  precondition(a1 == a2)
+  precondition(b1 == b2)
+  precondition(a2 == a3)
+  precondition(b2 == b3)
+
+  expectTrue(a1.isIdentical(to: a1))
+  expectTrue(a1.isIdentical(to: a2))
+  expectTrue(a1.isIdentical(to: a3))
+  expectFalse(a1.isIdentical(to: b1))
+  expectFalse(a1.isIdentical(to: b2))
+  expectFalse(a1.isIdentical(to: b3))
+
+  expectTrue(a2.isIdentical(to: a1))
+  expectTrue(a2.isIdentical(to: a2))
+  expectTrue(a2.isIdentical(to: a3))
+  expectFalse(a2.isIdentical(to: b1))
+  expectFalse(a2.isIdentical(to: b2))
+  expectFalse(a2.isIdentical(to: b3))
+
+  expectTrue(a3.isIdentical(to: a1))
+  expectTrue(a3.isIdentical(to: a2))
+  expectTrue(a3.isIdentical(to: a3))
+  expectFalse(a3.isIdentical(to: b1))
+  expectFalse(a3.isIdentical(to: b2))
+  expectFalse(a3.isIdentical(to: b3))
 }
 
 runAllTests()
