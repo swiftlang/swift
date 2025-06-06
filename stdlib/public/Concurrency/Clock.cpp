@@ -33,6 +33,10 @@
 
 #include "Error.h"
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC 1000000000ull
+#endif
+
 using namespace swift;
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
