@@ -589,6 +589,7 @@ private:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
     case Node::Kind::OutlinedInitializeWithTake:
+    case Node::Kind::OutlinedInitializeWithTakeNoValueWitness:
     case Node::Kind::OutlinedInitializeWithCopy:
     case Node::Kind::OutlinedAssignWithTake:
     case Node::Kind::OutlinedAssignWithCopy:
@@ -1517,6 +1518,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedInitializeWithTake:
+  case Node::Kind::OutlinedInitializeWithTakeNoValueWitness:
     Printer << "outlined init with take of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;

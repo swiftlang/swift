@@ -298,6 +298,8 @@ _T0SqWOC ---> outlined init with copy of Swift.Optional
 _T0SqWOD ---> outlined assign with take of Swift.Optional
 _T0SqWOF ---> outlined assign with copy of Swift.Optional
 _T0SqWOH ---> outlined destroy of Swift.Optional
+_T0SqWOB ---> outlined init with take of Swift.Optional
+_T0SqWOb ---> outlined init with take of Swift.Optional
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
