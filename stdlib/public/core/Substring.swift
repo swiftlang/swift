@@ -1308,3 +1308,24 @@ extension Substring {
     return Substring(_unchecked: Slice(base: base, bounds: r))
   }
 }
+
+extension Substring {
+  /// Returns a boolean value indicating whether this substring is identical to
+  /// `other`.
+  ///
+  /// Two substring values are identical if there is no way to distinguish between
+  /// them.
+  ///
+  /// Comparing substrings this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// substring storage object. Therefore, identical substrings are guaranteed to
+  /// compare equal with `==`, but not all equal substrings are considered
+  /// identical.
+  ///
+  /// - Performance: O(1)
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+    self._wholeGuts.rawBits == other._wholeGuts.rawBits && self._offsetRange == other._offsetRange
+  }
+}

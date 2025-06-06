@@ -282,4 +282,43 @@ SubstringTests.test("Substring.base") {
   }
 }
 
+SubstringTests.test("isIdentical(to:)")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.3, *) { false } else { true } },
+  reason: "Requires Swift 6.3's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = "abcdefg"
+  let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
+    s.index(s.startIndex, offsetBy: 4)]
+  let s2 = s1[s1.startIndex..<s1.endIndex]
+  let s3 = s2[s1.startIndex..<s1.endIndex]
+
+  expectTrue(s1.isIdentical(to: s1))
+  expectTrue(s1.isIdentical(to: s2))
+  expectTrue(s1.isIdentical(to: s3))
+
+  expectTrue(s2.isIdentical(to: s1))
+  expectTrue(s2.isIdentical(to: s2))
+  expectTrue(s2.isIdentical(to: s3))
+
+  expectTrue(s3.isIdentical(to: s1))
+  expectTrue(s3.isIdentical(to: s2))
+  expectTrue(s3.isIdentical(to: s3))
+
+  expectFalse(s1.dropFirst().isIdentical(to: s1))
+  expectFalse(s1.dropFirst().isIdentical(to: s2))
+  expectFalse(s1.dropFirst().isIdentical(to: s3))
+
+  expectFalse(s2.dropFirst().isIdentical(to: s1))
+  expectFalse(s2.dropFirst().isIdentical(to: s2))
+  expectFalse(s2.dropFirst().isIdentical(to: s3))
+
+  expectFalse(s3.dropFirst().isIdentical(to: s1))
+  expectFalse(s3.dropFirst().isIdentical(to: s2))
+  expectFalse(s3.dropFirst().isIdentical(to: s3))
+}
+
 runAllTests()
