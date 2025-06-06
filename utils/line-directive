@@ -208,9 +208,7 @@ def map_line_from_source_file(source_filename, source_line_num,
 
 def read_response_file(file_path):
     with open(file_path, 'r') as files:
-        # "Make an iterator out of shlex.shlex.get_token, then consume items
-        # until it returns None." (Then eagerly convert the result to a list so
-        # that we can close the file.)
+        # Read a response file and return a list of files (one per line).
         return [line.strip() for line in files if line.strip()]
 
 
