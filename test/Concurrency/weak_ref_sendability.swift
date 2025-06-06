@@ -49,7 +49,7 @@ final class CheckSendability3: Sendable {
 }
 
 final class CheckSendability4: Sendable {
-  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability4' has non-Sendable type 'NS?'}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability4' contains non-Sendable type 'NS'}}
   weak let x: NS? = nil
 }
 
