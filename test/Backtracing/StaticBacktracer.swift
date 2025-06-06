@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library %import-static-libdispatch -Onone -g -o %t/StaticBacktracer
+// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/StaticBacktracer
 // RUN: %target-codesign %t/StaticBacktracer
 // RUN: /usr/bin/ldd %backtracer-static | %FileCheck %s --check-prefix LIBS
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer-static %target-run %t/StaticBacktracer 2>&1 || true) | %FileCheck %s
