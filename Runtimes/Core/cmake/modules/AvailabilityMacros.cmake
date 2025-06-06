@@ -4,7 +4,7 @@ configure_file("${SwiftCore_SWIFTC_SOURCE_DIR}/utils/availability-macros.def"
 file(STRINGS "${CMAKE_CURRENT_BINARY_DIR}/availability-macros.def" availability_defs)
 list(FILTER availability_defs EXCLUDE REGEX "^\\s*(#.*)?$")
 foreach(def ${availability_defs})
-  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -define-availability -Xfrontend \"${def}\">")
+  list(APPEND availability_definitions "-Xfrontend -define-availability -Xfrontend \"${def}\"")
 
   if("${def}" MATCHES "SwiftStdlib .*")
     # For each SwiftStdlib x.y, also define StdlibDeploymentTarget x.y, which,
@@ -31,6 +31,12 @@ foreach(def ${availability_defs})
         endif()
       endif()
     endif()
-    add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -define-availability -Xfrontend \"${current}\">")
+    list(APPEND availability_definitions "-Xfrontend -define-availability -Xfrontend \"${current}\"")
   endif()
 endforeach()
+
+list(JOIN availability_definitions "\n" availability_definitions)
+file(GENERATE
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/availability-macros.rsp"
+  CONTENT "${availability_definitions}")
+add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:${CMAKE_Swift_RESPONSE_FILE_FLAG}${CMAKE_CURRENT_BINARY_DIR}/availability-macros.rsp>")
