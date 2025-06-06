@@ -22,6 +22,8 @@ is_sdk_requested(FREESTANDING swift_build_freestanding)
 if(swift_build_freestanding AND (SWIFT_FREESTANDING_FLAVOR STREQUAL "apple"))
   set(SWIFT_FREESTANDING_SDK "" CACHE STRING
       "Which SDK to use when building the FREESTANDING stdlib")
+  set(SWIFT_FREESTANDING_DEPLOYMENT_VERSION "" CACHE STRING
+      "The deployment version to use when building the FREESTANDING stdlib")
   set(SWIFT_FREESTANDING_TRIPLE_NAME "" CACHE STRING
       "Which triple name (e.g. 'none-macho') to use when building the FREESTANDING stdlib")
   set(SWIFT_FREESTANDING_MODULE_NAME "" CACHE STRING
@@ -31,7 +33,7 @@ if(swift_build_freestanding AND (SWIFT_FREESTANDING_FLAVOR STREQUAL "apple"))
   set(SWIFT_FREESTANDING_ARCHS "" CACHE STRING
       "Which architectures to build when building the FREESTANDING stdlib")
   configure_sdk_darwin(
-      FREESTANDING "FREESTANDING" ""
+      FREESTANDING "FREESTANDING" "${SWIFT_FREESTANDING_DEPLOYMENT_VERSION}"
       "${SWIFT_FREESTANDING_SDK}"
       "${SWIFT_FREESTANDING_TRIPLE_NAME}" "${SWIFT_FREESTANDING_MODULE_NAME}"
       "${SWIFT_FREESTANDING_AVAILABILITY_NAME}" "${SWIFT_FREESTANDING_ARCHS}")
