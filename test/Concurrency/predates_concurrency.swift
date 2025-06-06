@@ -357,3 +357,16 @@ do {
     }
   }
 }
+
+func testSendableMetatypeDowngrades() {
+  @preconcurrency
+  func acceptsSendableMetatype<T: SendableMetatype>(_: T.Type) {}
+  func acceptsSendableMetatypeStrict<T: SendableMetatype>(_: T.Type) {}
+
+  func test<T>(t: T.Type) { // expected-complete-tns-note 2 {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{14-14=: SendableMetatype}}
+    acceptsSendableMetatype(t)
+    // expected-complete-tns-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+    acceptsSendableMetatypeStrict(t)
+    // expected-complete-tns-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+  }
+}
