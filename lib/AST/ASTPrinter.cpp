@@ -3506,11 +3506,13 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
 
+  bool printAsVar = false;
   if (anyVar) {
-    Printer << (anyVar->isSettable(anyVar->getDeclContext()) ? "var " : "let ");
-  } else {
-    Printer << "let ";
+    printAsVar = (anyVar->isSettable(anyVar->getDeclContext()) ||
+                  isInObjCImpl(anyVar));
   }
+
+  Printer << (printAsVar ? "var " : "let ");
 
   bool isFirst = true;
   for (auto idx : range(decl->getNumPatternEntries())) {
@@ -3949,9 +3951,9 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
     
-    Printer.printIntroducerKeyword(
-      decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
-      Options, " ");
+    bool printAsVar = (decl->getIntroducer() != VarDecl::Introducer::Let ||
+                       isInObjCImpl(decl));
+    Printer.printIntroducerKeyword(printAsVar ? "var" : "let", Options, " ");
   }
   printContextIfNeeded(decl);
   recordDeclLoc(decl,
