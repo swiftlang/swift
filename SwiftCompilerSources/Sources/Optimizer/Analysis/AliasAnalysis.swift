@@ -327,7 +327,8 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
 
     case let debugValue as DebugValueInst:
-      if debugValue.operand.value.type.isAddress && memLoc.mayAlias(with: debugValue.operand.value, self) {
+      let v = debugValue.operand.value
+      if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
         return .init(read: true)
       } else {
         return .noEffects
@@ -434,6 +435,11 @@ struct AliasAnalysis {
       }
       let callee = builtin.operands[1].value
       return context.calleeAnalysis.getSideEffects(ofCallee: callee).memory
+    case .PrepareInitialization, .ZeroInitializer:
+      if builtin.arguments.count == 1, memLoc.mayAlias(with: builtin.arguments[0], self) {
+        return .init(write: true)
+      }
+      return .noEffects
     default:
       return defaultEffects(of: builtin, on: memLoc)
     }

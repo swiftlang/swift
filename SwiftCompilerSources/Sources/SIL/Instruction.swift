@@ -1358,7 +1358,7 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
     return bridged.AllocStack_hasVarInfo() ? bridged.AllocStack_getVarInfo() : nil
   }
 
-  public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+  public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst> {
     uses.users(ofType: DeallocStackInst.self)
   }
 }
@@ -1476,7 +1476,7 @@ final public class StoreBorrowInst : SingleValueInstruction, StoringInstruction,
     return self.uses.lazy.filter { $0.instruction is EndBorrowInst }
   }
 
-  public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+  public var endBorrows: LazyMapSequence<LazyFilterSequence<UseList>, EndBorrowInst> {
     // A `store_borrow` is an address value.
     // Only `end_borrow`s (with this address operand) can end such a borrow scope.
     uses.users(ofType: EndBorrowInst.self)
