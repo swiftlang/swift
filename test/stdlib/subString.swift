@@ -31,21 +31,39 @@ func checkHasContiguousStorageSubstring(_ x: Substring.UTF8View) {
   expectTrue(hasStorage)
 }
 
-fileprivate func slices(_ s: String) -> (
+fileprivate func slices(
+  _ s: String,
+  from: Int,
+  to: Int
+) -> (
   Substring,
   Substring,
   Substring
 ) {
-  let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
-    s.index(s.startIndex, offsetBy: 4)]
+  let s1 = s[s.index(s.startIndex, offsetBy: from) ..<
+    s.index(s.startIndex, offsetBy: to)]
   let s2 = s1[s1.startIndex..<s1.endIndex]
   let s3 = s2[s1.startIndex..<s1.endIndex]
-
-  precondition(s1.isEmpty == false)
-  precondition(s2.isEmpty == false)
-  precondition(s3.isEmpty == false)
-  
   return (s1, s2, s3)
+}
+
+fileprivate func allNotEmpty(
+  _ s: Substring...
+) -> Bool {
+  s.allSatisfy { $0.isEmpty == false }
+}
+
+fileprivate func allEqual(
+  _ s: Substring...
+) -> Bool {
+  for i in 0..<s.count {
+    for j in (i + 1)..<s.count {
+      if s[i] != s[j] {
+        return false
+      }
+    }
+  }
+  return true
 }
 
 SubstringTests.test("Equality") {
@@ -307,29 +325,11 @@ SubstringTests.test("isIdentical(to:) small ascii")
 .code {
   guard #available(SwiftStdlib 6.3, *) else { return }
 
-  let (a1, a2, a3) = slices("Hello")
-  let (b1, b2, b3) = slices("Hello")
+  let (a1, a2, a3) = slices("Hello", from: 2, to: 4)
+  let (b1, b2, b3) = slices("Hello", from: 2, to: 4)
 
-  precondition(a1 == a1)
-  precondition(a1 == a2)
-  precondition(a1 == a3)
-  precondition(a1 == b1)
-  precondition(a1 == b2)
-  precondition(a1 == b3)
-
-  precondition(a2 == a1)
-  precondition(a2 == a2)
-  precondition(a2 == a3)
-  precondition(a2 == b1)
-  precondition(a2 == b2)
-  precondition(a2 == b3)
-
-  precondition(a3 == a1)
-  precondition(a3 == a2)
-  precondition(a3 == a3)
-  precondition(a3 == b1)
-  precondition(a3 == b2)
-  precondition(a3 == b3)
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3))
 
   expectTrue(a1.isIdentical(to: a1))
   expectTrue(a1.isIdentical(to: a2))
@@ -361,39 +361,12 @@ SubstringTests.test("isIdentical(to:) small unicode")
 .code {
   guard #available(SwiftStdlib 6.3, *) else { return }
 
-  let (a1, a2, a3) = slices("Hello Cafe\u{301}")
-  let (b1, b2, b3) = slices("Hello Cafe\u{301}")
-  let (c1, c2, c3) = slices("Hello Café")
+  let (a1, a2, a3) = slices("Hello Cafe\u{301}", from: 2, to: 4)
+  let (b1, b2, b3) = slices("Hello Cafe\u{301}", from: 2, to: 4)
+  let (c1, c2, c3) = slices("Hello Café", from: 2, to: 4)
 
-  precondition(a1 == a1)
-  precondition(a1 == a2)
-  precondition(a1 == a3)
-  precondition(a1 == b1)
-  precondition(a1 == b2)
-  precondition(a1 == b3)
-  precondition(a1 == c1)
-  precondition(a1 == c2)
-  precondition(a1 == c3)
-
-  precondition(a2 == a1)
-  precondition(a2 == a2)
-  precondition(a2 == a3)
-  precondition(a2 == b1)
-  precondition(a2 == b2)
-  precondition(a2 == b3)
-  precondition(a2 == c1)
-  precondition(a2 == c2)
-  precondition(a2 == c3)
-
-  precondition(a3 == a1)
-  precondition(a3 == a2)
-  precondition(a3 == a3)
-  precondition(a3 == b1)
-  precondition(a3 == b2)
-  precondition(a3 == b3)
-  precondition(a3 == c1)
-  precondition(a3 == c2)
-  precondition(a3 == c3)
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3, c1, c2, c3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3, c1, c2, c3))
 
   expectTrue(a1.isIdentical(to: a1))
   expectTrue(a1.isIdentical(to: a2))
@@ -434,29 +407,11 @@ SubstringTests.test("isIdentical(to:) large ascii")
 .code {
   guard #available(SwiftStdlib 6.3, *) else { return }
 
-  let (a1, a2, a3) = slices(String(repeating: "Hello", count: 1000))
-  let (b1, b2, b3) = slices(String(repeating: "Hello", count: 1000))
+  let (a1, a2, a3) = slices(String(repeating: "Hello", count: 1000), from: 2, to: 4)
+  let (b1, b2, b3) = slices(String(repeating: "Hello", count: 1000), from: 2, to: 4)
 
-  precondition(a1 == a1)
-  precondition(a1 == a2)
-  precondition(a1 == a3)
-  precondition(a1 == b1)
-  precondition(a1 == b2)
-  precondition(a1 == b3)
-
-  precondition(a2 == a1)
-  precondition(a2 == a2)
-  precondition(a2 == a3)
-  precondition(a2 == b1)
-  precondition(a2 == b2)
-  precondition(a2 == b3)
-
-  precondition(a3 == a1)
-  precondition(a3 == a2)
-  precondition(a3 == a3)
-  precondition(a3 == b1)
-  precondition(a3 == b2)
-  precondition(a3 == b3)
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3))
 
   expectTrue(a1.isIdentical(to: a1))
   expectTrue(a1.isIdentical(to: a2))
