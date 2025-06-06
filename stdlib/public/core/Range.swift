@@ -94,9 +94,10 @@ extension RangeExpression {
   ///   - pattern: A range.
   ///   - bound: A value to match against `pattern`.
   @inlinable
+  @inline(__always)
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
-  }  
+  }
 }
 
 /// A half-open interval from a lower bound up to, but not including, an upper
@@ -194,7 +195,7 @@ public struct Range<Bound: Comparable> {
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
-  @inlinable
+  @_transparent
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element && element < upperBound
   }
@@ -682,7 +683,7 @@ extension PartialRangeFrom: RangeExpression {
   ) -> Range<Bound> where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
   }
-  @inlinable // trivial-implementation
+  @_transparent
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element
   }
@@ -1074,11 +1075,12 @@ extension Range {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: Range<Bound>) -> Bool {
     other.isEmpty ||
       (lowerBound <= other.lowerBound && upperBound >= other.upperBound)
   }
-  
+
   /// Returns a Boolean value indicating whether the given closed range is
   /// contained within this range.
   ///
@@ -1101,6 +1103,7 @@ extension Range {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound > other.upperBound
   }
