@@ -1,0 +1,12 @@
+module BoundsAttributedFunction {
+  header "bounds-attributed-function.h"
+  export *
+}
+module BoundsAttributedGlobal {
+  header "bounds-attributed-global.h"
+  export *
+}
+module BoundsAttributedStruct {
+  header "bounds-attributed-struct.h"
+  export *
+}
