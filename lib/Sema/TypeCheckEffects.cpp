@@ -1182,8 +1182,6 @@ public:
              PotentialEffectReason reason, SourceLoc loc,
              bool skipTypeCheck,
              std::optional<EffectKind> onlyEffect = std::nullopt) {
-    ASTContext &ctx = declRef.getDecl()->getASTContext();
-
     Classification result;
     bool considerAsync = !onlyEffect || *onlyEffect == EffectKind::Async;
     bool considerThrows = !onlyEffect || *onlyEffect == EffectKind::Throws;
