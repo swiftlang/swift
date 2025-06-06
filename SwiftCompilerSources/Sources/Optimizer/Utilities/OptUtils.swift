@@ -974,3 +974,30 @@ extension Type {
     return context._bridged.shouldExpand(self.bridged)
   }
 }
+
+/// Used by TempLValueElimination and TempRValueElimination to make the optimization work by both,
+/// `copy_addr` and `load`-`store`-pairs.
+protocol CopyLikeInstruction: Instruction {
+  var sourceAddress: Value { get }
+  var destinationAddress: Value { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
+  var loadingInstruction: Instruction { get }
+}
+
+extension CopyAddrInst: CopyLikeInstruction {
+  var sourceAddress: Value { source }
+  var destinationAddress: Value { destination }
+  var loadingInstruction: Instruction { self }
+}
+
+// A `store` which has a `load` as source operand. This is basically the same as a `copy_addr`.
+extension StoreInst: CopyLikeInstruction {
+  var sourceAddress: Value { load.address }
+  var destinationAddress: Value { destination }
+  var isTakeOfSource: Bool { load.loadOwnership == .take }
+  var isInitializationOfDestination: Bool { storeOwnership != .assign }
+  var loadingInstruction: Instruction { load }
+  private var load: LoadInst { source as! LoadInst }
+}
+
