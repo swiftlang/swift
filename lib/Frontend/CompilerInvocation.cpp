@@ -1573,6 +1573,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     ModuleInterfaceOpts.PublicFlags.IgnorableFlags +=
         " " + printFormalCxxInteropVersion(Opts);
 
+  Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
