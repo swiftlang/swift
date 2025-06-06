@@ -201,16 +201,49 @@ extension String {
   }
 
   @available(SwiftStdlib 6.2, *)
+  private var _span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+#if _runtime(_ObjC)
+      // handle non-UTF8 Objective-C bridging cases here
+      if !_guts.isFastUTF8, _guts._object.hasObjCBridgeableObject {
+        let storage = _guts._getOrAllocateAssociatedStorage()
+        let (start, count) = unsafe (storage.start, storage.count)
+        let span = unsafe Span(_unsafeStart: start, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let count = _guts.count
+      if _guts.isSmall {
+        let a = Builtin.addressOfBorrow(self)
+        let address = unsafe UnsafePointer<UTF8.CodeUnit>(a)
+        let span = unsafe Span(_unsafeStart: address, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      let isFastUTF8 = _guts.isFastUTF8
+      _precondition(isFastUTF8, "String must be contiguous UTF8")
+      let buffer = unsafe _guts._object.fastUTF8
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
+  /// A UTF8span over the code units that make up this string.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property transcodes the code units the first time
+  /// it is called. The transcoded buffer is cached, and subsequent calls
+  /// to `span` can reuse the buffer.
+  ///
+  ///  Returns: a `UTF8Span` over the code units of this String.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings,
+  ///    amortized O(1) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
     @lifetime(borrow self)
     borrowing get {
-      let isKnownASCII = _guts.isASCII
-      let utf8 = self.utf8
-      let span = utf8.span
-      let result = unsafe UTF8Span(
-        unchecked: span,
-        isKnownASCII: isKnownASCII)
-      return unsafe _overrideLifetime(result, borrowing: self)
+      unsafe UTF8Span(unchecked: _span, isKnownASCII: _guts.isASCII)
     }
   }
 }
