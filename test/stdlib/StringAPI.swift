@@ -539,7 +539,7 @@ StringTests.test("isIdentical(to:)")
   reason: "Requires Swift 6.3's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  guard #available(SwiftStdlib 6.3, *) else { return }
 
   let a = "Hello"
   let b = "Hello"

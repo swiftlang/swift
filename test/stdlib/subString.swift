@@ -288,7 +288,7 @@ SubstringTests.test("isIdentical(to:)")
   reason: "Requires Swift 6.3's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
+  guard #available(SwiftStdlib 6.3, *) else { return }
 
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
