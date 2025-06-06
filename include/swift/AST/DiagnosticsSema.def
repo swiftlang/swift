@@ -8195,7 +8195,7 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 // MARK: Lifetime Dependence Syntax
 //------------------------------------------------------------------------------
 
-ERROR(use_lifetime_underscored, PointsToFirstBadToken,
+WARNING(use_lifetime_underscored, PointsToFirstBadToken,
       "Unsupported use of @lifetime, use @_lifetime to specify lifetime dependencies", ())
 
 ERROR(lifetime_dependence_invalid_param_name, none,
