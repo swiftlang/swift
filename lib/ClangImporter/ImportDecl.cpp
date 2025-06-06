@@ -9208,6 +9208,12 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!ClangDecl)
     return;
 
+  // FIXME: for private macro generated functions we do not serialize the
+  // SILFunction's body anywhere triggering assertions.
+  if (ClangDecl->getAccess() == clang::AS_protected ||
+      ClangDecl->getAccess() == clang::AS_private)
+    return;
+
   if (ClangDecl->getNumParams() != MappedDecl->getParameters()->size())
     return;
 
