@@ -1683,7 +1683,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
-    Printer << attr->getString();
+    if (!attr->isUnderscored() || Options.SuppressLifetimes) {
+      Printer << "@lifetime" << attr->getLifetimeEntry()->getString();
+    } else {
+      Printer << "@_lifetime" << attr->getLifetimeEntry()->getString();
+    }
     break;
   }
 

@@ -3258,6 +3258,13 @@ suppressingFeatureIsolatedDeinit(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureLifetimes(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressLifetimes, true);
+  action();
+}
+
 namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
