@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature LifetimeDependence -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main %s -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999' | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main %s -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999' | %FileCheck %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_AddressableParameters
@@ -215,13 +215,13 @@ struct CO1 {
     init(_ s: String) { self.s = s }
 
     var storage: Span<String> {
-        @lifetime(borrow self)
+        @_lifetime(borrow self)
         borrowing get {
             fatalError()
         }
     }
 
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     func getStorage() -> Span<String> {
         fatalError()
     }
@@ -235,13 +235,13 @@ struct CO2<T> {
     init(_ s: T) { self.s = s }
 
     var storage: Span<T> {
-        @lifetime(borrow self)
+        @_lifetime(borrow self)
         borrowing get {
             fatalError()
         }
     }
 
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     func getStorage() -> Span<T> {
         fatalError()
     }

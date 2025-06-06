@@ -38,7 +38,7 @@ public func myFunc4(_: UnsafeMutablePointer<CInt>, _ len: CInt) {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(_myFunc4_param0: copy _myFunc4_param0) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(_myFunc4_param0: copy _myFunc4_param0) @_disfavoredOverload
 // CHECK-NEXT: public func myFunc4(_ _myFunc4_param0: inout MutableSpan<CInt>) {
 // CHECK-NEXT:     let _myFunc4_param1 = CInt(exactly: _myFunc4_param0.count)!
 // CHECK-NEXT:     return unsafe _myFunc4_param0.withUnsafeMutableBufferPointer { __myFunc4_param0Ptr in

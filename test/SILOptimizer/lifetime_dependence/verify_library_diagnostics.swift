@@ -7,11 +7,11 @@
 // RUN:   -enable-builtin-module \
 // RUN:   -module-name test \
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 
 // Test diagnostic output for interesting corner cases. Similar to semantics.swift, but this tests corner cases in the
@@ -23,7 +23,7 @@ public struct NE : ~Escapable {
 }
 
 public struct NEImmortal: ~Escapable {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {}
 }
 
@@ -47,10 +47,10 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
 
   public var neComputedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get { ne }
 
-    @lifetime(&self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }

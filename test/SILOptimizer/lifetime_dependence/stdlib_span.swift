@@ -4,10 +4,10 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -disable-access-control \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// RUN:   -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 // Test dependencies on the standard library Span APIs.
 
@@ -18,7 +18,7 @@
 extension UnsafeRawBufferPointer {
   @available(SwiftStdlib 6.2, *)
   public var storage: RawSpan {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get {
       let span = RawSpan(_unsafeBytes: self)
       return _overrideLifetime(span, borrowing: self)
@@ -37,14 +37,14 @@ func testUBPStorage(ubp: UnsafeRawBufferPointer) {
 }
 
 @available(SwiftStdlib 6.2, *)
-@lifetime(borrow ubp)
+@_lifetime(borrow ubp)
 func testUBPStorageReturn(ubp: UnsafeRawBufferPointer) -> RawSpan {
   // 'storage' can be returned since the function's return value also has a dependence on 'ubp'.
   return ubp.storage
 }
 
 @available(SwiftStdlib 6.2, *)
-@lifetime(borrow ubp)
+@_lifetime(borrow ubp)
 func testUBPStorageCopy(ubp: UnsafeRawBufferPointer) -> RawSpan {
   let localBuffer = ubp
   return localBuffer.storage // expected-error {{lifetime-dependent value escapes its scope}}

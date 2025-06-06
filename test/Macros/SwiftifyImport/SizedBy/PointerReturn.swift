@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature LifetimeDependence -strict-memory-safety -warnings-as-errors -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
+// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature Lifetimes -strict-memory-safety -warnings-as-errors -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
 
 @_SwiftifyImport(.sizedBy(pointer: .return, size: "len"))
 func myFunc(_ len: CInt) -> UnsafeMutableRawPointer {
@@ -37,7 +37,7 @@ func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawPointer, _ len1: 
 // CHECK-NEXT:     return unsafe UnsafeRawBufferPointer(start: unsafe nonEscaping(len), count: Int(len))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy p) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 // CHECK-NEXT: func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
 // CHECK-NEXT:     let len1 = CInt(exactly: p.byteCount)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe p.withUnsafeBytes { _pPtr in
@@ -45,13 +45,13 @@ func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawPointer, _ len1: 
 // CHECK-NEXT:             }, byteCount: Int(len2)), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow p) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(borrow p) @_disfavoredOverload
 // CHECK-NEXT: func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len2: CInt) -> RawSpan {
 // CHECK-NEXT:     let len1 = CInt(exactly: unsafe p.count)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy p) @lifetime(p: copy p) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
 // CHECK-NEXT: func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
 // CHECK-NEXT:     let len1 = CInt(exactly: p.byteCount)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe p.withUnsafeMutableBytes { _pPtr in
@@ -59,7 +59,7 @@ func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawPointer, _ len1: 
 // CHECK-NEXT:             }, byteCount: Int(len2)), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow p) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(borrow p) @_disfavoredOverload
 // CHECK-NEXT: func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawBufferPointer, _ len2: CInt) -> MutableRawSpan {
 // CHECK-NEXT:     let len1 = CInt(exactly: unsafe p.count)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe lifetimeDependentBorrowMut(p.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
