@@ -176,7 +176,8 @@ public:
   }
 
   bool requiresCAS() const {
-    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend;
+    return CASOpts.EnableCaching || IRGenOpts.UseCASBackend ||
+           CASOpts.ImportModuleFromCAS;
   }
 
   void setClangModuleCachePath(StringRef Path) {
