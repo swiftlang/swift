@@ -690,6 +690,13 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency;
   }
 
+  /// Returns true if a a Swift declaration starts after the current token, otherwise returns false.
+  bool isNextStartOfSwiftDecl() {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    return isStartOfSwiftDecl();
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, DiagRef Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&

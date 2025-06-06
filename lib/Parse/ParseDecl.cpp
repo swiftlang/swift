@@ -2908,7 +2908,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       break;
     }
 
-    consumeAttributeLParen();
+    auto LParenLoc = consumeAttributeLParen();
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
@@ -2920,27 +2920,43 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     
     // Parse the subject.
-    if (Tok.isContextualKeyword("set")) {
-      consumeToken();
-    } else {
-      diagnose(Loc, diag::attr_access_expected_set, AttrName);
-
+    if (!Tok.isContextualKeyword("set")) {
+      auto diag = diagnose(Loc, diag::attr_access_expected_set, AttrName);
+      
       // Minimal recovery: if there's a single token and then an r_paren,
       // consume them both. If there's just an r_paren, consume that.
-      if (!consumeIf(tok::r_paren)) {
-        if (Tok.isNot(tok::l_paren) && peekToken().is(tok::r_paren)) {
-          consumeToken();
-          consumeToken(tok::r_paren);
-        }
+      if (Tok.is(tok::r_paren)) {
+        // Suggest `set` between empty parens e.g. `private()` -> `private(set)`
+        auto SetLoc = consumeToken(tok::r_paren);
+        diag.fixItInsert(SetLoc, "set");
+      } else if (!Tok.is(tok::l_paren) && peekToken().is(tok::r_paren)) {
+        // Suggest `set` in place of an invalid token between parens
+        // e.g. `private(<invalid>)` -> `private(set)`
+        auto SetLoc = consumeToken();
+        diag.fixItReplace(SetLoc, "set");
+        consumeToken(tok::r_paren);
+      } else if (isNextStartOfSwiftDecl()) {
+        // Suggest `set)` in place of an invalid token after l_paren followed by
+        // a valid declaration start.
+        // e.g. `private( var x: Int` -> `private(set) var x: Int`
+        diag.fixItReplace(Tok.getLoc(), "set)");
+      } else {
+        // Suggest `set)` after l_paren if not followed by a valid declaration
+        // e.g. `private( val x: Int` -> `private(set) val x: Int`
+        diag.fixItInsertAfter(LParenLoc, "set)");
       }
+      
       return makeParserSuccess();
     }
+    
+    auto SubjectLoc = consumeToken();
 
     AttrRange = SourceRange(Loc, Tok.getLoc());
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+               DeclAttribute::isDeclModifier(DK))
+        .fixItInsertAfter(SubjectLoc, ")");
       return makeParserSuccess();
     }
 
