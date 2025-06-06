@@ -764,17 +764,29 @@ static void addSendableFixIt(
   }
 }
 
+static void addProtocolFixIt(const GenericTypeParamDecl *genericArgument,
+                             InFlightDiagnostic &diag, StringRef protocolName) {
+  if (genericArgument->getInherited().empty()) {
+    auto fixItLoc = genericArgument->getLoc();
+    diag.fixItInsertAfter(fixItLoc, llvm::Twine(": ", protocolName).str());
+  } else {
+    auto fixItLoc = genericArgument->getInherited().getEndLoc();
+    diag.fixItInsertAfter(fixItLoc, llvm::Twine(" & ", protocolName).str());
+  }
+}
 /// Add Fix-It text for the given generic param declaration type to adopt
 /// Sendable.
 static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
                              InFlightDiagnostic &diag) {
-  if (genericArgument->getInherited().empty()) {
-    auto fixItLoc = genericArgument->getLoc();
-    diag.fixItInsertAfter(fixItLoc, ": Sendable");
-  } else {
-    auto fixItLoc = genericArgument->getInherited().getEndLoc();
-    diag.fixItInsertAfter(fixItLoc, " & Sendable");
-  }
+  addProtocolFixIt(genericArgument, diag,
+                   getProtocolName(KnownProtocolKind::Sendable));
+}
+
+static void
+addSendableMetatypeFixIt(const GenericTypeParamDecl *genericArgument,
+                         InFlightDiagnostic &diag) {
+  addProtocolFixIt(genericArgument, diag,
+                   getProtocolName(KnownProtocolKind::SendableMetatype));
 }
 
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
@@ -1025,7 +1037,8 @@ static bool diagnoseSingleNonSendableType(
         if (genericParamTypeDecl &&
             genericParamTypeDecl->getModuleContext() == module) {
           auto diag = genericParamTypeDecl->diagnose(
-              diag::add_generic_parameter_sendable_conformance, type);
+              diag::add_generic_parameter_conformance, type,
+              ctx.getProtocol(KnownProtocolKind::Sendable));
           addSendableFixIt(genericParamTypeDecl, diag);
         }
       }
@@ -1240,6 +1253,32 @@ void swift::diagnoseMissingSendableConformance(
   diagnoseNonSendableTypes(
       type, sendableContext, /*inDerivedConformance*/Type(),
       loc, diag::non_sendable_type);
+}
+
+void swift::diagnoseMissingSendableMetatypeConformance(
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency) {
+  SendableCheckContext sendableContext(fromDC, preconcurrency);
+  DiagnosticBehavior behavior =
+      sendableContext.implicitSendableDiagnosticBehavior();
+
+  auto &ctx = type->getASTContext();
+  ctx.Diags.diagnose(loc, diag::non_sendable_metatype_type, type)
+      .limitBehaviorWithPreconcurrency(behavior, preconcurrency);
+
+  if (auto genericArchetype = type->getAs<ArchetypeType>()) {
+    auto interfaceType = genericArchetype->getInterfaceType();
+    if (auto genericParamType = interfaceType->getAs<GenericTypeParamType>()) {
+      auto module = fromDC->getParentModule();
+      auto *genericParamTypeDecl = genericParamType->getDecl();
+      if (genericParamTypeDecl &&
+          genericParamTypeDecl->getModuleContext() == module) {
+        auto diag = genericParamTypeDecl->diagnose(
+            diag::add_generic_parameter_conformance, type,
+            ctx.getProtocol(KnownProtocolKind::SendableMetatype));
+        addSendableMetatypeFixIt(genericParamTypeDecl, diag);
+      }
+    }
+  }
 }
 
 namespace {

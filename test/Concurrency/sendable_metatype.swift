@@ -83,3 +83,18 @@ nonisolated func passMetaSmuggledAnyFromExistential(_ pqT: (P & Q).Type) {
     acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }
+
+
+func testSendableMetatypeDowngrades() {
+  @preconcurrency
+  func acceptsSendableMetatype<T: SendableMetatype>(_: T.Type) {
+  }
+
+  func testWarning<T>(t: T.Type) { // expected-note {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{21-21=: SendableMetatype}}
+    acceptsSendableMetatype(t) // expected-warning {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+  }
+
+  func testWarning<T: P>(t: T.Type) { // expected-note {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{24-24= & SendableMetatype}}
+    acceptsSendableMetatype(t) // expected-warning {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+  }
+}
