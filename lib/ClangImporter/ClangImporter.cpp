@@ -682,6 +682,9 @@ void importer::getNormalInvocationArguments(
     }
   }
 
+  if (triple.isOSWindows() && EnableCXXInterop)
+    invocationArgStrs.push_back("-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
+
   // If we support SendingArgsAndResults, set the -D flag to signal that it
   // is supported.
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
