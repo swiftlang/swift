@@ -365,7 +365,8 @@ bool AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
     const BackDeployedAttr *attr, const ASTContext &ctx,
     AvailabilityDomain &domain, llvm::VersionTuple &platformVer) {
   bool hasRemap = false;
-  auto remappedDomain = domain.getRemappedDomain(ctx, hasRemap);
+  auto remappedDomain = AvailabilityDomain::forPlatform(attr->Platform)
+                            .getRemappedDomain(ctx, hasRemap);
   if (!hasRemap)
     return false;
 
