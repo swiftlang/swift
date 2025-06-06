@@ -5,13 +5,13 @@
 // RUN:   -module-name test \
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
 // RUN:   -enable-address-dependencies \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
 // RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_AddressableTypes
 
@@ -21,7 +21,7 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
@@ -33,7 +33,7 @@ struct NC : ~Copyable {
   let i: Int
 
   // Requires a borrow.
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getBV() -> BV {
     BV(p, i)
   }
@@ -76,7 +76,7 @@ func bv_borrow_var(p: UnsafeRawPointer, i: Int) {
 // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[BV]] on %0
 // CHECK: return [[MD]]
 // CHECK-LABEL: } // end sil function '$s4test18bv_pointer_convert1pAA2BVVSPySiG_tF'
-@lifetime(borrow p)
+@_lifetime(borrow p)
 func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
   BV(p, 0)
 }
@@ -90,7 +90,7 @@ public typealias IntSpan = Span<Int>
 
 @available(Span 0.1, *)
 protocol IntSpanable {
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func getIntSpan() -> IntSpan
 }
 
@@ -107,7 +107,7 @@ public struct Holder: IntSpanable {
     }
   }
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func getIntSpan() -> IntSpan {
     let span = unsafe Span(_unsafeStart: p, count: 1)
     return unsafe _overrideLifetime(span, borrowing: self)
@@ -125,7 +125,7 @@ public struct InlineHolder: IntSpanable {
     self.i = c.i
   }
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func getIntSpan() -> IntSpan {
     let a = Builtin.addressOfBorrow(self)
     let address = unsafe UnsafePointer<Int>(a)
@@ -136,7 +136,7 @@ public struct InlineHolder: IntSpanable {
 
 // 'some Spanable' is AddressableForDependencies.
 @available(Span 0.1, *)
-@lifetime(borrow spanable)
+@_lifetime(borrow spanable)
 func getIntSpan(_ spanable: some IntSpanable) -> IntSpan {
   spanable.getIntSpan()
 }

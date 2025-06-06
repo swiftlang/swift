@@ -1,13 +1,13 @@
 // RUN: %target-sil-opt \
 // RUN:   -lifetime-dependence-scope-fixup \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
 // RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_AddressableTypes
 
@@ -21,7 +21,7 @@ import Swift
 struct NE : ~Escapable {
   var p: UnsafeRawPointer
 
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init()
 }
 

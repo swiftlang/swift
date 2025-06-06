@@ -1,10 +1,10 @@
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature LifetimeDependence -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature LifetimeDependence -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature Lifetimes -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature Lifetimes -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -1237,7 +1237,7 @@ struct NEAggregate: ~Escapable {
   var ne: NEGutless
   let regular: Regular
 
-  @lifetime(copy ne) init(ne: NEMarker)
+  @_lifetime(copy ne) init(ne: NEMarker)
 }
 
 // CHECK-LABEL: sil [ossa] @no_destructure_nonescapable : {{.*}} {
