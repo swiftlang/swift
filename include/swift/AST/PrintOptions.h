@@ -395,6 +395,9 @@ public:
   /// as public
   bool SuppressIsolatedDeinit = false;
 
+  /// Suppress @_lifetime attribute and emit @lifetime instead.
+  bool SuppressLifetimes = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

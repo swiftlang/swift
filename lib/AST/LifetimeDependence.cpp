@@ -300,7 +300,7 @@ public:
     assert(lifetimeDependencies.empty());
 
     // Handle Builtins first because, even though Builtins require
-    // LifetimeDependence, we don't force Feature::LifetimeDependence
+    // LifetimeDependence, we don't force the experimental feature
     // to be enabled when importing the Builtin module.
     if (afd->isImplicit() && afd->getModuleContext()->isBuiltinModule()) {
       inferBuiltin();
@@ -308,6 +308,7 @@ public:
     }
 
     if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)
+        && !ctx.LangOpts.hasFeature(Feature::Lifetimes)
         && !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
 
       // Infer inout dependencies without requiring a feature flag. On
