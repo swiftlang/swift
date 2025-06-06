@@ -1380,9 +1380,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                     if (typeErased)
                       Printer << "@_noMetadata ";
                   }
-                  auto OptionsCopy = Options;
-                  OptionsCopy.PrintInternalLayoutName = typeErased;
-                  req.print(Printer, OptionsCopy);
+
+                  PrintOptions::OverrideScope scope(Options);
+                  OVERRIDE_PRINT_OPTION(scope, PrintInternalLayoutName, typeErased);
+                  req.print(Printer, Options);
                 },
                 [&] { Printer << ", "; });
 
@@ -1703,7 +1704,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                     ->getVarAtSimilarStructuralPosition(
                                       const_cast<VarDecl *>(cast<VarDecl>(D)));
     if (abiDecl) {
-      auto optionsCopy = Options;
+      PrintOptions::OverrideScope scope(Options);
 
       // Don't print any attributes marked with `ForbiddenInABIAttr`.
       // (Reminder: There is manual logic in `PrintAST::printAttributes()`
@@ -1715,12 +1716,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           continue;
 
         if (attrKind == DeclAttrKind::AccessControl)
-          optionsCopy.PrintAccess = false;
+          OVERRIDE_PRINT_OPTION(scope, PrintAccess, false);
         else
-          optionsCopy.ExcludeAttrList.push_back(attrKind);
+          scope.addExcludedAttr(attrKind);
       }
 
-      abiDecl->print(Printer, optionsCopy);
+      abiDecl->print(Printer, Options);
     }
     Printer << ")";
 
