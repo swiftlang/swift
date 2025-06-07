@@ -8,7 +8,7 @@ func makeGenericClosureWithUnknownClass<T>(t: T) where T : ClassProtocol {
   _ = { [unowned t] in _ = t }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s4main34makeGenericClosureWithUnknownClass1tyx_tAA0G8ProtocolRzlFyycfU_ : $@convention(thin) <T where T : ClassProtocol> (@in_guaranteed @sil_unowned T) -> () {
+// CHECK-LABEL: sil private [ossa] @$s4main34makeGenericClosureWithUnknownClass1tyx_tAA0G8ProtocolRzlFyycfU_ : $@convention(thin) <T where T : ClassProtocol> (@guaranteed <τ_0_0 where τ_0_0 : ClassProtocol> { var @sil_unowned τ_0_0 } <T>) -> () {
 
 func makeGenericClosureWithNativeClass1<T>(t: T) where T : BaseClass {
   _ = { [unowned t] in _ = t }
