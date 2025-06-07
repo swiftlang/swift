@@ -2049,11 +2049,24 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
-  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  auto *locator = getLocator();
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!(overload && overload->choice.isDecl()))
     return false;
 
   auto *decl = overload->choice.getDecl();
+
+  if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
+    auto argConv = locator->findLast<LocatorPathElt::ApplyArgToParam>();
+    if (!argConv)
+      return false;
+
+    emitDiagnosticAt(decl, diag::candidate_expects_inout_argument,
+                     argConv->getParamIdx() + 1);
+    return true;
+  }
+
   emitDiagnosticAt(decl, diag::candidate_is_not_assignable, decl);
   return true;
 }
