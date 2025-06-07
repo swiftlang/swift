@@ -2421,11 +2421,30 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
+static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
+                                                  const clang::Decl *parent) {
+  if (getActorIsolationOfContext(dc).isGlobalActor())
+    return true;
+
+  if (!parent->hasAttrs())
+    return false;
+
+  for (const auto *attr : parent->getAttrs()) {
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (isMainActorAttr(swiftAttr))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 std::optional<ClangImporter::Implementation::ImportParameterTypeResult>
 ClangImporter::Implementation::importParameterType(
-    const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
-    bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
-    bool paramIsError, bool paramIsCompletionHandler,
+    DeclContext *dc, const clang::Decl *parent, const clang::ParmVarDecl *param,
+    OptionalTypeKind optionalityOfParam, bool allowNSUIntegerAsInt,
+    bool isNSDictionarySubscriptGetter, bool paramIsError,
+    bool paramIsCompletionHandler,
     std::optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
@@ -2445,7 +2464,8 @@ ClangImporter::Implementation::importParameterType(
 
   if (SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
       paramIsCompletionHandler) {
-    attrs |= ImportTypeAttr::DefaultsToSendable;
+    if (!isParameterContextGlobalActorIsolated(dc, parent))
+      attrs |= ImportTypeAttr::DefaultsToSendable;
   }
 
   if (auto optionSetEnum = importer::findOptionSetEnum(paramTy, *this)) {
@@ -2722,13 +2742,13 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
 
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
-    auto swiftParamTyOpt =
-        importParameterType(param, optionalityOfParam, allowNSUIntegerAsInt,
-                            /*isNSDictionarySubscriptGetter=*/false,
-                            /*paramIsError=*/false,
-                            /*paramIsCompletionHandler=*/false,
-                            /*completionHandlerErrorParamIndex=*/std::nullopt,
-                            genericParams, paramAddDiag);
+    auto swiftParamTyOpt = importParameterType(
+        dc, clangDecl, param, optionalityOfParam, allowNSUIntegerAsInt,
+        /*isNSDictionarySubscriptGetter=*/false,
+        /*paramIsError=*/false,
+        /*paramIsCompletionHandler=*/false,
+        /*completionHandlerErrorParamIndex=*/std::nullopt, genericParams,
+        paramAddDiag);
     if (!swiftParamTyOpt) {
       addImportDiagnostic(param,
                           Diagnostic(diag::parameter_type_not_imported, param),
@@ -3285,7 +3305,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     ImportDiagnosticAdder paramAddDiag(*this, clangDecl, param->getLocation());
 
     auto swiftParamTyOpt = importParameterType(
-        param, optionalityOfParam, allowNSUIntegerAsIntInParam,
+        origDC, clangDecl, param, optionalityOfParam,
+        allowNSUIntegerAsIntInParam,
         kind == SpecialMethodKind::NSDictionarySubscriptGetter, paramIsError,
         paramIsCompletionHandler, completionHandlerErrorParamIndex,
         ArrayRef<GenericTypeParamDecl *>(), paramAddDiag);
