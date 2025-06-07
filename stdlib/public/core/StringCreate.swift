@@ -17,55 +17,64 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   // NOTE: Avoiding for-in syntax to avoid bounds checks
   //
-  // TODO(String performance): SIMD-ize
-  //
+  // TODO(String performance): please remove this SIMD-ization when Swift compiler will be smart enough
+  // to vectorize this simple loop on its own:
+  // for i in 0..<count where ptr[i] & byteASCIIMask != 0 {
+  //   return false
+  // }
+
+  let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
+  var i = 0
+
   let count = input.count
-  var ptr = unsafe UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
+  let stride = MemoryLayout<UInt>.stride
+  let simd4UintStride = MemoryLayout<SIMD4<UInt>>.stride
+  assert(simd4UintStride == stride * 4) // Memory layout of SIMD4<UInt> should match one of 4 UInt words
+  let address = Int(bitPattern: ptr)
 
-  let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
-  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
-  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
-  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
-  
-  let end128 = unsafe ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
-  let end64 = unsafe ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
-  let end32 = unsafe ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
-  let end16 = unsafe ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
-  let end = unsafe ptr + count
+  let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
+  let byteASCIIMask = UInt8(truncatingIfNeeded: 0x80 as UInt8)
+  let simd4ASCIIMask = SIMD4<UInt>(repeating: wordASCIIMask)
+  let simd4Zero = SIMD4<UInt>(repeating: 0)
 
-  
-  while unsafe ptr < end128 {
-    let pair = unsafe ptr.loadUnaligned(as: (UInt64, UInt64).self)
-    let result = (pair.0 | pair.1) & asciiMask64
-    guard result == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<(UInt64, UInt64)>.stride
-  }
-  
-  // If we had enough bytes for two iterations of this, we would have hit
-  // the loop above, so we only need to do this once
-  if unsafe ptr < end64 {
-    let value = unsafe ptr.loadUnaligned(as: UInt64.self)
-    guard value & asciiMask64 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt64>.stride
-  }
-  
-  if unsafe ptr < end32 {
-    let value = unsafe ptr.loadUnaligned(as: UInt32.self)
-    guard value & asciiMask32 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt32>.stride
-  }
-  
-  if unsafe ptr < end16 {
-    let value = unsafe ptr.loadUnaligned(as: UInt16.self)
-    guard value & asciiMask16 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt16>.stride
+  // Bytes up to beginning of a word
+  while (address &+ i) % stride != 0 && i < count {
+    guard ptr[i] & byteASCIIMask == 0 else { return false }
+    i &+= 1
   }
 
-  if unsafe ptr < end {
-    let value = unsafe ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
-    guard value & asciiMask8 == 0 else { return false }
+  // Words up to beginning of a 4-word
+  while (address &+ i) % simd4UintStride != 0 && (i &+ stride) <= count {
+    let word: UInt = UnsafePointer(
+      bitPattern: address &+ i
+    )._unsafelyUnwrappedUnchecked.pointee
+    guard word & wordASCIIMask == 0 else { return false }
+    i &+= stride
   }
-  unsafe _internalInvariant(ptr == end || ptr + 1 == end)
+
+  // Full 4-words
+  while (i &+ simd4UintStride) <= count {
+    let simd4: SIMD4<UInt> = UnsafePointer<SIMD4<UInt>>(
+      bitPattern: address &+ i
+    )._unsafelyUnwrappedUnchecked.pointee
+    guard simd4 & simd4ASCIIMask == simd4Zero else { return false }
+    i &+= simd4UintStride
+  }
+
+  // Full words
+  while (i &+ stride) <= count {
+    let word: UInt = UnsafePointer(
+      bitPattern: address &+ i
+    )._unsafelyUnwrappedUnchecked.pointee
+    guard word & wordASCIIMask == 0 else { return false }
+    i &+= stride
+  }
+
+  // Rest bytes up to end
+  while i < count {
+    guard ptr[i] & byteASCIIMask == 0 else { return false }
+    i &+= 1
+  }
   return true
 }
 
