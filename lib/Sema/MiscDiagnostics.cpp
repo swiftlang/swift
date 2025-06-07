@@ -1748,21 +1748,12 @@ public:
       return false;
     }
 
-    // Require that the RHS of the `let self = self` condition
-    // refers to a variable defined in a capture list.
+    // Require `LoadExpr`s when validating the self binding.
     // This lets us reject invalid examples like:
     //
-    //   var `self` = self ?? .somethingElse
+    //   let `self` = self ?? .somethingElse
     //   guard let self = self else { return }
     //   method() // <- implicit self is not allowed
-    //
-    // In 5.10, instead of this check, compiler was checking that RHS of the
-    // self binding is loaded from a mutable variable. This is incorrect, but
-    // before SE-0481 compiler was trying to maintain this behavior in Swift 5
-    // mode for source compatibility. After SE-0481 this does not work
-    // anymore, because even in Swift 5 mode `weak self` capture is not mutable.
-    // So we have to introduce a breaking change as part of the SE-0481, and use
-    // proper check for capture list even in Swift 5 mode.
     //
     return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
   }

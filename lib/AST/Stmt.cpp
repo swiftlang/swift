@@ -514,6 +514,8 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
+///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+///    the self condition is a `LoadExpr`.
 bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
                                          bool requiresCaptureListRef) const {
   return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef](const auto &cond) {
@@ -525,6 +527,8 @@ bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
+///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+///    the self condition is a `LoadExpr`.
 bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
                                        bool requiresCaptureListRef) const {
   auto pattern = getPatternOrNull();
