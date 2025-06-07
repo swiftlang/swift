@@ -1,0 +1,4 @@
+module Mirror {
+  header "mirror.h"
+  export *
+}

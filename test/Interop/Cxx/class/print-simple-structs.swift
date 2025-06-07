@@ -24,6 +24,28 @@ func printCxxStructNested() {
     print(s)
 }
 
+func printCxxImmortalFRT() {
+    let s = ImmortalFRT()
+    print(s)
+}
+
+extension FRTCustomStringConvertible : CustomStringConvertible {
+    public var description: String {
+        return "FRTCustomStringConvertible(publ: \(publ))"
+    }
+}
+
+func printCxxFRTCustomStringConvertible() {
+    let s = FRTCustomStringConvertible()
+    print(s)
+}
+
+func printCxxFRType() {
+    let s = FRType()
+    print(s)
+}
+
+
 printCxxStructPrivateFields() 
 // CHECK: HasPrivateFieldsOnly()
 
@@ -35,3 +57,12 @@ printCxxStructPrivatePublicProtectedFields()
 
 printCxxStructNested()
 // CHECK: Outer(publStruct: {{.*}}.HasPrivatePublicProtectedFields(publ1: 8, publ2: 12))
+
+printCxxImmortalFRT()
+// CHECK: ImmortalFRT()
+
+printCxxFRTCustomStringConvertible()
+// CHECK: FRTCustomStringConvertible(publ: 2)
+
+printCxxFRType()
+// CHECK: FRType()
