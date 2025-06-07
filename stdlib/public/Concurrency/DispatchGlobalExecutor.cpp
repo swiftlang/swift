@@ -55,6 +55,10 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC 1000000000ull
+#endif
+
 using namespace swift;
 
 /// The function passed to dispatch_async_f to execute a job.
@@ -294,7 +298,12 @@ platform_time(uint64_t nsec) {
 #endif
 
 static inline dispatch_time_t
-clock_and_value_to_time(int clock, long long deadline) {
+clock_and_value_to_time(int clock, long long sec, long long nsec) {
+  uint64_t deadline;
+  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
+      || __builtin_add_overflow(nsec, deadline, &deadline)) {
+    deadline = UINT64_MAX;
+  }
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
@@ -304,6 +313,20 @@ clock_and_value_to_time(int clock, long long deadline) {
     return value;
   case swift_clock_id_continuous:
     return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+  case swift_clock_id_wall: {
+#if defined(_WIN32)
+    struct timespec ts = { 
+      .tv_sec = sec,
+      .tv_nsec = static_cast<long>(nsec)
+    };
+#else
+    struct timespec ts = { 
+      .tv_sec = sec,
+      .tv_nsec = nsec
+    };
+#endif
+    return dispatch_walltime(&ts, 0);
+  }
   }
   __builtin_unreachable();
 }
@@ -332,13 +355,7 @@ void swift_dispatchEnqueueWithDeadline(bool global,
     job->schedulerPrivate[SwiftJobDispatchQueueIndex] = queue;
   }
 
-  uint64_t deadline;
-  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
-      || __builtin_add_overflow(nsec, deadline, &deadline)) {
-    deadline = UINT64_MAX;
-  }
-
-  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
+  dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
   if (tnsec != -1) {
     uint64_t leeway;
