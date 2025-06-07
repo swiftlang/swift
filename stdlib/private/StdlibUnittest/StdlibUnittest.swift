@@ -752,11 +752,14 @@ public func expectNil<T>(_ value: T?,
 }
 
 @discardableResult
-public func expectNotNil<T>(_ value: T?,
+@lifetime(copy value)
+public func expectNotNil<T: ~Copyable & ~Escapable>(
+  _ value: consuming T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) -> T? {
+  file: String = #file, line: UInt = #line
+) -> T? {
   if value == nil {
     expectationFailure("expected optional to be non-nil", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
