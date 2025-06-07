@@ -2798,6 +2798,17 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
+  for (auto *I : underlying->Imports) {
+    // Make sure that synthesized Swift code in the clang module wrapper
+    // (e.g. _SwiftifyImport macro expansions) can access the same symbols as
+    // if it were actually in the clang module
+    std::string swiftModuleName = isCxxStdModule(I) ?
+      static_cast<std::string>(SwiftContext.Id_CxxStdlib) :
+      I->getFullModuleName();
+    ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
+    UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext), ImportKind::Module);
+    implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
+  }
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
                                     [&](ModuleDecl *wrapper, auto addFile) {
