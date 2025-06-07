@@ -11,13 +11,18 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/SIMDFloatComparisons.swift
-// RUN: %target-swift-frontend -primary-file %t/SIMDFloatComparisons.swift -S | %FileCheck %t/SIMDFloatComparisons.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
-// RUN: %target-swift-frontend -primary-file %t/SIMDFloatComparisons.swift -S -O | %FileCheck %t/SIMDFloatComparisons.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
+// RUN: %target-swift-frontend -primary-file %t/SIMDFloatComparisons.swift -emit-ir | %FileCheck %t/SIMDFloatComparisons.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 
 import Swift
 
 %for bits in [16,32,64]:
+% if bits == 16:
+%  arch = "-arm64"
+% else:
+%  arch = ""
+% end
 % scalar = {16:'Float16',32:'Float',64:'Double'}[bits]
+% llvm = {16:'half',32:'float',64:'double'}[bits]
 % for totalBits in [64,128]:
 %  n = totalBits // bits
 %  if n != 1:
@@ -33,16 +38,12 @@ func compare_eq${n}x${bits}(
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
-%   else:
-// CHECK: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
-// CHECK-x86_64: cmpeqp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 %   end
-// CHECKO-arm64-NEXT: fcmeq.${neonSuffix} v0, v0, v1
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: fcmeq.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK${arch}: compare_eq${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = fcmp oeq <${n} x ${llvm}> %0, %1
+// CHECK${arch}-NEXT: [[RES:%[0-9]+]] = sext <${n} x i1> [[TMP]] to <${n} x i${bits}>
+// CHECK${arch}-NEXT: ret <${n} x i${bits}> [[RES]]
 
 %   if bits == 16:
 #if arch(arm64)
@@ -55,18 +56,12 @@ func compare_ne${n}x${bits}(
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
-%   else:
-// CHECK: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
-// CHECK-x86_64: cmpneqp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 %   end
-// CHECKO-arm64-NEXT: fcmeq.${neonSuffix} [[TMP:v[0-9]+]], v0, v1
-// CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, [[TMP]]
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: fcmeq.${neonSuffix}
-// CHECKOnone-arm64: mvn.${totalBits//8}b
-// CHECKOnone-arm64: ret
+// CHECK${arch}: compare_ne${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = fcmp une <${n} x ${llvm}> %0, %1
+// CHECK${arch}-NEXT: [[RES:%[0-9]+]] = sext <${n} x i1> [[TMP]] to <${n} x i${bits}>
+// CHECK${arch}-NEXT: ret <${n} x i${bits}> [[RES]]
 
 %   if bits == 16:
 #if arch(arm64)
@@ -79,16 +74,12 @@ func compare_lt${n}x${bits}(
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
-%   else:
-// CHECK: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
-// CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 %   end
-// CHECKO-arm64-NEXT: fcmgt.${neonSuffix} v0, v1, v0
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: fcmgt.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK${arch}: compare_lt${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = fcmp olt <${n} x ${llvm}> %0, %1
+// CHECK${arch}-NEXT: [[RES:%[0-9]+]] = sext <${n} x i1> [[TMP]] to <${n} x i${bits}>
+// CHECK${arch}-NEXT: ret <${n} x i${bits}> [[RES]]
 
 %   if bits == 16:
 #if arch(arm64)
@@ -101,16 +92,12 @@ func compare_le${n}x${bits}(
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
-%   else:
-// CHECK: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
-// CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 %   end
-// CHECKO-arm64-NEXT: fcmge.${neonSuffix} v0, v1, v0
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: fcmge.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK${arch}: compare_le${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = fcmp ole <${n} x ${llvm}> %0, %1
+// CHECK${arch}-NEXT: [[RES:%[0-9]+]] = sext <${n} x i1> [[TMP]] to <${n} x i${bits}>
+// CHECK${arch}-NEXT: ret <${n} x i${bits}> [[RES]]
 
 %   if bits == 16:
 #if arch(arm64)
@@ -123,16 +110,12 @@ func compare_ge${n}x${bits}(
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
-%   else:
-// CHECK: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
-// CHECK-x86_64: cmplep${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 %   end
-// CHECKO-arm64-NEXT: fcmge.${neonSuffix} v0, v0, v1
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: fcmge.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK${arch}: compare_ge${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = fcmp oge <${n} x ${llvm}> %0, %1
+// CHECK${arch}-NEXT: [[RES:%[0-9]+]] = sext <${n} x i1> [[TMP]] to <${n} x i${bits}>
+// CHECK${arch}-NEXT: ret <${n} x i${bits}> [[RES]]
 
 %   if bits == 16:
 #if arch(arm64)
@@ -145,16 +128,12 @@ func compare_gt${n}x${bits}(
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
-%   else:
-// CHECK: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
-// CHECK-x86_64: cmpltp${'s' if bits == 32 else 'd'}
-// CHECK-x86_64: ret
 %   end
-// CHECKO-arm64-NEXT: fcmgt.${neonSuffix} v0, v0, v1
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: fcmgt.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK${arch}: compare_gt${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = fcmp ogt <${n} x ${llvm}> %0, %1
+// CHECK${arch}-NEXT: [[RES:%[0-9]+]] = sext <${n} x i1> [[TMP]] to <${n} x i${bits}>
+// CHECK${arch}-NEXT: ret <${n} x i${bits}> [[RES]]
 
 %  end
 % end
