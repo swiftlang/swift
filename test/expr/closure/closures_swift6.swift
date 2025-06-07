@@ -6,8 +6,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix no-weak-let-
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix has-weak-let- -enable-experimental-feature WeakLet
 
-// REQUIRES: swift_feature_WeakLet
-
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
 func doVoidStuffNonEscaping(_ fn: () -> ()) {}

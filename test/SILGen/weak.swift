@@ -1,7 +1,6 @@
+
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s -enable-experimental-feature WeakLet | %FileCheck %s
-
-// REQUIRES: swift_feature_WeakLet
 
 class C {
   func f() -> Int { return 42 }

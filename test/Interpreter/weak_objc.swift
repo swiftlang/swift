@@ -8,7 +8,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_WeakLet
 
 import Foundation
 
