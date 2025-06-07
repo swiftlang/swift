@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-feature -Xfrontend WeakLet) | %FileCheck %s --check-prefixes=CHECK,CHECK-WEAK-LET
+
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_WeakLet
 
 protocol Protocol : class {
   func noop()
@@ -76,17 +79,19 @@ func testWeakInLet() {
 
 testWeakInLet()
 
+#if hasFeature(WeakLet)
 func testWeakLet() {
-  print("testWeakLet") // CHECK-LABEL: testWeakLet
+  print("testWeakLet") // CHECK-WEAK-LET-LABEL: testWeakLet
 
-  var obj: SwiftClassBase? = SwiftClass() // CHECK: SwiftClass Created
+  var obj: SwiftClassBase? = SwiftClass() // CHECK-WEAK-LET: SwiftClass Created
   weak let weakRef = obj
-  printState(weakRef) // CHECK-NEXT: is present
-  obj = nil // CHECK-NEXT: SwiftClass Destroyed
-  printState(weakRef) // CHECK-NEXT: is nil
+  printState(weakRef) // CHECK-WEAK-LET-NEXT: is present
+  obj = nil // CHECK-WEAK-LET-NEXT: SwiftClass Destroyed
+  printState(weakRef) // CHECK-WEAK-LET-NEXT: is nil
 }
 
 testWeakLet()
+#endif
 
 
 //======================== Test Classbound Protocols ========================

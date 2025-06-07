@@ -1,5 +1,7 @@
-
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s -enable-experimental-feature WeakLet | %FileCheck %s
+
+// REQUIRES: swift_feature_WeakLet
 
 class C {
   func f() -> Int { return 42 }
@@ -67,6 +69,7 @@ func testClosureOverWeak() {
   takeClosure { bC!.f() }
 }
 
+#if hasFeature(WeakLet)
 func testClosureOverWeakLet() {
   weak let bC = C()
   takeClosure { bC!.f() }
@@ -76,6 +79,8 @@ func testClosureOverWeakCapture() {
   let bC = C()
   takeClosure { [weak bC] in bC!.f() }
 }
+
+#endif
 
 class CC {
   weak var x: CC?

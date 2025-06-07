@@ -170,6 +170,15 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
       return CaptureKind::StorageAddress;
   }
 
+  // Reference storage types can appear in a capture list, which means
+  // we might allocate boxes to store the captures. However, those boxes
+  // have the same lifetime as the closure itself, so we must capture
+  // the box itself and not the payload, even if the closure is noescape,
+  // otherwise they will be destroyed when the closure is formed.
+  if (var->getInterfaceType()->is<ReferenceStorageType>() && !Context.LangOpts.hasFeature(Feature::WeakLet)) {
+    return CaptureKind::Box;
+  }
+
   // For 'let' constants
   if (!var->supportsMutation()) {
     assert(getTypeLowering(

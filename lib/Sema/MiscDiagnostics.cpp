@@ -4005,6 +4005,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       access &= ~RK_Written;
     }
     
+    // If this variable has WeakStorageType, then it can be mutated in ways we
+    // don't know.
+    if (var->getInterfaceType()->is<WeakStorageType>() && !DC->getASTContext().LangOpts.hasFeature(Feature::WeakLet))
+      access |= RK_Written;
+    
     // Diagnose variables that were never used (other than their
     // initialization).
     //
