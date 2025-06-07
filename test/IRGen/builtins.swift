@@ -204,6 +204,26 @@ func vector_select_test(
   return Builtin.select_Vec8xInt1_Vec8xInt32(p, trueValue, falseValue)
 }
 
+func interleave_test(
+  _ evens: Builtin.Vec8xInt16,
+  _ odds: Builtin.Vec8xInt16
+) -> (Builtin.Vec8xInt16, Builtin.Vec8xInt16) {
+  // CHECK: interleave_test
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 0, i32 8, i32 1, i32 9, i32 2, i32 10, i32 3, i32 11>
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 4, i32 12, i32 5, i32 13, i32 6, i32 14, i32 7, i32 15>
+  return Builtin.interleave_Vec8xInt16(evens, odds)
+}
+
+func deinterleave_test(
+  _ low: Builtin.Vec8xInt16,
+  _ high: Builtin.Vec8xInt16
+) -> (Builtin.Vec8xInt16, Builtin.Vec8xInt16) {
+  // CHECK: deinterleave_test
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
+  return Builtin.deinterleave_Vec8xInt16(low, high)
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test

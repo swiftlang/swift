@@ -680,8 +680,14 @@ BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 /// T must be trivial.
 BUILTIN_MISC_OPERATION(Select, "select", "n", Special)
 
-// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
+/// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
 BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
+
+/// Interleave has type (VecN<T>, VecN<T>) -> (VecN<T>, VecN<T>)
+BUILTIN_MISC_OPERATION(Interleave, "interleave", "n", Special)
+
+/// Deinterleave has type (VecN<T>, VecN<T>) -> (VecN<T>, VecN<T>)
+BUILTIN_MISC_OPERATION(Deinterleave, "deinterleave", "n", Special)
 
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
