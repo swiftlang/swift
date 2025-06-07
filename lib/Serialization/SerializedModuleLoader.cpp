@@ -744,6 +744,7 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   result += '.';
   result += file_types::getExtension(fileTy);
 
+  llvm::sys::path::make_preferred(result);
   return std::string(result.str());
 }
 

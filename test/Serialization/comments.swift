@@ -80,26 +80,26 @@ package func first_package_function() {}
 // SECOND: comments.swift:61:1: Extension/ RawComment=[/// Comment for no member extension\n] BriefComment=[Comment for no member extension]
 // SECOND: comments.swift:64:14: Func/first_package_function RawComment=[/// Comment on package function\n]
 // SECOND: comments.swift:67:27: Func/first_spi_function RawComment=[/// Comment on SPI function\n]
-// SECOND: Inputs/def_comments.swift:2:14: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
-// SECOND: Inputs/def_comments.swift:5:15: Struct/second_decl_struct_1
-// SECOND: Inputs/def_comments.swift:7:9: Accessor/second_decl_struct_1.<getter for second_decl_struct_1.instanceVar>
-// SECOND: Inputs/def_comments.swift:8:9: Accessor/second_decl_struct_1.<setter for second_decl_struct_1.instanceVar>
-// SECOND: Inputs/def_comments.swift:10:17: Enum/second_decl_struct_1.NestedEnum
-// SECOND: Inputs/def_comments.swift:11:22: TypeAlias/second_decl_struct_1.NestedTypealias
-// SECOND: Inputs/def_comments.swift:14:13: Enum/second_decl_enum_1
-// SECOND: Inputs/def_comments.swift:15:10: EnumElement/second_decl_enum_1.Case1
-// SECOND: Inputs/def_comments.swift:16:10: EnumElement/second_decl_enum_1.Case2
-// SECOND: Inputs/def_comments.swift:20:12: Constructor/second_decl_class_2.init
-// SECOND: Inputs/def_comments.swift:23:17: Protocol/second_decl_protocol_1
-// SECOND: Inputs/def_comments.swift:24:20: AssociatedType/second_decl_protocol_1.NestedTypealias
-// SECOND: Inputs/def_comments.swift:25:5: Subscript/second_decl_protocol_1.subscript
-// SECOND: Inputs/def_comments.swift:25:35: Accessor/second_decl_protocol_1.<getter for second_decl_protocol_1.subscript>
-// SECOND: Inputs/def_comments.swift:25:39: Accessor/second_decl_protocol_1.<setter for second_decl_protocol_1.subscript>
-// SECOND: Inputs/def_comments.swift:28:13: Var/decl_var_2 RawComment=none BriefComment=none DocCommentAsXML=none
-// SECOND: Inputs/def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
-// SECOND: Inputs/def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
-// SECOND: Inputs/def_comments.swift:31:14: Func/second_package_function RawComment=[/// Comment on package function\n]
-// SECOND: Inputs/def_comments.swift:34:27: Func/second_spi_function RawComment=[/// Comment on SPI function\n]
+// SECOND: def_comments.swift:2:14: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
+// SECOND: def_comments.swift:5:15: Struct/second_decl_struct_1
+// SECOND: def_comments.swift:7:9: Accessor/second_decl_struct_1.<getter for second_decl_struct_1.instanceVar>
+// SECOND: def_comments.swift:8:9: Accessor/second_decl_struct_1.<setter for second_decl_struct_1.instanceVar>
+// SECOND: def_comments.swift:10:17: Enum/second_decl_struct_1.NestedEnum
+// SECOND: def_comments.swift:11:22: TypeAlias/second_decl_struct_1.NestedTypealias
+// SECOND: def_comments.swift:14:13: Enum/second_decl_enum_1
+// SECOND: def_comments.swift:15:10: EnumElement/second_decl_enum_1.Case1
+// SECOND: def_comments.swift:16:10: EnumElement/second_decl_enum_1.Case2
+// SECOND: def_comments.swift:20:12: Constructor/second_decl_class_2.init
+// SECOND: def_comments.swift:23:17: Protocol/second_decl_protocol_1
+// SECOND: def_comments.swift:24:20: AssociatedType/second_decl_protocol_1.NestedTypealias
+// SECOND: def_comments.swift:25:5: Subscript/second_decl_protocol_1.subscript
+// SECOND: def_comments.swift:25:35: Accessor/second_decl_protocol_1.<getter for second_decl_protocol_1.subscript>
+// SECOND: def_comments.swift:25:39: Accessor/second_decl_protocol_1.<setter for second_decl_protocol_1.subscript>
+// SECOND: def_comments.swift:28:13: Var/decl_var_2 RawComment=none BriefComment=none DocCommentAsXML=none
+// SECOND: def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
+// SECOND: def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
+// SECOND: def_comments.swift:31:14: Func/second_package_function RawComment=[/// Comment on package function\n]
+// SECOND: def_comments.swift:34:27: Func/second_spi_function RawComment=[/// Comment on SPI function\n]
 // SECOND: NonExistingSource.swift:100000:13: Func/functionAfterPoundSourceLoc
 
 // Package and SPI functions won't show up in the (public) swiftinterface
