@@ -202,8 +202,7 @@ enum class ImportTypeAttr : uint8_t {
   Sendable = 1 << 2,
 
   /// Type is in a declaration where it would be imported as Sendable by
-  /// default. This comes directly from the parameters to
-  /// \c getImportTypeAttrs() and merely affects diagnostics.
+  /// default. Currently used for completion handlers.
   DefaultsToSendable = 1 << 3,
 
   /// Import the type of a parameter declared with
