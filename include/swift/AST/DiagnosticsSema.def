@@ -6913,11 +6913,12 @@ ERROR(availability_must_occur_alone, none,
       (AvailabilityDomain, bool))
 ERROR(availability_unexpected_version, none,
       "unexpected version number for %0", (AvailabilityDomain))
-WARNING(availability_unrecognized_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
-WARNING(availability_suggest_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0;"
-        " did you mean '%1'?",
+GROUPED_ERROR(availability_unrecognized_platform_name,
+        AvailabilityUnrecognizedName, PointsToFirstBadToken,
+        "unrecognized platform name %0", (Identifier))
+GROUPED_ERROR(availability_suggest_platform_name,
+        AvailabilityUnrecognizedName, PointsToFirstBadToken,
+        "unrecognized platform name %0; did you mean '%1'?",
         (Identifier, StringRef))
 WARNING(availability_unsupported_version_number, none,
         "'%0' is not a supported version number", (llvm::VersionTuple))
