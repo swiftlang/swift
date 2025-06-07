@@ -239,6 +239,10 @@ protected:
 
       NumFeatures : 31
     );
+
+    SWIFT_INLINE_BITFIELD(LifetimeAttr, DeclAttribute, 1,
+      isUnderscored : 1
+    );
   } Bits;
   // clang-format on
 
@@ -3351,16 +3355,20 @@ class LifetimeAttr final : public DeclAttribute {
   LifetimeEntry *entry;
 
   LifetimeAttr(SourceLoc atLoc, SourceRange baseRange, bool implicit,
-               LifetimeEntry *entry)
+               LifetimeEntry *entry, bool isUnderscored)
       : DeclAttribute(DeclAttrKind::Lifetime, atLoc, baseRange, implicit),
-        entry(entry) {}
+        entry(entry) {
+    Bits.LifetimeAttr.isUnderscored = isUnderscored;
+  }
 
 public:
   static LifetimeAttr *create(ASTContext &context, SourceLoc atLoc,
                               SourceRange baseRange, bool implicit,
-                              LifetimeEntry *entry);
+                              LifetimeEntry *entry, bool isUnderscored);
 
   LifetimeEntry *getLifetimeEntry() const { return entry; }
+
+  bool isUnderscored() const { return bool(Bits.LifetimeAttr.isUnderscored); }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Lifetime;
@@ -3368,8 +3376,11 @@ public:
 
   /// Create a copy of this attribute.
   LifetimeAttr *clone(ASTContext &ctx) const {
-    return new (ctx) LifetimeAttr(AtLoc, Range, isImplicit(), entry);
+    return new (ctx)
+        LifetimeAttr(AtLoc, Range, isImplicit(), entry, isUnderscored());
   }
+
+  std::string getString() const;
 
   bool isEquivalent(const LifetimeAttr *other, Decl *attachedTo) const;
 };

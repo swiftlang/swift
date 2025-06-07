@@ -38,7 +38,7 @@ LifetimeEntry::create(const ASTContext &ctx, SourceLoc startLoc,
 }
 
 std::string LifetimeEntry::getString() const {
-  std::string result = "@lifetime(";
+  std::string result = "(";
   if (targetDescriptor.has_value()) {
     result += targetDescriptor->getString();
     result += ": ";
