@@ -1712,9 +1712,7 @@ void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
                                 ImportTypeKind importKind,
                                 ImportTypeAttrs &attrs, clang::QualType type) {
   bool isMainActor = false;
-  bool isSendable =
-      SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
-      importKind == ImportTypeKind::CompletionHandlerParameter;
+  bool isSendable = false;
   bool isNonSendable = false;
 
   // Consider only immediate attributes, don't look through the typerefs
@@ -1733,8 +1731,10 @@ void swift::getConcurrencyAttrs(ASTContext &SwiftContext,
     attrs |= ImportTypeAttr::MainActor;
   if (isSendable)
     attrs |= ImportTypeAttr::Sendable;
-  if (isNonSendable)
+  if (isNonSendable) {
     attrs -= ImportTypeAttr::Sendable;
+    attrs -= ImportTypeAttr::DefaultsToSendable;
+  }
 }
 
 ImportedType ClangImporter::Implementation::importType(
@@ -2189,16 +2189,14 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
     }
   }
 
-  if (attrs.contains(ImportTypeAttr::Sendable)) {
+  if (attrs.contains(ImportTypeAttr::Sendable) ||
+      attrs.contains(ImportTypeAttr::DefaultsToSendable)) {
     bool changed;
     std::tie(type, changed) = GetSendableType(SwiftContext).convert(type);
 
     // Diagnose if we couldn't find a place to add `Sendable` to the type.
     if (!changed) {
       addDiag(Diagnostic(diag::clang_ignored_sendable_attr, type));
-
-      if (attrs.contains(ImportTypeAttr::DefaultsToSendable))
-        addDiag(Diagnostic(diag::clang_param_should_be_implicitly_sendable));
     }
   }
 
@@ -2444,6 +2442,11 @@ ClangImporter::Implementation::importParameterType(
   bool isInOut = false;
   bool isConsuming = false;
   bool isParamTypeImplicitlyUnwrapped = false;
+
+  if (SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
+      paramIsCompletionHandler) {
+    attrs |= ImportTypeAttr::DefaultsToSendable;
+  }
 
   if (auto optionSetEnum = importer::findOptionSetEnum(paramTy, *this)) {
     swiftParamTy = optionSetEnum.getType();
