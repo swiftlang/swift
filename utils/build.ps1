@@ -1422,7 +1422,7 @@ function Build-CMakeProject {
         switch ($Platform.OS) {
           Windows {
             if ($SwiftSDK -ne "") {
-              $SwiftArgs += @("-sdk", $SwiftSDK)
+              $SwiftArgs += @("-sysroot", $SwiftSDK)
             } else {
               $SwiftArgs += @(
                 "-vfsoverlay", "$RuntimeBinaryCache\stdlib\windows-vfs-overlay.yaml",
