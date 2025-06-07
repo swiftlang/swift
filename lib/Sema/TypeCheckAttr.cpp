@@ -8225,7 +8225,28 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
                         Ctx.LangOpts.Target.str());
 }
 
-void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
+void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {
+  if (!attr->isUnderscored()) {
+    // Allow @lifetime only in the stdlib, cxx and backward compatibility
+    // modules under -enable-experimental-feature LifetimeDependence
+    if (!Ctx.MainModule->isStdlibModule() && !Ctx.MainModule->isCxxModule() &&
+        Ctx.MainModule->getABIName() != Ctx.StdlibModuleName) {
+      Ctx.Diags.diagnose(attr->getLocation(), diag::use_lifetime_underscored);
+    }
+    if (!Ctx.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+      diagnose(attr->getLocation(), diag::requires_experimental_feature,
+               "@lifetime", false, Feature::LifetimeDependence.getName());
+    }
+  } else {
+    // Allow @_lifetime under -enable-experimental-feature Lifetimes
+    if (!Ctx.LangOpts.hasFeature(Feature::Lifetimes) &&
+        !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
+      diagnose(attr->getLocation(), diag::requires_experimental_feature,
+               "@_lifetime",
+               false, Feature::Lifetimes.getName());
+    }
+  }
+}
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {

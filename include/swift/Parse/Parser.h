@@ -1127,8 +1127,8 @@ public:
   );
 
   /// Parse the @lifetime attribute.
-  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  ParserResult<LifetimeAttr>
+  parseLifetimeAttribute(StringRef attrName, SourceLoc atLoc, SourceLoc loc);
 
   /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
   /// type modifier.
@@ -1158,7 +1158,8 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+    if ((Context.LangOpts.hasFeature(Feature::LifetimeDependence) ||
+         Context.LangOpts.hasFeature(Feature::Lifetimes)) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;

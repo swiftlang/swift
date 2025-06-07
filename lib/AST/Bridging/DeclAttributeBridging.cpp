@@ -527,10 +527,11 @@ BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
 
 BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry) {
+    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry,
+    bool isUnderscored) {
   return LifetimeAttr::create(cContext.unbridged(), cAtLoc.unbridged(),
                               cRange.unbridged(), /*implicit=*/false,
-                              cEntry.unbridged());
+                              cEntry.unbridged(), isUnderscored);
 }
 
 BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {

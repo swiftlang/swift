@@ -5,11 +5,11 @@
 // RUN:   -enable-builtin-module \
 // RUN:   -module-name test \
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 
 // Test diagnostic output for interesting corner cases. Similar to semantics.swift, but this tests corner cases in the
@@ -20,7 +20,7 @@ import Builtin
 struct Borrow<T: ~Copyable>: Copyable, ~Escapable {
   let pointer: UnsafePointer<T>
 
-  @lifetime(borrow value)
+  @_lifetime(borrow value)
   init(_ value: borrowing @_addressable T) {
     pointer = UnsafePointer(Builtin.unprotectedAddressOfBorrow(value))
   }
@@ -39,7 +39,7 @@ func useA(_:A){}
 public struct NE : ~Escapable {}
 
 public struct NEImmortal: ~Escapable {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {}
 }
 
@@ -52,16 +52,16 @@ struct Holder {
 // Generic non-Escapable for indirect values.
 struct GNE<T> : ~Escapable {
   let t: T
-  @lifetime(borrow t)
+  @_lifetime(borrow t)
   init(t: borrowing T) { self.t = copy t }
 }  
 
 @_silgen_name("forward")
-@lifetime(copy arg)
+@_lifetime(copy arg)
 func forward<T>(_ arg: GNE<T>) -> GNE<T>
 
 @_silgen_name("getGeneric")
-@lifetime(borrow holder)
+@_lifetime(borrow holder)
 func getGeneric<T: ~Escapable>(_ holder: borrowing Holder, _: T.Type) -> T
 
 func mutate(_: inout Holder) {}
@@ -71,7 +71,7 @@ func mutate(_: inout Holder) {}
 // See scope_fixup.sil: testReturnPhi.
 @available(Span 0.1, *)
 extension Array {
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating func getOptionalMutableSpan() -> MutableSpan<Element>? {
     if count == 0 {
       return nil
@@ -85,7 +85,7 @@ extension Array {
 // See scope_fixup.sil: testNestedModRead.
 @available(Span 0.1, *)
 @inline(never)
-@lifetime(&array)
+@_lifetime(&array)
 func getImmutableSpan(_ array: inout [Int]) -> Span<Int> {
  return array.span
 }
@@ -99,7 +99,7 @@ struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
 }
 
 // Test a borrowed dependency on an address
-@lifetime(immortal)
+@_lifetime(immortal)
 public func testGenericDep<T: ~Escapable>(type: T.Type) -> T {
   let holder = Holder()
   let result = getGeneric(holder, type)
@@ -126,10 +126,10 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
 
   public var neComputedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get { ne }
 
-    @lifetime(&self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }
@@ -137,7 +137,7 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
 }
 
 struct HasMethods {
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func data(index: Int) -> NEImmortal {
     NEImmortal()
   }
@@ -172,12 +172,12 @@ func testClosureCapture1(_ a: HasMethods) {
 // Indirect ~Escapable results
 // =============================================================================
 
-@lifetime(copy arg1)
+@_lifetime(copy arg1)
 func testIndirectForwardedResult<T>(arg1: GNE<T>) -> GNE<T> {
   forward(arg1)
 }
 
-@lifetime(copy arg1)
+@_lifetime(copy arg1)
 func testIndirectNonForwardedResult<T>(arg1: GNE<T>, arg2: GNE<T>) -> GNE<T> {
   // expected-error @-1{{lifetime-dependent variable 'arg2' escapes its scope}}
   // expected-note  @-2{{it depends on the lifetime of argument 'arg2'}}

@@ -2017,6 +2017,10 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::isCxxModule() const {
+  return !getParent() && getName() == getASTContext().Id_Cxx;
+}
+
 bool ModuleDecl::isConcurrencyModule() const {
   return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
