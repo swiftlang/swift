@@ -8259,6 +8259,9 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 // MARK: Lifetime Dependence Syntax
 //------------------------------------------------------------------------------
 
+ERROR(use_lifetime_underscored, PointsToFirstBadToken,
+      "Unsupported use of @lifetime, use @_lifetime to specify lifetime dependencies", ())
+
 ERROR(lifetime_dependence_invalid_param_name, none,
       "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
@@ -8293,7 +8296,7 @@ ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
       "cannot copy the lifetime of an Escapable type, use "
-      "'@lifetime(%1%0)' instead",
+      "'@_lifetime(%1%0)' instead",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of %0 dependence with %1 ownership",
@@ -8324,11 +8327,11 @@ ERROR(lifetime_dependence_feature_required_inout, none,
       (StringRef, Identifier))
 
 ERROR(lifetime_dependence_cannot_infer_return, none,
-      "%0 with a ~Escapable result requires '@lifetime(...)'", (StringRef))
+      "%0 with a ~Escapable result requires '@_lifetime(...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_mutating, none,
-      "%0 with a ~Escapable 'self' requires '@lifetime(self: ...)'", (StringRef))
+      "%0 with a ~Escapable 'self' requires '@_lifetime(self: ...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_inout, none,
-      "%0 with a ~Escapable 'inout' parameter requires '@lifetime(%1: ...)'",
+      "%0 with a ~Escapable 'inout' parameter requires '@_lifetime(%1: ...)'",
       (StringRef, Identifier))
 
 //------------------------------------------------------------------------------
@@ -8339,15 +8342,15 @@ ERROR(lifetime_dependence_cannot_infer_return_no_param, none,
       "%0 with a ~Escapable result needs a parameter to depend on",
       (StringRef))
 NOTE(lifetime_dependence_cannot_infer_return_immortal, none,
-     "'@lifetime(immortal)' can be used to indicate that values produced by "
+     "'@_lifetime(immortal)' can be used to indicate that values produced by "
      "this initializer have no lifetime dependencies", ())
 ERROR(lifetime_dependence_cannot_infer_bitwisecopyable, none,
       "cannot infer lifetime dependence on %0 because '%1' is BitwiseCopyable, "
-      "specify '@lifetime(borrow self)'",
+      "specify '@_lifetime(borrow self)'",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_infer_kind, none,
       "cannot infer the lifetime dependence scope on %0 with a ~Escapable "
-      "parameter, specify '@lifetime(borrow %1)' or '@lifetime(copy %1)'",
+      "parameter, specify '@_lifetime(borrow %1)' or '@_lifetime(copy %1)'",
       (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",

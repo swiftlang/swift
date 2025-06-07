@@ -1127,8 +1127,8 @@ public:
   );
 
   /// Parse the @lifetime attribute.
-  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  ParserResult<LifetimeAttr>
+  parseLifetimeAttribute(StringRef attrName, SourceLoc atLoc, SourceLoc loc);
 
   /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
   /// type modifier.
