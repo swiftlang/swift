@@ -68,7 +68,7 @@ final class CheckSendability7: Sendable {
 }
 
 final class CheckSendability8: Sendable {
-  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability8' has non-Sendable type 'NS'}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability8' has non-sendable type 'NS'}}
   unowned let x: NS = getNS()
 }
 
@@ -87,7 +87,7 @@ final class CheckSendability11: Sendable {
 }
 
 final class CheckSendability12: Sendable {
-  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability12' has non-Sendable type 'NS'}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability12' has non-sendable type 'NS'}}
   unowned(unsafe) let x: NS = getNS()
 }
 
@@ -122,7 +122,7 @@ func checkWeakCapture4(_ strongRef: NS) -> @Sendable () -> Void {
   // expected-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
   weak var weakRef: NS? = strongRef
   return {
-    // expected-error@+2 {{capture of 'weakRef' with non-Sendable type 'NS?' in a '@Sendable' closure}}
+    // expected-error@+2 {{capture of 'weakRef' with non-sendable type 'NS?' in a '@Sendable' closure}}
     // expected-error@+1 {{reference to captured var 'weakRef' in concurrently-executing code}}
     weakRef?.bar()
   }
@@ -131,7 +131,7 @@ func checkWeakCapture4(_ strongRef: NS) -> @Sendable () -> Void {
 func checkWeakCapture5(_ strongRef: NS) -> @Sendable () -> Void {
   weak let weakRef: NS? = strongRef
   return {
-    // expected-error@+1 {{capture of 'weakRef' with non-Sendable type 'NS?' in a '@Sendable' closure}}
+    // expected-error@+1 {{capture of 'weakRef' with non-sendable type 'NS?' in a '@Sendable' closure}}
     weakRef?.bar()
   }
 }
@@ -148,7 +148,7 @@ func checkWeakCapture6(_ strongRef: NS) -> @Sendable () -> Void {
 
 func checkWeakCapture7(_ strongRef: NS) -> @Sendable () -> Void {
   return { [weak weakRef = strongRef] in
-    // expected-error@+1 {{capture of 'weakRef' with non-Sendable type 'NS?' in a '@Sendable' closure}}
+    // expected-error@+1 {{capture of 'weakRef' with non-sendable type 'NS?' in a '@Sendable' closure}}
     weakRef?.bar()
   }
 }
@@ -181,7 +181,7 @@ func checkUnownedCapture4(_ strongRef: NS) -> @Sendable () -> Void {
   // expected-warning@+1 {{variable 'unownedRef' was never mutated; consider changing to 'let' constant}}
   unowned var unownedRef: NS = strongRef
   return {
-    // expected-error@+2 {{capture of 'unownedRef' with non-Sendable type 'NS' in a '@Sendable' closure}}
+    // expected-error@+2 {{capture of 'unownedRef' with non-sendable type 'NS' in a '@Sendable' closure}}
     // expected-error@+1 {{reference to captured var 'unownedRef' in concurrently-executing code}}
     unownedRef.bar()
   }
@@ -190,7 +190,7 @@ func checkUnownedCapture4(_ strongRef: NS) -> @Sendable () -> Void {
 func checkUnownedCapture5(_ strongRef: NS) -> @Sendable () -> Void {
   unowned let unownedRef: NS = strongRef
   return {
-    // expected-error@+1 {{capture of 'unownedRef' with non-Sendable type 'NS' in a '@Sendable' closure}}
+    // expected-error@+1 {{capture of 'unownedRef' with non-sendable type 'NS' in a '@Sendable' closure}}
     unownedRef.bar()
   }
 }
@@ -207,7 +207,7 @@ func checkUnownedCapture6(_ strongRef: NS) -> @Sendable () -> Void {
 
 func checkUnownedCapture7(_ strongRef: NS) -> @Sendable () -> Void {
   return { [unowned unownedRef = strongRef] in
-    // expected-error@+1 {{capture of 'unownedRef' with non-Sendable type 'NS' in a '@Sendable' closure}}
+    // expected-error@+1 {{capture of 'unownedRef' with non-sendable type 'NS' in a '@Sendable' closure}}
     unownedRef.bar()
   }
 }
@@ -240,7 +240,7 @@ func checkUnsafeCapture4(_ strongRef: NS) -> @Sendable () -> Void {
   // expected-warning@+1 {{variable 'unownedRef' was never mutated; consider changing to 'let' constant}}
   unowned(unsafe) var unownedRef: NS = strongRef
   return {
-    // expected-error@+2 {{capture of 'unownedRef' with non-Sendable type 'NS' in a '@Sendable' closure}}
+    // expected-error@+2 {{capture of 'unownedRef' with non-sendable type 'NS' in a '@Sendable' closure}}
     // expected-error@+1 {{reference to captured var 'unownedRef' in concurrently-executing code}}
     unownedRef.bar()
   }
@@ -249,7 +249,7 @@ func checkUnsafeCapture4(_ strongRef: NS) -> @Sendable () -> Void {
 func checkUnsafeCapture5(_ strongRef: NS) -> @Sendable () -> Void {
   unowned(unsafe) let unownedRef: NS = strongRef
   return {
-    // expected-error@+1 {{capture of 'unownedRef' with non-Sendable type 'NS' in a '@Sendable' closure}}
+    // expected-error@+1 {{capture of 'unownedRef' with non-sendable type 'NS' in a '@Sendable' closure}}
     unownedRef.bar()
   }
 }
@@ -266,7 +266,7 @@ func checkUnsafeCapture6(_ strongRef: NS) -> @Sendable () -> Void {
 
 func checkUnsafeCapture7(_ strongRef: NS) -> @Sendable () -> Void {
   return { [unowned(unsafe) unownedRef = strongRef] in
-    // expected-error@+1 {{capture of 'unownedRef' with non-Sendable type 'NS' in a '@Sendable' closure}}
+    // expected-error@+1 {{capture of 'unownedRef' with non-sendable type 'NS' in a '@Sendable' closure}}
     unownedRef.bar()
   }
 }
