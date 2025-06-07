@@ -21,7 +21,7 @@ import Swift
 /// When a `Span` is created, it inherits the lifetime of the container
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `Span` are bounds-checked,
-/// ensuring spcial safety and avoiding buffer overflow errors.
+/// ensuring spatial safety and avoiding buffer overflow errors.
 @frozen
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
