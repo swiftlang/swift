@@ -10,14 +10,14 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Int
   // CHECK: [[STRINGINIT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF :
   // CHECK: [[ARG:%.*]] = apply [[STRINGINIT]]
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) @Sendable (Int) -> (), SlowServer) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) (Int) -> (), SlowServer) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr Int, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Int, Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK: [[CONT_SLOT_ADDR:%.*]] = init_existential_addr [[CONT_SLOT]]
   // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT_ADDR]]
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Int) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Int) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[ARG]], [[BLOCK]], %0)
   // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
@@ -33,14 +33,14 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlowNullably("mail")
 
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $String
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> (), SlowServer) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (Optional<NSString>, Optional<NSError>) -> (), SlowServer) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] String, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<String, any Error> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK: [[CONT_SLOT_ADDR:%.*]] = init_existential_addr [[CONT_SLOT]]
   // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT_ADDR]]
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[STRING_COMPLETION_THROW_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSString>, Optional<NSError>) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[STRING_COMPLETION_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSString>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
@@ -50,18 +50,18 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: dealloc_stack [[RESUME_BUF]]
   let _: String = try await slowServer.findAnswer()
 
-  // CHECK: objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) @Sendable () -> (), SlowServer) -> ()
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
+  // CHECK: objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) () -> (), SlowServer) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any) -> ()
   await slowServer.serverRestart("somewhere")
 
-  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, {{.*}}Bool, Optional<NSString>, Optional<NSError>) -> ()
+  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, {{.*}}Bool, Optional<NSString>, Optional<NSError>) -> ()
   let _: String = try await slowServer.doSomethingFlaggy()
-  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSString>, {{.*}}Bool, Optional<NSError>) -> ()
+  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSString>, {{.*}}Bool, Optional<NSError>) -> ()
   let _: String = try await slowServer.doSomethingZeroFlaggy()
-  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, {{.*}}Bool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
+  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, {{.*}}Bool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
   let _: (String, String) = try await slowServer.doSomethingMultiResultFlaggy()
 
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSString>, Int, Optional<NSError>) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSString>, Int, Optional<NSError>) -> ()
   let (_, _): (String, Int) = try await slowServer.findMultipleAnswers()
 
   let (_, _): (Bool, Bool) = try await slowServer.findDifferentlyFlavoredBooleans()
@@ -189,14 +189,14 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Int
   // CHECK: [[STRINGINIT:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF :
   // CHECK: [[ARG:%.*]] = apply [[STRINGINIT]]
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) @Sendable (Int) -> (), SlowServer) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (NSString, @convention(block) (Int) -> (), SlowServer) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr Int, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Int, Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK: [[CONT_SLOT_ANY:%.*]] = init_existential_addr [[CONT_SLOT]]
   // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT_ANY]]
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Int) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[INT_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Int) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[ARG]], [[BLOCK]], %0)
   // CHECK: [[COPY:%.*]] = copy_value [[ARG]]
@@ -223,10 +223,10 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:  [[PROJECTED:%.*]] = project_block_storage [[STORE_ALLOC]] : $*@block_storage
 // CHECK:  [[PROJECTED_ANY:%.*]] = init_existential_addr [[PROJECTED]]
 // CHECK:  store [[CONT]] to [trivial] [[PROJECTED_ANY]]
-// CHECK:  [[INVOKER:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyBhyy_SSTz_
+// CHECK:  [[INVOKER:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyByy_SSTz_
 // CHECK:  [[BLOCK:%.*]] = init_block_storage_header [[STORE_ALLOC]] {{.*}}, invoke [[INVOKER]]
 // CHECK:  [[OPTIONAL_BLK:%.*]] = enum {{.*}}, #Optional.some!enumelt, [[BLOCK]]
-// CHECK:  apply [[METH]]([[STRING_ARG]], [[OPTIONAL_BLK]], {{%.*}}) : $@convention(objc_method) (NSString, Optional<@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> ()>, SlowServer) -> ()
+// CHECK:  apply [[METH]]([[STRING_ARG]], [[OPTIONAL_BLK]], {{%.*}}) : $@convention(objc_method) (NSString, Optional<@convention(block) (Optional<NSString>, Optional<NSError>) -> ()>, SlowServer) -> ()
 // CHECK:  [[STRING_ARG_COPY:%.*]] = copy_value [[STRING_ARG]] : $NSString
 // CHECK:  dealloc_stack [[STORE_ALLOC]] : $*@block_storage Any
 // CHECK:  destroy_value [[STRING_ARG]] : $NSString
@@ -340,10 +340,10 @@ extension SlowServer: @retroactive FailableFloatLoader {
 }
 // CHECK-LABEL: sil [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF : $@convention(method) @async (@guaranteed SlowServer) -> (Float, @error any Error)
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFTo : $@convention(objc_method) (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFTo : $@convention(objc_method) (@convention(block) (Float, Optional<NSError>) -> (), SlowServer) -> () {
 // CHECK:         function_ref @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable (Float, Optional<NSError>) -> (), SlowServer) -> ()
+// CHECK-LABEL: sil shared [thunk] [ossa] @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) (Float, Optional<NSError>) -> (), SlowServer) -> ()
 // CHECK:         [[BLOCK:%.*]] = copy_block
 // CHECK:         [[METHOD:%.*]] = function_ref @$sSo10SlowServerC10objc_asyncE16loadFloatOrThrowSfyYaKF :
 // CHECK:         try_apply [[METHOD]]({{%.*}}) : {{.*}}, normal bb1, error bb2
@@ -370,7 +370,7 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B:%.*]] = begin_borrow [[SLOWSERVER_ANYOBJECT_M]]
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O:%.*]] = open_existential_ref [[SLOWSERVER_ANYOBJECT_M_B]]
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O_C:%.*]] = copy_value [[SLOWSERVER_ANYOBJECT_M_B_O]]
-// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) @Sendable () -> (), @opened("{{.*}}", AnyObject) Self) -> ()
+// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) () -> (), @opened("{{.*}}", AnyObject) Self) -> ()
 // CHECK: [[CONT:%.*]] = get_async_continuation_addr ()
 // CHECK: [[UNSAFE_CONT:%.*]] = struct $UnsafeContinuation<(), Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
 // CHECK: [[BLOCK:%.*]] = alloc_stack $@block_storage Any
@@ -378,9 +378,9 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK: [[BLOCK_PROJECT_EX:%.*]] = init_existential_addr [[BLOCK_PROJECT]]
 // CHECK: store [[UNSAFE_CONT]] to [trivial] [[BLOCK_PROJECT_EX]]
 // CHECK: merge_isolation_region [[BLOCK]] : $*@block_storage Any,
-// CHECK: [[CONT_HANDLER:%.*]] = function_ref @$sIeyBh_ytTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
+// CHECK: [[CONT_HANDLER:%.*]] = function_ref @$sIeyB_ytTz_ : $@convention(c) (@inout_aliasable @block_storage Any) -> ()
 // CHECK: [[INIT_BLOCK_STORAGE_HEADER:%.*]] = init_block_storage_header [[BLOCK]] : $*@block_storage Any, invoke [[CONT_HANDLER]]
-// CHECK: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, [[BLOCK]]
+// CHECK-NOT: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, [[BLOCK]]
 // CHECK: apply [[METHOD]]({{%.*}}, [[INIT_BLOCK_STORAGE_HEADER]], [[SLOWSERVER_ANYOBJECT_M_B_O_C]])
 // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume bb1
 // CHECK: } // end sil function '$s10objc_async13testAnyObjectyySo10SlowServerCYaF'
