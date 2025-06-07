@@ -1894,6 +1894,9 @@ function Test-Compilers([Hashtable] $Platform, [switch] $TestClang, [switch] $Te
       Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
       Copy-Item "$RuntimeBinaryCache\bin\swiftCore.dll" "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
 
+      $PythonRoot = "$(Get-PythonPath $BuildPlatform)\tools"
+      $env:Path = "$PythonRoot;$env:Path"
+
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";
         # Check for required Python modules in CMake
