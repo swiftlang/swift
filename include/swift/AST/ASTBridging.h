@@ -1144,10 +1144,11 @@ BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
     BridgedASTContext cContext, BridgedSourceRange cRange,
     BridgedArrayRef cSources, BridgedLifetimeDescriptor cTarget);
 
-SWIFT_NAME("BridgedLifetimeAttr.createParsed(_:atLoc:range:entry:)")
+SWIFT_NAME(
+    "BridgedLifetimeAttr.createParsed(_:atLoc:range:entry:isUnderscored:)")
 BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry);
+    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry, bool isUnderscored);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroSyntax {
   BridgedMacroSyntaxFreestanding,

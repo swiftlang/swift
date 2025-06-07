@@ -1166,6 +1166,9 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// \returns true if this module is the "Cxx" module.
+  bool isCxxModule() const;
+
   /// \returns true if this module is the "_Concurrency" standard library module.
   bool isConcurrencyModule() const;
 

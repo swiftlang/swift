@@ -8182,7 +8182,22 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
                         Ctx.LangOpts.Target.str());
 }
 
-void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
+void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {
+  // Allow @lifetime only in the stdlib, cxx and backward compatibility modules
+  if (!attr->isUnderscored() &&
+      !(Ctx.MainModule->isStdlibModule() || Ctx.MainModule->isCxxModule() ||
+        Ctx.MainModule->getABIName() == Ctx.StdlibModuleName)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::use_lifetime_underscored);
+  }
+  if (!Ctx.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+      !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::requires_experimental_feature,
+             std::string("@") + (attr->isUnderscored()
+                                     ? std::string("_lifetime")
+                                     : std::string("lifetime")),
+             false, Feature::LifetimeDependence.getName());
+  }
+}
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
