@@ -415,7 +415,7 @@ public func testTrivialInoutBorrow(p: inout UnsafePointer<Int>) -> Span<Int> {
 
 private let immortalInt = 0
 
-private let immortalString = ""
+private let immortalStrings: [String] = []
 
 @lifetime(immortal)
 func testImmortalInt() -> Span<Int> {
@@ -425,10 +425,10 @@ func testImmortalInt() -> Span<Int> {
 }
 
 @lifetime(immortal)
-func testImmortalString() -> Span<String> {
-  let nilBasedBuffer = UnsafeBufferPointer<String>(start: nil, count: 0)
+func testImmortalStrings() -> Span<[String]> {
+  let nilBasedBuffer = UnsafeBufferPointer<[String]>(start: nil, count: 0)
   let span = Span(base: nilBasedBuffer.baseAddress, count: nilBasedBuffer.count)
-  return _overrideLifetime(span, borrowing: immortalString)
+  return _overrideLifetime(span, borrowing: immortalStrings)
 }
 
 let ptr = UnsafePointer<Int>(bitPattern: 1)!
