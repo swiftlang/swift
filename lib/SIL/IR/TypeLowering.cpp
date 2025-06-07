@@ -175,7 +175,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // have the same lifetime as the closure itself, so we must capture
   // the box itself and not the payload, even if the closure is noescape,
   // otherwise they will be destroyed when the closure is formed.
-  if (var->getInterfaceType()->is<ReferenceStorageType>() && !Context.LangOpts.hasFeature(Feature::WeakLet)) {
+  if (var->getInterfaceType()->is<ReferenceStorageType>()) {
     return CaptureKind::Box;
   }
 
