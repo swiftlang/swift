@@ -882,3 +882,28 @@ bool SourceManager::isImportMacroGeneratedLoc(SourceLoc loc) {
 
   return false;
 }
+
+SourceRange SourceManager::getUnexpandedMacroRange(SourceRange range) const {
+  unsigned bufferID = findBufferContainingLoc(range.Start);
+  SourceRange outerRange;
+  while (const auto *info = getGeneratedSourceInfo(bufferID)) {
+    switch (info->kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+      if (auto *customAttr = info->attachedMacroCustomAttr)
+        outerRange = customAttr->getRange();
+      else
+        outerRange =
+            ASTNode::getFromOpaqueValue(info->astNode).getSourceRange();
+      bufferID = findBufferContainingLoc(outerRange.Start);
+      continue;
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::PrettyPrinted:
+    case GeneratedSourceInfo::DefaultArgument:
+    case GeneratedSourceInfo::AttributeFromClang:
+      return SourceRange();
+    }
+  }
+  return outerRange;
+}
