@@ -1828,6 +1828,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     Python3_INCLUDE_DIR = "$PythonRoot\include";
     Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
     Python3_ROOT_DIR = $PythonRoot;
+    SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
