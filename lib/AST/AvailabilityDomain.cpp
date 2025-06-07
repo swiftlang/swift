@@ -368,22 +368,29 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     domain = results.front();
   }
 
+  bool hasCustomAvailability =
+      ctx.LangOpts.hasFeature(Feature::CustomAvailability);
+
   if (!domain) {
     auto domainString = identifier.str();
+    bool downgradeErrors =
+        !hasCustomAvailability || declContext->isInSwiftinterface();
     if (auto suggestion = closestCorrectedPlatformString(domainString)) {
       diags
           .diagnose(loc, diag::availability_suggest_platform_name, identifier,
                     *suggestion)
+          .limitBehaviorIf(downgradeErrors, DiagnosticBehavior::Warning)
           .fixItReplace(SourceRange(loc), *suggestion);
     } else {
-      diags.diagnose(loc, diag::availability_unrecognized_platform_name,
-                     identifier);
+      diags
+          .diagnose(loc, diag::availability_unrecognized_platform_name,
+                    identifier)
+          .limitBehaviorIf(downgradeErrors, DiagnosticBehavior::Warning);
     }
     return std::nullopt;
   }
 
-  if (domain->isCustom() &&
-      !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+  if (domain->isCustom() && !hasCustomAvailability &&
       !declContext->isInSwiftinterface()) {
     diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
                    *domain);
