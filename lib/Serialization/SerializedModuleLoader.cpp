@@ -638,11 +638,15 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
        loadedModuleFile->resolveModuleDefiningFilePath(Ctx.SearchPathOpts.getSDKPath());
 
   std::string userModuleVer = loadedModuleFile->getUserModuleVersion().getAsString();
+  std::vector<serialization::SearchPath> serializedSearchPaths;
+  llvm::copy(loadedModuleFile->getSearchPaths(), std::back_inserter(serializedSearchPaths));
+
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
       modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
-      optionalModuleImports, linkLibraries, importedHeader,
-      definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
+      optionalModuleImports, linkLibraries, serializedSearchPaths,
+      importedHeader, definingModulePath, isFramework,
+      loadedModuleFile->isStaticLibrary(),
       /*module-cache-key*/ "", userModuleVer);
 
   for (auto &macro : loadedModuleFile->getExternalMacros()) {
