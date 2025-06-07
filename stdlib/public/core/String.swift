@@ -408,6 +408,7 @@ extension String {
   /// identical.
   ///
   /// - Performance: O(1)
+  @available(*, deprecated, renamed: "isIdentical(to:)")
   @_alwaysEmitIntoClient
   public func _isIdentical(to other: Self) -> Bool {
     self._guts.rawBits == other._guts.rawBits
@@ -1112,4 +1113,23 @@ extension String {
   }
 }
 
-
+extension String {
+  /// Returns a boolean value indicating whether this string is identical to
+  /// `other`.
+  ///
+  /// Two string values are identical if there is no way to distinguish between
+  /// them.
+  ///
+  /// Comparing strings this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// string storage object. Therefore, identical strings are guaranteed to
+  /// compare equal with `==`, but not all equal strings are considered
+  /// identical.
+  ///
+  /// - Performance: O(1)
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+    self._guts.rawBits == other._guts.rawBits
+  }
+}
