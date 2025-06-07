@@ -68,6 +68,14 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
     return cacheResult(Ty, true);
   if (Ty->is<BuiltinFloatType>())
     return cacheResult(Ty, true);
+  if (Ty->is<BuiltinRawPointerType>())
+    return cacheResult(Ty, true);
+
+  if (auto fixedArrTy = dyn_cast<BuiltinFixedArrayType>(Ty)) {
+    auto subMap = Ty->getContextSubstitutionMap();
+    Type eltTy = fixedArrTy->getElementType().subst(subMap);
+    return !isSafeType(eltTy->getCanonicalType());
+  }
 
   // A struct is safe if
   //   * either it implements the _DestructorSafeContainer protocol and
@@ -81,8 +89,10 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
       return cacheResult(Ty, true);
 
     // Check the stored properties.
+    auto subMap = Ty->getContextSubstitutionMap();
     for (auto SP : Struct->getStoredProperties()) {
-      if (!isSafeType(SP->getInterfaceType()->getCanonicalType()))
+      Type spTy = SP->getInterfaceType().subst(subMap);
+      if (!isSafeType(spTy->getCanonicalType()))
         return cacheResult(Ty, false);
     }
     return cacheResult(Ty, true);
@@ -96,7 +106,17 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
     return cacheResult(Ty, true);
   }
 
-  // TODO: enum types.
+  if (auto *enumDecl = Ty->getEnumOrBoundGenericEnum()) {
+    auto subMap = Ty->getContextSubstitutionMap();
+    for (auto *enumEltDecl : enumDecl->getAllElements()) {
+      if (auto payloadInterfaceTy = enumEltDecl->getPayloadInterfaceType()) {
+        Type payloadTy = payloadInterfaceTy.subst(subMap);
+        if (!isSafeType(payloadTy->getCanonicalType()))
+          return cacheResult(Ty, false);
+      }
+    }
+    return cacheResult(Ty, true);
+  }
 
   return cacheResult(Ty, false);
 }
