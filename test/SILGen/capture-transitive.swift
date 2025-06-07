@@ -31,7 +31,7 @@ class C {
 
     func returnsSelf1() -> Self {
         return { [weak self] in self?.f(); return .init() }()
-        // CHECK-LABEL: sil private [ossa] @{{.*}}returnsSelf{{.*}} : $@convention(thin) (@in_guaranteed @sil_weak Optional<C>, @thick @dynamic_self C.Type) -> @owned C {
+        // CHECK-LABEL: sil private [ossa] @{{.*}}returnsSelf{{.*}}  : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }, @thick @dynamic_self C.Type) -> @owned C
     }
 
     func returnsSelf2() -> Self {

@@ -271,7 +271,7 @@ func testUnownedVariableBindingDiag() throws {
 }
 
 func testMultipleBindingDiag() {
-  weak let c1 = C(), c2: C? = C(), c3: C? = D()
+  weak var c1 = C(), c2: C? = C(), c3: C? = D()
   // expected-warning@-1 {{instance will be immediately deallocated because variable 'c1' is 'weak'}}
   // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-3 {{'c1' declared here}}
@@ -297,7 +297,7 @@ func testMultipleBindingDiag() {
 }
 
 func testTupleAndParenBinding() throws {
-  weak let ((c1), c2, c3): (C?, C?, C?) = (C() as C, (D()), try D(throwing: ()))
+  weak var ((c1), c2, c3): (C?, C?, C?) = (C() as C, (D()), try D(throwing: ()))
   // expected-warning@-1 {{instance will be immediately deallocated because variable 'c1' is 'weak'}}
   // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-3 {{'c1' declared here}}
@@ -323,11 +323,11 @@ func testTupleAndParenBinding() throws {
 }
 
 func testInitializationThroughClassArchetypeDiag<T : ClassProtocol>(_ t: T, _ p: ClassProtocol) throws {
-  weak let t1: T? = T() // expected-warning {{instance will be immediately deallocated because variable 't1' is 'weak'}}
+  weak var t1: T? = T() // expected-warning {{instance will be immediately deallocated because variable 't1' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'t1' declared here}}
 
-  weak let t2: ClassProtocol? = T(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 't2' is 'weak'}}
+  weak var t2: ClassProtocol? = T(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 't2' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'t2' declared here}}
 
@@ -342,7 +342,7 @@ func testInitializationThroughClassArchetypeDiag<T : ClassProtocol>(_ t: T, _ p:
   let optionalTType: T.Type? = T.self
   let optionalPType: ClassProtocol.Type? = type(of: p)
 
-  weak let t5 = optionalTType?.init(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 't5' is 'weak'}}
+  weak var t5 = optionalTType?.init(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 't5' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'t5' declared here}}
 
@@ -404,12 +404,12 @@ class C1 {
 }
 
 func testInitializationThroughMetaclassDiag(_ t: C.Type) {
-  weak let c1: C? = t.init() // expected-warning {{instance will be immediately deallocated because variable 'c1' is 'weak'}}
+  weak var c1: C? = t.init() // expected-warning {{instance will be immediately deallocated because variable 'c1' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'c1' declared here}}
 
   let optionalCType: C.Type? = t
-  weak let c2 = optionalCType?.init(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 'c2' is 'weak'}}
+  weak var c2 = optionalCType?.init(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 'c2' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'c2' declared here}}
 
@@ -439,7 +439,7 @@ func testInitializationThroughTupleElementDiag() {
 class E<T> {}
 
 func testGenericWeakClassDiag() {
-  weak let e = E<String>()
+  weak var e = E<String>()
   // expected-warning@-1 {{instance will be immediately deallocated because variable 'e' is 'weak'}}
   // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-3 {{'e' declared here}}
@@ -465,7 +465,7 @@ extension Optional {
 }
 
 func testDontDiagnoseOnUnrelatedInitializer() {
-  weak let c = C?(dontDiagnoseOnThis: ())
+  weak var c = C?(dontDiagnoseOnThis: ())
   unowned let c1 = C?(dontDiagnoseOnThis: ())!
   _ = c; _ = c1
 }
@@ -476,8 +476,8 @@ class F {
 }
 
 func testDontDiagnoseThroughMembers() {
-  weak let c1 = F().c
-  weak let c2 = F().makeC()
+  weak var c1 = F().c
+  weak var c2 = F().makeC()
   _ = c1; _ = c2
 }
 
@@ -488,7 +488,7 @@ func testDontDiagnoseOnStrongVariable() {
 }
 
 func testDontDiagnoseThroughImmediatelyEvaluatedClosure() {
-  weak let c1 = { C() }()
+  weak var c1 = { C() }()
   unowned let c2 = { C() }()
   _ = c1; _ = c2
 }

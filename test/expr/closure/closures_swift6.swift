@@ -936,8 +936,7 @@ class TestExtensionOnOptionalSelf {
 extension TestExtensionOnOptionalSelf? {
   func foo() {
     _ = { [weak self] in
-      // expected-error@+1 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-      foo()
+      foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
     }
 
     _ = {
@@ -947,10 +946,8 @@ extension TestExtensionOnOptionalSelf? {
     }
 
     _ = { [weak self] in
-      _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
-        // expected-error@+2 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-        // expected-note@+1 {{reference 'self.' explicitly}}
-        foo()
+      _ = {
+        foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
         self.foo()
         self?.bar()
       }
@@ -970,8 +967,7 @@ extension TestExtensionOnOptionalSelf? {
 extension TestExtensionOnOptionalSelf {
   func foo() {
     _ = { [weak self] in
-      // expected-error@+1 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-      foo()
+      foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
       self.foo()
       self?.bar()
     }
@@ -982,10 +978,8 @@ extension TestExtensionOnOptionalSelf {
     }
 
     _ = { [weak self] in
-      _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
-        // expected-error@+2 {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-        // expected-note@+1 {{reference 'self.' explicitly}}
-        foo()
+      _ = {
+        foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
         self.foo()
       }
     }
