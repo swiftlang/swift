@@ -262,12 +262,12 @@ class ExplicitSelfRequiredTest {
   // because its `sawError` flag is set to true. To preserve the "capture 'y' was never used" warnings
   // above, we put these cases in their own method.
   func weakSelfError() {
-    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
+    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{variable 'self' was written to, but never read}}
   }
 }
 
@@ -374,7 +374,7 @@ extension SomeClass {
     //expected-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}}
     //expected-note@-4{{reference 'self.' explicitly}}
 
-    // expected-warning @+1 {{capture 'self' was never used}}
+    // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
   }
@@ -511,7 +511,6 @@ func lvalueCapture<T>(c: GenericClass<T>) {
     _ = wc
 
     cc = wc!
-    wc = cc
   }
 }
 
@@ -1523,21 +1522,21 @@ final class AutoclosureTests {
       }
     }
     
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
     
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
     }
     
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         withNonEscapingAutoclosure(bar()) // expected-error {{all to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
       
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       doVoidStuff {
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
@@ -1772,13 +1771,13 @@ class rdar129475277 {
   func method() {}
 
   func test1() {
-    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{capture 'self' was never used}}
+    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       takesEscapingWithAllowedImplicitSelf {
         method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
     }
 
-    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{capture 'self' was never used}}
+    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       takesEscapingWithAllowedImplicitSelf {
         doVoidStuffNonEscaping {
           withNonEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
@@ -1786,7 +1785,7 @@ class rdar129475277 {
       }
     }
 
-    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{capture 'self' was never used}}
+    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       withNonEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
   }
@@ -1819,7 +1818,7 @@ class TestExtensionOnOptionalSelf {
 
 extension TestExtensionOnOptionalSelf? {
   func foo() {
-    _ = { [weak self] in // expected-warning {{capture 'self' was never used}}
+    _ = { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
 
@@ -1827,7 +1826,7 @@ extension TestExtensionOnOptionalSelf? {
       foo()
     }
 
-    _ = { [weak self] in // expected-warning {{capture 'self' was never used}}
+    _ = { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       _ = {
         foo()
       }
