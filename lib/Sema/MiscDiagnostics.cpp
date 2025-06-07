@@ -1755,7 +1755,8 @@ public:
     //   guard let self = self else { return }
     //   method() // <- implicit self is not allowed
     //
-    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
+    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
+                                        /*requireLoadExpr*/ true);
   }
 
   static bool
