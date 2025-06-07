@@ -239,12 +239,10 @@ class Z {
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
     // CHECK:      [[WEAK_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[WEAK_SELF]]
-    // CHECK:      [[WEAK_SELF_ADDR:%.*]] = project_box [[WEAK_SELF_LIFETIME]] : ${ var @sil_weak Optional<Z> }, 0
-    // CHECK:      [[FN:%.*]] = function_ref @$s12dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@in_guaranteed @sil_weak Optional<Z>, @thick @dynamic_self Z.Type) -> ()
-    // CHECK:      [[WEAK_SELF_COPY:%.*]] = alloc_stack $@sil_weak Optional<Z>
-    // CHECK:      copy_addr [[WEAK_SELF_ADDR]] to [init] [[WEAK_SELF_COPY]] : $*@sil_weak Optional<Z>
+    // CHECK:      [[FN:%.*]] = function_ref @$s12dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF_LIFETIME]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
-    // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@in_guaranteed @sil_weak Optional<Z>, @thick @dynamic_self Z.Type) -> ()
+    // CHECK:      partial_apply [callee_guaranteed] [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     let fn3 = {
       [weak self] in
       _ = self
@@ -427,7 +425,7 @@ class Derived : Base {
 class Generic<T> {
   // Examples where we have to add a special argument to capture Self's metadata
   func t1() -> Self {
-    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@in_guaranteed @sil_weak Optional<Generic<T>>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
+    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@guaranteed <τ_0_0> { var @sil_weak Optional<Generic<τ_0_0>> } <T>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
     _ = {[weak self] in self }
     return self
   }
