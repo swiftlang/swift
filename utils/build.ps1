@@ -2338,6 +2338,7 @@ function Build-ExperimentalRuntime {
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
 
         # NOTE(compnerd) we can get away with this currently because we only
         # use the C portion of the dispatch build, which is always built
