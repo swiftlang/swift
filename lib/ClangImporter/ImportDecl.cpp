@@ -135,7 +135,6 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                                     genericParams, dc, clangNode);
   }
   impl.importSwiftAttrAttributes(decl);
-  impl.swiftify(decl);
 
   return decl;
 }
@@ -4361,6 +4360,7 @@ namespace {
       }
 
       recordObjCOverride(result);
+      Impl.swiftify(result);
     }
 
     static bool hasComputedPropertyAttr(const clang::Decl *decl) {
@@ -9131,7 +9131,7 @@ static bool SwiftifiablePointerType(Type swiftType) {
     (nonnullType->getAnyPointerElementType(PTK) && PTK != PTK_AutoreleasingUnsafeMutablePointer);
 }
 
-void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
+void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
   if (importSymbolicCXXDecls)
@@ -9166,7 +9166,15 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
           return false;
         };
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
-    Type swiftReturnTy = MappedDecl->getResultInterfaceType();
+    Type swiftReturnTy;
+    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
+      swiftReturnTy = funcDecl->getResultInterfaceType();
+    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
+      swiftReturnTy = ctorDecl->getResultInterfaceType();
+    else {
+      assert(false && "Unexpected AbstractFunctionDecl subclass.");
+      return;
+    }
     bool returnIsStdSpan = registerStdSpanTypeMapping(
         swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
