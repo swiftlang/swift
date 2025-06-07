@@ -180,14 +180,12 @@ struct Outer {
     get { _innerObject }
   }
 
-  /* TODO: rdar://137608270 Add Builtin.addressof() support for @addressable arguments
-  @addressableSelf
-  var innerAddress: Inner {
+  var innerAddress: InnerTrivial {
+    @_addressableSelf
     unsafeAddress {
-      Builtin.addressof(inner)
+      UnsafePointer<InnerTrivial>(Builtin.addressOfBorrow(_innerTrivial))
     }
   }
-  */
 }
 
 func parse(_ span: Span<Int>) {}
@@ -577,26 +575,22 @@ func dependsOnAddressHelper(arg: @_addressable Holder) -> Span<Int> {
   arg.span()
 }
 
-/* TODO: requires -enable-address-dependencies
-
 // Non-addressable error returning a Span.
 @lifetime(borrow arg)
 func testTrivialNonAddressable(arg: TrivialHolder) -> Span<Int> {
   dependsOnTrivialAddressHelper(arg: arg)
-  // todo-error @-1{{lifetime-dependent value escapes its scope}
-  // todo-note  @-3{{it depends on the lifetime of variable 'arg'}}
-} // todo-note  {{this use causes the lifetime-dependent value to escape}}
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-3{{it depends on the lifetime of argument 'arg'}}
+} // expected-note  {{this use causes the lifetime-dependent value to escape}}
 
 // Non-addressable error returning a Span.
 @lifetime(borrow arg)
 func testNonAddressable(arg: Holder) -> Span<Int> {
   dependsOnAddressHelper(arg: arg)
-  // todo-error @-1{{lifetime-dependent value escapes its scope}
-  // todo-note  @-3{{it depends on the lifetime of variable 'arg'}}
-} // todo-note  {{this use causes the lifetime-dependent value to escape}}
-*/
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-3{{it depends on the lifetime of argument 'arg'}}
+} // expected-note  {{this use causes the lifetime-dependent value to escape}}
 
-/* TODO: rdar://145872854 (SILGen: @addressable inout arguments are copied)
 @lifetime(borrow arg)
 func test(arg: inout AddressableInt) -> Span<Int> {
   arg.span()
@@ -614,8 +608,6 @@ func testBorrowedAddressableInt(arg: Holder) -> Int {
 @lifetime(borrow arg)
 func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   arg.addressableInt.span()
-  // todo-error @-1{{lifetime-dependent value escapes its scope}
-  // todo-note  @-2{{it depends on the lifetime of this parent value}}
-} // todo-note  {{this use causes the lifetime-dependent value to escape}}
-
-*/
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-3{{it depends on the lifetime of argument 'arg'}}
+} // expected-note  {{this use causes the lifetime-dependent value to escape}}
